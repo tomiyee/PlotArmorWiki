@@ -12,6 +12,14 @@ npx drizzle-kit generate   # generate migration after schema changes
 npx drizzle-kit migrate    # apply pending migrations to Neon
 ```
 
+For local development with Docker instead of Neon, set `DATABASE_URL` in `.env.local` to a `localhost` connection string, then:
+
+```powershell
+.\scripts\start-db.ps1   # create or start the local Postgres container
+```
+
+The script reads `DATABASE_URL` from `.env.local` and uses those values when creating the Docker container, so credentials are defined in one place.
+
 No test runner is configured yet.
 
 ## Architecture
