@@ -104,3 +104,90 @@ A user visiting a serial wiki for the first time defaults to the first chapter. 
 
 - _Anonymous users_ — progress state is saved in browser storage (localStorage) per serial. Selections persist across sessions on the same device/browser.
 - _Logged-in users_ — the selected chapter is saved to their account per serial. When they return or log in, their last saved chapter is restored automatically.
+
+---
+
+## Data Model
+
+### Versioning Strategy
+
+All wiki page content is stored using **SCD Type 2 (closed-interval versioning)**. Every versioned row carries a `from_chapter_id` and `to_chapter_id` (nullable, where `NULL` means current). To read a value at chapter N, query for the row whose interval contains N:
+
+```sql
+WHERE from_chapter_idx <= N AND (to_chapter_idx IS NULL OR to_chapter_idx > N)
+```
+
+Schema structure (sections, floater rows) and page content are versioned on separate axes:
+
+- **Schema structure** — versioned by wall-clock time (`created_at` / `deleted_at`). Changes take effect immediately for all editors.
+- **Page content** — versioned by chapter index. Readers see only content from chapters at or before their progress cutoff.
+
+Each section and floater row has a **stable ID** so that content rows survive renames and reordering of schema attributes without modification.
+
+---
+
+### Tables
+
+#### Core structure
+
+```
+serials
+  id, title, description, splash_art_url
+
+serial_authors
+  serial_id, name, display_order
+
+chapters
+  id, serial_id, display_name, idx
+```
+
+`chapters.idx` is the integer used in all range comparisons.
+
+#### Schema definition (wall-clock versioned)
+
+```
+schemas
+  id, serial_id, name, has_floater
+
+schema_sections
+  id, schema_id, name, display_order, created_at, deleted_at
+
+schema_floater_rows
+  id, schema_id, label, display_order, created_at, deleted_at
+```
+
+`schema_floater_rows` only applies when `schemas.has_floater = true`. All floater rows store markdown text, identical in structure to sections.
+
+#### Pages (chapter-versioned content)
+
+```
+pages
+  id, schema_id, name, intro_chapter_id
+
+page_section_versions
+  page_id, section_id, from_chapter_id, to_chapter_id, content
+  PK: (page_id, section_id, from_chapter_id)
+
+page_floater_versions
+  page_id, from_chapter_id, to_chapter_id, image_url
+  PK: (page_id, from_chapter_id)
+
+page_floater_row_versions
+  page_id, floater_row_id, from_chapter_id, to_chapter_id, content
+  PK: (page_id, floater_row_id, from_chapter_id)
+```
+
+The floater header is always rendered from `pages.name` and is not stored separately. The image URL is versioned independently of row content to avoid unnecessary row closures when only one changes.
+
+#### Users
+
+```
+users
+  id, email, display_name, created_at
+
+user_progress
+  user_id, serial_id, chapter_id, updated_at
+  PK: (user_id, serial_id)
+```
+
+Anonymous user progress is stored client-side in `localStorage` per serial — no server row is created.
