@@ -37,7 +37,7 @@ try {
 }
 
 if ($dbHost -notin @("localhost", "127.0.0.1")) {
-    Write-Warning "DATABASE_URL points to '$dbHost' — this script is for local Docker only. Continuing anyway."
+    Write-Warning "DATABASE_URL points to '$dbHost' - this script is for local Docker only. Continuing anyway."
 }
 
 $existing = docker ps -a --filter "name=^${ContainerName}$" --format "{{.Names}}"
@@ -48,7 +48,7 @@ if ($running -eq $ContainerName) {
 } elseif ($existing -eq $ContainerName) {
     Write-Host "[$ContainerName] starting existing container..."
     docker start $ContainerName | Out-Null
-    Write-Host "[$ContainerName] started — postgres://$dbUser@$dbHost:$dbPort/$dbName"
+    Write-Host "[$ContainerName] started - postgres://$dbUser@$dbHost:${dbPort}/$dbName"
 } else {
     Write-Host "[$ContainerName] creating new container from $PostgresImage..."
     docker run `
@@ -58,5 +58,5 @@ if ($running -eq $ContainerName) {
         -e POSTGRES_DB=$dbName `
         -p "${dbPort}:5432" `
         -d $PostgresImage | Out-Null
-    Write-Host "[$ContainerName] created and started — postgres://$dbUser@$dbHost:$dbPort/$dbName"
+    Write-Host "[$ContainerName] created and started - postgres://$dbUser@$dbHost:${dbPort}/$dbName"
 }
