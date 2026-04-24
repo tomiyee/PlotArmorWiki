@@ -48,7 +48,7 @@ if ($running -eq $ContainerName) {
 } elseif ($existing -eq $ContainerName) {
     Write-Host "[$ContainerName] starting existing container..."
     docker start $ContainerName | Out-Null
-    Write-Host "[$ContainerName] started - postgres://$dbUser@$dbHost:${dbPort}/$dbName"
+    Write-Host "[$ContainerName] started - postgres://$dbUser@${dbHost}:${dbPort}/$dbName"
 } else {
     Write-Host "[$ContainerName] creating new container from $PostgresImage..."
     docker run `
@@ -58,5 +58,5 @@ if ($running -eq $ContainerName) {
         -e POSTGRES_DB=$dbName `
         -p "${dbPort}:5432" `
         -d $PostgresImage | Out-Null
-    Write-Host "[$ContainerName] created and started - postgres://$dbUser@$dbHost:${dbPort}/$dbName"
+    Write-Host "[$ContainerName] created and started - postgres://$dbUser@${dbHost}:${dbPort}/$dbName"
 }
