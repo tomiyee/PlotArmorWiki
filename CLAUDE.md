@@ -35,7 +35,7 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 
 ### Tech stack
 
-Database and ORM layers are implemented. Auth, Search, and Markdown are not yet.
+Database, ORM, and home page UI layers are implemented. Auth, Search, and Markdown are not yet.
 
 | Layer | Choice |
 |---|---|
@@ -46,6 +46,7 @@ Database and ORM layers are implemented. Auth, Search, and Markdown are not yet.
 | Search | PostgreSQL full-text search (tsvector) |
 | Markdown | `@uiw/react-md-editor` (edit) + `react-markdown` (render) |
 | Styling | Tailwind CSS v4 |
+| UI components | Shadcn UI (Button, Input) |
 | Hosting | Vercel |
 
 ### Core data pattern: SCD Type 2 versioning
@@ -83,5 +84,7 @@ First-time visitors on any serial default to chapter 1 and see a callout prompti
 - `src/db/schema.ts` — Drizzle ORM table definitions; source of truth for the data model.
 - `src/db/index.ts` — Drizzle client (postgres.js driver); exports `db` for use in Server Components and API routes.
 - `drizzle.config.ts` — Drizzle Kit config; reads `DATABASE_URL` from `.env.local`.
-- `src/app/layout.tsx` — root layout with Geist fonts and Tailwind base.
-- `src/app/page.tsx` — home page (currently empty scaffold).
+- `src/app/layout.tsx` — root layout with Geist fonts, Tailwind base, and `<Navbar>`.
+- `src/app/page.tsx` — home page with search bar and "Create wiki" button.
+- `src/components/Navbar.tsx` — shared navbar with site logo and auth placeholder.
+- `src/lib/utils.ts` — `cn()` utility for Tailwind class merging (Shadcn UI helper).
