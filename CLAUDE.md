@@ -12,6 +12,16 @@ npx drizzle-kit generate   # generate migration after schema changes
 npx drizzle-kit migrate    # apply pending migrations to Neon
 ```
 
+### Schema change workflow
+
+This project uses a **single squashed migration** strategy — there is always exactly one file in `drizzle/` (index `0000`). Whenever `src/db/schema.ts` changes:
+
+1. Delete the existing `drizzle/0000_*.sql` file.
+2. Run `npx drizzle-kit generate` to regenerate it from scratch.
+3. Commit the new migration file together with the schema change and the updated `drizzle/meta/` files in one commit.
+
+Never stack a second migration on top of the existing one. The squash approach keeps the migration history clean while the project is pre-launch and the DB can be wiped and rebuilt at any time.
+
 For local development with Docker instead of Neon, set `DATABASE_URL` in `.env.local` to a `localhost` connection string, then:
 
 ```powershell
