@@ -1,9 +1,8 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, serialAuthors, chapters } from '@/db/schema';
+import { serials, serialAuthors, volumes, chapters } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { titleToSlug } from '@/lib/slug';
-import { addChapter } from './actions';
+import { addChapter, addVolume } from './actions';
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -12,20 +11,17 @@ interface Props {
 export default async function SerialPage({ params }: Props) {
   const { serial: serialSlug } = await params;
 
-  // Resolve the serial by matching the slug derived from each title
-  const allSerials = await db
+  const [serial] = await db
     .select()
-    .from(serials);
-
-  const serial = allSerials.find(
-    (s) => titleToSlug(s.title) === serialSlug
-  );
+    .from(serials)
+    .where(eq(serials.slug, serialSlug))
+    .limit(1);
 
   if (!serial) {
     notFound();
   }
 
-  const [authors, chapterList] = await Promise.all([
+  const [authors, volumeList, chapterList] = await Promise.all([
     db
       .select()
       .from(serialAuthors)
@@ -33,11 +29,27 @@ export default async function SerialPage({ params }: Props) {
       .orderBy(serialAuthors.displayOrder),
     db
       .select()
+      .from(volumes)
+      .where(eq(volumes.serialId, serial.id))
+      .orderBy(volumes.idx),
+    db
+      .select({
+        id: chapters.id,
+        displayName: chapters.displayName,
+        idx: chapters.idx,
+        volumeId: chapters.volumeId,
+      })
       .from(chapters)
-      .where(eq(chapters.serialId, serial.id))
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
   ]);
 
+  const chaptersByVolume = new Map<number, { id: number; displayName: string; idx: number }[]>();
+  volumeList.forEach((v) => chaptersByVolume.set(v.id, []));
+  chapterList.forEach((c) => chaptersByVolume.get(c.volumeId)?.push(c));
+
+  const addVolumeForSerial = addVolume.bind(null, serial.id);
   const addChapterForSerial = addChapter.bind(null, serial.id);
 
   return (
@@ -56,63 +68,112 @@ export default async function SerialPage({ params }: Props) {
           )}
         </div>
 
-        {/* Chapter list */}
-        <section className="flex flex-col gap-3 mt-4">
-          <h2 className="text-xl font-semibold">Chapters</h2>
-          {chapterList.length > 0 ? (
-            <ol className="flex flex-col gap-2">
-              {chapterList.map((chapter) => (
-                <li
-                  key={chapter.id}
-                  className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-                >
-                  <span className="font-medium">{chapter.displayName}</span>
-                  <span className="text-gray-400">#{chapter.idx}</span>
-                </li>
-              ))}
-            </ol>
+        {/* Volume and chapter list */}
+        <section className="flex flex-col gap-4 mt-4">
+          <h2 className="text-xl font-semibold">Volumes &amp; Chapters</h2>
+          {volumeList.length > 0 ? (
+            <div className="flex flex-col gap-5">
+              {volumeList.map((volume) => {
+                const vChapters = chaptersByVolume.get(volume.id) ?? [];
+                return (
+                  <div key={volume.id} className="flex flex-col gap-2">
+                    <h3 className="text-base font-semibold">{volume.displayName}</h3>
+                    {vChapters.length > 0 ? (
+                      <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+                        {vChapters.map((chapter) => (
+                          <li
+                            key={chapter.id}
+                            className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
+                          >
+                            <span>{chapter.displayName}</span>
+                            <span className="text-gray-400">#{chapter.idx}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="text-sm text-gray-400 pl-3">No chapters yet.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-sm text-gray-500">No chapters yet.</p>
+            <p className="text-sm text-gray-500">No volumes yet. Add a volume to get started.</p>
           )}
         </section>
 
-        {/* Add chapter form */}
+        {/* Add volume form */}
         <section className="flex flex-col gap-3 mt-2">
-          <h3 className="text-lg font-semibold">Add chapter</h3>
-          <form action={addChapterForSerial} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="displayName" className="text-sm font-medium">
+          <h3 className="text-lg font-semibold">Add volume</h3>
+          <form action={addVolumeForSerial} className="flex gap-3 items-end">
+            <div className="flex flex-col gap-1 flex-1">
+              <label htmlFor="volumeDisplayName" className="text-sm font-medium">
                 Display name <span className="text-red-500">*</span>
               </label>
               <input
-                id="displayName"
+                id="volumeDisplayName"
                 name="displayName"
                 type="text"
                 required
-                placeholder="e.g. Chapter 1"
-                className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="idx" className="text-sm font-medium">
-                Index <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="idx"
-                name="idx"
-                type="number"
-                required
-                placeholder="e.g. 1"
+                placeholder="e.g. Volume 1"
                 className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
               />
             </div>
             <button
               type="submit"
-              className="self-start rounded-lg bg-black px-5 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white hover:bg-gray-800"
             >
-              Add chapter
+              Add volume
             </button>
           </form>
+        </section>
+
+        {/* Add chapter form */}
+        <section className="flex flex-col gap-3 mt-2">
+          <h3 className="text-lg font-semibold">Add chapter</h3>
+          {volumeList.length === 0 ? (
+            <p className="text-sm text-gray-500">Add a volume before adding chapters.</p>
+          ) : (
+            <form action={addChapterForSerial} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="volumeId" className="text-sm font-medium">
+                  Volume <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="volumeId"
+                  name="volumeId"
+                  required
+                  defaultValue={volumeList[volumeList.length - 1]?.id}
+                  className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black bg-white"
+                >
+                  {volumeList.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="chapterDisplayName" className="text-sm font-medium">
+                  Display name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="chapterDisplayName"
+                  name="displayName"
+                  type="text"
+                  required
+                  placeholder="e.g. Chapter 1"
+                  className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
+                />
+              </div>
+              <button
+                type="submit"
+                className="self-start rounded-lg bg-black px-5 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                Add chapter
+              </button>
+            </form>
+          )}
         </section>
       </div>
     </main>

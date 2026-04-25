@@ -2,41 +2,68 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, chapters } from '@/db/schema';
-import { titleToSlug } from '@/lib/slug';
-import { eq } from 'drizzle-orm';
+import { serials, volumes, chapters } from '@/db/schema';
+import { eq, max } from 'drizzle-orm';
 
-export async function addChapter(serialId: number, formData: FormData) {
+export async function addVolume(serialId: number, formData: FormData) {
   const displayName = formData.get('displayName');
-  const idxRaw = formData.get('idx');
 
-  if (
-    !displayName ||
-    typeof displayName !== 'string' ||
-    displayName.trim() === ''
-  ) {
-    throw new Error('Chapter display name is required');
+  if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') {
+    throw new Error('Volume display name is required');
   }
 
-  if (!idxRaw || typeof idxRaw !== 'string' || idxRaw.trim() === '') {
-    throw new Error('Chapter index is required');
-  }
+  const [{ maxIdx }] = await db
+    .select({ maxIdx: max(volumes.idx) })
+    .from(volumes)
+    .where(eq(volumes.serialId, serialId));
 
-  const idx = parseInt(idxRaw.trim(), 10);
-  if (isNaN(idx)) {
-    throw new Error('Chapter index must be a number');
-  }
-
-  await db.insert(chapters).values({
+  await db.insert(volumes).values({
     serialId,
     displayName: displayName.trim(),
-    idx,
+    idx: (maxIdx ?? 0) + 1,
   });
 
   const [serial] = await db
-    .select({ title: serials.title })
+    .select({ slug: serials.slug })
     .from(serials)
     .where(eq(serials.id, serialId));
 
-  redirect(`/${titleToSlug(serial.title)}`);
+  redirect(`/${serial.slug}`);
+}
+
+export async function addChapter(serialId: number, formData: FormData) {
+  const displayName = formData.get('displayName');
+  const volumeIdRaw = formData.get('volumeId');
+
+  if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') {
+    throw new Error('Chapter display name is required');
+  }
+
+  if (!volumeIdRaw || typeof volumeIdRaw !== 'string') {
+    throw new Error('Volume is required');
+  }
+
+  const volumeId = parseInt(volumeIdRaw, 10);
+  if (isNaN(volumeId)) {
+    throw new Error('Invalid volume');
+  }
+
+  const [{ maxIdx }] = await db
+    .select({ maxIdx: max(chapters.idx) })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .where(eq(volumes.serialId, serialId));
+
+  await db.insert(chapters).values({
+    volumeId,
+    displayName: displayName.trim(),
+    idx: (maxIdx ?? 0) + 1,
+  });
+
+  const [serial] = await db
+    .select({ slug: serials.slug })
+    .from(serials)
+    .where(eq(serials.id, serialId));
+
+  redirect(`/${serial.slug}`);
 }
