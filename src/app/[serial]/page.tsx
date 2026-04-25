@@ -3,6 +3,8 @@ import { db } from '@/db/index';
 import { serials, serialAuthors, volumes, chapters } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { addChapter, addVolume } from './actions';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -110,13 +112,12 @@ export default async function SerialPage({ params }: Props) {
               <label htmlFor="volumeDisplayName" className="text-sm font-medium">
                 Display name <span className="text-red-500">*</span>
               </label>
-              <input
+              <Input
                 id="volumeDisplayName"
                 name="displayName"
                 type="text"
                 required
                 placeholder="e.g. Volume 1"
-                className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
               />
             </div>
             <button
@@ -139,31 +140,27 @@ export default async function SerialPage({ params }: Props) {
                 <label htmlFor="volumeId" className="text-sm font-medium">
                   Volume <span className="text-red-500">*</span>
                 </label>
-                <select
+                <Select
                   id="volumeId"
                   name="volumeId"
                   required
                   defaultValue={volumeList[volumeList.length - 1]?.id}
-                  className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black bg-white"
-                >
-                  {volumeList.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.displayName}
-                    </option>
-                  ))}
-                </select>
+                  options={volumeList.map((v) => ({
+                    label: v.displayName,
+                    value: v.id,
+                  }))}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label htmlFor="chapterDisplayName" className="text-sm font-medium">
                   Display name <span className="text-red-500">*</span>
                 </label>
-                <input
+                <Input
                   id="chapterDisplayName"
                   name="displayName"
                   type="text"
                   required
                   placeholder="e.g. Chapter 1"
-                  className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
                 />
               </div>
               <button

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createSerial } from './actions';
+import { Input } from '@/components/ui/input';
 
 export default function NewSerialPage() {
   const [authors, setAuthors] = useState<string[]>(['']);
@@ -28,13 +29,12 @@ export default function NewSerialPage() {
             <label htmlFor="title" className="text-sm font-medium">
               Title <span className="text-red-500">*</span>
             </label>
-            <input
+            <Input
               id="title"
               name="title"
               type="text"
               required
               placeholder="e.g. One Piece"
-              className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
             />
           </div>
 
@@ -57,13 +57,13 @@ export default function NewSerialPage() {
             <span className="text-sm font-medium">Authors</span>
             {authors.map((author, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input
+                <Input
                   type="text"
                   name="authors"
                   value={author}
                   onChange={(e) => updateAuthor(i, e.target.value)}
                   placeholder={`Author ${i + 1}`}
-                  className="flex-1 rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
+                  className="flex-1"
                 />
                 {authors.length > 1 && (
                   <button
@@ -90,12 +90,11 @@ export default function NewSerialPage() {
             <label htmlFor="splashArtUrl" className="text-sm font-medium">
               Splash art URL <span className="text-gray-400">(optional)</span>
             </label>
-            <input
+            <Input
               id="splashArtUrl"
               name="splashArtUrl"
               type="url"
               placeholder="https://example.com/cover.jpg"
-              className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
             />
           </div>
 

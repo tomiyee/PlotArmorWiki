@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 
 type Serial = {
   id: number;
@@ -26,12 +27,12 @@ export default function SerialList({ serials }: Props) {
 
   return (
     <>
-      <input
+      <Input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search serials…"
-        className="w-full max-w-md rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black"
+        className="w-full max-w-md"
       />
       {filtered.length > 0 ? (
         <ul className="w-full max-w-md flex flex-col gap-3 mt-2">
