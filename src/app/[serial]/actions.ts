@@ -5,6 +5,50 @@ import { db } from '@/db/index';
 import { serials, volumes, chapters } from '@/db/schema';
 import { eq, max } from 'drizzle-orm';
 
+export async function deleteChapter(serialId: number, formData: FormData) {
+  const chapterIdRaw = formData.get('chapterId');
+  if (!chapterIdRaw || typeof chapterIdRaw !== 'string') {
+    throw new Error('Chapter ID is required');
+  }
+
+  const chapterId = parseInt(chapterIdRaw, 10);
+  if (isNaN(chapterId)) {
+    throw new Error('Invalid chapter ID');
+  }
+
+  await db.delete(chapters).where(eq(chapters.id, chapterId));
+
+  const [serial] = await db
+    .select({ slug: serials.slug })
+    .from(serials)
+    .where(eq(serials.id, serialId));
+
+  redirect(`/${serial.slug}`);
+}
+
+export async function deleteVolume(serialId: number, formData: FormData) {
+  const volumeIdRaw = formData.get('volumeId');
+  if (!volumeIdRaw || typeof volumeIdRaw !== 'string') {
+    throw new Error('Volume ID is required');
+  }
+
+  const volumeId = parseInt(volumeIdRaw, 10);
+  if (isNaN(volumeId)) {
+    throw new Error('Invalid volume ID');
+  }
+
+  // Delete all chapters in the volume first, then the volume itself
+  await db.delete(chapters).where(eq(chapters.volumeId, volumeId));
+  await db.delete(volumes).where(eq(volumes.id, volumeId));
+
+  const [serial] = await db
+    .select({ slug: serials.slug })
+    .from(serials)
+    .where(eq(serials.id, serialId));
+
+  redirect(`/${serial.slug}`);
+}
+
 export async function addVolume(serialId: number, formData: FormData) {
   const displayName = formData.get('displayName');
 
