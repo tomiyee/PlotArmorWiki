@@ -52,13 +52,13 @@ Steps 8 → 9 → 10 → 12 are a strict sequential chain.
 - ~~Add `.env.local` to `.gitignore`.~~
 - Commit: `feat: add Drizzle schema and initial Neon migration`
 
-## Step 3 — Home page static shell
+## ~~Step 3 — Home page static shell~~ ✓
 
-- Create a shared `<Navbar>` component rendered in the root `layout.tsx`. For now it just shows the site name "PlotArmor" and a placeholder for auth.
-- Build the home page (`app/page.tsx`):
-  - A search bar input (uncontrolled, no backend yet).
-  - A "Create wiki" button (links to `/new` — page does not need to exist yet).
-- No data fetching in this step.
+- ~~Create a shared `<Navbar>` component rendered in the root `layout.tsx`. For now it just shows the site name "PlotArmor" and a placeholder for auth.~~
+- ~~Build the home page (`app/page.tsx`):~~
+  - ~~A search bar input (uncontrolled, no backend yet).~~
+  - ~~A "Create wiki" button (links to `/new` — page does not need to exist yet).~~
+- ~~No data fetching in this step.~~
 - Commit: `feat: add home page shell with navbar and search bar`
 
 ## Step 4 — Serial creation and listing
