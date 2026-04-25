@@ -3,7 +3,7 @@ param(
     [string]$PostgresImage = "postgres:16"
 )
 
-$envPath = Join-Path $PSScriptRoot ".." ".env.local"
+$envPath = Join-Path (Join-Path $PSScriptRoot "..") ".env.local"
 
 if (-not (Test-Path $envPath)) {
     Write-Error ".env.local not found at $envPath. Create it with DATABASE_URL=postgres://user:password@localhost:5432/dbname"
@@ -38,6 +38,11 @@ try {
 
 if ($dbHost -notin @("localhost", "127.0.0.1")) {
     Write-Warning "DATABASE_URL points to '$dbHost' - this script is for local Docker only. Continuing anyway."
+}
+
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Error "docker not found in PATH. Install Docker Desktop and make sure it is running, then try again."
+    exit 1
 }
 
 $existing = docker ps -a --filter "name=^${ContainerName}$" --format "{{.Names}}"
