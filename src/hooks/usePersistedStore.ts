@@ -44,29 +44,23 @@ export function usePersistedStore<T>(
     try {
       const raw = localStorage.getItem(key);
       if (raw !== null) return JSON.parse(raw) as T;
-    } catch {
-      // Corrupted JSON or storage unavailable.
-    }
+    } catch {}
     return defaultValue;
   }, [key, defaultValue]);
 
-  // Server snapshot always returns defaultValue so SSR and the first client
-  // render agree, preventing a hydration mismatch.
-  const getServerSnapshot = useCallback((): T => {
-    return defaultValue;
-  }, [defaultValue]);
+  // Returns defaultValue on server to prevent SSR/client hydration mismatch.
+  const getServerSnapshot = useCallback((): T => defaultValue, [defaultValue]);
 
   const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setValue: Dispatch<SetStateAction<T>> = useCallback(
     (action) => {
-      let prev: T;
+      let prevRaw: string | null = null;
+      let prev: T = defaultValue;
       try {
-        const raw = localStorage.getItem(key);
-        prev = raw !== null ? (JSON.parse(raw) as T) : defaultValue;
-      } catch {
-        prev = defaultValue;
-      }
+        prevRaw = localStorage.getItem(key);
+        if (prevRaw !== null) prev = JSON.parse(prevRaw) as T;
+      } catch {}
 
       const next =
         typeof action === "function"
@@ -75,22 +69,20 @@ export function usePersistedStore<T>(
 
       try {
         const serialized = JSON.stringify(next);
+        if (serialized === prevRaw) return;
         localStorage.setItem(key, serialized);
 
-        // Dispatch a synthetic StorageEvent so the same-tab subscriber fires.
         // The native `storage` event only fires in *other* tabs.
         window.dispatchEvent(
           new StorageEvent("storage", {
             key,
             newValue: serialized,
-            oldValue: JSON.stringify(prev),
+            oldValue: prevRaw,
             storageArea: localStorage,
             url: window.location.href,
           })
         );
-      } catch {
-        // Storage quota exceeded or unavailable.
-      }
+      } catch {}
     },
     [key, defaultValue]
   );
