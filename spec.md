@@ -149,7 +149,7 @@ chapters
 #### Schema definition (wall-clock versioned)
 
 ```
-schemas
+page_schemas
   id, serial_id, name, has_floater
 
 schema_sections

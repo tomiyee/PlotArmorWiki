@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
@@ -24,6 +23,8 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { RenameForm } from '@/components/RenameForm';
+import { useServerAction } from '@/hooks/useServerAction';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,44 +70,93 @@ interface SchemaManagerProps {
   reorderFloaterRowsAction: (formData: FormData) => Promise<void>;
 }
 
-// ─── Inline rename forms ────────────────────────────────────────────────────────
+// ─── ReorderableItem ───────────────────────────────────────────────────────────
 
-function RenameForm({
-  hiddenName,
-  hiddenValue,
-  fieldName,
-  defaultValue,
-  onSave,
-  onCancel,
-  inputClassName,
+function ReorderableItem({
+  label,
+  isFirst,
+  isLast,
+  isPending,
+  isRenaming,
+  onMoveUp,
+  onMoveDown,
+  onStartRename,
+  renameForm,
+  onDelete,
 }: {
-  hiddenName: string;
-  hiddenValue: string | number;
-  fieldName: string;
-  defaultValue: string;
-  onSave: (fd: FormData) => void;
-  onCancel: () => void;
-  inputClassName?: string;
+  label: string;
+  isFirst: boolean;
+  isLast: boolean;
+  isPending: boolean;
+  isRenaming: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onStartRename: () => void;
+  renameForm: React.ReactNode;
+  onDelete: () => void;
 }) {
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    onSave(new FormData(e.currentTarget));
-    onCancel();
-  }
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-1">
-      <input type="hidden" name={hiddenName} value={hiddenValue} />
-      <Input
-        name={fieldName}
-        defaultValue={defaultValue}
-        required
-        autoFocus
-        className={inputClassName ?? 'flex-1'}
-        onKeyDown={(e) => e.key === 'Escape' && onCancel()}
-      />
-      <Button type="submit" size="sm">Save</Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-    </form>
+    <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
+      {isRenaming ? (
+        renameForm
+      ) : (
+        <>
+          <Box className="flex-1 items-center gap-2">
+            <Box col className="gap-0.5 mr-1">
+              <Button
+                type="button"
+                variant="ghost"
+                title="Move up"
+                disabled={isFirst || isPending}
+                onClick={onMoveUp}
+                className="h-3 w-4 p-0 rounded-sm text-gray-400 hover:text-gray-600 hover:bg-transparent disabled:opacity-30 leading-none"
+                aria-label={`Move ${label} up`}
+              >
+                ▲
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                title="Move down"
+                disabled={isLast || isPending}
+                onClick={onMoveDown}
+                className="h-3 w-4 p-0 rounded-sm text-gray-400 hover:text-gray-600 hover:bg-transparent disabled:opacity-30 leading-none"
+                aria-label={`Move ${label} down`}
+              >
+                ▼
+              </Button>
+            </Box>
+            <span
+              className="cursor-pointer hover:text-primary transition-colors"
+              title="Click to rename"
+              onClick={onStartRename}
+            >
+              {label}
+            </span>
+          </Box>
+          <Box className="items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              title={`Rename ${label}`}
+              onClick={onStartRename}
+            >
+              <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon-xs"
+              title={`Delete ${label}`}
+              onClick={onDelete}
+            >
+              <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+            </Button>
+          </Box>
+        </>
+      )}
+    </li>
   );
 }
 
@@ -116,61 +166,60 @@ function RenameForm({
  * Renders the sections and floater rows for a single expanded schema.
  *
  * @example
- * <SchemaDetail schema={schema} onAction={...} isPending={false} />
+ * <SchemaDetail schema={schema} {...actionProps} />
  */
 function SchemaDetail({
   schema,
   onDeleteSection,
   onDeleteFloaterRow,
-  onRenameSection,
-  onRenameFloaterRow,
-  onMoveSection,
-  onMoveFloaterRow,
+  renameSectionAction,
+  renameFloaterRowAction,
+  reorderSectionsAction,
+  reorderFloaterRowsAction,
   addSectionAction,
   addFloaterRowAction,
-  isPending,
-  run,
 }: {
   schema: Schema;
   onDeleteSection: (sectionId: number, name: string) => void;
   onDeleteFloaterRow: (rowId: number, label: string, schemaId: number) => void;
-  onRenameSection: (fd: FormData) => void;
-  onRenameFloaterRow: (fd: FormData) => void;
-  onMoveSection: (schemaId: number, orderedIds: number[]) => void;
-  onMoveFloaterRow: (schemaId: number, orderedIds: number[]) => void;
+  renameSectionAction: (fd: FormData) => Promise<void>;
+  renameFloaterRowAction: (fd: FormData) => Promise<void>;
+  reorderSectionsAction: (fd: FormData) => Promise<void>;
+  reorderFloaterRowsAction: (fd: FormData) => Promise<void>;
   addSectionAction: (formData: FormData) => Promise<void>;
   addFloaterRowAction: (formData: FormData) => Promise<void>;
-  isPending: boolean;
-  run: (action: (fd: FormData) => Promise<void>, fd: FormData, onDone?: () => void) => void;
 }) {
+  const { run, isPending } = useServerAction();
   const [renamingSectionId, setRenamingSectionId] = useState<number | null>(null);
   const [renamingRowId, setRenamingRowId] = useState<number | null>(null);
   const [addingSection, setAddingSection] = useState(false);
   const [addingFloaterRow, setAddingFloaterRow] = useState(false);
 
-  const sections = [...schema.sections].sort((a, b) => a.displayOrder - b.displayOrder);
-  const floaterRows = [...schema.floaterRows].sort((a, b) => a.displayOrder - b.displayOrder);
+  const sections = schema.sections;
+  const floaterRows = schema.floaterRows;
 
   function moveSection(id: number, direction: 'up' | 'down') {
-    const sorted = [...sections];
-    const idx = sorted.findIndex((s) => s.id === id);
+    const idx = sections.findIndex((s) => s.id === id);
     if (idx === -1) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sorted.length) return;
-    const newOrder = sorted.map((s) => s.id);
+    if (swapIdx < 0 || swapIdx >= sections.length) return;
+    const newOrder = sections.map((s) => s.id);
     [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
-    onMoveSection(schema.id, newOrder);
+    const fd = new FormData();
+    fd.set('orderedIds', JSON.stringify(newOrder));
+    run(reorderSectionsAction, fd);
   }
 
   function moveFloaterRow(id: number, direction: 'up' | 'down') {
-    const sorted = [...floaterRows];
-    const idx = sorted.findIndex((r) => r.id === id);
+    const idx = floaterRows.findIndex((r) => r.id === id);
     if (idx === -1) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sorted.length) return;
-    const newOrder = sorted.map((r) => r.id);
+    if (swapIdx < 0 || swapIdx >= floaterRows.length) return;
+    const newOrder = floaterRows.map((r) => r.id);
     [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
-    onMoveFloaterRow(schema.id, newOrder);
+    const fd = new FormData();
+    fd.set('orderedIds', JSON.stringify(newOrder));
+    run(reorderFloaterRowsAction, fd);
   }
 
   return (
@@ -181,80 +230,35 @@ function SchemaDetail({
         {sections.length > 0 ? (
           <ol className="flex flex-col gap-1">
             {sections.map((section, i) => (
-              <li key={section.id} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
-                {renamingSectionId === section.id ? (
+              <ReorderableItem
+                key={section.id}
+                label={section.name}
+                isFirst={i === 0}
+                isLast={i === sections.length - 1}
+                isPending={isPending}
+                isRenaming={renamingSectionId === section.id}
+                onMoveUp={() => moveSection(section.id, 'up')}
+                onMoveDown={() => moveSection(section.id, 'down')}
+                onStartRename={() => setRenamingSectionId(section.id)}
+                onDelete={() => onDeleteSection(section.id, section.name)}
+                renameForm={
                   <RenameForm
                     hiddenName="sectionId"
                     hiddenValue={section.id}
                     fieldName="name"
                     defaultValue={section.name}
-                    onSave={onRenameSection}
+                    onSave={(fd) => run(renameSectionAction, fd)}
                     onCancel={() => setRenamingSectionId(null)}
                     inputClassName="flex-1 h-7 text-sm"
                   />
-                ) : (
-                  <>
-                    <Box className="flex-1 items-center gap-2">
-                      <Box col className="gap-0.5 mr-1">
-                        <button
-                          type="button"
-                          title="Move up"
-                          disabled={i === 0 || isPending}
-                          onClick={() => moveSection(section.id, 'up')}
-                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 leading-none h-3"
-                          aria-label={`Move ${section.name} up`}
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          title="Move down"
-                          disabled={i === sections.length - 1 || isPending}
-                          onClick={() => moveSection(section.id, 'down')}
-                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 leading-none h-3"
-                          aria-label={`Move ${section.name} down`}
-                        >
-                          ▼
-                        </button>
-                      </Box>
-                      <span
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        title="Click to rename"
-                        onClick={() => setRenamingSectionId(section.id)}
-                      >
-                        {section.name}
-                      </span>
-                    </Box>
-                    <Box className="items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        title={`Rename ${section.name}`}
-                        onClick={() => setRenamingSectionId(section.id)}
-                      >
-                        <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon-xs"
-                        title={`Delete ${section.name}`}
-                        onClick={() => onDeleteSection(section.id, section.name)}
-                      >
-                        <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
-                      </Button>
-                    </Box>
-                  </>
-                )}
-              </li>
+                }
+              />
             ))}
           </ol>
         ) : (
           <Text muted>No sections yet.</Text>
         )}
 
-        {/* Add section */}
         {addingSection ? (
           <form
             onSubmit={(e) => {
@@ -293,87 +297,41 @@ function SchemaDetail({
         )}
       </Box>
 
-      {/* Floater rows (only if schema has floater) */}
       {schema.hasFloater && (
         <Box col className="gap-2">
           <Text variant="h4">Floater rows</Text>
           {floaterRows.length > 0 ? (
             <ol className="flex flex-col gap-1">
               {floaterRows.map((row, i) => (
-                <li key={row.id} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
-                  {renamingRowId === row.id ? (
+                <ReorderableItem
+                  key={row.id}
+                  label={row.label}
+                  isFirst={i === 0}
+                  isLast={i === floaterRows.length - 1}
+                  isPending={isPending}
+                  isRenaming={renamingRowId === row.id}
+                  onMoveUp={() => moveFloaterRow(row.id, 'up')}
+                  onMoveDown={() => moveFloaterRow(row.id, 'down')}
+                  onStartRename={() => setRenamingRowId(row.id)}
+                  onDelete={() => onDeleteFloaterRow(row.id, row.label, schema.id)}
+                  renameForm={
                     <RenameForm
                       hiddenName="rowId"
                       hiddenValue={row.id}
                       fieldName="label"
                       defaultValue={row.label}
-                      onSave={onRenameFloaterRow}
+                      onSave={(fd) => run(renameFloaterRowAction, fd)}
                       onCancel={() => setRenamingRowId(null)}
                       inputClassName="flex-1 h-7 text-sm"
                     />
-                  ) : (
-                    <>
-                      <Box className="flex-1 items-center gap-2">
-                        <Box col className="gap-0.5 mr-1">
-                          <button
-                            type="button"
-                            title="Move up"
-                            disabled={i === 0 || isPending}
-                            onClick={() => moveFloaterRow(row.id, 'up')}
-                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30 leading-none h-3"
-                            aria-label={`Move ${row.label} up`}
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            title="Move down"
-                            disabled={i === floaterRows.length - 1 || isPending}
-                            onClick={() => moveFloaterRow(row.id, 'down')}
-                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30 leading-none h-3"
-                            aria-label={`Move ${row.label} down`}
-                          >
-                            ▼
-                          </button>
-                        </Box>
-                        <span
-                          className="cursor-pointer hover:text-primary transition-colors"
-                          title="Click to rename"
-                          onClick={() => setRenamingRowId(row.id)}
-                        >
-                          {row.label}
-                        </span>
-                      </Box>
-                      <Box className="items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          title={`Rename ${row.label}`}
-                          onClick={() => setRenamingRowId(row.id)}
-                        >
-                          <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon-xs"
-                          title={`Delete ${row.label}`}
-                          onClick={() => onDeleteFloaterRow(row.id, row.label, schema.id)}
-                        >
-                          <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
-                        </Button>
-                      </Box>
-                    </>
-                  )}
-                </li>
+                  }
+                />
               ))}
             </ol>
           ) : (
             <Text muted>No floater rows yet.</Text>
           )}
 
-          {/* Add floater row */}
           {addingFloaterRow ? (
             <form
               onSubmit={(e) => {
@@ -453,21 +411,12 @@ export function SchemaManager({
   renameFloaterRowAction,
   reorderFloaterRowsAction,
 }: SchemaManagerProps) {
-  const router = useRouter();
+  const { run, isPending } = useServerAction();
   const [expandedSchemaIds, setExpandedSchemaIds] = useState<Set<number>>(new Set());
   const [renamingSchemaId, setRenamingSchemaId] = useState<number | null>(null);
   const [addingSchema, setAddingSchema] = useState(false);
   const [hasFloater, setHasFloater] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  function run(action: (fd: FormData) => Promise<void>, fd: FormData, onDone?: () => void) {
-    startTransition(async () => {
-      await action(fd);
-      router.refresh();
-      onDone?.();
-    });
-  }
 
   function toggleExpand(schemaId: number) {
     setExpandedSchemaIds((prev) => {
@@ -496,37 +445,24 @@ export function SchemaManager({
     }
   }
 
-  function handleMoveSection(schemaId: number, orderedIds: number[]) {
-    const fd = new FormData();
-    fd.set('orderedIds', JSON.stringify(orderedIds));
-    run(reorderSectionsAction, fd);
-  }
-
-  function handleMoveFloaterRow(schemaId: number, orderedIds: number[]) {
-    const fd = new FormData();
-    fd.set('orderedIds', JSON.stringify(orderedIds));
-    run(reorderFloaterRowsAction, fd);
-  }
-
   const deleteDialogTitle =
     pendingDelete?.type === 'schema'
-      ? `Delete schema "${pendingDelete.name}"?`
+      ? `Delete page type "${pendingDelete.name}"?`
       : pendingDelete?.type === 'section'
-        ? `Delete section "${pendingDelete?.name}"?`
+        ? `Delete section "${pendingDelete.name}"?`
         : `Delete floater row "${pendingDelete?.name}"?`;
 
   const deleteDialogBody =
     pendingDelete?.type === 'schema'
-      ? 'This will permanently delete this schema and all its pages. This action cannot be undone.'
+      ? 'This will permanently delete this page type and all its pages. This action cannot be undone.'
       : pendingDelete?.type === 'section'
-        ? 'This will remove this section from all wiki pages in this schema. This action cannot be undone.'
-        : 'This will remove this floater row from all wiki pages in this schema. This action cannot be undone.';
+        ? 'This will remove this section from all wiki pages in this page type. This action cannot be undone.'
+        : 'This will remove this floater row from all wiki pages in this page type. This action cannot be undone.';
 
   return (
     <section className="flex flex-col gap-4 mt-4">
-      <Text variant="h2">Schemas</Text>
+      <Text variant="h2">Page Types</Text>
 
-      {/* Schema list */}
       {schemas.length > 0 ? (
         <Box col className="gap-3">
           {schemas.map((schema) => {
@@ -535,12 +471,13 @@ export function SchemaManager({
 
             return (
               <Box col key={schema.id} className="gap-2 rounded-lg border border-gray-200 p-3">
-                {/* Schema header */}
                 <Box className="items-center gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-xs"
                     onClick={() => toggleExpand(schema.id)}
-                    className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                    className="text-gray-500 hover:text-gray-700"
                     title={isExpanded ? 'Collapse' : 'Expand'}
                     aria-expanded={isExpanded}
                   >
@@ -548,7 +485,7 @@ export function SchemaManager({
                       icon={isExpanded ? faChevronDown : faChevronRight}
                       className="h-3 w-3"
                     />
-                  </button>
+                  </Button>
 
                   {isRenaming ? (
                     <RenameForm
@@ -561,16 +498,17 @@ export function SchemaManager({
                     />
                   ) : (
                     <>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => toggleExpand(schema.id)}
-                        className="flex-1 text-left"
+                        className="flex-1 justify-start h-auto p-0 hover:bg-transparent font-normal"
                       >
                         <Text variant="h4" as="span">{schema.name}</Text>
                         {schema.hasFloater && (
                           <Text as="span" muted className="ml-2 text-xs">(has floater)</Text>
                         )}
-                      </button>
+                      </Button>
                       <Box className="items-center gap-1">
                         <Button
                           type="button"
@@ -595,7 +533,6 @@ export function SchemaManager({
                   )}
                 </Box>
 
-                {/* Expanded detail */}
                 {isExpanded && (
                   <SchemaDetail
                     schema={schema}
@@ -603,14 +540,12 @@ export function SchemaManager({
                     onDeleteFloaterRow={(id, label, schemaId) =>
                       setPendingDelete({ type: 'floaterRow', id, name: label, schemaId })
                     }
-                    onRenameSection={(fd) => run(renameSectionAction, fd)}
-                    onRenameFloaterRow={(fd) => run(renameFloaterRowAction, fd)}
-                    onMoveSection={handleMoveSection}
-                    onMoveFloaterRow={handleMoveFloaterRow}
+                    renameSectionAction={renameSectionAction}
+                    renameFloaterRowAction={renameFloaterRowAction}
+                    reorderSectionsAction={reorderSectionsAction}
+                    reorderFloaterRowsAction={reorderFloaterRowsAction}
                     addSectionAction={addSectionAction}
                     addFloaterRowAction={addFloaterRowAction}
-                    isPending={isPending}
-                    run={run}
                   />
                 )}
               </Box>
@@ -618,10 +553,9 @@ export function SchemaManager({
           })}
         </Box>
       ) : (
-        <Text muted>No schemas yet. Add a schema to define wiki page categories.</Text>
+        <Text muted>No page types yet. Add a page type to define wiki page categories.</Text>
       )}
 
-      {/* Add schema */}
       <div className="mt-2 pt-4 border-t border-gray-100">
         {addingSchema ? (
           <form
@@ -638,18 +572,16 @@ export function SchemaManager({
             }}
             className="flex flex-col gap-3"
           >
-            <Box className="gap-3 items-end">
-              <Box col className="gap-1 flex-1">
-                <Label htmlFor="schemaName">Schema name</Label>
-                <Input
-                  id="schemaName"
-                  name="name"
-                  required
-                  placeholder="e.g. Characters, Locations…"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Escape' && setAddingSchema(false)}
-                />
-              </Box>
+            <Box col className="gap-1 flex-1">
+              <Label htmlFor="schemaName">Page type name</Label>
+              <Input
+                id="schemaName"
+                name="name"
+                required
+                placeholder="e.g. Characters, Locations…"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Escape' && setAddingSchema(false)}
+              />
             </Box>
             <Box className="items-center gap-2">
               <input
@@ -662,7 +594,7 @@ export function SchemaManager({
               <Label htmlFor="hasFloater">Has floater sidebar</Label>
             </Box>
             <Box className="gap-2">
-              <Button type="submit" disabled={isPending}>Add schema</Button>
+              <Button type="submit" disabled={isPending}>Add page type</Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -682,12 +614,11 @@ export function SchemaManager({
             onClick={() => setAddingSchema(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-            Add schema
+            Add page type
           </Button>
         )}
       </div>
 
-      {/* Delete confirmation dialog */}
       <Dialog
         isOpen={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}

@@ -90,15 +90,15 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
 - No optimistic UI required for now — revalidate the page after each action completes.
 - Commit: `feat: drag-and-drop reordering for volumes and chapters`
 
-## Step 6 — Schema management
+## ~~Step 6 — Schema management~~ ✓
 
-- On the serial detail page, add a second section below chapters for managing schemas.
-- "Add schema" form: schema name, toggle for whether it has a floater. Creates a `schemas` row.
-- Clicking a schema expands or navigates to a schema detail view where editors can:
-  - Add/remove sections (inserts/soft-deletes `schema_sections` rows via `deleted_at`).
-  - If `has_floater`, add/remove floater rows (`schema_floater_rows`).
-  - Reorder sections and floater rows (updates `display_order`).
-- No chapter versioning in this step — schema structure changes are wall-clock only.
+- ~~On the serial detail page, add a second section below chapters for managing schemas.~~
+- ~~"Add schema" form: schema name, toggle for whether it has a floater. Creates a `schemas` row.~~
+- ~~Clicking a schema expands or navigates to a schema detail view where editors can:~~
+  - ~~Add/remove sections (inserts/soft-deletes `schema_sections` rows via `deleted_at`).~~
+  - ~~If `has_floater`, add/remove floater rows (`schema_floater_rows`).~~
+  - ~~Reorder sections and floater rows (updates `display_order`).~~
+- ~~No chapter versioning in this step — schema structure changes are wall-clock only.~~
 - Commit: `feat: schema management with sections and floater row config`
 
 ## Step 7 — Page schema index page

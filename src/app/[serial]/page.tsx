@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/db/index';
 import { serials, serialAuthors, volumes, chapters, pageSchemas, schemaSections, schemaFloaterRows } from '@/db/schema';
-import { eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   addSchema, deleteSchema, renameSchema,
@@ -58,14 +58,26 @@ export default async function SerialPage({ params }: Props) {
       .where(eq(pageSchemas.serialId, serial.id))
       .orderBy(pageSchemas.id),
     db
-      .select()
+      .select({
+        id: schemaSections.id,
+        schemaId: schemaSections.schemaId,
+        name: schemaSections.name,
+        displayOrder: schemaSections.displayOrder,
+      })
       .from(schemaSections)
-      .where(isNull(schemaSections.deletedAt))
+      .innerJoin(pageSchemas, eq(schemaSections.schemaId, pageSchemas.id))
+      .where(and(isNull(schemaSections.deletedAt), eq(pageSchemas.serialId, serial.id)))
       .orderBy(schemaSections.displayOrder),
     db
-      .select()
+      .select({
+        id: schemaFloaterRows.id,
+        schemaId: schemaFloaterRows.schemaId,
+        label: schemaFloaterRows.label,
+        displayOrder: schemaFloaterRows.displayOrder,
+      })
       .from(schemaFloaterRows)
-      .where(isNull(schemaFloaterRows.deletedAt))
+      .innerJoin(pageSchemas, eq(schemaFloaterRows.schemaId, pageSchemas.id))
+      .where(and(isNull(schemaFloaterRows.deletedAt), eq(pageSchemas.serialId, serial.id)))
       .orderBy(schemaFloaterRows.displayOrder),
   ]);
 
@@ -73,7 +85,6 @@ export default async function SerialPage({ params }: Props) {
   volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
   chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
 
-  // Build schemas with their sections and floater rows
   const schemaIds = new Set(schemaList.map((s) => s.id));
   const sectionsBySchema: Record<number, typeof sectionList> = {};
   const floaterRowsBySchema: Record<number, typeof floaterRowList> = {};

@@ -3,6 +3,7 @@
 import { db } from '@/db/index';
 import { serials, volumes, chapters, pageSchemas, schemaSections, schemaFloaterRows } from '@/db/schema';
 import { and, eq, gte, gt, inArray, isNull, lte, max, sql } from 'drizzle-orm';
+import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 
 export async function deleteChapter(serialId: number, formData: FormData) {
   const chapterIdRaw = formData.get('chapterId');
@@ -107,22 +108,9 @@ export async function renameChapter(_serialId: number, formData: FormData) {
   await db.update(chapters).set({ displayName: displayName.trim() }).where(eq(chapters.id, chapterId));
 }
 
-const CHAPTER_TYPES = ['Chapter', 'Episode', 'Issue', 'Part'] as const;
-const VOLUME_TYPES = ['Volume', 'Season', 'Arc', 'Book'] as const;
-type ChapterType = (typeof CHAPTER_TYPES)[number];
-type VolumeType = (typeof VOLUME_TYPES)[number];
-
 export async function updateSerialTypes(serialId: number, formData: FormData) {
-  const chapterTypeRaw = formData.get('chapterType');
-  const volumeTypeRaw = formData.get('volumeType');
-
-  const chapterType: ChapterType = CHAPTER_TYPES.includes(chapterTypeRaw as ChapterType)
-    ? (chapterTypeRaw as ChapterType)
-    : 'Chapter';
-  const volumeType: VolumeType = VOLUME_TYPES.includes(volumeTypeRaw as VolumeType)
-    ? (volumeTypeRaw as VolumeType)
-    : 'Volume';
-
+  const chapterType = parseChapterType(formData.get('chapterType'));
+  const volumeType = parseVolumeType(formData.get('volumeType'));
   await db.update(serials).set({ chapterType, volumeType }).where(eq(serials.id, serialId));
 }
 
