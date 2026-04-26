@@ -1,7 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { Text } from '@/components/ui/text';
@@ -19,20 +18,9 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-
-const CHAPTER_TYPE_OPTIONS = [
-  { label: 'Chapter', value: 'Chapter' },
-  { label: 'Episode', value: 'Episode' },
-  { label: 'Issue', value: 'Issue' },
-  { label: 'Part', value: 'Part' },
-] as const;
-
-const VOLUME_TYPE_OPTIONS = [
-  { label: 'Volume', value: 'Volume' },
-  { label: 'Season', value: 'Season' },
-  { label: 'Arc', value: 'Arc' },
-  { label: 'Book', value: 'Book' },
-] as const;
+import { RenameForm } from '@/components/RenameForm';
+import { useServerAction } from '@/hooks/useServerAction';
+import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS, ChapterType, VolumeType } from '@/lib/serialTypes';
 
 interface Chapter {
   id: number;
@@ -56,8 +44,8 @@ interface PendingDelete {
 interface SerialEditorProps {
   volumes: Volume[];
   chaptersByVolume: Record<number, Chapter[]>;
-  chapterType: string;
-  volumeType: string;
+  chapterType: ChapterType;
+  volumeType: VolumeType;
   addChapterAction: (formData: FormData) => Promise<void>;
   addVolumeAction: (formData: FormData) => Promise<void>;
   deleteChapterAction: (formData: FormData) => Promise<void>;
@@ -65,68 +53,6 @@ interface SerialEditorProps {
   renameChapterAction: (formData: FormData) => Promise<void>;
   renameVolumeAction: (formData: FormData) => Promise<void>;
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
-}
-
-function RenameVolumeForm({
-  volume,
-  onSave,
-  onCancel,
-}: {
-  volume: Volume;
-  onSave: (fd: FormData) => void;
-  onCancel: () => void;
-}) {
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    onSave(new FormData(e.currentTarget));
-    onCancel();
-  }
-  return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-1">
-      <input type="hidden" name="volumeId" value={volume.id} />
-      <Input
-        name="displayName"
-        defaultValue={volume.displayName}
-        required
-        autoFocus
-        className="flex-1"
-        onKeyDown={(e) => e.key === 'Escape' && onCancel()}
-      />
-      <Button type="submit" size="sm">Save</Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-    </form>
-  );
-}
-
-function RenameChapterForm({
-  chapter,
-  onSave,
-  onCancel,
-}: {
-  chapter: Chapter;
-  onSave: (fd: FormData) => void;
-  onCancel: () => void;
-}) {
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    onSave(new FormData(e.currentTarget));
-    onCancel();
-  }
-  return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-1">
-      <input type="hidden" name="chapterId" value={chapter.id} />
-      <Input
-        name="displayName"
-        defaultValue={chapter.displayName}
-        required
-        autoFocus
-        className="flex-1 h-7 text-sm"
-        onKeyDown={(e) => e.key === 'Escape' && onCancel()}
-      />
-      <Button type="submit" size="sm">Save</Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-    </form>
-  );
 }
 
 export function SerialEditor({
@@ -142,7 +68,7 @@ export function SerialEditor({
   renameVolumeAction,
   updateSerialTypesAction,
 }: SerialEditorProps) {
-  const router = useRouter();
+  const { run, isPending } = useServerAction();
   const [editing, setEditing] = useState(false);
   const [currentChapterType, setCurrentChapterType] = useState(chapterType);
   const [currentVolumeType, setCurrentVolumeType] = useState(volumeType);
@@ -151,9 +77,7 @@ export function SerialEditor({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [addingChapterToVolumeId, setAddingChapterToVolumeId] = useState<number | null>(null);
   const [addingVolume, setAddingVolume] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
-  // Refs for "add" forms so we can reset them after submission
   const addVolumeFormRef = useRef<HTMLFormElement>(null);
   const addChapterFormRefs = useRef<Map<number, HTMLFormElement>>(new Map());
 
@@ -162,14 +86,6 @@ export function SerialEditor({
     fd.set('chapterType', newChapterType);
     fd.set('volumeType', newVolumeType);
     run(updateSerialTypesAction, fd);
-  }
-
-  function run(action: (fd: FormData) => Promise<void>, fd: FormData, onDone?: () => void) {
-    startTransition(async () => {
-      await action(fd);
-      router.refresh();
-      onDone?.();
-    });
   }
 
   function confirmDelete() {
@@ -184,11 +100,6 @@ export function SerialEditor({
     }
   }
 
-  const dialogTitle =
-    pendingDelete?.type === 'volume'
-      ? `Delete "${pendingDelete.name}"?`
-      : `Delete "${pendingDelete?.name}"?`;
-
   const dialogBody =
     pendingDelete?.type === 'volume'
       ? 'This will permanently delete the volume and all its chapters. This action cannot be undone.'
@@ -198,22 +109,20 @@ export function SerialEditor({
     <section className="flex flex-col gap-4 mt-4">
       <Box className="items-center justify-between">
         <Text variant="h2">Volumes &amp; Chapters</Text>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => {
             setEditing((prev) => !prev);
             setRenamingVolumeId(null);
             setRenamingChapterId(null);
           }}
           title={editing ? 'Exit edit mode' : 'Edit volumes and chapters'}
-          className={`rounded-md p-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-            editing
-              ? 'bg-primary text-primary-foreground'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-          }`}
+          className={editing ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-gray-500 hover:text-gray-700'}
         >
           <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-        </button>
+        </Button>
       </Box>
 
       {editing && (
@@ -222,7 +131,7 @@ export function SerialEditor({
             <Label htmlFor="volumeType">Volume type</Label>
             <Select
               id="volumeType"
-              options={[...VOLUME_TYPE_OPTIONS]}
+              options={VOLUME_TYPE_OPTIONS}
               value={currentVolumeType}
               onChange={(val) => {
                 setCurrentVolumeType(val);
@@ -234,7 +143,7 @@ export function SerialEditor({
             <Label htmlFor="chapterType">Chapter type</Label>
             <Select
               id="chapterType"
-              options={[...CHAPTER_TYPE_OPTIONS]}
+              options={CHAPTER_TYPE_OPTIONS}
               value={currentChapterType}
               onChange={(val) => {
                 setCurrentChapterType(val);
@@ -256,8 +165,11 @@ export function SerialEditor({
                 {/* Volume header */}
                 <Box className="items-center justify-between gap-2">
                   {editing && isRenamingVolume ? (
-                    <RenameVolumeForm
-                      volume={volume}
+                    <RenameForm
+                      hiddenName="volumeId"
+                      hiddenValue={volume.id}
+                      fieldName="displayName"
+                      defaultValue={volume.displayName}
                       onSave={(fd) => run(renameVolumeAction, fd)}
                       onCancel={() => setRenamingVolumeId(null)}
                     />
@@ -297,10 +209,14 @@ export function SerialEditor({
                           className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
                         >
                           {editing && isRenamingChapter ? (
-                            <RenameChapterForm
-                              chapter={chapter}
+                            <RenameForm
+                              hiddenName="chapterId"
+                              hiddenValue={chapter.id}
+                              fieldName="displayName"
+                              defaultValue={chapter.displayName}
                               onSave={(fd) => run(renameChapterAction, fd)}
                               onCancel={() => setRenamingChapterId(null)}
+                              inputClassName="flex-1 h-7 text-sm"
                             />
                           ) : (
                             <>
@@ -431,7 +347,7 @@ export function SerialEditor({
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogTitle>Delete &ldquo;{pendingDelete?.name}&rdquo;?</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <DialogDescription>{dialogBody}</DialogDescription>
