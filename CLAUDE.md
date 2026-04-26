@@ -46,7 +46,7 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 
 ### Tech stack
 
-Database, ORM, and home page UI layers are implemented. Auth, Search, and Markdown are not yet.
+Database, ORM, home page UI, serial/chapter/schema/page management, and markdown rendering are implemented. Auth and Search are not yet.
 
 | Layer | Choice |
 |---|---|
@@ -109,7 +109,7 @@ First-time visitors on any serial default to chapter 1 and see a callout prompti
 - `src/app/[serial]/[schema]/SchemaIndexEditor.tsx` — Client Component for inline editing of a schema's name and markdown body; toggles between rendered view and edit form, navigates to the new URL when the name changes.
 - `src/app/[serial]/[schema]/new/page.tsx` — page creation form; collects page name and intro chapter (chapters grouped by volume via optgroup), submits via `createPage` Server Action.
 - `src/app/[serial]/[schema]/new/actions.ts` — `createPage` Server Action; validates serial and schema exist, inserts into `pages`, redirects to `/{serial}/{schema}/{page}`.
-- `src/app/[serial]/[schema]/[page]/page.tsx` — bare page shell; resolves serial/schema/page, renders the page name as a heading and the intro chapter display name.
+- `src/app/[serial]/[schema]/[page]/page.tsx` — wiki page view; resolves serial/schema/page, renders the page name, intro chapter, and all active schema sections with their latest `page_section_versions` content via `<ReactMarkdown>`. Sections with no content row show "No content yet."
 - `src/components/SerialMetadataEditor.tsx` — Client Component for inline editing of a serial's title, description, authors, and splash art URL; pen-icon toggle swaps between read view and edit form; redirects if the title (slug) changes.
 - `src/components/SerialEditor.tsx` — Client Component managing edit mode for the serial's volumes and chapters; in edit mode shows volume/chapter type dropdowns (persisted immediately on change), inline rename forms, add-volume/chapter forms, delete confirmations, and drag-and-drop reordering via `@dnd-kit`.
 - `src/components/SchemaManager.tsx` — Client Component for managing page schemas; accepts `serialSlug` to render a "View" link to each schema's index page, expand/collapse per-schema detail with section and floater-row add/rename/reorder/delete.
