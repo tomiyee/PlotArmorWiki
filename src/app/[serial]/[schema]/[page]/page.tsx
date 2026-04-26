@@ -88,60 +88,54 @@ export default async function PageView({ params }: Props) {
     sectionVersions.map((v) => [v.sectionId, v.content]),
   );
 
-  // Floater data — only fetched when the schema has a floater.
   let floaterImageUrl: string | null = null;
   let activeFloaterRows: { id: number; label: string }[] = [];
   let floaterRowContent: Map<number, string> = new Map();
 
   if (schema.hasFloater) {
-    // Latest page_floater_versions row.
-    const [floaterVersion] = await db
-      .select({ imageUrl: pageFloaterVersions.imageUrl })
-      .from(pageFloaterVersions)
-      .where(
-        and(
-          eq(pageFloaterVersions.pageId, page.id),
-          isNull(pageFloaterVersions.toChapterId),
+    const [[floaterVersion], fetchedRows, floaterRowVersions] = await Promise.all([
+      db
+        .select({ imageUrl: pageFloaterVersions.imageUrl })
+        .from(pageFloaterVersions)
+        .where(
+          and(
+            eq(pageFloaterVersions.pageId, page.id),
+            isNull(pageFloaterVersions.toChapterId),
+          ),
+        )
+        .limit(1),
+      db
+        .select({ id: schemaFloaterRows.id, label: schemaFloaterRows.label })
+        .from(schemaFloaterRows)
+        .where(
+          and(
+            eq(schemaFloaterRows.schemaId, schema.id),
+            isNull(schemaFloaterRows.deletedAt),
+          ),
+        )
+        .orderBy(asc(schemaFloaterRows.displayOrder)),
+      db
+        .select({
+          floaterRowId: pageFloaterRowVersions.floaterRowId,
+          content: pageFloaterRowVersions.content,
+        })
+        .from(pageFloaterRowVersions)
+        .where(
+          and(
+            eq(pageFloaterRowVersions.pageId, page.id),
+            isNull(pageFloaterRowVersions.toChapterId),
+          ),
         ),
-      )
-      .limit(1);
+    ]);
 
     floaterImageUrl = floaterVersion?.imageUrl ?? null;
-
-    // Active floater rows for this schema (soft-delete aware).
-    activeFloaterRows = await db
-      .select({ id: schemaFloaterRows.id, label: schemaFloaterRows.label })
-      .from(schemaFloaterRows)
-      .where(
-        and(
-          eq(schemaFloaterRows.schemaId, schema.id),
-          isNull(schemaFloaterRows.deletedAt),
-        ),
-      )
-      .orderBy(asc(schemaFloaterRows.displayOrder));
-
-    // Latest content for each floater row.
-    const floaterRowVersions = await db
-      .select({
-        floaterRowId: pageFloaterRowVersions.floaterRowId,
-        content: pageFloaterRowVersions.content,
-      })
-      .from(pageFloaterRowVersions)
-      .where(
-        and(
-          eq(pageFloaterRowVersions.pageId, page.id),
-          isNull(pageFloaterRowVersions.toChapterId),
-        ),
-      );
-
+    activeFloaterRows = fetchedRows;
     floaterRowContent = new Map(
       floaterRowVersions.map((v) => [v.floaterRowId, v.content]),
     );
   }
 
-  const hasFloaterContent =
-    schema.hasFloater &&
-    (floaterImageUrl !== null || activeFloaterRows.length > 0);
+  const hasFloaterContent = floaterImageUrl !== null || activeFloaterRows.length > 0;
 
   return (
     <main className="px-6 py-16">
@@ -152,7 +146,6 @@ export default async function PageView({ params }: Props) {
             : 'mx-auto max-w-2xl'
         }
       >
-        {/* Body column */}
         <Box col className="gap-6">
           {/* Breadcrumb */}
           <Text muted className="text-sm">
@@ -195,7 +188,6 @@ export default async function PageView({ params }: Props) {
           })}
         </Box>
 
-        {/* Floater sidebar — only rendered when the schema has a floater */}
         {hasFloaterContent && (
           <aside className="sticky top-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
             <Text variant="h3">{page.name}</Text>
