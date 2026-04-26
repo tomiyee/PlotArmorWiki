@@ -1,8 +1,16 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
 import { db } from '@/db/index';
-import { serials, pageSchemas, pages, chapters } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import {
+  serials,
+  pageSchemas,
+  pages,
+  chapters,
+  schemaSections,
+  pageSectionVersions,
+} from '@/db/schema';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 
@@ -52,6 +60,31 @@ export default async function PageView({ params }: Props) {
     .where(eq(chapters.id, page.introChapterId))
     .limit(1);
 
+  // Fetch active sections for this schema, ordered for display.
+  const activeSections = await db
+    .select({ id: schemaSections.id, name: schemaSections.name })
+    .from(schemaSections)
+    .where(and(eq(schemaSections.schemaId, schema.id), isNull(schemaSections.deletedAt)))
+    .orderBy(asc(schemaSections.displayOrder));
+
+  // Fetch the latest content version for each section (to_chapter_id IS NULL = current).
+  const sectionVersions = await db
+    .select({
+      sectionId: pageSectionVersions.sectionId,
+      content: pageSectionVersions.content,
+    })
+    .from(pageSectionVersions)
+    .where(
+      and(
+        eq(pageSectionVersions.pageId, page.id),
+        isNull(pageSectionVersions.toChapterId),
+      ),
+    );
+
+  const contentBySectionId = new Map(
+    sectionVersions.map((v) => [v.sectionId, v.content]),
+  );
+
   return (
     <main className="flex flex-col items-center px-6 py-16 gap-8">
       <Box col className="w-full max-w-2xl gap-6">
@@ -77,6 +110,23 @@ export default async function PageView({ params }: Props) {
             </Text>
           )}
         </Box>
+
+        {/* Sections */}
+        {activeSections.map((section) => {
+          const content = contentBySectionId.get(section.id) ?? '';
+          return (
+            <Box key={section.id} col className="gap-2">
+              <Text variant="h2">{section.name}</Text>
+              {content ? (
+                <div className="prose prose-gray max-w-none text-gray-700">
+                  <ReactMarkdown>{content}</ReactMarkdown>
+                </div>
+              ) : (
+                <Text muted>No content yet.</Text>
+              )}
+            </Box>
+          );
+        })}
       </Box>
     </main>
   );
