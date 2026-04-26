@@ -120,13 +120,13 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
 - ~~Add a "New page" link on the schema index page for each schema.~~
 - Commit: `feat: page creation form and bare page shell`
 
-## Step 9 — Page rendering with current content
+## ~~Step 9 — Page rendering with current content~~ ✓
 
-- Install `react-markdown`.
-- Update the page route (`app/[serial]/[schema]/[page]/page.tsx`) to fetch and render body content:
-  - For each active section in the schema (where `deleted_at IS NULL`), fetch the latest `page_section_versions` row (`to_chapter_id IS NULL`).
-  - Render each section heading and its content using `<ReactMarkdown>`.
-- No chapter filter yet — this always shows the latest version.
+- ~~Install `react-markdown`.~~
+- ~~Update the page route (`app/[serial]/[schema]/[page]/page.tsx`) to fetch and render body content:~~
+  - ~~For each active section in the schema (where `deleted_at IS NULL`), fetch the latest `page_section_versions` row (`to_chapter_id IS NULL`).~~
+  - ~~Render each section heading and its content using `<ReactMarkdown>`.~~
+- ~~No chapter filter yet — this always shows the latest version.~~
 - Commit: `feat: render page body sections as markdown (latest content)`
 
 ## Step 10 — Floater sidebar
