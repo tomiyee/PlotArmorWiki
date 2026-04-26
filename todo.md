@@ -129,24 +129,24 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
 - ~~No chapter filter yet — this always shows the latest version.~~
 - Commit: `feat: render page body sections as markdown (latest content)`
 
-## Step 10 — Floater sidebar
+## ~~Step 10 — Floater sidebar~~ ✓
 
-- Update the page route to also fetch and render the floater if `schema.has_floater`:
-  - Latest `page_floater_versions` row for the image URL.
-  - Latest `page_floater_row_versions` rows for each active floater row.
-- Render as a sidebar panel floating top-right: page name as header, image, then labeled rows.
-- Layout: use CSS Grid or Flexbox — body on the left, floater on the right.
+- ~~Update the page route to also fetch and render the floater if `schema.has_floater`:~~
+  - ~~Latest `page_floater_versions` row for the image URL.~~
+  - ~~Latest `page_floater_row_versions` rows for each active floater row.~~
+- ~~Render as a sidebar panel floating top-right: page name as header, image, then labeled rows.~~
+- ~~Layout: use CSS Grid or Flexbox — body on the left, floater on the right.~~
 - Commit: `feat: render floater sidebar with image and labeled rows`
 
-## Step 11 — Chapter progress selector (anonymous, localStorage only)
+## ~~Step 11 — Chapter progress selector (anonymous, localStorage only)~~ ✓
 
-- Create a `<ChapterSelector>` Client Component. It:
-  - Receives the list of chapters for the current serial as props.
-  - Reads/writes progress from `localStorage` keyed by serial ID using `usePersistedStore`: `plotarmor:progress:{serial_id}`.
-  - Defaults to the first chapter if no value is stored.
-  - Shows a temporary callout banner on first visit prompting the user to set their chapter.
-- Mount `<ChapterSelector>` in the navbar when on a serial page. The selected chapter ID must be accessible to Server Components — pass it as a cookie (set on selection, read server-side) rather than relying on localStorage alone.
-- **No auth dependency**: this step works entirely with localStorage for anonymous users.
+- ~~Create a `<ChapterSelector>` Client Component. It:~~
+  - ~~Receives the list of chapters for the current serial as props.~~
+  - ~~Reads/writes progress from `localStorage` keyed by serial ID using `usePersistedStore`: `plotarmor:progress:{serial_id}`.~~
+  - ~~Defaults to the first chapter if no value is stored.~~
+  - ~~Shows a temporary callout banner on first visit prompting the user to set their chapter.~~
+- ~~Mount `<ChapterSelector>` in the navbar when on a serial page. The selected chapter ID must be accessible to Server Components — pass it as a cookie (set on selection, read server-side) rather than relying on localStorage alone.~~
+- ~~**No auth dependency**: this step works entirely with localStorage for anonymous users.~~
 - Commit: `feat: chapter progress selector with localStorage persistence`
 
 ## Step 12 — SCD Type 2 versioned read path
