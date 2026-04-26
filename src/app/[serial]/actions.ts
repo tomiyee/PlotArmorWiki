@@ -194,6 +194,41 @@ export async function reorderChapters(
   });
 }
 
+/**
+ * Reassigns every chapter's `idx` and `volumeId` for a serial in one transaction.
+ * Covers both within-volume reordering and cross-volume chapter moves.
+ *
+ * `volumeOrder` defines the global chapter sequence (earlier volumes → lower idx).
+ * `chaptersByVolumeId` must include every chapter in the serial — no partial updates.
+ *
+ * @example
+ * await reorderAllChapters(serialId, [1, 2], { 1: [10, 11], 2: [12] });
+ */
+export async function reorderAllChapters(
+  serialId: number,
+  volumeOrder: number[],
+  chaptersByVolumeId: Record<number, number[]>,
+) {
+  if (volumeOrder.length === 0) return;
+
+  const serialVolumes = await db
+    .select({ id: volumes.id })
+    .from(volumes)
+    .where(eq(volumes.serialId, serialId));
+  const validVolumeIds = new Set(serialVolumes.map((v) => v.id));
+
+  await db.transaction(async (tx) => {
+    let idx = 0;
+    for (const volumeId of volumeOrder) {
+      if (!validVolumeIds.has(volumeId)) continue;
+      for (const chapterId of chaptersByVolumeId[volumeId] ?? []) {
+        idx++;
+        await tx.update(chapters).set({ idx, volumeId }).where(eq(chapters.id, chapterId));
+      }
+    }
+  });
+}
+
 export async function addChapter(serialId: number, formData: FormData) {
   const displayName = formData.get('displayName');
   const volumeIdRaw = formData.get('volumeId');

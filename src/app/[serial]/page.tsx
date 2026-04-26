@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@/db/index';
 import { serials, serialAuthors, volumes, chapters } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, reorderChapters, reorderVolumes, updateSerialTypes } from './actions';
+import { addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, reorderAllChapters, reorderVolumes, updateSerialTypes } from './actions';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { SerialEditor } from '@/components/SerialEditor';
@@ -59,7 +59,7 @@ export default async function SerialPage({ params }: Props) {
   const renameChapterForSerial = renameChapter.bind(null, serial.id);
   const renameVolumeForSerial = renameVolume.bind(null, serial.id);
   const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
-  const reorderChaptersForSerial = reorderChapters.bind(null, serial.id);
+  const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
 
   return (
@@ -89,7 +89,7 @@ export default async function SerialPage({ params }: Props) {
           renameChapterAction={renameChapterForSerial}
           renameVolumeAction={renameVolumeForSerial}
           reorderVolumesAction={reorderVolumesForSerial}
-          reorderChaptersAction={reorderChaptersForSerial}
+          reorderAllChaptersAction={reorderAllChaptersForSerial}
           updateSerialTypesAction={updateSerialTypesForSerial}
         />
       </Box>

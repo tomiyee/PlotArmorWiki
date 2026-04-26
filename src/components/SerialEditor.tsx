@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen, faPlus, faTrash, faGripVertical } from '@fortawesome/free-solid-svg-icons';
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   TouchSensor,
@@ -13,6 +14,8 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
+  type DragOverEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -70,7 +73,10 @@ interface SerialEditorProps {
   renameChapterAction: (formData: FormData) => Promise<void>;
   renameVolumeAction: (formData: FormData) => Promise<void>;
   reorderVolumesAction: (orderedVolumeIds: number[]) => Promise<void>;
-  reorderChaptersAction: (volumeId: number, orderedChapterIds: number[]) => Promise<void>;
+  reorderAllChaptersAction: (
+    volumeOrder: number[],
+    chaptersByVolumeId: Record<number, number[]>,
+  ) => Promise<void>;
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
 }
 
@@ -136,6 +142,35 @@ function RenameChapterForm({
   );
 }
 
+// Non-interactive clone of a volume rendered by DragOverlay — layout-isolated from flex container.
+function VolumeDragPreview({ volume, chapters: vChapters }: { volume: Volume; chapters: Chapter[] }) {
+  return (
+    <Box col className="gap-2 rounded-lg bg-white border border-gray-200 shadow-xl p-2">
+      <Text variant="h4">{volume.displayName}</Text>
+      {vChapters.length > 0 && (
+        <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+          {vChapters.map((chapter) => (
+            <li key={chapter.id} className="flex items-center justify-between rounded-md px-3 py-2 text-sm">
+              <span className="truncate">{chapter.displayName}</span>
+              <Text as="span" muted>#{chapter.idx}</Text>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Box>
+  );
+}
+
+// Non-interactive clone of a chapter rendered by DragOverlay.
+function ChapterDragPreview({ chapter }: { chapter: Chapter }) {
+  return (
+    <li className="flex items-center justify-between rounded-md px-3 py-2 text-sm bg-white border border-gray-200 shadow-lg list-none">
+      <span className="truncate">{chapter.displayName}</span>
+      <Text as="span" muted>#{chapter.idx}</Text>
+    </li>
+  );
+}
+
 /**
  * Sortable row for a single chapter within a volume.
  * In edit mode the drag handle is visible and the row is draggable.
@@ -145,6 +180,7 @@ function SortableChapterItem({
   editing,
   isRenaming,
   isPending,
+  isVolumeDragging,
   onStartRename,
   onSaveRename,
   onCancelRename,
@@ -154,6 +190,7 @@ function SortableChapterItem({
   editing: boolean;
   isRenaming: boolean;
   isPending: boolean;
+  isVolumeDragging: boolean;
   onStartRename: () => void;
   onSaveRename: (fd: FormData) => void;
   onCancelRename: () => void;
@@ -161,13 +198,17 @@ function SortableChapterItem({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: chapter.id,
-    disabled: !editing || isPending,
+    // Disable chapter sortable while a volume is being dragged to prevent collision conflicts.
+    disabled: !editing || isPending || isVolumeDragging,
+    data: { type: 'chapter', volumeId: chapter.volumeId },
   });
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    // CSS.Translate avoids any scale components that would distort the element's size.
+    transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    // Hide the original element while DragOverlay renders the visual clone.
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
 
@@ -227,6 +268,7 @@ function SortableChapterItem({
 /**
  * Sortable card for a single volume (including its inner chapter list).
  * In edit mode the volume header has its own drag handle.
+ * Chapter reordering and cross-volume moves are handled by the outer DndContext.
  */
 function SortableVolumeItem({
   volume,
@@ -236,6 +278,7 @@ function SortableVolumeItem({
   isRenamingVolume,
   renamingChapterId,
   addingChapterToVolumeId,
+  isVolumeDragging,
   onStartRenameVolume,
   onSaveRenameVolume,
   onCancelRenameVolume,
@@ -244,7 +287,6 @@ function SortableVolumeItem({
   onSaveRenameChapter,
   onCancelRenameChapter,
   onDeleteChapter,
-  onChapterDragEnd,
   onAddChapterClick,
   onAddChapterSubmit,
   onCancelAddChapter,
@@ -257,6 +299,7 @@ function SortableVolumeItem({
   isRenamingVolume: boolean;
   renamingChapterId: number | null;
   addingChapterToVolumeId: number | null;
+  isVolumeDragging: boolean;
   onStartRenameVolume: () => void;
   onSaveRenameVolume: (fd: FormData) => void;
   onCancelRenameVolume: () => void;
@@ -265,8 +308,6 @@ function SortableVolumeItem({
   onSaveRenameChapter: (fd: FormData) => void;
   onCancelRenameChapter: () => void;
   onDeleteChapter: (id: number, name: string) => void;
-  onChapterDragEnd: (volumeId: number, event: DragEndEvent) => void;
-  chapterSensors: ReturnType<typeof useSensors>;
   onAddChapterClick: (volumeId: number) => void;
   onAddChapterSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onCancelAddChapter: () => void;
@@ -275,12 +316,13 @@ function SortableVolumeItem({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: volume.id,
     disabled: !editing || isPending,
+    data: { type: 'volume' },
   });
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
 
@@ -333,34 +375,29 @@ function SortableVolumeItem({
         )}
       </Box>
 
-      {/* Chapter list with inner sortable context */}
+      {/* Chapter list — SortableContext only; DndContext lives in the parent SerialEditor */}
       {vChapters.length > 0 ? (
-        <DndContext
-          sensors={chapterSensors}
-          collisionDetection={closestCenter}
-          onDragEnd={(event) => onChapterDragEnd(volume.id, event)}
+        <SortableContext
+          items={vChapters.map((c) => c.id)}
+          strategy={verticalListSortingStrategy}
         >
-          <SortableContext
-            items={vChapters.map((c) => c.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
-              {vChapters.map((chapter) => (
-                <SortableChapterItem
-                  key={chapter.id}
-                  chapter={chapter}
-                  editing={editing}
-                  isRenaming={renamingChapterId === chapter.id}
-                  isPending={isPending}
-                  onStartRename={() => onStartRenameChapter(chapter.id)}
-                  onSaveRename={onSaveRenameChapter}
-                  onCancelRename={onCancelRenameChapter}
-                  onDelete={() => onDeleteChapter(chapter.id, chapter.displayName)}
-                />
-              ))}
-            </ol>
-          </SortableContext>
-        </DndContext>
+          <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+            {vChapters.map((chapter) => (
+              <SortableChapterItem
+                key={chapter.id}
+                chapter={chapter}
+                editing={editing}
+                isRenaming={renamingChapterId === chapter.id}
+                isPending={isPending}
+                isVolumeDragging={isVolumeDragging}
+                onStartRename={() => onStartRenameChapter(chapter.id)}
+                onSaveRename={onSaveRenameChapter}
+                onCancelRename={onCancelRenameChapter}
+                onDelete={() => onDeleteChapter(chapter.id, chapter.displayName)}
+              />
+            ))}
+          </ol>
+        </SortableContext>
       ) : (
         <Text muted className="pl-3">No chapters yet.</Text>
       )}
@@ -403,8 +440,9 @@ function SortableVolumeItem({
 
 /**
  * Client Component managing edit mode for a serial's volumes and chapters.
- * In edit mode, volumes and chapters are reorderable via drag-and-drop (dnd-kit).
- * Reorder actions update the server and then refresh the page; no optimistic UI.
+ * Uses a single DndContext for both volume reordering and chapter reordering
+ * (including cross-volume moves). DragOverlay renders an isolated clone so the
+ * drag preview is never distorted by its flex container.
  *
  * @example
  * <SerialEditor
@@ -419,7 +457,7 @@ function SortableVolumeItem({
  *   renameChapterAction={renameChapterForSerial}
  *   renameVolumeAction={renameVolumeForSerial}
  *   reorderVolumesAction={reorderVolumesForSerial}
- *   reorderChaptersAction={reorderChaptersForSerial}
+ *   reorderAllChaptersAction={reorderAllChaptersForSerial}
  *   updateSerialTypesAction={updateSerialTypesForSerial}
  * />
  */
@@ -435,7 +473,7 @@ export function SerialEditor({
   renameChapterAction,
   renameVolumeAction,
   reorderVolumesAction,
-  reorderChaptersAction,
+  reorderAllChaptersAction,
   updateSerialTypesAction,
 }: SerialEditorProps) {
   const router = useRouter();
@@ -449,11 +487,11 @@ export function SerialEditor({
   const [addingVolume, setAddingVolume] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Local optimistic ordering — updated immediately on drag end, then server-confirmed on refresh
+  // Local optimistic ordering — updated immediately on drag, server-confirmed on refresh.
   const [volumes, setVolumes] = useState<Volume[]>(initialVolumes);
   const [chaptersByVolume, setChaptersByVolume] = useState<Record<number, Chapter[]>>(initialChaptersByVolume);
 
-  // Sync with server-side props when the page refreshes
+  // Sync with server-side props when the page refreshes.
   const prevVolumes = useRef(initialVolumes);
   if (prevVolumes.current !== initialVolumes) {
     prevVolumes.current = initialVolumes;
@@ -461,15 +499,26 @@ export function SerialEditor({
     setChaptersByVolume(initialChaptersByVolume);
   }
 
-  // Refs for "add" forms so we can reset them after submission
+  // Tracks what is currently being dragged; drives DragOverlay content.
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeDragType, setActiveDragType] = useState<'volume' | 'chapter' | null>(null);
+
+  // Refs for "add" forms so we can reset them after submission.
   const addVolumeFormRef = useRef<HTMLFormElement>(null);
   const addChapterFormRefs = useRef<Map<number, HTMLFormElement>>(new Map());
 
-  const volumeSensors = useSensors(
+  const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  function findVolumeForChapter(chapterId: number, state: Record<number, Chapter[]>): number | null {
+    for (const [volumeId, chs] of Object.entries(state)) {
+      if (chs.some((c) => c.id === chapterId)) return Number(volumeId);
+    }
+    return null;
+  }
 
   function runTypeUpdate(newVolumeType: string, newChapterType: string) {
     const fd = new FormData();
@@ -498,39 +547,108 @@ export function SerialEditor({
     }
   }
 
-  function handleVolumeDragEnd(event: DragEndEvent) {
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as number);
+    setActiveDragType(event.active.data.current?.type ?? null);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over || active.data.current?.type !== 'chapter') return;
 
-    const oldIndex = volumes.findIndex((v) => v.id === active.id);
-    const newIndex = volumes.findIndex((v) => v.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const activeChapterId = active.id as number;
+    const overId = over.id as number;
 
-    const reordered = arrayMove(volumes, oldIndex, newIndex);
-    setVolumes(reordered);
+    setChaptersByVolume((prev) => {
+      const activeVolumeId = findVolumeForChapter(activeChapterId, prev);
+      if (activeVolumeId === null) return prev;
 
-    startTransition(async () => {
-      await reorderVolumesAction(reordered.map((v) => v.id));
-      router.refresh();
+      let targetVolumeId: number | null = null;
+      if (over.data.current?.type === 'volume') {
+        targetVolumeId = overId;
+      } else if (over.data.current?.type === 'chapter') {
+        targetVolumeId = findVolumeForChapter(overId, prev);
+      }
+
+      // Only act on cross-volume moves; within-volume sorting is handled by DragEnd.
+      if (targetVolumeId === null || targetVolumeId === activeVolumeId) return prev;
+
+      const activeChapter = prev[activeVolumeId]?.find((c) => c.id === activeChapterId);
+      if (!activeChapter) return prev;
+
+      const sourceChapters = prev[activeVolumeId].filter((c) => c.id !== activeChapterId);
+      const destChapters = prev[targetVolumeId] ?? [];
+
+      let newDestChapters: Chapter[];
+      if (over.data.current?.type === 'chapter') {
+        const overIndex = destChapters.findIndex((c) => c.id === overId);
+        newDestChapters = overIndex >= 0
+          ? [...destChapters.slice(0, overIndex), activeChapter, ...destChapters.slice(overIndex)]
+          : [...destChapters, activeChapter];
+      } else {
+        newDestChapters = [...destChapters, activeChapter];
+      }
+
+      return { ...prev, [activeVolumeId]: sourceChapters, [targetVolumeId]: newDestChapters };
     });
   }
 
-  function handleChapterDragEnd(volumeId: number, event: DragEndEvent) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    setActiveId(null);
+    setActiveDragType(null);
+    if (!over) return;
 
-    const vChapters = chaptersByVolume[volumeId] ?? [];
-    const oldIndex = vChapters.findIndex((c) => c.id === active.id);
-    const newIndex = vChapters.findIndex((c) => c.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const activeNumId = active.id as number;
+    const overNumId = over.id as number;
 
-    const reordered = arrayMove(vChapters, oldIndex, newIndex);
-    setChaptersByVolume((prev) => ({ ...prev, [volumeId]: reordered }));
+    if (active.data.current?.type === 'volume') {
+      if (activeNumId === overNumId) return;
+      const oldIndex = volumes.findIndex((v) => v.id === activeNumId);
+      const newIndex = volumes.findIndex((v) => v.id === overNumId);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const reordered = arrayMove(volumes, oldIndex, newIndex);
+      setVolumes(reordered);
+      startTransition(async () => {
+        await reorderVolumesAction(reordered.map((v) => v.id));
+        router.refresh();
+      });
+    } else if (active.data.current?.type === 'chapter') {
+      // Cross-volume moves were applied in onDragOver; apply within-volume arrayMove here.
+      let finalChaptersByVolume = chaptersByVolume;
+      const currentVolumeId = findVolumeForChapter(activeNumId, chaptersByVolume);
 
-    startTransition(async () => {
-      await reorderChaptersAction(volumeId, reordered.map((c) => c.id));
-      router.refresh();
-    });
+      if (
+        currentVolumeId !== null &&
+        over.data.current?.type === 'chapter' &&
+        activeNumId !== overNumId
+      ) {
+        const overVolumeId = findVolumeForChapter(overNumId, chaptersByVolume);
+        if (overVolumeId === currentVolumeId) {
+          const vChapters = chaptersByVolume[currentVolumeId] ?? [];
+          const oldIdx = vChapters.findIndex((c) => c.id === activeNumId);
+          const newIdx = vChapters.findIndex((c) => c.id === overNumId);
+          if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
+            const reordered = arrayMove(vChapters, oldIdx, newIdx);
+            finalChaptersByVolume = { ...chaptersByVolume, [currentVolumeId]: reordered };
+            setChaptersByVolume(finalChaptersByVolume);
+          }
+        }
+      }
+
+      startTransition(async () => {
+        await reorderAllChaptersAction(
+          volumes.map((v) => v.id),
+          Object.fromEntries(
+            Object.entries(finalChaptersByVolume).map(([vid, chs]) => [
+              Number(vid),
+              chs.map((c) => c.id),
+            ]),
+          ),
+        );
+        router.refresh();
+      });
+    }
   }
 
   function handleAddChapterSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -542,8 +660,12 @@ export function SerialEditor({
     });
   }
 
-  const dialogTitle = `Delete "${pendingDelete?.name}"?`;
+  const activeVolume = activeId !== null ? volumes.find((v) => v.id === activeId) : null;
+  const activeChapter = activeId !== null
+    ? Object.values(chaptersByVolume).flat().find((c) => c.id === activeId)
+    : null;
 
+  const dialogTitle = `Delete "${pendingDelete?.name}"?`;
   const dialogBody =
     pendingDelete?.type === 'volume'
       ? 'This will permanently delete the volume and all its chapters. This action cannot be undone.'
@@ -600,12 +722,14 @@ export function SerialEditor({
         </Box>
       )}
 
-      {volumes.length > 0 ? (
-        <DndContext
-          sensors={volumeSensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleVolumeDragEnd}
-        >
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        {volumes.length > 0 ? (
           <SortableContext
             items={volumes.map((v) => v.id)}
             strategy={verticalListSortingStrategy}
@@ -621,6 +745,7 @@ export function SerialEditor({
                   isRenamingVolume={renamingVolumeId === volume.id}
                   renamingChapterId={renamingChapterId}
                   addingChapterToVolumeId={addingChapterToVolumeId}
+                  isVolumeDragging={activeDragType === 'volume'}
                   onStartRenameVolume={() => { setRenamingVolumeId(volume.id); setRenamingChapterId(null); }}
                   onSaveRenameVolume={(fd) => run(renameVolumeAction, fd)}
                   onCancelRenameVolume={() => setRenamingVolumeId(null)}
@@ -629,8 +754,6 @@ export function SerialEditor({
                   onSaveRenameChapter={(fd) => run(renameChapterAction, fd)}
                   onCancelRenameChapter={() => setRenamingChapterId(null)}
                   onDeleteChapter={(id, name) => setPendingDelete({ type: 'chapter', id, name })}
-                  onChapterDragEnd={handleChapterDragEnd}
-                  chapterSensors={volumeSensors}
                   onAddChapterClick={(volId) => { setAddingChapterToVolumeId(volId); setAddingVolume(false); }}
                   onAddChapterSubmit={handleAddChapterSubmit}
                   onCancelAddChapter={() => setAddingChapterToVolumeId(null)}
@@ -642,10 +765,20 @@ export function SerialEditor({
               ))}
             </Box>
           </SortableContext>
-        </DndContext>
-      ) : (
-        <Text muted>No volumes yet. Add a volume to get started.</Text>
-      )}
+        ) : (
+          <Text muted>No volumes yet. Add a volume to get started.</Text>
+        )}
+
+        <DragOverlay>
+          {activeVolume && (
+            <VolumeDragPreview
+              volume={activeVolume}
+              chapters={chaptersByVolume[activeVolume.id] ?? []}
+            />
+          )}
+          {activeChapter && <ChapterDragPreview chapter={activeChapter} />}
+        </DragOverlay>
+      </DndContext>
 
       {/* Add volume — toggle between button and inline form */}
       {editing && (
