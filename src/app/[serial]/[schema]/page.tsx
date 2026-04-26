@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
 import { db } from '@/db/index';
 import { serials, pageSchemas, pages } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
+import { updateSchema } from '../actions';
+import { SchemaIndexEditor } from './SchemaIndexEditor';
 
 interface Props {
   params: Promise<{ serial: string; schema: string }>;
@@ -42,23 +43,24 @@ export default async function SchemaIndexPage({ params }: Props) {
     .where(eq(pages.schemaId, schema.id))
     .orderBy(pages.name);
 
+  const updateSchemaForSerial = updateSchema.bind(null, serial.id);
+
   return (
     <main className="flex flex-col items-center px-6 py-16 gap-8">
       <Box col className="w-full max-w-2xl gap-6">
-        <Box col className="gap-2">
-          <Text muted className="text-sm">
-            <Link href={`/${serialSlug}`} className="hover:underline">
-              {serial.title}
-            </Link>
-          </Text>
-          <Text variant="h1">{schema.name}</Text>
-        </Box>
+        <Text muted className="text-sm">
+          <Link href={`/${serialSlug}`} className="hover:underline">
+            {serial.title}
+          </Link>
+        </Text>
 
-        {schema.body && (
-          <div className="prose prose-gray max-w-none text-gray-700">
-            <ReactMarkdown>{schema.body}</ReactMarkdown>
-          </div>
-        )}
+        <SchemaIndexEditor
+          schemaId={schema.id}
+          initialName={schema.name}
+          initialBody={schema.body}
+          serialSlug={serialSlug}
+          updateSchemaAction={updateSchemaForSerial}
+        />
 
         <Box col className="gap-3">
           <Text variant="h2">Pages</Text>
