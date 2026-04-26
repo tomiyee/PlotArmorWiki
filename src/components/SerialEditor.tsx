@@ -3,7 +3,25 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faPen, faPlus, faTrash, faGripVertical } from '@fortawesome/free-solid-svg-icons';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Input } from '@/components/ui/input';
@@ -64,6 +82,8 @@ interface SerialEditorProps {
   deleteVolumeAction: (formData: FormData) => Promise<void>;
   renameChapterAction: (formData: FormData) => Promise<void>;
   renameVolumeAction: (formData: FormData) => Promise<void>;
+  reorderVolumesAction: (orderedVolumeIds: number[]) => Promise<void>;
+  reorderChaptersAction: (volumeId: number, orderedChapterIds: number[]) => Promise<void>;
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
 }
 
@@ -129,9 +149,301 @@ function RenameChapterForm({
   );
 }
 
+/**
+ * Sortable row for a single chapter within a volume.
+ * In edit mode the drag handle is visible and the row is draggable.
+ */
+function SortableChapterItem({
+  chapter,
+  editing,
+  isRenaming,
+  isPending,
+  onStartRename,
+  onSaveRename,
+  onCancelRename,
+  onDelete,
+}: {
+  chapter: Chapter;
+  editing: boolean;
+  isRenaming: boolean;
+  isPending: boolean;
+  onStartRename: () => void;
+  onSaveRename: (fd: FormData) => void;
+  onCancelRename: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: chapter.id,
+    disabled: !editing || isPending,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
+    >
+      {editing && isRenaming ? (
+        <RenameChapterForm
+          chapter={chapter}
+          onSave={onSaveRename}
+          onCancel={onCancelRename}
+        />
+      ) : (
+        <>
+          <Box className="items-center gap-2 flex-1 min-w-0">
+            {editing && (
+              <span
+                {...attributes}
+                {...listeners}
+                className="text-gray-400 cursor-grab active:cursor-grabbing touch-none"
+                title="Drag to reorder"
+              >
+                <FontAwesomeIcon icon={faGripVertical} className="h-3 w-3" />
+              </span>
+            )}
+            <span
+              className={`truncate ${editing ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+              onClick={editing ? onStartRename : undefined}
+              title={editing ? 'Click to rename' : undefined}
+            >
+              {chapter.displayName}
+            </span>
+          </Box>
+          <Box className="items-center gap-2 shrink-0">
+            <Text as="span" muted>#{chapter.idx}</Text>
+            {editing && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon-xs"
+                title={`Delete ${chapter.displayName}`}
+                onClick={onDelete}
+              >
+                <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+              </Button>
+            )}
+          </Box>
+        </>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Sortable card for a single volume (including its inner chapter list).
+ * In edit mode the volume header has its own drag handle.
+ */
+function SortableVolumeItem({
+  volume,
+  chapters: vChapters,
+  editing,
+  isPending,
+  isRenamingVolume,
+  renamingChapterId,
+  addingChapterToVolumeId,
+  onStartRenameVolume,
+  onSaveRenameVolume,
+  onCancelRenameVolume,
+  onDeleteVolume,
+  onStartRenameChapter,
+  onSaveRenameChapter,
+  onCancelRenameChapter,
+  onDeleteChapter,
+  onChapterDragEnd,
+  onAddChapterClick,
+  onAddChapterSubmit,
+  onCancelAddChapter,
+  addChapterFormRef,
+}: {
+  volume: Volume;
+  chapters: Chapter[];
+  editing: boolean;
+  isPending: boolean;
+  isRenamingVolume: boolean;
+  renamingChapterId: number | null;
+  addingChapterToVolumeId: number | null;
+  onStartRenameVolume: () => void;
+  onSaveRenameVolume: (fd: FormData) => void;
+  onCancelRenameVolume: () => void;
+  onDeleteVolume: () => void;
+  onStartRenameChapter: (id: number) => void;
+  onSaveRenameChapter: (fd: FormData) => void;
+  onCancelRenameChapter: () => void;
+  onDeleteChapter: (id: number, name: string) => void;
+  onChapterDragEnd: (volumeId: number, event: DragEndEvent) => void;
+  onAddChapterClick: (volumeId: number) => void;
+  onAddChapterSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onCancelAddChapter: () => void;
+  addChapterFormRef: (el: HTMLFormElement | null) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: volume.id,
+    disabled: !editing || isPending,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const isAddingChapterHere = addingChapterToVolumeId === volume.id;
+
+  return (
+    <Box col ref={setNodeRef} style={style} className="gap-2">
+      {/* Volume header */}
+      <Box className="items-center justify-between gap-2">
+        {editing && isRenamingVolume ? (
+          <RenameVolumeForm
+            volume={volume}
+            onSave={onSaveRenameVolume}
+            onCancel={onCancelRenameVolume}
+          />
+        ) : (
+          <>
+            <Box className="items-center gap-2 flex-1 min-w-0">
+              {editing && (
+                <span
+                  {...attributes}
+                  {...listeners}
+                  className="text-gray-400 cursor-grab active:cursor-grabbing touch-none"
+                  title="Drag to reorder volume"
+                >
+                  <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
+                </span>
+              )}
+              <Text
+                variant="h4"
+                className={editing ? 'cursor-pointer hover:text-primary transition-colors' : ''}
+                onClick={editing ? onStartRenameVolume : undefined}
+                title={editing ? 'Click to rename' : undefined}
+              >
+                {volume.displayName}
+              </Text>
+            </Box>
+            {editing && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon-sm"
+                title={`Delete ${volume.displayName} and all its chapters`}
+                onClick={onDeleteVolume}
+              >
+                <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
+              </Button>
+            )}
+          </>
+        )}
+      </Box>
+
+      {/* Chapter list with inner sortable context */}
+      {vChapters.length > 0 ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event) => onChapterDragEnd(volume.id, event)}
+        >
+          <SortableContext
+            items={vChapters.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+              {vChapters.map((chapter) => (
+                <SortableChapterItem
+                  key={chapter.id}
+                  chapter={chapter}
+                  editing={editing}
+                  isRenaming={renamingChapterId === chapter.id}
+                  isPending={isPending}
+                  onStartRename={() => onStartRenameChapter(chapter.id)}
+                  onSaveRename={onSaveRenameChapter}
+                  onCancelRename={onCancelRenameChapter}
+                  onDelete={() => onDeleteChapter(chapter.id, chapter.displayName)}
+                />
+              ))}
+            </ol>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <Text muted className="pl-3">No chapters yet.</Text>
+      )}
+
+      {/* Add chapter — toggle between button and inline form */}
+      {editing && (
+        isAddingChapterHere ? (
+          <form
+            ref={addChapterFormRef}
+            onSubmit={onAddChapterSubmit}
+            className="flex gap-2 items-center pl-3 mt-1"
+          >
+            <input type="hidden" name="volumeId" value={volume.id} />
+            <Input
+              name="displayName"
+              required
+              placeholder="Chapter name…"
+              autoFocus
+              className="flex-1"
+              onKeyDown={(e) => e.key === 'Escape' && onCancelAddChapter()}
+            />
+            <Button type="submit" size="sm" disabled={isPending}>Add chapter</Button>
+          </form>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="self-start ml-3 mt-1"
+            onClick={() => onAddChapterClick(volume.id)}
+          >
+            <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+            Add chapter
+          </Button>
+        )
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Client Component managing edit mode for a serial's volumes and chapters.
+ * In edit mode, volumes and chapters are reorderable via drag-and-drop (dnd-kit).
+ * Reorder actions update the server and then refresh the page; no optimistic UI.
+ *
+ * @example
+ * <SerialEditor
+ *   volumes={volumeList}
+ *   chaptersByVolume={chaptersByVolume}
+ *   chapterType="Chapter"
+ *   volumeType="Volume"
+ *   addChapterAction={addChapterForSerial}
+ *   addVolumeAction={addVolumeForSerial}
+ *   deleteChapterAction={deleteChapterForSerial}
+ *   deleteVolumeAction={deleteVolumeForSerial}
+ *   renameChapterAction={renameChapterForSerial}
+ *   renameVolumeAction={renameVolumeForSerial}
+ *   reorderVolumesAction={reorderVolumesForSerial}
+ *   reorderChaptersAction={reorderChaptersForSerial}
+ *   updateSerialTypesAction={updateSerialTypesForSerial}
+ * />
+ */
 export function SerialEditor({
-  volumes,
-  chaptersByVolume,
+  volumes: initialVolumes,
+  chaptersByVolume: initialChaptersByVolume,
   chapterType,
   volumeType,
   addChapterAction,
@@ -140,6 +452,8 @@ export function SerialEditor({
   deleteVolumeAction,
   renameChapterAction,
   renameVolumeAction,
+  reorderVolumesAction,
+  reorderChaptersAction,
   updateSerialTypesAction,
 }: SerialEditorProps) {
   const router = useRouter();
@@ -153,9 +467,27 @@ export function SerialEditor({
   const [addingVolume, setAddingVolume] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // Local optimistic ordering — updated immediately on drag end, then server-confirmed on refresh
+  const [volumes, setVolumes] = useState<Volume[]>(initialVolumes);
+  const [chaptersByVolume, setChaptersByVolume] = useState<Record<number, Chapter[]>>(initialChaptersByVolume);
+
+  // Sync with server-side props when the page refreshes
+  const prevVolumes = useRef(initialVolumes);
+  if (prevVolumes.current !== initialVolumes) {
+    prevVolumes.current = initialVolumes;
+    setVolumes(initialVolumes);
+    setChaptersByVolume(initialChaptersByVolume);
+  }
+
   // Refs for "add" forms so we can reset them after submission
   const addVolumeFormRef = useRef<HTMLFormElement>(null);
   const addChapterFormRefs = useRef<Map<number, HTMLFormElement>>(new Map());
+
+  const volumeSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   function runTypeUpdate(newVolumeType: string, newChapterType: string) {
     const fd = new FormData();
@@ -182,6 +514,50 @@ export function SerialEditor({
       fd.set('chapterId', String(pendingDelete.id));
       run(deleteChapterAction, fd, () => setPendingDelete(null));
     }
+  }
+
+  function handleVolumeDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = volumes.findIndex((v) => v.id === active.id);
+    const newIndex = volumes.findIndex((v) => v.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(volumes, oldIndex, newIndex);
+    setVolumes(reordered);
+
+    startTransition(async () => {
+      await reorderVolumesAction(reordered.map((v) => v.id));
+      router.refresh();
+    });
+  }
+
+  function handleChapterDragEnd(volumeId: number, event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const vChapters = chaptersByVolume[volumeId] ?? [];
+    const oldIndex = vChapters.findIndex((c) => c.id === active.id);
+    const newIndex = vChapters.findIndex((c) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(vChapters, oldIndex, newIndex);
+    setChaptersByVolume((prev) => ({ ...prev, [volumeId]: reordered }));
+
+    startTransition(async () => {
+      await reorderChaptersAction(volumeId, reordered.map((c) => c.id));
+      router.refresh();
+    });
+  }
+
+  function handleAddChapterSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    run(addChapterAction, new FormData(form), () => {
+      form.reset();
+      setAddingChapterToVolumeId(null);
+    });
   }
 
   const dialogTitle =
@@ -246,141 +622,47 @@ export function SerialEditor({
       )}
 
       {volumes.length > 0 ? (
-        <Box col className="gap-5">
-          {volumes.map((volume) => {
-            const vChapters = chaptersByVolume[volume.id] ?? [];
-            const isRenamingVolume = renamingVolumeId === volume.id;
-
-            return (
-              <Box col key={volume.id} className="gap-2">
-                {/* Volume header */}
-                <Box className="items-center justify-between gap-2">
-                  {editing && isRenamingVolume ? (
-                    <RenameVolumeForm
-                      volume={volume}
-                      onSave={(fd) => run(renameVolumeAction, fd)}
-                      onCancel={() => setRenamingVolumeId(null)}
-                    />
-                  ) : (
-                    <>
-                      <Text
-                        variant="h4"
-                        className={editing ? 'cursor-pointer hover:text-primary transition-colors' : ''}
-                        onClick={editing ? () => { setRenamingVolumeId(volume.id); setRenamingChapterId(null); } : undefined}
-                        title={editing ? 'Click to rename' : undefined}
-                      >
-                        {volume.displayName}
-                      </Text>
-                      {editing && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon-sm"
-                          title={`Delete ${volume.displayName} and all its chapters`}
-                          onClick={() => setPendingDelete({ type: 'volume', id: volume.id, name: volume.displayName })}
-                        >
-                          <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </Box>
-
-                {/* Chapter list */}
-                {vChapters.length > 0 ? (
-                  <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
-                    {vChapters.map((chapter) => {
-                      const isRenamingChapter = renamingChapterId === chapter.id;
-                      return (
-                        <li
-                          key={chapter.id}
-                          className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
-                        >
-                          {editing && isRenamingChapter ? (
-                            <RenameChapterForm
-                              chapter={chapter}
-                              onSave={(fd) => run(renameChapterAction, fd)}
-                              onCancel={() => setRenamingChapterId(null)}
-                            />
-                          ) : (
-                            <>
-                              <span
-                                className={editing ? 'cursor-pointer hover:text-primary transition-colors' : ''}
-                                onClick={editing ? () => { setRenamingChapterId(chapter.id); setRenamingVolumeId(null); } : undefined}
-                                title={editing ? 'Click to rename' : undefined}
-                              >
-                                {chapter.displayName}
-                              </span>
-                              <Box className="items-center gap-2">
-                                <Text as="span" muted>#{chapter.idx}</Text>
-                                {editing && (
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="icon-xs"
-                                    title={`Delete ${chapter.displayName}`}
-                                    onClick={() => setPendingDelete({ type: 'chapter', id: chapter.id, name: chapter.displayName })}
-                                  >
-                                    <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
-                                  </Button>
-                                )}
-                              </Box>
-                            </>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                ) : (
-                  <Text muted className="pl-3">No chapters yet.</Text>
-                )}
-
-                {/* Add chapter — toggle between button and inline form */}
-                {editing && (
-                  addingChapterToVolumeId === volume.id ? (
-                    <form
-                      ref={(el) => {
-                        if (el) addChapterFormRefs.current.set(volume.id, el);
-                        else addChapterFormRefs.current.delete(volume.id);
-                      }}
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const form = e.currentTarget;
-                        run(addChapterAction, new FormData(form), () => {
-                          form.reset();
-                          setAddingChapterToVolumeId(null);
-                        });
-                      }}
-                      className="flex gap-2 items-center pl-3 mt-1"
-                    >
-                      <input type="hidden" name="volumeId" value={volume.id} />
-                      <Input
-                        name="displayName"
-                        required
-                        placeholder="Chapter name…"
-                        autoFocus
-                        className="flex-1"
-                        onKeyDown={(e) => e.key === 'Escape' && setAddingChapterToVolumeId(null)}
-                      />
-                      <Button type="submit" size="sm" disabled={isPending}>Add chapter</Button>
-                    </form>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="self-start ml-3 mt-1"
-                      onClick={() => { setAddingChapterToVolumeId(volume.id); setAddingVolume(false); }}
-                    >
-                      <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-                      Add chapter
-                    </Button>
-                  )
-                )}
-              </Box>
-            );
-          })}
-        </Box>
+        <DndContext
+          sensors={volumeSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleVolumeDragEnd}
+        >
+          <SortableContext
+            items={volumes.map((v) => v.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <Box col className="gap-5">
+              {volumes.map((volume) => (
+                <SortableVolumeItem
+                  key={volume.id}
+                  volume={volume}
+                  chapters={chaptersByVolume[volume.id] ?? []}
+                  editing={editing}
+                  isPending={isPending}
+                  isRenamingVolume={renamingVolumeId === volume.id}
+                  renamingChapterId={renamingChapterId}
+                  addingChapterToVolumeId={addingChapterToVolumeId}
+                  onStartRenameVolume={() => { setRenamingVolumeId(volume.id); setRenamingChapterId(null); }}
+                  onSaveRenameVolume={(fd) => run(renameVolumeAction, fd)}
+                  onCancelRenameVolume={() => setRenamingVolumeId(null)}
+                  onDeleteVolume={() => setPendingDelete({ type: 'volume', id: volume.id, name: volume.displayName })}
+                  onStartRenameChapter={(id) => { setRenamingChapterId(id); setRenamingVolumeId(null); }}
+                  onSaveRenameChapter={(fd) => run(renameChapterAction, fd)}
+                  onCancelRenameChapter={() => setRenamingChapterId(null)}
+                  onDeleteChapter={(id, name) => setPendingDelete({ type: 'chapter', id, name })}
+                  onChapterDragEnd={handleChapterDragEnd}
+                  onAddChapterClick={(volId) => { setAddingChapterToVolumeId(volId); setAddingVolume(false); }}
+                  onAddChapterSubmit={handleAddChapterSubmit}
+                  onCancelAddChapter={() => setAddingChapterToVolumeId(null)}
+                  addChapterFormRef={(el) => {
+                    if (el) addChapterFormRefs.current.set(volume.id, el);
+                    else addChapterFormRefs.current.delete(volume.id);
+                  }}
+                />
+              ))}
+            </Box>
+          </SortableContext>
+        </DndContext>
       ) : (
         <Text muted>No volumes yet. Add a volume to get started.</Text>
       )}
