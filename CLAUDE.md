@@ -102,11 +102,14 @@ First-time visitors on any serial default to chapter 1 and see a callout prompti
 - `src/app/page.tsx` — home page; async Server Component that fetches all serials and passes them to `<SerialList>`.
 - `src/app/new/page.tsx` — serial creation form (title, description, authors, splash art URL, volume type, chapter type).
 - `src/app/new/actions.ts` — `createSerial` Server Action; inserts into `serials` and `serial_authors` (storing the computed slug, chapter type, and volume type), redirects to `/{slug}`.
-- `src/app/[serial]/page.tsx` — serial detail page; resolves serial via `WHERE slug = ?`, lists chapters grouped by volume, delegates editing to `<SerialEditor>`.
-- `src/app/[serial]/actions.ts` — `addVolume`, `addChapter`, `updateSerialTypes`, `reorderVolumes`, and `reorderChapters` Server Actions; `reorderChapters` re-sequences global `idx` values for all affected chapters in a single transaction to maintain the serial-level linear order.
+- `src/app/[serial]/page.tsx` — serial detail page; resolves serial via `WHERE slug = ?`, lists chapters grouped by volume, delegates editing to `<SerialEditor>` and schema management to `<SchemaManager>`.
+- `src/app/[serial]/actions.ts` — Server Actions for volume/chapter CRUD (`addVolume`, `addChapter`, `deleteVolume`, `deleteChapter`, `renameVolume`, `renameChapter`, `updateSerialTypes`, `reorderVolumes`, `reorderAllChapters`) and schema/section/floater-row CRUD (`addSchema`, `deleteSchema`, `renameSchema`, `addSection`, `deleteSection`, `renameSection`, `reorderSections`, `addFloaterRow`, `deleteFloaterRow`, `renameFloaterRow`, `reorderFloaterRows`).
 - `src/components/SerialEditor.tsx` — Client Component managing edit mode for the serial's volumes and chapters; in edit mode shows volume/chapter type dropdowns (persisted immediately on change), inline rename forms, add-volume/chapter forms, delete confirmations, and drag-and-drop reordering via `@dnd-kit`.
+- `src/components/SchemaManager.tsx` — Client Component for managing page schemas; expand/collapse per-schema detail with section and floater-row add/rename/reorder/delete.
+- `src/components/RenameForm.tsx` — shared generic inline rename form (hidden ID field + text input + Save/Cancel); used by `SchemaManager`.
 - `src/components/Navbar.tsx` — shared navbar with site logo and auth placeholder.
 - `src/components/SerialList.tsx` — Client Component owning the search input; filters serial list client-side by title.
+- `src/hooks/useServerAction.ts` — `useServerAction()` hook; wraps a server action in `useTransition` + `router.refresh()`. Returns `{ run, isPending }`. Use in all Client Components that call Server Actions.
 - `src/lib/serial-types.ts` — shared `ChapterType`/`VolumeType` types, `CHAPTER_TYPES`/`VOLUME_TYPES` arrays, `parseChapterType`/`parseVolumeType` helpers, and `CHAPTER_TYPE_OPTIONS`/`VOLUME_TYPE_OPTIONS` for `<Select>` components. Single source of truth — import from here instead of duplicating in action files or components.
 - `src/lib/slug.ts` — `titleToSlug` utility; slug is computed at creation time and stored in `serials.slug`.
 - `src/lib/utils.ts` — `cn()` utility for Tailwind class merging (Shadcn UI helper).
@@ -120,6 +123,7 @@ Always use the design-system components in `src/components/ui/` instead of bare 
 |---|---|
 | `<input>` | `<Input>` from `@/components/ui/input` |
 | `<select>` | `<Select>` from `@/components/ui/select` |
+| `<button>` | `<Button>` from `@/components/ui/button` |
 | `<h1>`–`<h4>`, `<p>`, `<label>`, `<span>` (text) | `<Text variant="…">` from `@/components/ui/text` |
 
 `<Text>` variants and their default elements: `h1` → `<h1>`, `h2` → `<h2>`, `h3` → `<h3>`, `h4` → `<h4>`, `body` → `<p>` (gray-700), `faint` → `<p>` (gray-400), `label` → `<span>`. Pass `muted` (boolean) to override any variant's text color to gray-500. Override the rendered element with `as` (e.g. `<Text as="label" variant="label" htmlFor="…">`). One-off spacing or layout tweaks go in `className`.

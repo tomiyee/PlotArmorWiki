@@ -40,7 +40,8 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from '@/lib/serial-types';
+import { useServerAction } from '@/hooks/useServerAction';
+import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS, ChapterType, VolumeType } from '@/lib/serial-types';
 
 interface Chapter {
   id: number;
@@ -64,8 +65,8 @@ interface PendingDelete {
 interface SerialEditorProps {
   volumes: Volume[];
   chaptersByVolume: Record<number, Chapter[]>;
-  chapterType: string;
-  volumeType: string;
+  chapterType: ChapterType;
+  volumeType: VolumeType;
   addChapterAction: (formData: FormData) => Promise<void>;
   addVolumeAction: (formData: FormData) => Promise<void>;
   deleteChapterAction: (formData: FormData) => Promise<void>;
@@ -476,7 +477,7 @@ export function SerialEditor({
   reorderAllChaptersAction,
   updateSerialTypesAction,
 }: SerialEditorProps) {
-  const router = useRouter();
+  const { run, isPending } = useServerAction();
   const [editing, setEditing] = useState(false);
   const [currentChapterType, setCurrentChapterType] = useState(chapterType);
   const [currentVolumeType, setCurrentVolumeType] = useState(volumeType);
@@ -485,7 +486,10 @@ export function SerialEditor({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [addingChapterToVolumeId, setAddingChapterToVolumeId] = useState<number | null>(null);
   const [addingVolume, setAddingVolume] = useState(false);
-  const [isPending, startTransition] = useTransition();
+
+
+  const router = useRouter();
+  const [, startTransition] = useTransition();
 
   // Local optimistic ordering — updated immediately on drag, server-confirmed on refresh.
   const [volumes, setVolumes] = useState<Volume[]>(initialVolumes);
@@ -525,14 +529,6 @@ export function SerialEditor({
     fd.set('chapterType', newChapterType);
     fd.set('volumeType', newVolumeType);
     run(updateSerialTypesAction, fd);
-  }
-
-  function run(action: (fd: FormData) => Promise<void>, fd: FormData, onDone?: () => void) {
-    startTransition(async () => {
-      await action(fd);
-      router.refresh();
-      onDone?.();
-    });
   }
 
   function confirmDelete() {
@@ -665,7 +661,6 @@ export function SerialEditor({
     ? Object.values(chaptersByVolume).flat().find((c) => c.id === activeId)
     : null;
 
-  const dialogTitle = `Delete "${pendingDelete?.name}"?`;
   const dialogBody =
     pendingDelete?.type === 'volume'
       ? 'This will permanently delete the volume and all its chapters. This action cannot be undone.'
@@ -675,22 +670,20 @@ export function SerialEditor({
     <section className="flex flex-col gap-4 mt-4">
       <Box className="items-center justify-between">
         <Text variant="h2">Volumes &amp; Chapters</Text>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => {
             setEditing((prev) => !prev);
             setRenamingVolumeId(null);
             setRenamingChapterId(null);
           }}
           title={editing ? 'Exit edit mode' : 'Edit volumes and chapters'}
-          className={`rounded-md p-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-            editing
-              ? 'bg-primary text-primary-foreground'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-          }`}
+          className={editing ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-gray-500 hover:text-gray-700'}
         >
           <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-        </button>
+        </Button>
       </Box>
 
       {editing && (
@@ -826,7 +819,7 @@ export function SerialEditor({
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogTitle>Delete &ldquo;{pendingDelete?.name}&rdquo;?</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <DialogDescription>{dialogBody}</DialogDescription>

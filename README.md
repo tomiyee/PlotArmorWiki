@@ -53,9 +53,10 @@ Schema structure (sections, floater rows) is versioned by wall-clock time. Page 
 ```
 serials          id, title, slug, description, splash_art_url, chapter_type, volume_type
 serial_authors   serial_id, name, display_order
-chapters         id, serial_id, display_name, idx
+volumes          id, serial_id, display_name, idx
+chapters         id, volume_id, display_name, idx
 
-schemas              id, serial_id, name, has_floater
+page_schemas         id, serial_id, name, has_floater
 schema_sections      id, schema_id, name, display_order, created_at, deleted_at
 schema_floater_rows  id, schema_id, label, display_order, created_at, deleted_at
 
