@@ -4,6 +4,7 @@ import { serials, serialAuthors, volumes, chapters, pageSchemas, schemaSections,
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
+  reorderVolumes, reorderAllChapters,
   addSchema, deleteSchema, renameSchema,
   addSection, deleteSection, renameSection, reorderSections,
   addFloaterRow, deleteFloaterRow, renameFloaterRow, reorderFloaterRows,
@@ -104,6 +105,8 @@ export default async function SerialPage({ params }: Props) {
   const deleteVolumeForSerial = deleteVolume.bind(null, serial.id);
   const renameChapterForSerial = renameChapter.bind(null, serial.id);
   const renameVolumeForSerial = renameVolume.bind(null, serial.id);
+  const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
+  const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
 
   const addSchemaForSerial = addSchema.bind(null, serial.id);
@@ -144,6 +147,8 @@ export default async function SerialPage({ params }: Props) {
           deleteVolumeAction={deleteVolumeForSerial}
           renameChapterAction={renameChapterForSerial}
           renameVolumeAction={renameVolumeForSerial}
+          reorderVolumesAction={reorderVolumesForSerial}
+          reorderAllChaptersAction={reorderAllChaptersForSerial}
           updateSerialTypesAction={updateSerialTypesForSerial}
         />
 

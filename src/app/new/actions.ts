@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
 import { serials, serialAuthors } from '@/db/schema';
 import { titleToSlug } from '@/lib/slug';
-import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
+import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
 
 export async function createSerial(formData: FormData) {
   const title = formData.get('title');

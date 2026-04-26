@@ -8,7 +8,7 @@ import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from '@/lib/serialTypes';
+import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from '@/lib/serial-types';
 
 export default function NewSerialPage() {
   const [authors, setAuthors] = useState<string[]>(['']);
@@ -98,7 +98,7 @@ export default function NewSerialPage() {
               <Select
                 id="volumeType"
                 name="volumeType"
-                options={[...VOLUME_TYPE_OPTIONS]}
+                options={VOLUME_TYPE_OPTIONS}
                 defaultValue="Volume"
               />
             </Box>
@@ -107,7 +107,7 @@ export default function NewSerialPage() {
               <Select
                 id="chapterType"
                 name="chapterType"
-                options={[...CHAPTER_TYPE_OPTIONS]}
+                options={CHAPTER_TYPE_OPTIONS}
                 defaultValue="Chapter"
               />
             </Box>

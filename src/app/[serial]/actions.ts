@@ -2,8 +2,8 @@
 
 import { db } from '@/db/index';
 import { serials, volumes, chapters, pageSchemas, schemaSections, schemaFloaterRows } from '@/db/schema';
-import { and, eq, gte, gt, inArray, isNull, lte, max, sql } from 'drizzle-orm';
-import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
+import { and, asc, eq, gte, gt, inArray, isNull, lte, max, sql } from 'drizzle-orm';
+import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
 
 export async function deleteChapter(serialId: number, formData: FormData) {
   const chapterIdRaw = formData.get('chapterId');
@@ -112,6 +112,136 @@ export async function updateSerialTypes(serialId: number, formData: FormData) {
   const chapterType = parseChapterType(formData.get('chapterType'));
   const volumeType = parseVolumeType(formData.get('volumeType'));
   await db.update(serials).set({ chapterType, volumeType }).where(eq(serials.id, serialId));
+}
+
+/**
+ * Reorders volumes for a serial by reassigning `idx` values in a single transaction.
+ * `orderedVolumeIds` must contain every volume ID for the serial — no partial reorders.
+ *
+ * @example
+ * await reorderVolumes(serialId, [3, 1, 2]);
+ */
+export async function reorderVolumes(serialId: number, orderedVolumeIds: number[]) {
+  if (orderedVolumeIds.length === 0) return;
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedVolumeIds.length; i++) {
+      await tx
+        .update(volumes)
+        .set({ idx: i + 1 })
+        .where(and(eq(volumes.id, orderedVolumeIds[i]), eq(volumes.serialId, serialId)));
+    }
+
+    // Re-sequence chapter idx to match the new volume order, preserving within-volume order.
+    let chapterIdx = 0;
+    for (const volumeId of orderedVolumeIds) {
+      const volumeChapters = await tx
+        .select({ id: chapters.id })
+        .from(chapters)
+        .where(eq(chapters.volumeId, volumeId))
+        .orderBy(asc(chapters.idx));
+
+      for (const chapter of volumeChapters) {
+        chapterIdx++;
+        await tx.update(chapters).set({ idx: chapterIdx }).where(eq(chapters.id, chapter.id));
+      }
+    }
+  });
+}
+
+/**
+ * Reorders chapters within a volume, reassigning global `chapters.idx` values so the
+ * serial-level linear order stays strictly increasing (chapters in earlier volumes always
+ * precede those in later volumes). All affected rows are updated in a single transaction.
+ *
+ * `orderedChapterIds` must contain every chapter ID for the target volume — no partial reorders.
+ *
+ * @example
+ * await reorderChapters(serialId, volumeId, [5, 3, 4]);
+ */
+export async function reorderChapters(
+  serialId: number,
+  volumeId: number,
+  orderedChapterIds: number[],
+) {
+  if (orderedChapterIds.length === 0) return;
+
+  await db.transaction(async (tx) => {
+    const [targetVolume] = await tx
+      .select({ idx: volumes.idx })
+      .from(volumes)
+      .where(and(eq(volumes.id, volumeId), eq(volumes.serialId, serialId)));
+
+    if (!targetVolume) throw new Error('Volume not found');
+
+    // baseIdx is the highest global idx among all chapters that precede this volume,
+    // so we can start numbering this volume's chapters immediately after.
+    const precedingResult = await tx
+      .select({ maxIdx: max(chapters.idx) })
+      .from(chapters)
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(and(eq(volumes.serialId, serialId), sql`${volumes.idx} < ${targetVolume.idx}`));
+
+    const baseIdx = precedingResult[0]?.maxIdx ?? 0;
+
+    for (let i = 0; i < orderedChapterIds.length; i++) {
+      await tx
+        .update(chapters)
+        .set({ idx: baseIdx + i + 1 })
+        .where(eq(chapters.id, orderedChapterIds[i]));
+    }
+
+    // Re-sequence later volumes so the global idx remains strictly increasing.
+    // Fetch ordered by idx to preserve their relative order.
+    const followingChapters = await tx
+      .select({ id: chapters.id })
+      .from(chapters)
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(and(eq(volumes.serialId, serialId), sql`${volumes.idx} > ${targetVolume.idx}`))
+      .orderBy(asc(chapters.idx));
+
+    for (let i = 0; i < followingChapters.length; i++) {
+      await tx
+        .update(chapters)
+        .set({ idx: baseIdx + orderedChapterIds.length + i + 1 })
+        .where(eq(chapters.id, followingChapters[i].id));
+    }
+  });
+}
+
+/**
+ * Reassigns every chapter's `idx` and `volumeId` for a serial in one transaction.
+ * Covers both within-volume reordering and cross-volume chapter moves.
+ *
+ * `volumeOrder` defines the global chapter sequence (earlier volumes → lower idx).
+ * `chaptersByVolumeId` must include every chapter in the serial — no partial updates.
+ *
+ * @example
+ * await reorderAllChapters(serialId, [1, 2], { 1: [10, 11], 2: [12] });
+ */
+export async function reorderAllChapters(
+  serialId: number,
+  volumeOrder: number[],
+  chaptersByVolumeId: Record<number, number[]>,
+) {
+  if (volumeOrder.length === 0) return;
+
+  const serialVolumes = await db
+    .select({ id: volumes.id })
+    .from(volumes)
+    .where(eq(volumes.serialId, serialId));
+  const validVolumeIds = new Set(serialVolumes.map((v) => v.id));
+
+  await db.transaction(async (tx) => {
+    let idx = 0;
+    for (const volumeId of volumeOrder) {
+      if (!validVolumeIds.has(volumeId)) continue;
+      for (const chapterId of chaptersByVolumeId[volumeId] ?? []) {
+        idx++;
+        await tx.update(chapters).set({ idx, volumeId }).where(eq(chapters.id, chapterId));
+      }
+    }
+  });
 }
 
 export async function addChapter(serialId: number, formData: FormData) {
