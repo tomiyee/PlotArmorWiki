@@ -1,13 +1,13 @@
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { db } from '@/db/index';
-import { serials, pageSchemas, pages } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { buttonVariants } from '@/components/ui/button';
-import { updateSchema } from '../actions';
-import { SchemaIndexEditor } from './SchemaIndexEditor';
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { db } from "@/db/index";
+import { serials, pageSchemas, pages } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { Text } from "@/components/ui/text";
+import { Box } from "@/components/ui/box";
+import { buttonVariants } from "@/components/ui/button";
+import { updateSchema } from "../actions";
+import { SchemaIndexEditor } from "./SchemaIndexEditor";
 
 interface Props {
   params: Promise<{ serial: string; schema: string }>;
@@ -31,7 +31,12 @@ export default async function SchemaIndexPage({ params }: Props) {
   const [schema] = await db
     .select()
     .from(pageSchemas)
-    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
+    .where(
+      and(
+        eq(pageSchemas.serialId, serial.id),
+        eq(pageSchemas.name, schemaName),
+      ),
+    )
     .limit(1);
 
   if (!schema) {
@@ -68,7 +73,7 @@ export default async function SchemaIndexPage({ params }: Props) {
             <Text variant="h2">Pages</Text>
             <Link
               href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
-              className={buttonVariants({ size: 'sm' })}
+              className={buttonVariants({ size: "sm" })}
             >
               New page
             </Link>
