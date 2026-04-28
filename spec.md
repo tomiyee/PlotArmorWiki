@@ -139,6 +139,15 @@ HAVING chapters.idx = MAX(chapters.idx)
 
 **Introduction chapter follows chapter identity**: `pages.intro_chapter_id` stores a chapter ID. If that chapter is reordered to a later position, the page becomes visible to fewer users; if moved earlier, it becomes visible to more. This is intentional — the author is making a structural correction to when the subject was first introduced, and visibility should follow that correction.
 
+### Write Path
+
+Edits always write at the **head chapter** — the latest chapter in the serial — so fully-caught-up readers see changes immediately. For each versioned dimension being saved, `savePageContent` performs a single upsert keyed by `(pageId, sectionId, chapterId)`:
+
+- If a revision already exists at the head chapter for that dimension, update it in-place.
+- Otherwise insert a new revision row at the head chapter.
+
+This is implemented in `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts` and runs inside a single transaction.
+
 ---
 
 ### Tables
@@ -159,7 +168,7 @@ chapters
   id, volume_id, display_name, idx
 ```
 
-`chapters.idx` is a **global, serial-level** integer used in all range comparisons — it is strictly increasing across all volumes (all chapters in Volume N come before Volume N+1). Volumes are an organizational grouping layer only; they do not affect the SCD query logic.
+`chapters.idx` is a **global, serial-level** integer used in all range comparisons — it is strictly increasing across all volumes (all chapters in Volume N come before Volume N+1). Volumes are an organizational grouping layer only; they do not affect the chapter-range query logic.
 
 #### Schema definition (wall-clock versioned)
 
