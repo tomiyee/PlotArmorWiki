@@ -41,10 +41,11 @@ Every page also records the chapter it was first introduced in, which determines
 
 ## Data model
 
-Content versioning uses **SCD Type 2 (closed-interval)**: every content row carries a `from_chapter_id` and `to_chapter_id` (nullable = current). To read a value at chapter N:
+Content versioning uses **single-timestamp versioning**: every content row carries a single `chapter_id` — the chapter when that value was introduced or last changed. At most one revision per `(page, section, chapter)` tuple (enforced by PK). To read a value at chapter N, find the revision with the highest `chapter.idx` ≤ N:
 
 ```sql
-WHERE from_chapter_idx <= N AND (to_chapter_idx IS NULL OR to_chapter_idx > N)
+SELECT ... GROUP BY section_id HAVING chapters.idx = MAX(chapters.idx)
+WHERE page_id = ? AND chapters.idx <= N
 ```
 
 Schema structure (sections, floater rows) is versioned by wall-clock time. Page content is versioned by chapter index. These two axes are independent.
@@ -62,9 +63,9 @@ schema_sections      id, schema_id, name, display_order, created_at, deleted_at
 schema_floater_rows  id, schema_id, label, display_order, created_at, deleted_at
 
 pages                    id, schema_id, name, intro_chapter_id
-page_section_versions    page_id, section_id, from_chapter_id, to_chapter_id, content
-page_floater_versions    page_id, from_chapter_id, to_chapter_id, image_url
-page_floater_row_versions  page_id, floater_row_id, from_chapter_id, to_chapter_id, content
+page_section_versions    page_id, section_id, chapter_id, content
+page_floater_versions    page_id, chapter_id, image_url
+page_floater_row_versions  page_id, floater_row_id, chapter_id, content
 
 users            id, email, display_name, created_at
 user_progress    user_id, serial_id, chapter_id, updated_at
