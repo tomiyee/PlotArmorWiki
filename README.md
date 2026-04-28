@@ -77,7 +77,7 @@ For the full design spec, see [spec.md](spec.md).
 | Layer | Choice |
 |-------|--------|
 | Framework | Next.js 16 (App Router) |
-| Database | PostgreSQL via Neon |
+| Database | PostgreSQL |
 | ORM | Drizzle ORM |
 | Auth | Auth.js (NextAuth v5) |
 | Search | PostgreSQL full-text search |
@@ -95,9 +95,9 @@ pnpm install
 
 Create `.env.local` with your database connection string.
 
-**Neon (production/staging):**
+**Production/staging:**
 ```
-DATABASE_URL=postgres://<user>:<password>@<host>/neondb?sslmode=require
+DATABASE_URL=postgres://<user>:<password>@<host>/<db>?sslmode=require
 ```
 
 **Local Docker (development):**
