@@ -3,7 +3,7 @@
 Each step is one commit. The app should be in a runnable state after each step.
 See `spec.md` for full design context and `README.md` for a project overview.
 
-Tech stack: Next.js 15 (App Router), TypeScript, Tailwind CSS, Drizzle ORM, Neon (serverless Postgres), Auth.js v5, `react-markdown`, `@uiw/react-md-editor`.
+Tech stack: Next.js 15 (App Router), TypeScript, Tailwind CSS, Drizzle ORM, serverless Postgres, Auth.js v5, `react-markdown`, `@uiw/react-md-editor`.
 
 ---
 
@@ -25,15 +25,15 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
 
 ## ~~Step 1 — Project scaffold~~ ✓
 
-- ~~Run `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, no `turbopack` (compatibility with Neon/Auth.js).~~
+- ~~Run `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, no `turbopack` (compatibility with Auth.js).~~
 - ~~Delete all boilerplate content from `page.tsx`, `globals.css`, etc.~~
 - ~~Verify `npm run dev` starts without errors and the page renders.~~
 - Commit: `chore: scaffold Next.js project`
 
 ## ~~Step 2 — Database + Drizzle setup~~ ✓
 
-- ~~Create a Neon project and copy the connection string to `.env.local` as `DATABASE_URL`.~~
-- ~~Install: `drizzle-orm`, `@neondatabase/serverless`, `drizzle-kit`, `dotenv`.~~
+- ~~Copy the database connection string to `.env.local` as `DATABASE_URL`.~~
+- ~~Install: `drizzle-orm`, `postgres`, `drizzle-kit`, `dotenv`.~~
 - ~~Create `src/db/schema.ts` with all tables defined using Drizzle's schema DSL. Define all tables from the spec in one file:~~
   - ~~`serials` — `id`, `title`, `description`, `splash_art_url`~~
   - ~~`serial_authors` — `serial_id`, `name`, `display_order`~~
@@ -47,11 +47,11 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
   - ~~`page_floater_row_versions` — `page_id`, `floater_row_id`, `from_chapter_id`, `to_chapter_id`, `content`; PK `(page_id, floater_row_id, from_chapter_id)`~~
   - ~~`users` — `id`, `email`, `display_name`, `created_at`~~
   - ~~`user_progress` — `user_id`, `serial_id`, `chapter_id`, `updated_at`; PK `(user_id, serial_id)`~~
-- ~~Create `drizzle.config.ts` pointing at `src/db/schema.ts` and Neon.~~
-- ~~Create `src/db/index.ts` exporting a `db` client using `@neondatabase/serverless`.~~
-- ~~Run `npx drizzle-kit generate` and `npx drizzle-kit migrate` to apply the schema to Neon.~~
+- ~~Create `drizzle.config.ts` pointing at `src/db/schema.ts`.~~
+- ~~Create `src/db/index.ts` exporting a `db` client using `postgres`.~~
+- ~~Run `npx drizzle-kit generate` and `npx drizzle-kit migrate` to apply the schema.~~
 - ~~Add `.env.local` to `.gitignore`.~~
-- Commit: `feat: add Drizzle schema and initial Neon migration`
+- Commit: `feat: add Drizzle schema and initial migration`
 
 ## ~~Step 3 — Home page static shell~~ ✓
 
@@ -151,7 +151,7 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
 
 ## ~~Step 12 — SCD Type 2 versioned read path~~ ✓
 
-**This is the core spoiler-protection query — prototype it in raw SQL against Neon before wiring it into Drizzle.**
+**This is the core spoiler-protection query — prototype it in raw SQL before wiring it into Drizzle.**
 
 - ~~Read the user's progress chapter index (`chapters.idx`) from the cookie set in step 11.~~
 - ~~Replace the "latest only" queries in the page route with the versioned range filter:~~
@@ -160,7 +160,7 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
   ```
 - ~~Apply this filter to `page_section_versions`, `page_floater_versions`, and `page_floater_row_versions`.~~
 - ~~A section with no content row in range renders as empty (not an error).~~
-- ~~Verify by inserting test versioned rows in Neon and toggling the progress cookie.~~
+- ~~Verify by inserting test versioned rows in the database and toggling the progress cookie.~~
 - Commit: `feat: apply SCD Type 2 chapter filter to page content queries`
 
 ## Step 13 — Content editing (no auth gate yet)

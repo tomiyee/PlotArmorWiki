@@ -1,5 +1,5 @@
 {
-  "id": "8b7ea095-389f-41d1-80b6-b6d4fc5f36e1",
+  "id": "d3e18488-04cc-410c-9c7d-f39b782c6a36",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -71,17 +71,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "from_chapter_id": {
-          "name": "from_chapter_id",
+        "chapter_id": {
+          "name": "chapter_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "to_chapter_id": {
-          "name": "to_chapter_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         },
         "content": {
           "name": "content",
@@ -119,25 +113,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "page_floater_row_versions_from_chapter_id_chapters_id_fk": {
-          "name": "page_floater_row_versions_from_chapter_id_chapters_id_fk",
+        "page_floater_row_versions_chapter_id_chapters_id_fk": {
+          "name": "page_floater_row_versions_chapter_id_chapters_id_fk",
           "tableFrom": "page_floater_row_versions",
           "tableTo": "chapters",
           "columnsFrom": [
-            "from_chapter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "page_floater_row_versions_to_chapter_id_chapters_id_fk": {
-          "name": "page_floater_row_versions_to_chapter_id_chapters_id_fk",
-          "tableFrom": "page_floater_row_versions",
-          "tableTo": "chapters",
-          "columnsFrom": [
-            "to_chapter_id"
+            "chapter_id"
           ],
           "columnsTo": [
             "id"
@@ -147,12 +128,12 @@
         }
       },
       "compositePrimaryKeys": {
-        "page_floater_row_versions_page_id_floater_row_id_from_chapter_id_pk": {
-          "name": "page_floater_row_versions_page_id_floater_row_id_from_chapter_id_pk",
+        "page_floater_row_versions_page_id_floater_row_id_chapter_id_pk": {
+          "name": "page_floater_row_versions_page_id_floater_row_id_chapter_id_pk",
           "columns": [
             "page_id",
             "floater_row_id",
-            "from_chapter_id"
+            "chapter_id"
           ]
         }
       },
@@ -171,17 +152,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "from_chapter_id": {
-          "name": "from_chapter_id",
+        "chapter_id": {
+          "name": "chapter_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "to_chapter_id": {
-          "name": "to_chapter_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         },
         "image_url": {
           "name": "image_url",
@@ -205,25 +180,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "page_floater_versions_from_chapter_id_chapters_id_fk": {
-          "name": "page_floater_versions_from_chapter_id_chapters_id_fk",
+        "page_floater_versions_chapter_id_chapters_id_fk": {
+          "name": "page_floater_versions_chapter_id_chapters_id_fk",
           "tableFrom": "page_floater_versions",
           "tableTo": "chapters",
           "columnsFrom": [
-            "from_chapter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "page_floater_versions_to_chapter_id_chapters_id_fk": {
-          "name": "page_floater_versions_to_chapter_id_chapters_id_fk",
-          "tableFrom": "page_floater_versions",
-          "tableTo": "chapters",
-          "columnsFrom": [
-            "to_chapter_id"
+            "chapter_id"
           ],
           "columnsTo": [
             "id"
@@ -233,11 +195,11 @@
         }
       },
       "compositePrimaryKeys": {
-        "page_floater_versions_page_id_from_chapter_id_pk": {
-          "name": "page_floater_versions_page_id_from_chapter_id_pk",
+        "page_floater_versions_page_id_chapter_id_pk": {
+          "name": "page_floater_versions_page_id_chapter_id_pk",
           "columns": [
             "page_id",
-            "from_chapter_id"
+            "chapter_id"
           ]
         }
       },
@@ -320,17 +282,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "from_chapter_id": {
-          "name": "from_chapter_id",
+        "chapter_id": {
+          "name": "chapter_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "to_chapter_id": {
-          "name": "to_chapter_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         },
         "content": {
           "name": "content",
@@ -368,25 +324,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "page_section_versions_from_chapter_id_chapters_id_fk": {
-          "name": "page_section_versions_from_chapter_id_chapters_id_fk",
+        "page_section_versions_chapter_id_chapters_id_fk": {
+          "name": "page_section_versions_chapter_id_chapters_id_fk",
           "tableFrom": "page_section_versions",
           "tableTo": "chapters",
           "columnsFrom": [
-            "from_chapter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "page_section_versions_to_chapter_id_chapters_id_fk": {
-          "name": "page_section_versions_to_chapter_id_chapters_id_fk",
-          "tableFrom": "page_section_versions",
-          "tableTo": "chapters",
-          "columnsFrom": [
-            "to_chapter_id"
+            "chapter_id"
           ],
           "columnsTo": [
             "id"
@@ -396,12 +339,12 @@
         }
       },
       "compositePrimaryKeys": {
-        "page_section_versions_page_id_section_id_from_chapter_id_pk": {
-          "name": "page_section_versions_page_id_section_id_from_chapter_id_pk",
+        "page_section_versions_page_id_section_id_chapter_id_pk": {
+          "name": "page_section_versions_page_id_section_id_chapter_id_pk",
           "columns": [
             "page_id",
             "section_id",
-            "from_chapter_id"
+            "chapter_id"
           ]
         }
       },
