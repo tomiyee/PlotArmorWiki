@@ -10,18 +10,16 @@ CREATE TABLE "chapters" (
 CREATE TABLE "page_floater_row_versions" (
 	"page_id" integer NOT NULL,
 	"floater_row_id" integer NOT NULL,
-	"from_chapter_id" integer NOT NULL,
-	"to_chapter_id" integer,
+	"chapter_id" integer NOT NULL,
 	"content" text DEFAULT '' NOT NULL,
-	CONSTRAINT "page_floater_row_versions_page_id_floater_row_id_from_chapter_id_pk" PRIMARY KEY("page_id","floater_row_id","from_chapter_id")
+	CONSTRAINT "page_floater_row_versions_page_id_floater_row_id_chapter_id_pk" PRIMARY KEY("page_id","floater_row_id","chapter_id")
 );
 --> statement-breakpoint
 CREATE TABLE "page_floater_versions" (
 	"page_id" integer NOT NULL,
-	"from_chapter_id" integer NOT NULL,
-	"to_chapter_id" integer,
+	"chapter_id" integer NOT NULL,
 	"image_url" text,
-	CONSTRAINT "page_floater_versions_page_id_from_chapter_id_pk" PRIMARY KEY("page_id","from_chapter_id")
+	CONSTRAINT "page_floater_versions_page_id_chapter_id_pk" PRIMARY KEY("page_id","chapter_id")
 );
 --> statement-breakpoint
 CREATE TABLE "page_schemas" (
@@ -35,10 +33,9 @@ CREATE TABLE "page_schemas" (
 CREATE TABLE "page_section_versions" (
 	"page_id" integer NOT NULL,
 	"section_id" integer NOT NULL,
-	"from_chapter_id" integer NOT NULL,
-	"to_chapter_id" integer,
+	"chapter_id" integer NOT NULL,
 	"content" text DEFAULT '' NOT NULL,
-	CONSTRAINT "page_section_versions_page_id_section_id_from_chapter_id_pk" PRIMARY KEY("page_id","section_id","from_chapter_id")
+	CONSTRAINT "page_section_versions_page_id_section_id_chapter_id_pk" PRIMARY KEY("page_id","section_id","chapter_id")
 );
 --> statement-breakpoint
 CREATE TABLE "pages" (
@@ -110,16 +107,13 @@ CREATE TABLE "volumes" (
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_volume_id_volumes_id_fk" FOREIGN KEY ("volume_id") REFERENCES "public"."volumes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_floater_row_id_schema_floater_rows_id_fk" FOREIGN KEY ("floater_row_id") REFERENCES "public"."schema_floater_rows"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_from_chapter_id_chapters_id_fk" FOREIGN KEY ("from_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_to_chapter_id_chapters_id_fk" FOREIGN KEY ("to_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_from_chapter_id_chapters_id_fk" FOREIGN KEY ("from_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_to_chapter_id_chapters_id_fk" FOREIGN KEY ("to_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_schemas" ADD CONSTRAINT "page_schemas_serial_id_serials_id_fk" FOREIGN KEY ("serial_id") REFERENCES "public"."serials"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_section_id_schema_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."schema_sections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_from_chapter_id_chapters_id_fk" FOREIGN KEY ("from_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_to_chapter_id_chapters_id_fk" FOREIGN KEY ("to_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_schema_id_page_schemas_id_fk" FOREIGN KEY ("schema_id") REFERENCES "public"."page_schemas"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_intro_chapter_id_chapters_id_fk" FOREIGN KEY ("intro_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "schema_floater_rows" ADD CONSTRAINT "schema_floater_rows_schema_id_page_schemas_id_fk" FOREIGN KEY ("schema_id") REFERENCES "public"."page_schemas"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

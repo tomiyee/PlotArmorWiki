@@ -114,36 +114,26 @@ A user visiting a serial wiki for the first time defaults to the first chapter. 
 
 ### Versioning Strategy
 
-All wiki page content is stored using **SCD Type 2 (closed-interval versioning)**. Every versioned row carries a `from_chapter_id` and `to_chapter_id` (nullable, where `NULL` means current). To read a value at chapter N, query for the row whose interval contains N:
-
-```sql
-WHERE from_chapter_idx <= N AND (to_chapter_idx IS NULL OR to_chapter_idx > N)
-```
+All wiki page content is stored using **single-timestamp versioning**. Every versioned row carries a `chapter_id` — the chapter when that content was introduced or last changed. There is at most one revision per `(page, section, chapter)` tuple; the primary key enforces this.
 
 Schema structure (sections, floater rows) and page content are versioned on separate axes:
 
 - **Schema structure** — versioned by wall-clock time (`created_at` / `deleted_at`). Changes take effect immediately for all editors.
-- **Page content** — versioned by chapter index. Readers see only content from chapters at or before their progress cutoff.
+- **Page content** — versioned by chapter identity. Readers see only content from chapters at or before their progress cutoff.
 
 Each section and floater row has a **stable ID** so that content rows survive renames and reordering of schema attributes without modification.
 
-### SCD Version Chain Invariant
+**Read rule**: To read a content value as of the user's cutoff chapter (idx N), find the revision for that dimension with the highest `chapter.idx` that is ≤ N:
 
-For each content dimension (`page_section_versions` per `(page_id, section_id)`, `page_floater_versions` per `page_id`, `page_floater_row_versions` per `(page_id, floater_row_id)`), the set of version rows must form a **non-overlapping, contiguous sequence** when sorted by `from_chapter.idx`:
+```sql
+SELECT ... FROM page_section_versions
+JOIN chapters ON chapter_id = chapters.id
+WHERE page_id = ? AND chapters.idx <= N
+GROUP BY section_id
+HAVING chapters.idx = MAX(chapters.idx)
+```
 
-- Each version's interval is half-open: `[from_chapter.idx, to_chapter.idx)` — `from` is inclusive, `to` is exclusive (matching the SCD query).
-- For consecutive versions `v[i]` and `v[i+1]`: `v[i].to_chapter_id = v[i+1].from_chapter_id`. This ensures no gap and no overlap between them.
-- The last version (highest `from_chapter.idx`) always has `to_chapter_id = NULL`.
-
-**`from_chapter_id` is the source of truth.** It records when a piece of information was introduced or last changed. `to_chapter_id` is a derived bookkeeping value that exists only to efficiently close a version's interval; it carries no independent editorial meaning.
-
-### Chapter Reordering and Version Chain Repair
-
-When chapters are reordered (volumes reordered, chapters reordered within a volume, or chapters moved across volumes), `chapters.idx` values are reassigned. Because SCD queries resolve `from_chapter_id` and `to_chapter_id` to their current `idx` at render time, a reorder can silently break the chain invariant by creating gaps or overlaps between previously valid version intervals.
-
-**Repair rule**: After any reorder, for every version chain in the serial, sort versions by their current `from_chapter.idx` and rewrite `to_chapter_id` so that `v[i].to_chapter_id = v[i+1].from_chapter_id`, with the final version set to `NULL`. This repair runs inside the same database transaction as the reorder so the invariant is restored atomically.
-
-**Why `from_chapter_id` wins over `to_chapter_id`**: An editor assigns `from_chapter_id` when creating or updating content — it expresses editorial intent ("this fact is true starting from chapter X"). `to_chapter_id` is set automatically to close the previous version when a new one is created. Reordering is a structural correction to the chapter sequence; it would be wrong to silently change when a piece of information was _introduced_ just because its temporal neighbors moved. Adjusting `to_chapter_id` preserves the editorial intent of every version while restoring a consistent chain.
+**Chapter reordering**: Because revisions are keyed by `chapter_id` (not `chapters.idx`), reassigning `idx` during a reorder has no effect on which revision is "latest at or before" a given chapter — revisions naturally follow their chapter's new position. No post-reorder repair step is needed.
 
 **User progress follows chapter identity, not position**: Anonymous progress is stored as a chapter ID (not an idx). If a user sets their cutoff to "Book 2, Chapter 3" and the author later inserts an earlier chapter before it, the user's cutoff chapter ID is unchanged — they are now implicitly past the new chapter too. This is intentional: a new chapter inserted before the user's current position is assumed to have been read, since the user self-reported being at the later chapter.
 
@@ -204,17 +194,19 @@ pages
   id, schema_id, name, intro_chapter_id
 
 page_section_versions
-  page_id, section_id, from_chapter_id, to_chapter_id, content
-  PK: (page_id, section_id, from_chapter_id)
+  page_id, section_id, chapter_id, content
+  PK: (page_id, section_id, chapter_id)
 
 page_floater_versions
-  page_id, from_chapter_id, to_chapter_id, image_url
-  PK: (page_id, from_chapter_id)
+  page_id, chapter_id, image_url
+  PK: (page_id, chapter_id)
 
 page_floater_row_versions
-  page_id, floater_row_id, from_chapter_id, to_chapter_id, content
-  PK: (page_id, floater_row_id, from_chapter_id)
+  page_id, floater_row_id, chapter_id, content
+  PK: (page_id, floater_row_id, chapter_id)
 ```
+
+Each `chapter_id` is the chapter when that content was introduced or last changed. At most one revision per `(page, section, chapter)` — the PK enforces uniqueness.
 
 The floater header is always rendered from `pages.name` and is not stored separately. The image URL is versioned independently of row content to avoid unnecessary row closures when only one changes.
 
@@ -239,7 +231,7 @@ Anonymous user progress is stored client-side in `localStorage` per serial — n
 The URL pattern `/{serial}/{schema}/{page-name}` maps directly to file-based routing. SSR is required because spoiler filtering is user-specific — content is rendered per-request with the user's chapter cutoff. Next.js handles the API layer (auth, progress saves) in the same project.
 
 ### Database: PostgreSQL
-The SCD Type 2 queries (`WHERE from_chapter_idx <= N AND (to_chapter_idx IS NULL OR to_chapter_idx > N)`) are complex range comparisons. PostgreSQL handles these cleanly, and the data model is inherently relational with multiple join paths.
+The versioned content queries (finding the latest revision per group at or before a chapter cutoff) involve grouped aggregates and self-joins. PostgreSQL handles these cleanly, and the data model is inherently relational with multiple join paths.
 
 ### ORM: Drizzle ORM
 The versioned queries are too custom for Prisma's generated queries to handle ergonomically. Drizzle allows typed SQL directly where needed, without fighting the abstraction. Schemas map 1:1 to the tables defined above.
@@ -255,8 +247,8 @@ Editor for contributors, renderer for readers.
 
 ### Styling: Tailwind CSS
 
-### Hosting: Vercel + Neon (serverless Postgres)
-Neon's branching is useful for schema migrations. Neon and Vercel both have free tiers sufficient for early development.
+### Hosting: Vercel
+Vercel hosts the app with free tiers sufficient for early development.
 
 ---
 
@@ -267,10 +259,10 @@ Neon's branching is useful for schema migrations. Neon and Vercel both have free
 | Framework | Next.js | Remix | Larger ecosystem; RSC reduces client bundle on content-heavy pages. Remix is the strongest alternative — its loader/action model maps cleanly to per-request versioned content fetching. |
 | ORM | Drizzle | Prisma | Drizzle wins when queries are custom SQL-heavy |
 | Search | PG FTS | Meilisearch | Meilisearch is faster/fuzzier but requires a sync pipeline |
-| DB host | Neon | Supabase, Railway | Supabase adds an auth layer that duplicates Auth.js |
+| DB host | Serverless Postgres | Supabase, Railway | Supabase adds an auth layer that duplicates Auth.js |
 
 ### Known Risks
 
 - **App Router complexity** — The chapter selector (reactive, in the navbar) must be a Client Component while the rest of the page can be a Server Component. Getting this boundary wrong causes unnecessary client JS or stale renders.
 - **Vercel alignment** — Next.js works everywhere, but some features (Server Actions) have rough edges when self-hosting or deploying to Cloudflare Workers.
-- **SCD Type 2 read path** — Rendering a wiki page requires joining `page_section_versions` and `page_floater_row_versions` with chapter range filtering. Worth prototyping this query in SQL before committing to the ORM layer.
+- **Versioned content read path** — Rendering a wiki page requires a subquery-join to find the latest revision per section/floater-row at or before the user's cutoff idx. The subquery groups by dimension, aggregates the max idx, then joins back for the content row.

@@ -13,8 +13,7 @@ import {
   pageFloaterVersions,
   pageFloaterRowVersions,
 } from '@/db/schema';
-import { alias } from 'drizzle-orm/pg-core';
-import { and, asc, eq, isNull, lte, or, gt } from 'drizzle-orm';
+import { and, asc, eq, isNull, lte, max } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { PageEditor } from './PageEditor';
@@ -25,13 +24,12 @@ interface Props {
 
 /**
  * Reads the user's chapter cutoff idx for a given serial from the
- * progress cookie set by <ChapterSelector>.  Returns the chapter idx
- * (a global, serial-level integer) so Server Components can apply the
- * SCD Type 2 range filter without an extra round-trip per query.
+ * progress cookie set by <ChapterSelector>. Returns the chapter idx
+ * (a global, serial-level integer) used as the upper bound when finding
+ * the latest revision per section.
  *
- * Falls back to 0 when no cookie is present so that the range filter
- * still works — it simply returns only content that starts at chapter 0
- * or earlier, which in practice is nothing, rendering all sections empty.
+ * Falls back to 0 when no cookie is present — the subquery finds no
+ * revision with idx ≤ 0, so all sections render empty.
  *
  * @example
  * const cutoffIdx = await getChapterCutoffIdx(serial.id);
@@ -69,11 +67,14 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [schema] = await db
-    .select()
-    .from(pageSchemas)
-    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
-    .limit(1);
+  const [[schema], cutoffIdx] = await Promise.all([
+    db
+      .select()
+      .from(pageSchemas)
+      .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
+      .limit(1),
+    getChapterCutoffIdx(serial.id),
+  ]);
 
   if (!schema) {
     notFound();
@@ -89,17 +90,17 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  // Resolve the user's progress cutoff for this serial (SCD Type 2 filter).
-  const cutoffIdx = await getChapterCutoffIdx(serial.id);
+  const sectionMaxIdxSq = db
+    .select({
+      sectionId: pageSectionVersions.sectionId,
+      maxIdx: max(chapters.idx).as('max_idx'),
+    })
+    .from(pageSectionVersions)
+    .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+    .where(and(eq(pageSectionVersions.pageId, page.id), lte(chapters.idx, cutoffIdx)))
+    .groupBy(pageSectionVersions.sectionId)
+    .as('section_max_idx_sq');
 
-  // Aliased chapter joins for the SCD Type 2 range filter.
-  // We need two aliases because each versioned table has both a from_chapter_id
-  // and a to_chapter_id that must be compared against chapters.idx independently.
-  const fromChapter = alias(chapters, 'from_chapter');
-  const toChapter = alias(chapters, 'to_chapter');
-
-  // SCD Type 2 range filter: from_chapter_idx <= cutoff AND (to_chapter_idx IS NULL OR to_chapter_idx > cutoff)
-  // Achieved by LEFT JOINing chapters twice (aliased) so we can compare .idx without subqueries.
   const [[introChapter], activeSections, sectionVersions] = await Promise.all([
     db
       .select({ displayName: chapters.displayName })
@@ -117,18 +118,15 @@ export default async function PageView({ params }: Props) {
         content: pageSectionVersions.content,
       })
       .from(pageSectionVersions)
-      .innerJoin(fromChapter, eq(pageSectionVersions.fromChapterId, fromChapter.id))
-      .leftJoin(toChapter, eq(pageSectionVersions.toChapterId, toChapter.id))
-      .where(
+      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+      .innerJoin(
+        sectionMaxIdxSq,
         and(
-          eq(pageSectionVersions.pageId, page.id),
-          lte(fromChapter.idx, cutoffIdx),
-          or(
-            isNull(pageSectionVersions.toChapterId),
-            gt(toChapter.idx, cutoffIdx),
-          ),
+          eq(pageSectionVersions.sectionId, sectionMaxIdxSq.sectionId),
+          eq(chapters.idx, sectionMaxIdxSq.maxIdx),
         ),
-      ),
+      )
+      .where(eq(pageSectionVersions.pageId, page.id)),
   ]);
 
   const contentBySectionId = new Map(
@@ -146,27 +144,31 @@ export default async function PageView({ params }: Props) {
   let floaterRows: { id: number; label: string; content: string }[] = [];
 
   if (schema.hasFloater) {
-    const fromChapterF = alias(chapters, 'from_chapter_f');
-    const toChapterF = alias(chapters, 'to_chapter_f');
-    const fromChapterFR = alias(chapters, 'from_chapter_fr');
-    const toChapterFR = alias(chapters, 'to_chapter_fr');
+    const floaterMaxIdxSq = db
+      .select({ maxIdx: max(chapters.idx).as('max_idx') })
+      .from(pageFloaterVersions)
+      .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
+      .where(and(eq(pageFloaterVersions.pageId, page.id), lte(chapters.idx, cutoffIdx)))
+      .as('floater_max_idx_sq');
+
+    const floaterRowMaxIdxSq = db
+      .select({
+        floaterRowId: pageFloaterRowVersions.floaterRowId,
+        maxIdx: max(chapters.idx).as('max_idx'),
+      })
+      .from(pageFloaterRowVersions)
+      .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
+      .where(and(eq(pageFloaterRowVersions.pageId, page.id), lte(chapters.idx, cutoffIdx)))
+      .groupBy(pageFloaterRowVersions.floaterRowId)
+      .as('floater_row_max_idx_sq');
 
     const [[floaterVersion], fetchedRows, floaterRowVersions] = await Promise.all([
       db
         .select({ imageUrl: pageFloaterVersions.imageUrl })
         .from(pageFloaterVersions)
-        .innerJoin(fromChapterF, eq(pageFloaterVersions.fromChapterId, fromChapterF.id))
-        .leftJoin(toChapterF, eq(pageFloaterVersions.toChapterId, toChapterF.id))
-        .where(
-          and(
-            eq(pageFloaterVersions.pageId, page.id),
-            lte(fromChapterF.idx, cutoffIdx),
-            or(
-              isNull(pageFloaterVersions.toChapterId),
-              gt(toChapterF.idx, cutoffIdx),
-            ),
-          ),
-        )
+        .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
+        .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
+        .where(eq(pageFloaterVersions.pageId, page.id))
         .limit(1),
       db
         .select({ id: schemaFloaterRows.id, label: schemaFloaterRows.label })
@@ -184,18 +186,15 @@ export default async function PageView({ params }: Props) {
           content: pageFloaterRowVersions.content,
         })
         .from(pageFloaterRowVersions)
-        .innerJoin(fromChapterFR, eq(pageFloaterRowVersions.fromChapterId, fromChapterFR.id))
-        .leftJoin(toChapterFR, eq(pageFloaterRowVersions.toChapterId, toChapterFR.id))
-        .where(
+        .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
+        .innerJoin(
+          floaterRowMaxIdxSq,
           and(
-            eq(pageFloaterRowVersions.pageId, page.id),
-            lte(fromChapterFR.idx, cutoffIdx),
-            or(
-              isNull(pageFloaterRowVersions.toChapterId),
-              gt(toChapterFR.idx, cutoffIdx),
-            ),
+            eq(pageFloaterRowVersions.floaterRowId, floaterRowMaxIdxSq.floaterRowId),
+            eq(chapters.idx, floaterRowMaxIdxSq.maxIdx),
           ),
-        ),
+        )
+        .where(eq(pageFloaterRowVersions.pageId, page.id)),
     ]);
 
     const rowContentMap = new Map(floaterRowVersions.map((v) => [v.floaterRowId, v.content]));

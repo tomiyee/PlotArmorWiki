@@ -9,7 +9,7 @@ pnpm dev          # start Next.js dev server
 pnpm build        # production build
 pnpm lint         # run ESLint
 pnpm drizzle-kit generate   # generate migration after schema changes
-pnpm drizzle-kit migrate    # apply pending migrations to Neon
+pnpm drizzle-kit migrate    # apply pending migrations
 ```
 
 ### Schema change workflow
@@ -22,7 +22,7 @@ This project uses a **single squashed migration** strategy — there is always e
 
 Never stack a second migration on top of the existing one. The squash approach keeps the migration history clean while the project is pre-launch and the DB can be wiped and rebuilt at any time.
 
-For local development with Docker instead of Neon, set `DATABASE_URL` in `.env.local` to a `localhost` connection string, then:
+For local development with Docker, set `DATABASE_URL` in `.env.local` to a `localhost` connection string, then:
 
 ```powershell
 .\scripts\start-db.ps1   # create or start the local Postgres container
@@ -51,7 +51,7 @@ Database, ORM, home page UI, serial/chapter/schema/page management, markdown ren
 | Layer | Choice |
 |---|---|
 | Framework | Next.js 16 (App Router, SSR) |
-| Database | PostgreSQL via Neon (serverless) |
+| Database | PostgreSQL (serverless) |
 | ORM | Drizzle ORM |
 | Auth | Auth.js (NextAuth v5) |
 | Search | PostgreSQL full-text search (tsvector) |
@@ -60,12 +60,14 @@ Database, ORM, home page UI, serial/chapter/schema/page management, markdown ren
 | UI components | Shadcn UI (Button, Input, Select, Dialog) + custom Text |
 | Hosting | Vercel |
 
-### Core data pattern: SCD Type 2 versioning
+### Core data pattern: single-timestamp versioning
 
-All wiki page content is chapter-versioned using closed-interval rows (`from_chapter_id`, `to_chapter_id` where `NULL` = current). To read content at chapter index N:
+All wiki page content is chapter-versioned. Each revision row carries a single `chapter_id` — the chapter when that content was introduced or last changed. At most one revision per `(page, section, chapter)` tuple (enforced by PK). To read content at chapter index N, find the revision with the highest `chapter.idx` that is ≤ N:
 
 ```sql
-WHERE from_chapter_idx <= N AND (to_chapter_idx IS NULL OR to_chapter_idx > N)
+-- conceptual read pattern (implemented as a subquery-join in Drizzle)
+SELECT ... GROUP BY section_id HAVING chapters.idx = MAX(chapters.idx)
+WHERE page_id = ? AND chapters.idx <= N
 ```
 
 **Schema structure** (sections, floater rows) is wall-clock versioned (`created_at`/`deleted_at`).  
@@ -104,15 +106,15 @@ First-time visitors on any serial default to chapter 1 and see a callout prompti
 - `src/app/new/page.tsx` — serial creation form (title, description, authors, splash art URL, volume type, chapter type).
 - `src/app/new/actions.ts` — `createSerial` Server Action; inserts into `serials` and `serial_authors` (storing the computed slug, chapter type, and volume type), redirects to `/{slug}`.
 - `src/app/[serial]/page.tsx` — serial detail page; resolves serial via `WHERE slug = ?`, lists chapters grouped by volume, delegates editing to `<SerialEditor>` and schema management to `<SchemaManager>`.
-- `src/app/[serial]/actions.ts` — Server Actions for volume/chapter CRUD (`addVolume`, `addChapter`, `deleteVolume`, `deleteChapter`, `renameVolume`, `renameChapter`, `updateSerialTypes`, `reorderVolumes`, `reorderChapters`, `reorderAllChapters`) and schema/section/floater-row CRUD (`addSchema`, `deleteSchema`, `renameSchema`, `updateSchema`, `addSection`, `deleteSection`, `renameSection`, `reorderSections`, `addFloaterRow`, `deleteFloaterRow`, `renameFloaterRow`, `reorderFloaterRows`). All three reorder actions call `repairVersionChains` inside their transaction to restore the SCD version chain invariant after idx reassignment.
+- `src/app/[serial]/actions.ts` — Server Actions for volume/chapter CRUD (`addVolume`, `addChapter`, `deleteVolume`, `deleteChapter`, `renameVolume`, `renameChapter`, `updateSerialTypes`, `reorderVolumes`, `reorderChapters`, `reorderAllChapters`) and schema/section/floater-row CRUD (`addSchema`, `deleteSchema`, `renameSchema`, `updateSchema`, `addSection`, `deleteSection`, `renameSection`, `reorderSections`, `addFloaterRow`, `deleteFloaterRow`, `renameFloaterRow`, `reorderFloaterRows`). Reorder actions reassign `chapters.idx` — no post-reorder version repair is needed because content revisions are keyed by `chapter_id` and follow their chapter's new position automatically.
 - `src/app/[serial]/[schema]/page.tsx` — schema index page; resolves serial via slug and schema via `WHERE serial_id = ? AND name = ?`, renders `<SchemaIndexEditor>` and a chapter-filtered list of pages (hides pages whose `intro_chapter_idx` exceeds the user's cutoff) linking to `/{serial}/{schema}/{page}`.
 - `src/app/[serial]/[schema]/SchemaIndexEditor.tsx` — Client Component for inline editing of a schema's name and markdown body; toggles between rendered view and edit form, navigates to the new URL when the name changes.
 - `src/app/[serial]/[schema]/new/page.tsx` — page creation form; collects page name and intro chapter (chapters grouped by volume via optgroup), submits via `createPage` Server Action.
 - `src/app/[serial]/[schema]/new/actions.ts` — `createPage` Server Action; validates serial and schema exist, inserts into `pages`, redirects to `/{serial}/{schema}/{page}`.
 - `src/app/[serial]/layout.tsx` — serial-scoped nested layout; fetches the serial, its volumes, and chapters, then renders a dark sub-bar with `<ChapterSelector>` above all `/{serial}/…` pages.
-- `src/app/[serial]/[schema]/[page]/page.tsx` — wiki page view; resolves serial/schema/page, reads the user's chapter cutoff from cookie, fetches chapter-filtered section content and floater data, then delegates all rendering (read and edit modes) to `<PageEditor>`.
+- `src/app/[serial]/[schema]/[page]/page.tsx` — wiki page view; resolves serial/schema/page, reads the user's chapter cutoff from cookie, fetches chapter-filtered section content and floater data (subquery-join: max `chapters.idx` ≤ cutoff per section/floater-row), then delegates all rendering (read and edit modes) to `<PageEditor>`.
 - `src/app/[serial]/[schema]/[page]/PageEditor.tsx` — Client Component that owns the page body layout. In read mode renders sections via `<ReactMarkdown>` and the floater sidebar. In edit mode each section gets a dynamically-imported `<MDEditor>` (SSR disabled) and floater fields get text inputs. On save, calls `savePageContent` then refreshes.
-- `src/app/[serial]/[schema]/[page]/actions.ts` — `savePageContent` Server Action; resolves serial/schema/page by slug/name, finds the head chapter, then writes all changed section and floater content via the SCD Type 2 write path (close open row + insert new head row, or update in-place if the open row already starts at head).
+- `src/app/[serial]/[schema]/[page]/actions.ts` — `savePageContent` Server Action; resolves serial/schema/page by slug/name, finds the head chapter, then upserts each section/floater field at `(pageId, sectionId, headChapterId)` — readers at an earlier cutoff see the prior version via the max-idx read path.
 - `src/components/SerialMetadataEditor.tsx` — Client Component for inline editing of a serial's title, description, authors, and splash art URL; pen-icon toggle swaps between read view and edit form; redirects if the title (slug) changes.
 - `src/components/SerialEditor.tsx` — Client Component managing edit mode for the serial's volumes and chapters; in edit mode shows volume/chapter type dropdowns (persisted immediately on change), inline rename forms, add-volume/chapter forms, delete confirmations, and drag-and-drop reordering via `@dnd-kit`.
 - `src/components/SchemaManager.tsx` — Client Component for managing page schemas; accepts `serialSlug` to render a "View" link to each schema's index page, expand/collapse per-schema detail with section and floater-row add/rename/reorder/delete.

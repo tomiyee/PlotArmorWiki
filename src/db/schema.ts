@@ -115,13 +115,12 @@ export const pageSectionVersions = pgTable(
     sectionId: integer('section_id')
       .notNull()
       .references(() => schemaSections.id),
-    fromChapterId: integer('from_chapter_id')
+    chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),
-    toChapterId: integer('to_chapter_id').references(() => chapters.id),
     content: text('content').notNull().default(''),
   },
-  (t) => [primaryKey({ columns: [t.pageId, t.sectionId, t.fromChapterId] })],
+  (t) => [primaryKey({ columns: [t.pageId, t.sectionId, t.chapterId] })],
 );
 
 export const pageFloaterVersions = pgTable(
@@ -130,13 +129,12 @@ export const pageFloaterVersions = pgTable(
     pageId: integer('page_id')
       .notNull()
       .references(() => pages.id),
-    fromChapterId: integer('from_chapter_id')
+    chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),
-    toChapterId: integer('to_chapter_id').references(() => chapters.id),
     imageUrl: text('image_url'),
   },
-  (t) => [primaryKey({ columns: [t.pageId, t.fromChapterId] })],
+  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
 );
 
 export const pageFloaterRowVersions = pgTable(
@@ -148,13 +146,12 @@ export const pageFloaterRowVersions = pgTable(
     floaterRowId: integer('floater_row_id')
       .notNull()
       .references(() => schemaFloaterRows.id),
-    fromChapterId: integer('from_chapter_id')
+    chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),
-    toChapterId: integer('to_chapter_id').references(() => chapters.id),
     content: text('content').notNull().default(''),
   },
-  (t) => [primaryKey({ columns: [t.pageId, t.floaterRowId, t.fromChapterId] })],
+  (t) => [primaryKey({ columns: [t.pageId, t.floaterRowId, t.chapterId] })],
 );
 
 export const users = pgTable('users', {

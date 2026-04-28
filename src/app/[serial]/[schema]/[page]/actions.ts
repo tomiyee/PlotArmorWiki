@@ -11,7 +11,7 @@ import {
   pageFloaterVersions,
   pageFloaterRowVersions,
 } from '@/db/schema';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -20,7 +20,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
  */
 async function getHeadChapterId(serialId: number): Promise<number> {
   const [row] = await db
-    .select({ id: chapters.id, idx: chapters.idx })
+    .select({ id: chapters.id })
     .from(chapters)
     .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
     .where(eq(volumes.serialId, serialId))
@@ -32,16 +32,11 @@ async function getHeadChapterId(serialId: number): Promise<number> {
 }
 
 /**
- * Saves all page content via the SCD Type 2 write path.
+ * Saves all page content at the serial's current head chapter.
  *
- * For each changed section / floater field:
- *   1. Close the currently-open row by setting `to_chapter_id = headChapterId`.
- *   2. Insert a new open row with `from_chapter_id = headChapterId`, `to_chapter_id = NULL`.
- * If no open row exists for a field, just insert a new one.
- *
- * `sectionContent` maps section ID → new markdown string.
- * `floaterImageUrl` is null when the schema has no floater.
- * `floaterRowContent` maps floater-row ID → new content string.
+ * Each section/floater field is an upsert keyed by (pageId, …, chapterId).
+ * Readers at an earlier chapter cutoff see the previous version via the
+ * max-idx subquery read path.
  *
  * @example
  * await savePageContent(serialSlug, schemaName, pageName, sectionContent, floaterImageUrl, floaterRowContent);
@@ -81,171 +76,43 @@ export async function savePageContent(
     // ── Section content ────────────────────────────────────────────────────────
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
       const sectionId = parseInt(sectionIdStr, 10);
-
-      // Find the currently-open row (to_chapter_id IS NULL)
-      const [openRow] = await tx
-        .select({ fromChapterId: pageSectionVersions.fromChapterId })
-        .from(pageSectionVersions)
-        .where(
-          and(
-            eq(pageSectionVersions.pageId, page.id),
-            eq(pageSectionVersions.sectionId, sectionId),
-            isNull(pageSectionVersions.toChapterId),
-          ),
-        )
-        .limit(1);
-
-      if (openRow) {
-        if (openRow.fromChapterId === headChapterId) {
-          // The open row already starts at head — update it in-place (no new version needed).
-          await tx
-            .update(pageSectionVersions)
-            .set({ content })
-            .where(
-              and(
-                eq(pageSectionVersions.pageId, page.id),
-                eq(pageSectionVersions.sectionId, sectionId),
-                eq(pageSectionVersions.fromChapterId, headChapterId),
-              ),
-            );
-        } else {
-          // Close the open row and open a new one at head.
-          await tx
-            .update(pageSectionVersions)
-            .set({ toChapterId: headChapterId })
-            .where(
-              and(
-                eq(pageSectionVersions.pageId, page.id),
-                eq(pageSectionVersions.sectionId, sectionId),
-                eq(pageSectionVersions.fromChapterId, openRow.fromChapterId),
-              ),
-            );
-          await tx.insert(pageSectionVersions).values({
-            pageId: page.id,
-            sectionId,
-            fromChapterId: headChapterId,
-            toChapterId: null,
-            content,
-          });
-        }
-      } else {
-        // No open row yet — insert a fresh one at head.
-        await tx.insert(pageSectionVersions).values({
-          pageId: page.id,
-          sectionId,
-          fromChapterId: headChapterId,
-          toChapterId: null,
-          content,
+      await tx
+        .insert(pageSectionVersions)
+        .values({ pageId: page.id, sectionId, chapterId: headChapterId, content })
+        .onConflictDoUpdate({
+          target: [
+            pageSectionVersions.pageId,
+            pageSectionVersions.sectionId,
+            pageSectionVersions.chapterId,
+          ],
+          set: { content },
         });
-      }
     }
 
-    // ── Floater image URL ──────────────────────────────────────────────────────
     if (schema.hasFloater) {
-      const [openRow] = await tx
-        .select({ fromChapterId: pageFloaterVersions.fromChapterId })
-        .from(pageFloaterVersions)
-        .where(
-          and(
-            eq(pageFloaterVersions.pageId, page.id),
-            isNull(pageFloaterVersions.toChapterId),
-          ),
-        )
-        .limit(1);
-
-      if (openRow) {
-        if (openRow.fromChapterId === headChapterId) {
-          await tx
-            .update(pageFloaterVersions)
-            .set({ imageUrl: floaterImageUrl })
-            .where(
-              and(
-                eq(pageFloaterVersions.pageId, page.id),
-                eq(pageFloaterVersions.fromChapterId, headChapterId),
-              ),
-            );
-        } else {
-          await tx
-            .update(pageFloaterVersions)
-            .set({ toChapterId: headChapterId })
-            .where(
-              and(
-                eq(pageFloaterVersions.pageId, page.id),
-                eq(pageFloaterVersions.fromChapterId, openRow.fromChapterId),
-              ),
-            );
-          await tx.insert(pageFloaterVersions).values({
-            pageId: page.id,
-            fromChapterId: headChapterId,
-            toChapterId: null,
-            imageUrl: floaterImageUrl,
-          });
-        }
-      } else {
-        await tx.insert(pageFloaterVersions).values({
-          pageId: page.id,
-          fromChapterId: headChapterId,
-          toChapterId: null,
-          imageUrl: floaterImageUrl,
+      // ── Floater image URL ────────────────────────────────────────────────────
+      await tx
+        .insert(pageFloaterVersions)
+        .values({ pageId: page.id, chapterId: headChapterId, imageUrl: floaterImageUrl })
+        .onConflictDoUpdate({
+          target: [pageFloaterVersions.pageId, pageFloaterVersions.chapterId],
+          set: { imageUrl: floaterImageUrl },
         });
-      }
-    }
 
-    // ── Floater row content ────────────────────────────────────────────────────
-    for (const [floaterRowIdStr, content] of Object.entries(floaterRowContent)) {
-      const floaterRowId = parseInt(floaterRowIdStr, 10);
-
-      const [openRow] = await tx
-        .select({ fromChapterId: pageFloaterRowVersions.fromChapterId })
-        .from(pageFloaterRowVersions)
-        .where(
-          and(
-            eq(pageFloaterRowVersions.pageId, page.id),
-            eq(pageFloaterRowVersions.floaterRowId, floaterRowId),
-            isNull(pageFloaterRowVersions.toChapterId),
-          ),
-        )
-        .limit(1);
-
-      if (openRow) {
-        if (openRow.fromChapterId === headChapterId) {
-          await tx
-            .update(pageFloaterRowVersions)
-            .set({ content })
-            .where(
-              and(
-                eq(pageFloaterRowVersions.pageId, page.id),
-                eq(pageFloaterRowVersions.floaterRowId, floaterRowId),
-                eq(pageFloaterRowVersions.fromChapterId, headChapterId),
-              ),
-            );
-        } else {
-          await tx
-            .update(pageFloaterRowVersions)
-            .set({ toChapterId: headChapterId })
-            .where(
-              and(
-                eq(pageFloaterRowVersions.pageId, page.id),
-                eq(pageFloaterRowVersions.floaterRowId, floaterRowId),
-                eq(pageFloaterRowVersions.fromChapterId, openRow.fromChapterId),
-              ),
-            );
-          await tx.insert(pageFloaterRowVersions).values({
-            pageId: page.id,
-            floaterRowId,
-            fromChapterId: headChapterId,
-            toChapterId: null,
-            content,
+      // ── Floater row content ──────────────────────────────────────────────────
+      for (const [floaterRowIdStr, content] of Object.entries(floaterRowContent)) {
+        const floaterRowId = parseInt(floaterRowIdStr, 10);
+        await tx
+          .insert(pageFloaterRowVersions)
+          .values({ pageId: page.id, floaterRowId, chapterId: headChapterId, content })
+          .onConflictDoUpdate({
+            target: [
+              pageFloaterRowVersions.pageId,
+              pageFloaterRowVersions.floaterRowId,
+              pageFloaterRowVersions.chapterId,
+            ],
+            set: { content },
           });
-        }
-      } else {
-        await tx.insert(pageFloaterRowVersions).values({
-          pageId: page.id,
-          floaterRowId,
-          fromChapterId: headChapterId,
-          toChapterId: null,
-          content,
-        });
       }
     }
   });
