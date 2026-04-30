@@ -335,6 +335,8 @@ function SortableVolumeItem({
   onAddChapterSubmit,
   onCancelAddChapter,
   addChapterFormRef,
+  chapterType,
+  volumeType,
 }: {
   volume: Volume;
   chapters: Chapter[];
@@ -356,6 +358,8 @@ function SortableVolumeItem({
   onAddChapterSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onCancelAddChapter: () => void;
   addChapterFormRef: (el: HTMLFormElement | null) => void;
+  chapterType: ChapterType;
+  volumeType: VolumeType;
 }) {
   const {
     attributes,
@@ -397,7 +401,7 @@ function SortableVolumeItem({
                   {...attributes}
                   {...listeners}
                   className="text-gray-400 cursor-grab active:cursor-grabbing touch-none"
-                  title="Drag to reorder volume"
+                  title={`Drag to reorder ${volumeType.toLowerCase()}`}
                 >
                   <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
                 </span>
@@ -420,7 +424,7 @@ function SortableVolumeItem({
                 type="button"
                 variant="destructive"
                 size="icon-sm"
-                title={`Delete ${volume.displayName} and all its chapters`}
+                title={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}
                 onClick={onDeleteVolume}
               >
                 <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
@@ -457,7 +461,7 @@ function SortableVolumeItem({
         </SortableContext>
       ) : (
         <Text muted className="pl-3">
-          No chapters yet.
+          No {chapterType.toLowerCase()}s yet.
         </Text>
       )}
 
@@ -473,13 +477,13 @@ function SortableVolumeItem({
             <Input
               name="displayName"
               required
-              placeholder="Chapter name…"
+              placeholder={`${chapterType} name…`}
               autoFocus
               className="flex-1"
               onKeyDown={(e) => e.key === "Escape" && onCancelAddChapter()}
             />
             <Button type="submit" size="sm" disabled={isPending}>
-              Add chapter
+              Add {chapterType.toLowerCase()}
             </Button>
           </form>
         ) : (
@@ -491,7 +495,7 @@ function SortableVolumeItem({
             onClick={() => onAddChapterClick(volume.id)}
           >
             <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-            Add chapter
+            Add {chapterType.toLowerCase()}
           </Button>
         ))}
     </Box>
@@ -781,13 +785,13 @@ export function SerialEditor({
 
   const dialogBody =
     pendingDelete?.type === "volume"
-      ? "This will permanently delete the volume and all its chapters. This action cannot be undone."
-      : "This will permanently delete the chapter. This action cannot be undone.";
+      ? `This will permanently delete the ${currentVolumeType.toLowerCase()} and all its ${currentChapterType.toLowerCase()}s. This action cannot be undone.`
+      : `This will permanently delete the ${currentChapterType.toLowerCase()}. This action cannot be undone.`;
 
   return (
     <section className="flex flex-col gap-4 mt-4">
       <Box className="items-center justify-between">
-        <Text variant="h2">Volumes &amp; Chapters</Text>
+        <Text variant="h2">{currentVolumeType}s &amp; {currentChapterType}s</Text>
         <Button
           type="button"
           variant="ghost"
@@ -797,7 +801,7 @@ export function SerialEditor({
             setRenamingVolumeId(null);
             setRenamingChapterId(null);
           }}
-          title={editing ? "Exit edit mode" : "Edit volumes and chapters"}
+          title={editing ? "Exit edit mode" : `Edit ${currentVolumeType.toLowerCase()}s and ${currentChapterType.toLowerCase()}s`}
           className={
             editing
               ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
@@ -893,12 +897,14 @@ export function SerialEditor({
                     if (el) addChapterFormRefs.current.set(volume.id, el);
                     else addChapterFormRefs.current.delete(volume.id);
                   }}
+                  chapterType={currentChapterType}
+                  volumeType={currentVolumeType}
                 />
               ))}
             </Box>
           </SortableContext>
         ) : (
-          <Text muted>No volumes yet. Add a volume to get started.</Text>
+          <Text muted>No {volumeType.toLowerCase()}s yet. Add a {volumeType.toLowerCase()} to get started.</Text>
         )}
 
         <DragOverlay>
@@ -931,13 +937,13 @@ export function SerialEditor({
               <Input
                 name="displayName"
                 required
-                placeholder="Volume name…"
+                placeholder={`${currentVolumeType} name…`}
                 autoFocus
                 className="flex-1"
                 onKeyDown={(e) => e.key === "Escape" && setAddingVolume(false)}
               />
               <Button type="submit" disabled={isPending}>
-                Add volume
+                Add {currentVolumeType.toLowerCase()}
               </Button>
             </form>
           ) : (
@@ -950,7 +956,7 @@ export function SerialEditor({
               }}
             >
               <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-              Add volume
+              Add {currentVolumeType.toLowerCase()}
             </Button>
           )}
         </div>

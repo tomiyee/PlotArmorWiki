@@ -133,9 +133,9 @@ export default async function NewPagePage({ params }: Props) {
               />
             ) : (
               <Text muted className="text-sm">
-                No chapters yet.{' '}
+                No {serial.chapterType.toLowerCase()}s yet.{' '}
                 <Link href={`/${serialSlug}`} className="text-blue-600 hover:underline">
-                  Add a chapter first.
+                  Add a {serial.chapterType.toLowerCase()} first.
                 </Link>
               </Text>
             )}
