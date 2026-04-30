@@ -36,7 +36,6 @@ import { Box } from "@/components/ui/box";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogHeader,
@@ -791,7 +790,9 @@ export function SerialEditor({
   return (
     <section className="flex flex-col gap-4 mt-4">
       <Box className="items-center justify-between">
-        <Text variant="h2">{currentVolumeType}s &amp; {currentChapterType}s</Text>
+        <Text variant="h2">
+          {currentVolumeType}s &amp; {currentChapterType}s
+        </Text>
         <Button
           type="button"
           variant="ghost"
@@ -801,7 +802,11 @@ export function SerialEditor({
             setRenamingVolumeId(null);
             setRenamingChapterId(null);
           }}
-          title={editing ? "Exit edit mode" : `Edit ${currentVolumeType.toLowerCase()}s and ${currentChapterType.toLowerCase()}s`}
+          title={
+            editing
+              ? "Exit edit mode"
+              : `Edit ${currentVolumeType.toLowerCase()}s and ${currentChapterType.toLowerCase()}s`
+          }
           className={
             editing
               ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
@@ -813,31 +818,31 @@ export function SerialEditor({
       </Box>
 
       {editing && (
-        <Box className="gap-4">
-          <Box col className="gap-1 flex-1">
-            <Label htmlFor="volumeType">Volume type</Label>
-            <Select
-              id="volumeType"
-              options={VOLUME_TYPE_OPTIONS}
-              value={currentVolumeType}
-              onChange={(val) => {
-                setCurrentVolumeType(val);
-                runTypeUpdate(val, currentChapterType);
-              }}
-            />
-          </Box>
-          <Box col className="gap-1 flex-1">
-            <Label htmlFor="chapterType">Chapter type</Label>
-            <Select
-              id="chapterType"
-              options={CHAPTER_TYPE_OPTIONS}
-              value={currentChapterType}
-              onChange={(val) => {
-                setCurrentChapterType(val);
-                runTypeUpdate(currentVolumeType, val);
-              }}
-            />
-          </Box>
+        <Box className="items-center gap-2 flex-wrap">
+          <Text variant="body" as="span">
+            Each
+          </Text>
+          <Select
+            id="chapterType"
+            options={CHAPTER_TYPE_OPTIONS}
+            value={currentChapterType}
+            onChange={(val) => {
+              setCurrentChapterType(val);
+              runTypeUpdate(currentVolumeType, val);
+            }}
+          />
+          <Text variant="body" as="span">
+            is grouped by
+          </Text>
+          <Select
+            id="volumeType"
+            options={VOLUME_TYPE_OPTIONS}
+            value={currentVolumeType}
+            onChange={(val) => {
+              setCurrentVolumeType(val);
+              runTypeUpdate(val, currentChapterType);
+            }}
+          />
         </Box>
       )}
 
@@ -904,7 +909,10 @@ export function SerialEditor({
             </Box>
           </SortableContext>
         ) : (
-          <Text muted>No {volumeType.toLowerCase()}s yet. Add a {volumeType.toLowerCase()} to get started.</Text>
+          <Text muted>
+            No {volumeType.toLowerCase()}s yet. Add a {volumeType.toLowerCase()}{" "}
+            to get started.
+          </Text>
         )}
 
         <DragOverlay>
