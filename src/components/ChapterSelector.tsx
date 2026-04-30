@@ -121,7 +121,7 @@ export function ChapterSelector({
         {!calloutDismissed && (
           <Box className="mb-1 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             <Text variant="label" className="flex-1 text-amber-800">
-              Set your chapter to avoid spoilers.
+              Set your {chapterType.toLowerCase()} to avoid spoilers.
             </Text>
             <Button
               variant="ghost"
@@ -146,7 +146,7 @@ export function ChapterSelector({
           value={effectiveChapterId ?? undefined}
           onChange={handleChange}
           className="w-52"
-          aria-label="Select chapter progress"
+          aria-label={`Select ${chapterType.toLowerCase()} progress`}
         />
       </Box>
     </Box>
