@@ -38,6 +38,9 @@ yarn.lock
 .env*
 !.env.local.example
 
+# local database snapshots
+/db-snapshots
+
 # vercel
 .vercel
 

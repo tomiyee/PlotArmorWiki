@@ -133,3 +133,41 @@ To regenerate migrations after schema changes:
 ```bash
 pnpm drizzle-kit generate
 ```
+
+## Saving and loading the database state
+
+Two pairs of scripts let you snapshot and restore the local Docker database for quick testing or sharing a known-good seed.
+
+### Save a snapshot
+
+Dumps the running container's database to a plain-SQL file under `db-snapshots/` (the directory is git-ignored).
+
+**Linux / macOS / WSL (bash):**
+```bash
+./scripts/save-db.sh                          # auto-named: db-snapshots/2024-01-15_14-30-00.sql
+./scripts/save-db.sh db-snapshots/my-seed.sql # custom path
+```
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\save-db.ps1                                      # auto-named
+.\scripts\save-db.ps1 -OutputFile db-snapshots\my-seed.sql  # custom path
+```
+
+### Load a snapshot
+
+Drops and recreates the database, then loads the specified dump. Prompts for confirmation unless `--force` / `-Force` is passed.
+
+**Linux / macOS / WSL (bash):**
+```bash
+./scripts/load-db.sh db-snapshots/my-seed.sql          # with confirmation prompt
+./scripts/load-db.sh db-snapshots/my-seed.sql --force  # skip prompt
+```
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql          # with confirmation prompt
+.\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql -Force   # skip prompt
+```
+
+> **Warning:** Loading a snapshot permanently deletes all current data in the local database. Make sure you save first if you need it.
