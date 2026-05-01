@@ -160,14 +160,16 @@ Drops and recreates the database, then loads the specified dump. Prompts for con
 
 **Linux / macOS / WSL (bash):**
 ```bash
-./scripts/load-db.sh db-snapshots/my-seed.sql          # with confirmation prompt
-./scripts/load-db.sh db-snapshots/my-seed.sql --force  # skip prompt
+./scripts/load-db.sh                                   # interactive picker from db-snapshots/
+./scripts/load-db.sh db-snapshots/my-seed.sql          # load a specific file
+./scripts/load-db.sh db-snapshots/my-seed.sql --force  # skip confirmation prompt
 ```
 
 **Windows (PowerShell):**
 ```powershell
-.\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql          # with confirmation prompt
-.\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql -Force   # skip prompt
+.\scripts\load-db.ps1                                              # interactive picker from db-snapshots\
+.\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql          # load a specific file
+.\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql -Force   # skip confirmation prompt
 ```
 
 > **Warning:** Loading a snapshot permanently deletes all current data in the local database. Make sure you save first if you need it.

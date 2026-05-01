@@ -2,10 +2,11 @@
 # Restore the local Docker Postgres database from a SQL dump file.
 #
 # Usage:
-#   ./scripts/load-db.sh <input-file> [container-name] [--force]
+#   ./scripts/load-db.sh [input-file] [container-name] [--force]
 #
 # Arguments:
-#   input-file     — path to a .sql dump produced by save-db.sh (required)
+#   input-file     — path to a .sql dump produced by save-db.sh
+#                    (omit to pick interactively from db-snapshots/)
 #   container-name — Docker container name (default: plotarmor-db)
 #   --force        — skip the confirmation prompt
 #
@@ -37,8 +38,24 @@ for arg in "$@"; do
 done
 
 if [[ -z "$INPUT_FILE" ]]; then
-    echo "usage: $0 <input-file> [container-name] [--force]" >&2
-    exit 1
+    SNAPSHOTS_DIR="$REPO_ROOT/db-snapshots"
+    mapfile -t SNAPSHOT_FILES < <(ls -t "$SNAPSHOTS_DIR"/*.sql 2>/dev/null)
+    if [[ ${#SNAPSHOT_FILES[@]} -eq 0 ]]; then
+        echo "error: no .sql files found in $SNAPSHOTS_DIR" >&2
+        exit 1
+    fi
+    echo "Select a snapshot to restore:"
+    for i in "${!SNAPSHOT_FILES[@]}"; do
+        printf "  %d) %s\n" "$((i+1))" "$(basename "${SNAPSHOT_FILES[$i]}")"
+    done
+    echo ""
+    read -r -p "Enter number [1-${#SNAPSHOT_FILES[@]}]: " CHOICE
+    if ! [[ "$CHOICE" =~ ^[0-9]+$ ]] || (( CHOICE < 1 || CHOICE > ${#SNAPSHOT_FILES[@]} )); then
+        echo "aborted." >&2
+        exit 1
+    fi
+    INPUT_FILE="${SNAPSHOT_FILES[$((CHOICE-1))]}"
+    echo ""
 fi
 
 if [[ ! -f "$INPUT_FILE" ]]; then
