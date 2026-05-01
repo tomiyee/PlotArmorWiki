@@ -90,6 +90,39 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
+  const [introChapter] = await db
+    .select({ displayName: chapters.displayName, idx: chapters.idx })
+    .from(chapters)
+    .where(eq(chapters.id, page.introChapterId))
+    .limit(1);
+
+  if (introChapter && introChapter.idx > cutoffIdx) {
+    return (
+      <main className="px-6 py-16">
+        <div className="mx-auto max-w-5xl">
+          <Box col className="gap-6">
+            <Text muted className="text-sm">
+              <Link href={`/${serialSlug}`} className="hover:underline">
+                {serial.title}
+              </Link>
+              {' / '}
+              <Link
+                href={`/${serialSlug}/${encodeURIComponent(schemaName)}`}
+                className="hover:underline"
+              >
+                {schemaName}
+              </Link>
+            </Text>
+            <Text variant="body">
+              This {schema.name} is introduced in {serial.chapterType}{' '}
+              {introChapter.displayName}. This page is hidden to prevent spoilers.
+            </Text>
+          </Box>
+        </div>
+      </main>
+    );
+  }
+
   const sectionMaxIdxSq = db
     .select({
       sectionId: pageSectionVersions.sectionId,
@@ -101,12 +134,7 @@ export default async function PageView({ params }: Props) {
     .groupBy(pageSectionVersions.sectionId)
     .as('section_max_idx_sq');
 
-  const [[introChapter], activeSections, sectionVersions] = await Promise.all([
-    db
-      .select({ displayName: chapters.displayName })
-      .from(chapters)
-      .where(eq(chapters.id, page.introChapterId))
-      .limit(1),
+  const [activeSections, sectionVersions] = await Promise.all([
     db
       .select({ id: schemaSections.id, name: schemaSections.name })
       .from(schemaSections)

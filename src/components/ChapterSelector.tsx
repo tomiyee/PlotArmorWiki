@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -80,12 +81,20 @@ export function ChapterSelector({
     false,
   );
 
-  // Mirror the selected chapter ID into a cookie so Server Components can read it.
+  const router = useRouter();
+
+  function writeCookie(id: number) {
+    document.cookie = `${cookieName(serialId)}=${id}; path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}`;
+  }
+
+  // Mirror the selected chapter ID into a cookie on mount so Server Components
+  // can read the cutoff on the next navigation (initial hydration only).
   useEffect(() => {
     const id = selectedChapterId ?? firstChapterId;
     if (id === null) return;
-    document.cookie = `${cookieName(serialId)}=${id}; path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}`;
-  }, [selectedChapterId, firstChapterId, serialId]);
+    writeCookie(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (allChapters.length === 0) return null;
 
@@ -106,6 +115,9 @@ export function ChapterSelector({
   function handleChange(chapterId: number) {
     setSelectedChapterId(chapterId);
     setCalloutDismissed(true);
+    // Set cookie synchronously before refresh so the server sees the new value.
+    writeCookie(chapterId);
+    router.refresh();
   }
 
   function dismissCallout() {

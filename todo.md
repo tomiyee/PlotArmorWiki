@@ -176,12 +176,12 @@ Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all 
   3. ~~`current chapter` here means the latest chapter in the serial (the edit always writes at head).~~
 - Commit: `feat: markdown content editor with SCD Type 2 write path`
 
-## Step 14 — Spoiler-aware page blocking
+## ~~Step 14 — Spoiler-aware page blocking~~ ✓
 
-- At the top of the page Server Component, after resolving the page and user's progress cutoff:
-  - If `pages.intro_chapter_id` maps to a chapter whose `idx` > the user's cutoff `idx`, do not render any page content.
-  - Instead render: *"This [schema name] is introduced in [intro chapter display name]. This page is hidden to prevent spoilers."*
-  - Do not display the page name anywhere on the blocked view.
+- ~~At the top of the page Server Component, after resolving the page and user's progress cutoff:~~
+  - ~~If `pages.intro_chapter_id` maps to a chapter whose `idx` > the user's cutoff `idx`, do not render any page content.~~
+  - ~~Instead render: *"This [schema name] is introduced in [intro chapter display name]. This page is hidden to prevent spoilers."*~~
+  - ~~Do not display the page name anywhere on the blocked view.~~
 - Commit: `feat: block page content for pages beyond user progress`
 
 ## Step 15 — Spoiler-aware search
