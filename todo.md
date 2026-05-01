@@ -1,218 +1,264 @@
 # PlotArmor — Implementation TODO
 
-Each step is one commit. The app should be in a runnable state after each step.
-See `spec.md` for full design context and `README.md` for a project overview.
+---
 
-Tech stack: Next.js 15 (App Router), TypeScript, Tailwind CSS, Drizzle ORM, serverless Postgres, Auth.js v5, `react-markdown`, `@uiw/react-md-editor`.
+## Step 1 — Chapter-targeted write path
+
+The save action currently hardcodes the head chapter. This step makes the target chapter a parameter so editors can contribute data points at any chapter in the series, not just the latest one.
+
+- Add an optional `targetChapterId: number | undefined` parameter to `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts`.
+- When `targetChapterId` is provided, use it directly instead of calling `getHeadChapterId`.
+- When omitted, keep the existing behavior of writing at the head chapter.
+- No UI change in this step — `PageEditor` still passes `undefined`, behavior is identical to before.
+- Commit: `feat: accept target chapter in savePageContent`
 
 ---
 
-## Parallelization opportunities
+## Step 2 — Server action: fetch content at a given chapter
 
-Steps with no shared file or data dependency can be developed concurrently in separate git worktrees.
+Editors need to pre-fill the edit form with what exists at any chapter they select. The read query already exists in `page.tsx` but is embedded in the Server Component and tied to the reader's cookie cutoff. This step extracts it into a callable action.
 
-| After step | Can run in parallel |
-|------------|-------------------|
-| Step 1 | **Steps 2 + 3** — DB setup vs. UI shell |
-| Steps 2 + 3 | **Steps 4 + 5** — serial CRUD vs. chapter management |
-| Step 5b | **Steps 6 + 11** — schema management vs. chapter progress selector |
-| Step 12 | **Steps 13, 14, 15** — editor, page blocking, spoiler-aware search |
-
-Steps 8 → 9 → 10 → 12 are a strict sequential chain.
-Auth (Step 16) and progress sync (Step 17) are intentionally deferred until all localStorage-based features are complete.
+- Add `getPageContentAtChapter(serialSlug, schemaName, pageName, chapterId)` to `src/app/[serial]/[schema]/[page]/actions.ts`.
+- The function runs the same max-idx subquery join as `page.tsx` but takes an explicit `chapterId` (resolved to `chapters.idx`) instead of reading the cookie.
+- Returns `{ sections: { id, content }[], floaterImageUrl: string | null, floaterRows: { id, content }[] }`.
+- Commit: `feat: add getPageContentAtChapter server action`
 
 ---
 
-## ~~Step 1 — Project scaffold~~ ✓
+## Step 3 — Chapter selector in edit mode
 
-- ~~Run `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, no `turbopack` (compatibility with Auth.js).~~
-- ~~Delete all boilerplate content from `page.tsx`, `globals.css`, etc.~~
-- ~~Verify `npm run dev` starts without errors and the page renders.~~
-- Commit: `chore: scaffold Next.js project`
+Wires Steps 1 and 2 into the UI so editors can pick which chapter their edits apply to.
 
-## ~~Step 2 — Database + Drizzle setup~~ ✓
+- In `src/app/[serial]/[schema]/[page]/page.tsx`, fetch all chapters for the serial (id, displayName, volumeName, idx) and pass them — alongside the head chapter id — to `<PageEditor>` as new props.
+- In `<PageEditor>`, add a `chapters` prop and a `headChapterId` prop. In edit mode, render a `<Select>` labeled "Writing as of:" that defaults to the head chapter.
+- When the selected chapter changes, call `getPageContentAtChapter` and replace the draft state with the returned content so the editor reflects what readers at that chapter currently see.
+- On save, pass the selected `targetChapterId` to `savePageContent`.
+- Commit: `feat: chapter selector in edit mode for targeted content versioning`
 
-- ~~Copy the database connection string to `.env.local` as `DATABASE_URL`.~~
-- ~~Install: `drizzle-orm`, `postgres`, `drizzle-kit`, `dotenv`.~~
-- ~~Create `src/db/schema.ts` with all tables defined using Drizzle's schema DSL. Define all tables from the spec in one file:~~
-  - ~~`serials` — `id`, `title`, `description`, `splash_art_url`~~
-  - ~~`serial_authors` — `serial_id`, `name`, `display_order`~~
-  - ~~`chapters` — `id`, `serial_id`, `display_name`, `idx`~~
-  - ~~`schemas` — `id`, `serial_id`, `name`, `has_floater`~~
-  - ~~`schema_sections` — `id`, `schema_id`, `name`, `display_order`, `created_at`, `deleted_at`~~
-  - ~~`schema_floater_rows` — `id`, `schema_id`, `label`, `display_order`, `created_at`, `deleted_at`~~
-  - ~~`pages` — `id`, `schema_id`, `name`, `intro_chapter_id`~~
-  - ~~`page_section_versions` — `page_id`, `section_id`, `from_chapter_id`, `to_chapter_id`, `content`; PK `(page_id, section_id, from_chapter_id)`~~
-  - ~~`page_floater_versions` — `page_id`, `from_chapter_id`, `to_chapter_id`, `image_url`; PK `(page_id, from_chapter_id)`~~
-  - ~~`page_floater_row_versions` — `page_id`, `floater_row_id`, `from_chapter_id`, `to_chapter_id`, `content`; PK `(page_id, floater_row_id, from_chapter_id)`~~
-  - ~~`users` — `id`, `email`, `display_name`, `created_at`~~
-  - ~~`user_progress` — `user_id`, `serial_id`, `chapter_id`, `updated_at`; PK `(user_id, serial_id)`~~
-- ~~Create `drizzle.config.ts` pointing at `src/db/schema.ts`.~~
-- ~~Create `src/db/index.ts` exporting a `db` client using `postgres`.~~
-- ~~Run `npx drizzle-kit generate` and `npx drizzle-kit migrate` to apply the schema.~~
-- ~~Add `.env.local` to `.gitignore`.~~
-- Commit: `feat: add Drizzle schema and initial migration`
+---
 
-## ~~Step 3 — Home page static shell~~ ✓
+## Step 4 — Consistent content widths
 
-- ~~Create a shared `<Navbar>` component rendered in the root `layout.tsx`. For now it just shows the site name "PlotArmor" and a placeholder for auth.~~
-- ~~Build the home page (`app/page.tsx`):~~
-  - ~~A search bar input (uncontrolled, no backend yet).~~
-  - ~~A "Create wiki" button (links to `/new` — page does not need to exist yet).~~
-- ~~No data fetching in this step.~~
-- Commit: `feat: add home page shell with navbar and search bar`
+Pages currently have inconsistent max-widths and padding. Establish a single container constraint before adding more pages.
 
-## ~~Step 4 — Serial creation and listing~~ ✓
+- Audit every page route for its root max-width class: `src/app/page.tsx`, `src/app/new/page.tsx`, `src/app/[serial]/page.tsx`, `src/app/[serial]/[schema]/page.tsx`, `src/app/[serial]/[schema]/new/page.tsx`, `src/app/[serial]/[schema]/[page]/page.tsx`.
+- Create `src/components/ui/page-container.tsx` — a `<div>` with `max-w-5xl mx-auto w-full px-4 py-6`. Accept a `className` prop for per-page overrides.
+- Replace ad-hoc width classes on each page's root element with `<PageContainer>`. The wiki page layout (with floater sidebar) may need `max-w-6xl` — override via `className`.
+- Commit: `feat: PageContainer component for consistent content width across all pages`
 
-- ~~Create `app/new/page.tsx` — a form to create a serial:~~
-  - ~~Fields: title (required), description (textarea), authors (repeatable text input), splash art URL (optional).~~
-  - ~~Submit via a Server Action that inserts into `serials` and `serial_authors`, then redirects to `/{serial-slug}`.~~
-  - ~~Use the serial title lowercased and hyphenated as the URL slug (store it or derive it — pick one approach and be consistent).~~
-- ~~Update `app/page.tsx` to fetch and list all serials from the DB below the search bar.~~
-- ~~Wire the search bar to filter the displayed list client-side (no FTS yet).~~
-- Commit: `feat: serial creation form and listing on home page`
+---
 
-## ~~Step 5 — Chapter management~~ ✓
+## Step 5 — Rename "Page Types" to "Page Categories"
 
-- ~~Create `app/[serial]/page.tsx` — the serial detail page. For now it shows:~~
-  - ~~The serial title, description, and authors.~~
-  - ~~A list of existing chapters in index order.~~
-  - ~~A form to add a new chapter (display name only; index auto-assigned as max existing index + 1). Submit via Server Action inserting into `chapters`.~~
-- Commit: `feat: serial detail page with chapter list and add-chapter form`
+The label "Page Types" is ambiguous. "Page Categories" communicates that schemas are categorical groupings of wiki pages, not type-system variants.
 
-## ~~Step 5b — Volume and chapter reordering (drag and drop)~~ ✓
+- `grep -ri "page type" src/` to locate all display-facing strings — headings, labels, button text, placeholder text.
+- Update each occurrence. The internal identifier is `schema` throughout the codebase, so no DB migration or variable rename is needed — UI strings only.
+- Commit: `chore: rename "Page Types" to "Page Categories" in all UI text`
 
-- ~~On the serial detail page, make both the volume list and each volume's chapter list reorderable via drag and drop.~~
-- ~~Use `@dnd-kit/core` and `@dnd-kit/sortable` (or equivalent) — no native HTML5 drag API, which lacks touch support.~~
-- ~~**Volume reordering:** dragging a volume to a new position updates `volumes.idx` for all volumes in the serial via a Server Action; chapters are not renumbered.~~
-- ~~**Chapter reordering within a volume:** dragging a chapter to a new position within its volume reassigns `chapters.idx` globally so the serial-level linear order remains strictly increasing (all chapters of earlier volumes precede later ones).~~
-- ~~Both Server Actions must update all affected rows in a single transaction to avoid partial reorder states.~~
-- ~~No optimistic UI required for now — revalidate the page after each action completes.~~
-- Commit: `feat: drag-and-drop reordering for volumes and chapters`
+---
 
-## ~~Step 6 — Schema management~~ ✓
+## Step 6 — Tooltip wrapper for icon buttons
 
-- ~~On the serial detail page, add a second section below chapters for managing schemas.~~
-- ~~"Add schema" form: schema name, toggle for whether it has a floater. Creates a `schemas` row.~~
-- ~~Clicking a schema expands or navigates to a schema detail view where editors can:~~
-  - ~~Add/remove sections (inserts/soft-deletes `schema_sections` rows via `deleted_at`).~~
-  - ~~If `has_floater`, add/remove floater rows (`schema_floater_rows`).~~
-  - ~~Reorder sections and floater rows (updates `display_order`).~~
-- ~~No chapter versioning in this step — schema structure changes are wall-clock only.~~
-- Commit: `feat: schema management with sections and floater row config`
+Icon-only buttons have no visible label; users cannot discover their purpose without a tooltip.
 
-## ~~Step 7 — Page schema index page~~ ✓
+- Install or verify `@radix-ui/react-tooltip` is available (it ships with Shadcn).
+- Create `src/components/ui/tooltip.tsx` exporting a `<Tooltip content={ReactNode} side?="top"|"right"|"bottom"|"left">` wrapper that composes `TooltipProvider`, `TooltipTrigger`, and `TooltipContent` from Radix. The API should be `<Tooltip content="Edit schema"><Button .../></Tooltip>`.
+- Add `<TooltipProvider>` to `src/app/layout.tsx` so the provider is global.
+- Audit all icon-only buttons across `SerialEditor`, `SchemaManager`, `SchemaIndexEditor`, `PageEditor`, `SerialMetadataEditor`, and `Navbar`. Wrap each with the appropriate `<Tooltip content="…">`.
+- Commit: `feat: Tooltip wrapper component; add tooltips to all icon-only buttons`
 
-- ~~Create `app/[serial]/[schema]/page.tsx` — the schema index page. It shows:~~
-  - ~~The schema name as a heading.~~
-  - ~~The schema `body` rendered as markdown (using `react-markdown`) if set — this is the editor-provided description of the category (e.g. what "Characters" means for this wiki).~~
-  - ~~A list of all pages belonging to this schema, each linking to `/{serial}/{schema}/{page-name}`.~~
-- ~~Resolve the serial via `WHERE slug = ?` and the schema via `WHERE serial_id = ? AND name = ?`.~~
-- ~~Link to this index page from the serial detail page next to each schema name.~~
-- Commit: `feat: page schema index page with body description and page list`
+---
 
-## ~~Step 8 — Page creation~~ ✓
+## Step 7 — Search no-match redirect to Create Wiki with prefilled title
 
-- ~~Create `app/[serial]/[schema]/new/page.tsx` — a form to create a wiki page:~~
-  - ~~Fields: page name, intro chapter (select from existing chapters for this serial).~~
-  - ~~Submit via Server Action inserting into `pages`, then redirects to `/{serial}/{schema}/{page-name}`.~~
-- ~~Create `app/[serial]/[schema]/[page]/page.tsx` — renders a bare shell: just the page name as a heading and the intro chapter. No content yet.~~
-- ~~Add a "New page" link on the schema index page for each schema.~~
-- Commit: `feat: page creation form and bare page shell`
+When a user types a wiki name and gets zero results, pressing Enter is a natural next action. Routing them directly to the creation form with their query pre-filled reduces friction.
 
-## ~~Step 9 — Page rendering with current content~~ ✓
+- In `<SerialList>` (`src/components/SerialList.tsx`): add a `keydown` handler on the search `<Input>`. When the key is `Enter`, `query` is non-empty, and the filtered list has zero results, call `router.push('/new?title=' + encodeURIComponent(query))`.
+- In `src/app/new/page.tsx`: read `searchParams.title` (string | undefined) and pass it as a `defaultTitle` prop to the form client component.
+- In the new-serial form client component: attach a `ref` to the title `<Input>` and call `.focus()` inside a `useEffect` that fires when `defaultTitle` is non-empty.
+- Commit: `feat: redirect to Create Wiki with prefilled title on no-results Enter`
 
-- ~~Install `react-markdown`.~~
-- ~~Update the page route (`app/[serial]/[schema]/[page]/page.tsx`) to fetch and render body content:~~
-  - ~~For each active section in the schema (where `deleted_at IS NULL`), fetch the latest `page_section_versions` row (`to_chapter_id IS NULL`).~~
-  - ~~Render each section heading and its content using `<ReactMarkdown>`.~~
-- ~~No chapter filter yet — this always shows the latest version.~~
-- Commit: `feat: render page body sections as markdown (latest content)`
+---
 
-## ~~Step 10 — Floater sidebar~~ ✓
+## Step 8 — Seed new wikis with default page categories
 
-- ~~Update the page route to also fetch and render the floater if `schema.has_floater`:~~
-  - ~~Latest `page_floater_versions` row for the image URL.~~
-  - ~~Latest `page_floater_row_versions` rows for each active floater row.~~
-- ~~Render as a sidebar panel floating top-right: page name as header, image, then labeled rows.~~
-- ~~Layout: use CSS Grid or Flexbox — body on the left, floater on the right.~~
-- Commit: `feat: render floater sidebar with image and labeled rows`
+New wikis start empty. Adding default "Character" and "Location" schemas on creation reduces the setup burden since these are near-universal categories.
 
-## ~~Step 11 — Chapter progress selector (anonymous, localStorage only)~~ ✓
+- In `createSerial` (`src/app/new/actions.ts`): after inserting the serial row, insert two schemas into `schemas` and their default sections into `schema_sections` within the same transaction:
+  - **Character** — sections: `Description`, `Appearances`.
+  - **Location** — sections: `Description`, `Notable Events`.
+- No UI change needed — the serial detail page will display them automatically after creation.
+- Commit: `feat: seed new wikis with default Character and Location page categories`
 
-- ~~Create a `<ChapterSelector>` Client Component. It:~~
-  - ~~Receives the list of chapters for the current serial as props.~~
-  - ~~Reads/writes progress from `localStorage` keyed by serial ID using `usePersistedStore`: `plotarmor:progress:{serial_id}`.~~
-  - ~~Defaults to the first chapter if no value is stored.~~
-  - ~~Shows a temporary callout banner on first visit prompting the user to set their chapter.~~
-- ~~Mount `<ChapterSelector>` in the navbar when on a serial page. The selected chapter ID must be accessible to Server Components — pass it as a cookie (set on selection, read server-side) rather than relying on localStorage alone.~~
-- ~~**No auth dependency**: this step works entirely with localStorage for anonymous users.~~
-- Commit: `feat: chapter progress selector with localStorage persistence`
+---
 
-## ~~Step 12 — SCD Type 2 versioned read path~~ ✓
+## Step 9 — Collapsible volumes in chapter selector and TOC
 
-**This is the core spoiler-protection query — prototype it in raw SQL before wiring it into Drizzle.**
+Long series have many volumes. Collapsing them makes the chapter selector and TOC navigable without scrolling through irrelevant entries.
 
-- ~~Read the user's progress chapter index (`chapters.idx`) from the cookie set in step 11.~~
-- ~~Replace the "latest only" queries in the page route with the versioned range filter:~~
-  ```sql
-  WHERE from_chapter_idx <= :cutoff AND (to_chapter_idx IS NULL OR to_chapter_idx > :cutoff)
-  ```
-- ~~Apply this filter to `page_section_versions`, `page_floater_versions`, and `page_floater_row_versions`.~~
-- ~~A section with no content row in range renders as empty (not an error).~~
-- ~~Verify by inserting test versioned rows in the database and toggling the progress cookie.~~
-- Commit: `feat: apply SCD Type 2 chapter filter to page content queries`
+- In `<ChapterSelector>` (`src/components/ChapterSelector.tsx`): group options by volume. Render each volume as a collapsible header (`▶ / ▼ Volume Name`) with its chapters indented beneath. Default state: all volumes expanded; persist per-volume collapse state in `localStorage` under `plotarmor:vol-collapsed:{serialId}:{volumeId}`.
+- Apply the same collapsible pattern to the TOC component introduced in Step 10 — do this step first but leave a TODO comment if Step 10 is not yet complete.
+- Commit: `feat: collapsible volume groups in chapter selector and table of contents`
 
-## ~~Step 13 — Content editing (no auth gate yet)~~ ✓
+---
 
-- ~~Install `@uiw/react-md-editor`.~~
-- ~~Add an "Edit" mode to the page view (visible to all users initially — add auth gate in Step 16):~~
-  - ~~Each section gets an `<MDEditor>` replacing the read-only `<ReactMarkdown>`.~~
-  - ~~The floater image URL and each floater row get text inputs.~~
-  - ~~A single "Save" button submits all changes via a Server Action.~~
-- ~~The Server Action implements the SCD Type 2 write path:~~
-  1. ~~For each changed section: find the open row (`to_chapter_id IS NULL`), set its `to_chapter_id` to the current chapter, insert a new row with `from_chapter_id = current chapter, to_chapter_id = NULL, content = new content`.~~
-  2. ~~Same pattern for `page_floater_versions` and `page_floater_row_versions`.~~
-  3. ~~`current chapter` here means the latest chapter in the serial (the edit always writes at head).~~
-- Commit: `feat: markdown content editor with SCD Type 2 write path`
+## Step 10 — Table of contents as left sidebar / mobile drawer
 
-## ~~Step 14 — Spoiler-aware page blocking~~ ✓
+The chapter list embedded inline in the serial page becomes unwieldy for long series. A persistent sidebar improves at-a-glance navigation.
 
-- ~~At the top of the page Server Component, after resolving the page and user's progress cutoff:~~
-  - ~~If `pages.intro_chapter_id` maps to a chapter whose `idx` > the user's cutoff `idx`, do not render any page content.~~
-  - ~~Instead render: *"This [schema name] is introduced in [intro chapter display name]. This page is hidden to prevent spoilers."*~~
-  - ~~Do not display the page name anywhere on the blocked view.~~
-- Commit: `feat: block page content for pages beyond user progress`
+- Extract the volume/chapter list from `src/app/[serial]/page.tsx` into `src/components/SerialTOC.tsx` — a Server Component that accepts `volumes` (with nested chapters) and `serialSlug`.
+- On `md+` screens: render `<SerialTOC>` as a sticky left panel (`w-56 shrink-0`) alongside the main content using a two-column flex layout in `src/app/[serial]/page.tsx`.
+- On `sm` screens: hide the sidebar (`hidden md:block`). Add a "Contents" icon button in the serial sub-bar that opens `<SerialTOC>` inside a `<Dialog>` (or Shadcn `Sheet`) drawer.
+- Commit: `feat: table of contents as sticky left sidebar with mobile drawer`
 
-## Step 15 — Spoiler-aware search
+---
 
-- Replace the client-side list filter on the home page with a server-side search endpoint.
-- Implement using PostgreSQL full-text search on `pages.name` and `serials.title`:
-  - Add a `tsvector` index to `pages.name` or use `to_tsvector` inline.
-  - The query must also filter out pages whose `intro_chapter_id` resolves to an `idx` beyond the user's current progress for that serial.
-- Wire the home page search bar to call this endpoint (can use a Server Action or a route handler).
+## Step 11 — Merge serial sub-bar into top navbar
+
+Two stacked nav bars feel heavy. Merging the serial name and chapter selector into the primary navbar reduces visual weight and saves vertical space.
+
+- Introduce an optional `serialSlot` render prop (or a `SerialNavContext`) that pages can use to inject content into the right side of `<Navbar>`.
+- In `src/app/[serial]/layout.tsx`: populate the slot with the serial title (linked to `/{serial}`) and `<ChapterSelector>`. Remove the dark sub-bar `<div>`.
+- When not on a serial route the slot renders nothing; the navbar shows only the logo and auth.
+- Adjust responsive styling so the serial title truncates gracefully at narrow widths.
+- Commit: `feat: merge serial name and chapter selector into top navbar`
+
+---
+
+## Step 12 — Bulk chapter input
+
+Adding chapters one at a time is tedious for a series with many entries. A bulk-entry textarea reduces this to a single action.
+
+- In `<SerialEditor>` (`src/components/SerialEditor.tsx`): add a "Bulk add" expander beneath each volume's chapter list (visible in edit mode). The expander reveals a `<textarea>` labelled "One [chapterType] name per line" and a Submit button.
+- Add `bulkAddChapters(serialSlug: string, volumeId: number, names: string[])` to `src/app/[serial]/actions.ts`. Filter empty/whitespace lines, then insert all chapters in a single transaction, assigning `idx` values sequentially after the current maximum for the series.
+- Commit: `feat: bulk chapter input for adding multiple chapters at once`
+
+---
+
+## Step 13 — Consolidated floating edit mode
+
+Edit controls are currently scattered across every component. A single global edit-mode toggle gives a cleaner reading experience and a consistent editing workflow.
+
+- Create `src/contexts/EditModeContext.tsx` exporting `EditModeProvider` and `useEditMode()`. State: `{ isEditing: boolean; toggle(): void; registerHandlers(onSave, onDiscard): void }`. Each editable page registers its save/discard callbacks on mount and deregisters on unmount.
+- Create `src/components/EditModeFAB.tsx` — a fixed bottom-right floating button:
+  - **Read mode**: single pencil icon button (`<Tooltip content="Edit">`) that calls `toggle()`.
+  - **Edit mode**: two buttons — "Save" (calls registered `onSave`) and "Discard" (calls registered `onDiscard`), both labeled.
+- Wrap the root layout in `<EditModeProvider>` (`src/app/layout.tsx`). Render `<EditModeFAB>` inside the layout so it appears on every page.
+- Audit each editable component (`SerialEditor`, `SchemaManager`, `SchemaIndexEditor`, `PageEditor`, `SerialMetadataEditor`): remove their inline edit-toggle buttons; show edit controls/forms only when `useEditMode().isEditing` is `true`; wire their save/discard logic to `registerHandlers`.
+- Commit: `feat: consolidated floating edit mode FAB; remove per-component edit toggles`
+
+---
+
+## Step 14 — Move schema section editor to schema index page
+
+Section management is currently buried inside `SchemaManager` on the serial page. Editors expect to manage a schema's structure while looking at the schema itself.
+
+- On `src/app/[serial]/[schema]/page.tsx`: pass section and floater-row data to a new `<SchemaSectionEditor>` Client Component rendered below the schema description. Visibility is gated on `useEditMode().isEditing` (Step 13).
+- `<SchemaSectionEditor>` reuses the add/rename/reorder/delete logic already in `SchemaManager`. Extract the shared pieces into `src/components/SectionEditorPanel.tsx` and import from both locations to avoid duplication.
+- In `SchemaManager` on the serial page, replace the expanded section editor with a condensed read-only row count and a "Manage →" link to the schema index page.
+- Commit: `feat: schema section editor on the schema index page`
+
+---
+
+## Step 15 — Empty states across the app
+
+Empty lists with no message leave users confused about whether content is loading, missing, or simply not yet created.
+
+- Serial page: if a serial has no volumes/chapters, show a prompt "No chapters yet — add your first one below" (visible always, not just in edit mode).
+- Schema index page: if a schema has no pages, show "No pages yet — create the first one" with a link to the new-page form.
+- Home page: if no serials exist at all, show a call-to-action "No wikis yet — create one" linking to `/new`.
+- Wiki page: if a section has no content for the user's chapter cutoff, show a faint "No content for this chapter yet" placeholder rather than a blank section.
+- Commit: `feat: empty state messages across serial, schema, page, and home views`
+
+---
+
+## Step 16 — Version history per section
+
+After Step 3, editors can write at any chapter, but have no way to see what data points already exist in the time series. This step surfaces that.
+
+- For each active section, fetch all `page_section_versions` rows for the current page joined to `chapters`, ordered by `chapters.idx`. This is the raw time series for that section.
+- In `<PageEditor>` read mode, show a "History" toggle (collapsed by default) beneath each section listing the chapters that have an explicit version entry (e.g. "Chapter 3 · Chapter 7 · Chapter 12 (head)"). Each entry is clickable and switches the page into edit mode targeted at that chapter.
+- No new DB tables or schema changes needed.
+- Commit: `feat: section version history showing data points in the time series`
+
+---
+
+## Step 17 — Chapter pages with synopsis and introduced content
+
+Each chapter should have its own wiki page showing a synopsis and a list of schema pages (characters, locations, etc.) introduced in that chapter. This makes chapters first-class content objects.
+
+- Add a `chapter_synopses` table: `(chapter_id PK, content text, updated_at timestamptz)`. Run the squashed-migration workflow from CLAUDE.md.
+- Create route `src/app/[serial]/chapter/[chapterIdx]/page.tsx`. Resolve the chapter by `serial_id` + `idx`. Fetch synopsis content from `chapter_synopses`. Fetch all pages whose `intro_chapter_id` matches this chapter, grouped by schema.
+- Render: chapter title, synopsis (markdown, editable via Step 13's edit mode), then a grouped list of introduced pages (e.g. "Characters introduced: Anya, Yoru").
+- In `<SerialTOC>` (Step 10) and `<ChapterSelector>` (Step 9), link each chapter label to `/{serial}/chapter/{idx}`.
+- Commit: `feat: chapter pages with synopsis and list of introduced content`
+
+---
+
+## Step 18 — Text wraps around the floater sidebar
+
+The current two-column grid layout for the wiki page body and floater sidebar places them in separate, rigid columns. Wrapping text around the floater creates a more natural reading layout.
+
+- In `src/app/[serial]/[schema]/[page]/PageEditor.tsx`: replace the two-column CSS grid with a single-column prose container where the floater uses `float: right` with appropriate margin (`mr-0 ml-4 mb-4`) and a fixed width (e.g. `w-72`).
+- The floater renders before the first section so text from all sections flows around it.
+- On mobile (`sm`), remove the float and stack the floater above the content: `float-none w-full`.
+- Commit: `feat: prose wraps around floater sidebar instead of rigid two-column layout`
+
+---
+
+## Step 19 — Spoiler-aware search
+
+The home page currently filters serials by title client-side with substring matching. The spec calls for server-side full-text search across both serials and pages, with spoiler filtering on page results.
+
+- Add `to_tsvector` on `pages.name` and `serials.title` (inline or as a generated column with index).
+- Create a server-side search endpoint (Server Action or route handler) that:
+  - Matches serials by title.
+  - Matches pages by name, joining to resolve serial context.
+  - Filters out pages whose `intro_chapter_id → idx` exceeds the user's progress for that serial. Read progress from the per-serial cookie (`plotarmor_chapter_{serialId}`); for serials with no cookie, use `idx = 0` (only show pages introduced at or before the first chapter).
+- Replace the client-side filter in `<SerialList>` with a call to this endpoint.
 - Commit: `feat: server-side spoiler-aware search with PG full-text search`
 
-## Step 16 — Auth.js setup
+**Note:** The home page has no single-serial context, so the endpoint must read per-serial progress cookies for each serial that appears in results. This is fine — cookies are sent with every request — but the handler needs to iterate over each matched serial's cookie.
 
-Auth is intentionally deferred until all anonymous/localStorage-based features are complete and working.
+---
 
-- Install: `next-auth@beta`, and a provider package (e.g. GitHub OAuth).
-- Create `src/auth.ts` configuring Auth.js with the chosen provider. Adapter: use the Drizzle adapter or a custom one writing to the `users` table.
-- Add `app/api/auth/[...nextauth]/route.ts`.
+## Step 20 — Auth.js setup
+
+Auth is intentionally deferred until all localStorage-based features are complete and working.
+
+- Install `next-auth@beta` and a provider package (e.g. GitHub OAuth).
+- Create `src/auth.ts` configuring Auth.js with the chosen provider; use a Drizzle adapter or custom adapter writing to the existing `users` table.
+- Add `src/app/api/auth/[...nextauth]/route.ts`.
 - Add `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and provider credentials to `.env.local`.
-- Update `<Navbar>` to show a sign-in button (unauthenticated) or the user's display name + sign-out (authenticated), using `auth()` from `src/auth.ts` in a Server Component.
+- Update `<Navbar>` to show a sign-in button (unauthenticated) or the user's display name + sign-out (authenticated) using `auth()` in a Server Component.
 - Verify sign-in and sign-out work end-to-end.
 - Commit: `feat: Auth.js setup with GitHub provider and session in navbar`
 
-## Step 17 — Progress sync for logged-in users
+---
 
-- When the user selects a chapter in `<ChapterSelector>`:
-  - If authenticated: call a Server Action that upserts `user_progress (user_id, serial_id, chapter_id)`.
-  - If anonymous: write to `localStorage` only (existing behavior from Step 11).
-- On page load, the Server Component reads progress in priority order:
-  1. `user_progress` table (if session exists).
-  2. Cookie set in step 11 (fallback for anonymous).
-- When an anonymous user signs in, optionally merge their `localStorage` progress into the DB (nice-to-have, not required for initial ship).
-- Add auth gate to content editor (Step 13): only show Edit mode to authenticated users.
+## Step 21 — Progress sync for logged-in users + auth gate
+
+Depends on Step 20.
+
+- In `<ChapterSelector>`, add auth awareness:
+  - If the user is authenticated: call a Server Action that upserts `user_progress (user_id, serial_id, chapter_id)` in addition to writing the cookie.
+  - If anonymous: cookie + localStorage only (existing behavior).
+- On serial page load, read progress in priority order:
+  1. `user_progress` table row (if session exists).
+  2. Cookie fallback (existing anonymous behavior).
+- Add auth gate to the content editor in `<PageEditor>`: only render the edit FAB (Step 13) for authenticated users.
+- Merge anonymous `localStorage` progress into the DB on sign-in (nice-to-have; not required for initial ship).
 - Commit: `feat: sync chapter progress to DB for authenticated users`
+
+---
+
+## Step 22 — Dark mode
+
+Dark mode is deferred until the component palette is stable (after Steps 1–14 settle the layout) to avoid auditing twice.
+
+- In `tailwind.config.ts`, set `darkMode: 'class'`.
+- Create `src/components/ThemeToggle.tsx` — a sun/moon icon button that toggles a `dark` class on `<html>` and persists the preference in `localStorage` under `plotarmor:theme`.
+- Add `<ThemeToggle>` to `<Navbar>`.
+- Audit every component in `src/components/ui/` and every page for hardcoded light-mode colors. Add `dark:` variants where needed. Pay special attention to the markdown editor (`@uiw/react-md-editor` has a built-in `data-color-mode` prop).
+- Commit: `feat: dark mode with system-preference default and manual toggle`
