@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { PageContainer } from '@/components/ui/page-container';
 import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from '@/lib/serial-types';
 
 export default function NewSerialPage() {
@@ -26,8 +27,8 @@ export default function NewSerialPage() {
   }
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-scroll flex flex-col items-center px-6 py-16">
-      <div className="w-full max-w-lg">
+    <main className="flex-1 min-h-0 overflow-y-scroll">
+      <PageContainer className="max-w-lg">
         <Text variant="h1" className="text-2xl mb-8">Create a new wiki</Text>
         <form action={createSerial} className="flex flex-col gap-5">
           {/* Title */}
@@ -130,7 +131,7 @@ export default function NewSerialPage() {
             Create wiki
           </Button>
         </form>
-      </div>
+      </PageContainer>
     </main>
   );
 }

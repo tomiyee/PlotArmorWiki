@@ -7,6 +7,7 @@ import { and, eq, lte } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { buttonVariants } from "@/components/ui/button";
+import { PageContainer } from "@/components/ui/page-container";
 import { updateSchema } from "../actions";
 import { SchemaIndexEditor } from "./SchemaIndexEditor";
 
@@ -73,8 +74,9 @@ export default async function SchemaIndexPage({ params }: Props) {
   const updateSchemaForSerial = updateSchema.bind(null, serial.id);
 
   return (
-    <main className="flex flex-col items-center px-6 py-16 gap-8">
-      <Box col className="w-full max-w-2xl gap-6">
+    <main>
+      <PageContainer>
+      <Box col className="gap-6">
         <Text muted className="text-sm">
           <Link href={`/${serialSlug}`} className="hover:underline">
             {serial.title}
@@ -117,6 +119,7 @@ export default async function SchemaIndexPage({ params }: Props) {
           )}
         </Box>
       </Box>
+      </PageContainer>
     </main>
   );
 }

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { PageContainer } from '@/components/ui/page-container';
 import { createPage } from './actions';
 
 interface Props {
@@ -83,8 +84,9 @@ export default async function NewPagePage({ params }: Props) {
   const createPageAction = createPage.bind(null, serialSlug, schemaName);
 
   return (
-    <main className="flex flex-col items-center px-6 py-16">
-      <Box col className="w-full max-w-lg gap-8">
+    <main>
+      <PageContainer className="max-w-lg">
+      <Box col className="gap-8">
         {/* Breadcrumb */}
         <Text muted className="text-sm">
           <Link href={`/${serialSlug}`} className="hover:underline">
@@ -150,6 +152,7 @@ export default async function NewPagePage({ params }: Props) {
           </Button>
         </form>
       </Box>
+      </PageContainer>
     </main>
   );
 }
