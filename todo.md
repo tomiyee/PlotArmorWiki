@@ -14,26 +14,26 @@
 
 ---
 
-## Step 2 — Server action: fetch content at a given chapter
+## ~~Step 2 — Server action: fetch content at a given chapter~~ ✓
 
-Editors need to pre-fill the edit form with what exists at any chapter they select. The read query already exists in `page.tsx` but is embedded in the Server Component and tied to the reader's cookie cutoff. This step extracts it into a callable action.
+~~Editors need to pre-fill the edit form with what exists at any chapter they select. The read query already exists in `page.tsx` but is embedded in the Server Component and tied to the reader's cookie cutoff. This step extracts it into a callable action.~~
 
-- Add `getPageContentAtChapter(serialSlug, schemaName, pageName, chapterId)` to `src/app/[serial]/[schema]/[page]/actions.ts`.
-- The function runs the same max-idx subquery join as `page.tsx` but takes an explicit `chapterId` (resolved to `chapters.idx`) instead of reading the cookie.
-- Returns `{ sections: { id, content }[], floaterImageUrl: string | null, floaterRows: { id, content }[] }`.
-- Commit: `feat: add getPageContentAtChapter server action`
+~~- Add `getPageContentAtChapter(serialSlug, schemaName, pageName, chapterId)` to `src/app/[serial]/[schema]/[page]/actions.ts`.~~
+~~- The function runs the same max-idx subquery join as `page.tsx` but takes an explicit `chapterId` (resolved to `chapters.idx`) instead of reading the cookie.~~
+~~- Returns `{ sections: { id, content }[], floaterImageUrl: string | null, floaterRows: { id, content }[] }`.~~
+~~- Commit: `feat: add getPageContentAtChapter server action`~~
 
 ---
 
-## Step 3 — Chapter selector in edit mode
+## ~~Step 3 — Chapter selector in edit mode~~ ✓
 
-Wires Steps 1 and 2 into the UI so editors can pick which chapter their edits apply to.
+~~Wires Steps 1 and 2 into the UI so editors can pick which chapter their edits apply to.~~
 
-- In `src/app/[serial]/[schema]/[page]/page.tsx`, fetch all chapters for the serial (id, displayName, volumeName, idx) and pass them — alongside the head chapter id — to `<PageEditor>` as new props.
-- In `<PageEditor>`, add a `chapters` prop and a `headChapterId` prop. In edit mode, render a `<Select>` labeled "Writing as of:" that defaults to the head chapter.
-- When the selected chapter changes, call `getPageContentAtChapter` and replace the draft state with the returned content so the editor reflects what readers at that chapter currently see.
-- On save, pass the selected `targetChapterId` to `savePageContent`.
-- Commit: `feat: chapter selector in edit mode for targeted content versioning`
+~~- In `src/app/[serial]/[schema]/[page]/page.tsx`, fetch all chapters for the serial (id, displayName, volumeName, idx) and pass them — alongside the head chapter id — to `<PageEditor>` as new props.~~
+~~- In `<PageEditor>`, add a `chapters` prop and a `headChapterId` prop. In edit mode, render a `<Select>` labeled "Writing as of:" that defaults to the head chapter.~~
+~~- When the selected chapter changes, call `getPageContentAtChapter` and replace the draft state with the returned content so the editor reflects what readers at that chapter currently see.~~
+~~- On save, pass the selected `targetChapterId` to `savePageContent`.~~
+~~- Commit: `feat: chapter selector in edit mode for targeted content versioning`~~
 
 ---
 
