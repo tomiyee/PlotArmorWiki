@@ -32,14 +32,21 @@ async function getHeadChapterId(serialId: number): Promise<number> {
 }
 
 /**
- * Saves all page content at the serial's current head chapter.
+ * Saves all page content at the specified chapter, or the head chapter when
+ * no target is given. Passing `targetChapterId` lets editors backfill or
+ * overwrite content at any chapter without touching newer revisions.
  *
  * Each section/floater field is an upsert keyed by (pageId, …, chapterId).
  * Readers at an earlier chapter cutoff see the previous version via the
  * max-idx subquery read path.
  *
  * @example
+ * // Write at head (default behaviour — UI passes undefined)
  * await savePageContent(serialSlug, schemaName, pageName, sectionContent, floaterImageUrl, floaterRowContent);
+ *
+ * @example
+ * // Write at a specific chapter (used by the chapter selector in edit mode)
+ * await savePageContent(serialSlug, schemaName, pageName, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
  */
 export async function savePageContent(
   serialSlug: string,
@@ -48,6 +55,7 @@ export async function savePageContent(
   sectionContent: Record<number, string>,
   floaterImageUrl: string | null,
   floaterRowContent: Record<number, string>,
+  targetChapterId?: number,
 ): Promise<void> {
   const [serial] = await db
     .select({ id: serials.id })
@@ -70,7 +78,7 @@ export async function savePageContent(
     .limit(1);
   if (!page) throw new Error('Page not found');
 
-  const headChapterId = await getHeadChapterId(serial.id);
+  const headChapterId = targetChapterId ?? (await getHeadChapterId(serial.id));
 
   await db.transaction(async (tx) => {
     // ── Section content ────────────────────────────────────────────────────────
