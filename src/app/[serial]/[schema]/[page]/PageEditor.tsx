@@ -158,8 +158,11 @@ export function PageEditor({
   }
 
   // ── Read mode ────────────────────────────────────────────────────────────────
+  // Use props directly so content updates when router.refresh() delivers new
+  // server-rendered props (e.g. after the user changes their chapter cutoff).
+  // Draft state is only needed while editing.
   const hasFloaterContent =
-    hasFloater && (draftFloaterImageUrl || floaterRows.length > 0);
+    hasFloater && (floaterImageUrl || floaterRows.length > 0);
 
   if (!isEditing) {
     return (
@@ -171,21 +174,18 @@ export function PageEditor({
         }
       >
         <Box col className="gap-6">
-          {sections.map((section) => {
-            const content = draftSectionContent[section.id] ?? "";
-            return (
-              <Box key={section.id} col className="gap-2">
-                <Text variant="h2">{section.name}</Text>
-                {content ? (
-                  <div className="prose prose-gray max-w-none text-gray-700">
-                    <ReactMarkdown>{content}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <Text muted>No content yet.</Text>
-                )}
-              </Box>
-            );
-          })}
+          {sections.map((section) => (
+            <Box key={section.id} col className="gap-2">
+              <Text variant="h2">{section.name}</Text>
+              {section.content ? (
+                <div className="prose prose-gray max-w-none text-gray-700">
+                  <ReactMarkdown>{section.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <Text muted>No content yet.</Text>
+              )}
+            </Box>
+          ))}
 
           <Box className="pt-2">
             <Button
@@ -201,10 +201,10 @@ export function PageEditor({
 
         {hasFloaterContent && (
           <aside className="sticky top-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
-            {draftFloaterImageUrl && (
+            {floaterImageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={draftFloaterImageUrl}
+                src={floaterImageUrl}
                 alt="Floater image"
                 className="w-full rounded object-cover"
               />
@@ -212,17 +212,14 @@ export function PageEditor({
 
             {floaterRows.length > 0 && (
               <dl className="flex flex-col gap-2 text-sm">
-                {floaterRows.map((row) => {
-                  const content = draftFloaterRowContent[row.id] ?? "";
-                  return (
-                    <div key={row.id}>
-                      <dt className="font-medium text-gray-600">{row.label}</dt>
-                      <dd className="text-gray-800 whitespace-pre-wrap">
-                        {content || <span className="text-gray-400">—</span>}
-                      </dd>
-                    </div>
-                  );
-                })}
+                {floaterRows.map((row) => (
+                  <div key={row.id}>
+                    <dt className="font-medium text-gray-600">{row.label}</dt>
+                    <dd className="text-gray-800 whitespace-pre-wrap">
+                      {row.content || <span className="text-gray-400">—</span>}
+                    </dd>
+                  </div>
+                ))}
               </dl>
             )}
           </aside>
