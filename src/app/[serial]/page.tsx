@@ -10,6 +10,7 @@ import {
   addFloaterRow, deleteFloaterRow, renameFloaterRow, reorderFloaterRows,
 } from './actions';
 import { Box } from '@/components/ui/box';
+import { PageContainer } from '@/components/ui/page-container';
 import { SerialEditor } from '@/components/SerialEditor';
 import { SchemaManager } from '@/components/SchemaManager';
 import { SerialMetadataEditor } from '@/components/SerialMetadataEditor';
@@ -123,8 +124,9 @@ export default async function SerialPage({ params }: Props) {
   const reorderFloaterRowsForSerial = reorderFloaterRows.bind(null, serial.id);
 
   return (
-    <main className="flex flex-col items-center px-6 py-16 gap-8">
-      <Box col className="w-full max-w-2xl gap-4">
+    <main>
+      <PageContainer>
+      <Box col className="gap-4">
         {/* Serial header with inline edit */}
         <SerialMetadataEditor
           title={serial.title}
@@ -168,6 +170,7 @@ export default async function SerialPage({ params }: Props) {
           reorderFloaterRowsAction={reorderFloaterRowsForSerial}
         />
       </Box>
+      </PageContainer>
     </main>
   );
 }

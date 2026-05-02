@@ -3,20 +3,23 @@ import { db } from '@/db/index';
 import { serials } from '@/db/schema';
 import SerialList from '@/components/SerialList';
 import { Text } from '@/components/ui/text';
+import { PageContainer } from '@/components/ui/page-container';
 
 export default async function Home() {
   const allSerials = await db.select().from(serials);
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-scroll flex flex-col items-center px-6 py-16 gap-6">
-      <Text variant="h1">Find a wiki</Text>
-      <SerialList serials={allSerials} />
-      <Link
-        href="/new"
-        className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white hover:bg-gray-800"
-      >
-        Create wiki
-      </Link>
+    <main className="flex-1 min-h-0 overflow-y-scroll flex flex-col items-center">
+      <PageContainer className="flex flex-col items-center gap-6 py-16">
+        <Text variant="h1">Find a wiki</Text>
+        <SerialList serials={allSerials} />
+        <Link
+          href="/new"
+          className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white hover:bg-gray-800"
+        >
+          Create wiki
+        </Link>
+      </PageContainer>
     </main>
   );
 }

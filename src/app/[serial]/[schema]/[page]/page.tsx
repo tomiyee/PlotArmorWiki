@@ -17,6 +17,7 @@ import {
 import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
+import { PageContainer } from "@/components/ui/page-container";
 import { PageEditor } from "./PageEditor";
 
 interface Props {
@@ -137,8 +138,8 @@ export default async function PageView({ params }: Props) {
 
   if (introChapter && introChapter.idx > cutoffIdx) {
     return (
-      <main className="px-6 py-16">
-        <div className="mx-auto max-w-5xl">
+      <main>
+        <PageContainer>
           <Box col className="gap-6">
             <Text muted className="text-sm">
               <Link href={`/${serialSlug}`} className="hover:underline">
@@ -158,7 +159,7 @@ export default async function PageView({ params }: Props) {
               spoilers.
             </Text>
           </Box>
-        </div>
+        </PageContainer>
       </main>
     );
   }
@@ -305,8 +306,8 @@ export default async function PageView({ params }: Props) {
   }
 
   return (
-    <main className="px-6 py-16">
-      <div className="mx-auto max-w-5xl">
+    <main>
+      <PageContainer>
         <Box col className="gap-6">
           {/* Breadcrumb */}
           <Text muted className="text-sm">
@@ -342,7 +343,7 @@ export default async function PageView({ params }: Props) {
             headChapterId={headChapterId}
           />
         </Box>
-      </div>
+      </PageContainer>
     </main>
   );
 }
