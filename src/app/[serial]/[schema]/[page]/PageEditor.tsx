@@ -1,29 +1,29 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen } from '@fortawesome/free-solid-svg-icons';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { savePageContent } from './actions';
+import dynamic from "next/dynamic";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPen } from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/text";
+import { Box } from "@/components/ui/box";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { savePageContent } from "./actions";
 
 // MDEditor uses browser-only APIs; dynamic import with ssr:false prevents
 // hydration mismatches in Next.js App Router.
-const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
-export interface SectionData {
+interface SectionData {
   id: number;
   name: string;
   content: string;
 }
 
-export interface FloaterRowData {
+interface FloaterRowData {
   id: number;
   label: string;
   content: string;
@@ -66,22 +66,26 @@ export function PageEditor({
   const [isPending, startTransition] = useTransition();
   const [isEditing, setIsEditing] = useState(false);
 
-  const [draftSectionContent, setDraftSectionContent] = useState<Record<number, string>>(
-    () => Object.fromEntries(sections.map((s) => [s.id, s.content])),
-  );
+  const [draftSectionContent, setDraftSectionContent] = useState<
+    Record<number, string>
+  >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
-    floaterImageUrl ?? '',
+    floaterImageUrl ?? "",
   );
-  const [draftFloaterRowContent, setDraftFloaterRowContent] = useState<Record<number, string>>(
-    () => Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
-  );
+  const [draftFloaterRowContent, setDraftFloaterRowContent] = useState<
+    Record<number, string>
+  >(() => Object.fromEntries(floaterRows.map((r) => [r.id, r.content])));
 
   const hasFloater = floaterImageUrl !== undefined;
 
   function handleCancel() {
-    setDraftSectionContent(Object.fromEntries(sections.map((s) => [s.id, s.content])));
-    setDraftFloaterImageUrl(floaterImageUrl ?? '');
-    setDraftFloaterRowContent(Object.fromEntries(floaterRows.map((r) => [r.id, r.content])));
+    setDraftSectionContent(
+      Object.fromEntries(sections.map((s) => [s.id, s.content])),
+    );
+    setDraftFloaterImageUrl(floaterImageUrl ?? "");
+    setDraftFloaterRowContent(
+      Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
+    );
     setIsEditing(false);
   }
 
@@ -92,7 +96,7 @@ export function PageEditor({
         schemaName,
         pageName,
         draftSectionContent,
-        hasFloater ? (draftFloaterImageUrl.trim() || null) : null,
+        hasFloater ? draftFloaterImageUrl.trim() || null : null,
         hasFloater ? draftFloaterRowContent : {},
       );
       setIsEditing(false);
@@ -109,13 +113,13 @@ export function PageEditor({
       <div
         className={
           hasFloaterContent
-            ? 'grid grid-cols-[1fr_280px] gap-8 items-start'
+            ? "grid grid-cols-[1fr_280px] gap-8 items-start"
             : undefined
         }
       >
         <Box col className="gap-6">
           {sections.map((section) => {
-            const content = draftSectionContent[section.id] ?? '';
+            const content = draftSectionContent[section.id] ?? "";
             return (
               <Box key={section.id} col className="gap-2">
                 <Text variant="h2">{section.name}</Text>
@@ -156,7 +160,7 @@ export function PageEditor({
             {floaterRows.length > 0 && (
               <dl className="flex flex-col gap-2 text-sm">
                 {floaterRows.map((row) => {
-                  const content = draftFloaterRowContent[row.id] ?? '';
+                  const content = draftFloaterRowContent[row.id] ?? "";
                   return (
                     <div key={row.id}>
                       <dt className="font-medium text-gray-600">{row.label}</dt>
@@ -182,9 +186,12 @@ export function PageEditor({
           <Text variant="h2">{section.name}</Text>
           <div data-color-mode="light">
             <MDEditor
-              value={draftSectionContent[section.id] ?? ''}
+              value={draftSectionContent[section.id] ?? ""}
               onChange={(val) =>
-                setDraftSectionContent((prev) => ({ ...prev, [section.id]: val ?? '' }))
+                setDraftSectionContent((prev) => ({
+                  ...prev,
+                  [section.id]: val ?? "",
+                }))
               }
               height={300}
               preview="edit"
@@ -194,7 +201,10 @@ export function PageEditor({
       ))}
 
       {hasFloater && (
-        <Box col className="gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <Box
+          col
+          className="gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+        >
           <Text variant="h3">Floater fields</Text>
 
           <Box col className="gap-1.5">
@@ -213,9 +223,12 @@ export function PageEditor({
               <Label htmlFor={`floater-row-${row.id}`}>{row.label}</Label>
               <Input
                 id={`floater-row-${row.id}`}
-                value={draftFloaterRowContent[row.id] ?? ''}
+                value={draftFloaterRowContent[row.id] ?? ""}
                 onChange={(e) =>
-                  setDraftFloaterRowContent((prev) => ({ ...prev, [row.id]: e.target.value }))
+                  setDraftFloaterRowContent((prev) => ({
+                    ...prev,
+                    [row.id]: e.target.value,
+                  }))
                 }
                 disabled={isPending}
               />
@@ -226,7 +239,7 @@ export function PageEditor({
 
       <Box className="gap-2">
         <Button onClick={handleSave} disabled={isPending}>
-          {isPending ? 'Saving…' : 'Save'}
+          {isPending ? "Saving…" : "Save"}
         </Button>
         <Button variant="outline" onClick={handleCancel} disabled={isPending}>
           Cancel
