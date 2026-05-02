@@ -7,6 +7,7 @@ import {
   pageSchemas,
   pages,
   chapters,
+  volumes,
   schemaSections,
   pageSectionVersions,
   schemaFloaterRows,
@@ -71,7 +72,7 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [[schema], cutoffIdx] = await Promise.all([
+  const [[schema], cutoffIdx, volumeList, chapterList] = await Promise.all([
     db
       .select()
       .from(pageSchemas)
@@ -83,11 +84,40 @@ export default async function PageView({ params }: Props) {
       )
       .limit(1),
     getChapterCutoffIdx(serial.id),
+    db
+      .select({ id: volumes.id, displayName: volumes.displayName })
+      .from(volumes)
+      .where(eq(volumes.serialId, serial.id))
+      .orderBy(asc(volumes.idx)),
+    db
+      .select({
+        id: chapters.id,
+        displayName: chapters.displayName,
+        idx: chapters.idx,
+        volumeId: chapters.volumeId,
+      })
+      .from(chapters)
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(volumes.serialId, serial.id))
+      .orderBy(asc(chapters.idx)),
   ]);
 
   if (!schema) {
     notFound();
   }
+
+  // Build a structured chapter list for the chapter selector in edit mode.
+  // Each volume becomes an optgroup with its chapters as options.
+  const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
+  const allChapters = chapterList.map((c) => ({
+    id: c.id,
+    displayName: c.displayName,
+    idx: c.idx,
+    volumeName: volumeNameById.get(c.volumeId) ?? "",
+  }));
+
+  // Head chapter is the one with the highest idx (last in the ordered list).
+  const headChapterId = chapterList.at(-1)?.id ?? null;
 
   const [page] = await db
     .select()
@@ -308,6 +338,8 @@ export default async function PageView({ params }: Props) {
             sections={sections}
             floaterImageUrl={floaterImageUrl}
             floaterRows={floaterRows}
+            allChapters={allChapters}
+            headChapterId={headChapterId}
           />
         </Box>
       </div>
