@@ -307,7 +307,7 @@ export default async function PageView({ params }: Props) {
 
   return (
     <main>
-      <PageContainer className="max-w-6xl">
+      <PageContainer>
         <Box col className="gap-6">
           {/* Breadcrumb */}
           <Text muted className="text-sm">
