@@ -25,24 +25,26 @@ interface Props {
 }
 
 /**
- * Reads the user's chapter cutoff idx for a given serial from the
- * progress cookie set by <ChapterSelector>. Returns the chapter idx
- * (a global, serial-level integer) used as the upper bound when finding
- * the latest revision per section.
+ * Reads the user's chapter cutoff for a given serial from the progress
+ * cookie set by <ChapterSelector>. Returns both the chapter id (DB PK)
+ * and idx (global ordering integer) so callers can pass the id to
+ * PageEditor as the default "Writing as of" selection.
  *
- * Falls back to 0 when no cookie is present — the subquery finds no
- * revision with idx ≤ 0, so all sections render empty.
+ * Falls back to idx=0 / id=null when no cookie is present — the subquery
+ * finds no revision with idx ≤ 0, so all sections render empty.
  *
  * @example
- * const cutoffIdx = await getChapterCutoffIdx(serial.id);
+ * const { cutoffIdx, readingChapterId } = await getChapterCutoff(serial.id);
  */
-async function getChapterCutoffIdx(serialId: number): Promise<number> {
+async function getChapterCutoff(
+  serialId: number,
+): Promise<{ cutoffIdx: number; readingChapterId: number | null }> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(`plotarmor_chapter_${serialId}`)?.value;
-  if (!raw) return 0;
+  if (!raw) return { cutoffIdx: 0, readingChapterId: null };
 
   const chapterId = parseInt(raw, 10);
-  if (isNaN(chapterId)) return 0;
+  if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
 
   const [row] = await db
     .select({ idx: chapters.idx })
@@ -50,7 +52,8 @@ async function getChapterCutoffIdx(serialId: number): Promise<number> {
     .where(eq(chapters.id, chapterId))
     .limit(1);
 
-  return row?.idx ?? 0;
+  if (!row) return { cutoffIdx: 0, readingChapterId: null };
+  return { cutoffIdx: row.idx, readingChapterId: chapterId };
 }
 
 export default async function PageView({ params }: Props) {
@@ -73,7 +76,7 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [[schema], cutoffIdx, volumeList, chapterList] = await Promise.all([
+  const [[schema], chapterCutoff, volumeList, chapterList] = await Promise.all([
     db
       .select()
       .from(pageSchemas)
@@ -84,7 +87,7 @@ export default async function PageView({ params }: Props) {
         ),
       )
       .limit(1),
-    getChapterCutoffIdx(serial.id),
+    getChapterCutoff(serial.id),
     db
       .select({ id: volumes.id, displayName: volumes.displayName })
       .from(volumes)
@@ -102,6 +105,7 @@ export default async function PageView({ params }: Props) {
       .where(eq(volumes.serialId, serial.id))
       .orderBy(asc(chapters.idx)),
   ]);
+  const { cutoffIdx, readingChapterId } = chapterCutoff;
 
   if (!schema) {
     notFound();
@@ -341,6 +345,7 @@ export default async function PageView({ params }: Props) {
             floaterRows={floaterRows}
             allChapters={allChapters}
             headChapterId={headChapterId}
+            readingChapterId={readingChapterId}
           />
         </Box>
       </PageContainer>
