@@ -2,15 +2,15 @@
 
 ---
 
-## Step 1 — Chapter-targeted write path
+## ~~Step 1 — Chapter-targeted write path~~ ✓
 
-The save action currently hardcodes the head chapter. This step makes the target chapter a parameter so editors can contribute data points at any chapter in the series, not just the latest one.
+~~The save action currently hardcodes the head chapter. This step makes the target chapter a parameter so editors can contribute data points at any chapter in the series, not just the latest one.~~
 
-- Add an optional `targetChapterId: number | undefined` parameter to `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts`.
-- When `targetChapterId` is provided, use it directly instead of calling `getHeadChapterId`.
-- When omitted, keep the existing behavior of writing at the head chapter.
-- No UI change in this step — `PageEditor` still passes `undefined`, behavior is identical to before.
-- Commit: `feat: accept target chapter in savePageContent`
+~~- Add an optional `targetChapterId: number | undefined` parameter to `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts`.~~
+~~- When `targetChapterId` is provided, use it directly instead of calling `getHeadChapterId`.~~
+~~- When omitted, keep the existing behavior of writing at the head chapter.~~
+~~- No UI change in this step — `PageEditor` still passes `undefined`, behavior is identical to before.~~
+~~- Commit: `feat: accept target chapter in savePageContent`~~
 
 ---
 

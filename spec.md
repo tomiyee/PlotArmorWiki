@@ -141,10 +141,10 @@ HAVING chapters.idx = MAX(chapters.idx)
 
 ### Write Path
 
-Edits always write at the **head chapter** — the latest chapter in the serial — so fully-caught-up readers see changes immediately. For each versioned dimension being saved, `savePageContent` performs a single upsert keyed by `(pageId, sectionId, chapterId)`:
+`savePageContent` accepts an optional `targetChapterId`. When provided it writes at that chapter directly; when omitted it defaults to the **head chapter** (the latest chapter in the serial) so fully-caught-up readers see changes immediately. For each versioned dimension being saved, it performs a single upsert keyed by `(pageId, sectionId, chapterId)`:
 
-- If a revision already exists at the head chapter for that dimension, update it in-place.
-- Otherwise insert a new revision row at the head chapter.
+- If a revision already exists at the target chapter for that dimension, update it in-place.
+- Otherwise insert a new revision row at the target chapter.
 
 This is implemented in `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts` and runs inside a single transaction.
 
