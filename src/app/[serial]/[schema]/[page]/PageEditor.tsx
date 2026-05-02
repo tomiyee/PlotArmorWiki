@@ -11,7 +11,8 @@ import { Box } from "@/components/ui/box";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { savePageContent } from "./actions";
+import { Select } from "@/components/ui/select";
+import { savePageContent, getPageContentAtChapter } from "./actions";
 
 // MDEditor uses browser-only APIs; dynamic import with ssr:false prevents
 // hydration mismatches in Next.js App Router.
@@ -29,6 +30,13 @@ interface FloaterRowData {
   content: string;
 }
 
+interface ChapterData {
+  id: number;
+  displayName: string;
+  idx: number;
+  volumeName: string;
+}
+
 interface Props {
   serialSlug: string;
   schemaName: string;
@@ -37,12 +45,20 @@ interface Props {
   /** null when the schema has no floater */
   floaterImageUrl: string | null | undefined;
   floaterRows: FloaterRowData[];
+  /** All chapters for this serial, used to populate the "Writing as of:" selector. */
+  allChapters: ChapterData[];
+  /** The id of the head chapter (highest idx). Used as the default target for saves. */
+  headChapterId: number | null;
 }
 
 /**
  * Renders the page body in read mode and switches to an inline edit mode where
  * each section gets an MDEditor, and floater fields get plain text inputs.
  * On save, calls the `savePageContent` Server Action which writes via SCD Type 2.
+ *
+ * In edit mode, a "Writing as of:" chapter selector lets the editor target any
+ * chapter. Changing the selection reloads draft content via `getPageContentAtChapter`
+ * so the editor always sees what readers at that chapter currently see.
  *
  * @example
  * <PageEditor
@@ -52,6 +68,8 @@ interface Props {
  *   sections={[{ id: 1, name: 'Overview', content: '...' }]}
  *   floaterImageUrl="https://..."
  *   floaterRows={[{ id: 2, label: 'Age', content: '19' }]}
+ *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
+ *   headChapterId={5}
  * />
  */
 export function PageEditor({
@@ -61,6 +79,8 @@ export function PageEditor({
   sections,
   floaterImageUrl,
   floaterRows,
+  allChapters,
+  headChapterId,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -76,6 +96,11 @@ export function PageEditor({
     Record<number, string>
   >(() => Object.fromEntries(floaterRows.map((r) => [r.id, r.content])));
 
+  // The chapter the editor is currently targeting. Defaults to head.
+  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
+    headChapterId,
+  );
+
   const hasFloater = floaterImageUrl !== undefined;
 
   function handleCancel() {
@@ -86,7 +111,34 @@ export function PageEditor({
     setDraftFloaterRowContent(
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
+    setSelectedChapterId(headChapterId);
     setIsEditing(false);
+  }
+
+  /**
+   * When the editor picks a different target chapter, fetch the content that
+   * readers at that chapter currently see and replace the draft with it so the
+   * editor can review and then overwrite it.
+   */
+  function handleChapterChange(chapterId: number) {
+    setSelectedChapterId(chapterId);
+    startTransition(async () => {
+      const data = await getPageContentAtChapter(
+        serialSlug,
+        schemaName,
+        pageName,
+        chapterId,
+      );
+      setDraftSectionContent(
+        Object.fromEntries(data.sections.map((s) => [s.id, s.content])),
+      );
+      if (hasFloater) {
+        setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
+        setDraftFloaterRowContent(
+          Object.fromEntries(data.floaterRows.map((r) => [r.id, r.content])),
+        );
+      }
+    });
   }
 
   function handleSave() {
@@ -98,6 +150,7 @@ export function PageEditor({
         draftSectionContent,
         hasFloater ? draftFloaterImageUrl.trim() || null : null,
         hasFloater ? draftFloaterRowContent : {},
+        selectedChapterId ?? undefined,
       );
       setIsEditing(false);
       router.refresh();
@@ -105,8 +158,11 @@ export function PageEditor({
   }
 
   // ── Read mode ────────────────────────────────────────────────────────────────
+  // Use props directly so content updates when router.refresh() delivers new
+  // server-rendered props (e.g. after the user changes their chapter cutoff).
+  // Draft state is only needed while editing.
   const hasFloaterContent =
-    hasFloater && (draftFloaterImageUrl || floaterRows.length > 0);
+    hasFloater && (floaterImageUrl || floaterRows.length > 0);
 
   if (!isEditing) {
     return (
@@ -118,21 +174,18 @@ export function PageEditor({
         }
       >
         <Box col className="gap-6">
-          {sections.map((section) => {
-            const content = draftSectionContent[section.id] ?? "";
-            return (
-              <Box key={section.id} col className="gap-2">
-                <Text variant="h2">{section.name}</Text>
-                {content ? (
-                  <div className="prose prose-gray max-w-none text-gray-700">
-                    <ReactMarkdown>{content}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <Text muted>No content yet.</Text>
-                )}
-              </Box>
-            );
-          })}
+          {sections.map((section) => (
+            <Box key={section.id} col className="gap-2">
+              <Text variant="h2">{section.name}</Text>
+              {section.content ? (
+                <div className="prose prose-gray max-w-none text-gray-700">
+                  <ReactMarkdown>{section.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <Text muted>No content yet.</Text>
+              )}
+            </Box>
+          ))}
 
           <Box className="pt-2">
             <Button
@@ -148,10 +201,10 @@ export function PageEditor({
 
         {hasFloaterContent && (
           <aside className="sticky top-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
-            {draftFloaterImageUrl && (
+            {floaterImageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={draftFloaterImageUrl}
+                src={floaterImageUrl}
                 alt="Floater image"
                 className="w-full rounded object-cover"
               />
@@ -159,17 +212,14 @@ export function PageEditor({
 
             {floaterRows.length > 0 && (
               <dl className="flex flex-col gap-2 text-sm">
-                {floaterRows.map((row) => {
-                  const content = draftFloaterRowContent[row.id] ?? "";
-                  return (
-                    <div key={row.id}>
-                      <dt className="font-medium text-gray-600">{row.label}</dt>
-                      <dd className="text-gray-800 whitespace-pre-wrap">
-                        {content || <span className="text-gray-400">—</span>}
-                      </dd>
-                    </div>
-                  );
-                })}
+                {floaterRows.map((row) => (
+                  <div key={row.id}>
+                    <dt className="font-medium text-gray-600">{row.label}</dt>
+                    <dd className="text-gray-800 whitespace-pre-wrap">
+                      {row.content || <span className="text-gray-400">—</span>}
+                    </dd>
+                  </div>
+                ))}
               </dl>
             )}
           </aside>
@@ -179,8 +229,42 @@ export function PageEditor({
   }
 
   // ── Edit mode ────────────────────────────────────────────────────────────────
+  // Build Select options: volumes as optgroups, chapters as options inside each.
+  const chapterSelectOptions = (() => {
+    const volumeMap = new Map<
+      string,
+      { label: string; value: number; idx: number }[]
+    >();
+    for (const ch of allChapters) {
+      const arr = volumeMap.get(ch.volumeName) ?? [];
+      arr.push({ label: ch.displayName, value: ch.id, idx: ch.idx });
+      volumeMap.set(ch.volumeName, arr);
+    }
+    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
+      label: volumeName,
+      value: -1 as number, // group node — value unused
+      children: chaps.map((c) => ({ label: c.label, value: c.value })),
+    }));
+  })();
+
   return (
     <Box col className="gap-6">
+      {allChapters.length > 0 && (
+        <Box className="items-center gap-3">
+          <Label htmlFor="target-chapter" className="shrink-0 text-sm">
+            Writing as of:
+          </Label>
+          <Select<number>
+            id="target-chapter"
+            options={chapterSelectOptions}
+            value={selectedChapterId ?? undefined}
+            onChange={handleChapterChange}
+            disabled={isPending}
+            className="w-52"
+          />
+        </Box>
+      )}
+
       {sections.map((section) => (
         <Box key={section.id} col className="gap-2">
           <Text variant="h2">{section.name}</Text>
