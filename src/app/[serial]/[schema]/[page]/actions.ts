@@ -33,6 +33,31 @@ async function getHeadChapterId(serialId: number): Promise<number> {
   return row.id;
 }
 
+async function resolvePageIds(serialSlug: string, schemaName: string, pageName: string) {
+  const [serial] = await db
+    .select({ id: serials.id })
+    .from(serials)
+    .where(eq(serials.slug, serialSlug))
+    .limit(1);
+  if (!serial) throw new Error('Serial not found');
+
+  const [schema] = await db
+    .select({ id: pageSchemas.id, hasFloater: pageSchemas.hasFloater })
+    .from(pageSchemas)
+    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
+    .limit(1);
+  if (!schema) throw new Error('Schema not found');
+
+  const [page] = await db
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.schemaId, schema.id), eq(pages.name, pageName)))
+    .limit(1);
+  if (!page) throw new Error('Page not found');
+
+  return { serialId: serial.id, schema, pageId: page.id };
+}
+
 /**
  * Saves all page content at the specified chapter, or the head chapter when
  * no target is given. Passing `targetChapterId` lets editors backfill or
@@ -59,36 +84,15 @@ export async function savePageContent(
   floaterRowContent: Record<number, string>,
   targetChapterId?: number,
 ): Promise<void> {
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
-  if (!serial) throw new Error('Serial not found');
-
-  const [schema] = await db
-    .select({ id: pageSchemas.id, hasFloater: pageSchemas.hasFloater })
-    .from(pageSchemas)
-    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
-    .limit(1);
-  if (!schema) throw new Error('Schema not found');
-
-  const [page] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .where(and(eq(pages.schemaId, schema.id), eq(pages.name, pageName)))
-    .limit(1);
-  if (!page) throw new Error('Page not found');
-
-  const headChapterId = targetChapterId ?? (await getHeadChapterId(serial.id));
+  const { serialId, schema, pageId } = await resolvePageIds(serialSlug, schemaName, pageName);
+  const headChapterId = targetChapterId ?? (await getHeadChapterId(serialId));
 
   await db.transaction(async (tx) => {
-    // ── Section content ────────────────────────────────────────────────────────
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
       const sectionId = parseInt(sectionIdStr, 10);
       await tx
         .insert(pageSectionVersions)
-        .values({ pageId: page.id, sectionId, chapterId: headChapterId, content })
+        .values({ pageId, sectionId, chapterId: headChapterId, content })
         .onConflictDoUpdate({
           target: [
             pageSectionVersions.pageId,
@@ -100,21 +104,19 @@ export async function savePageContent(
     }
 
     if (schema.hasFloater) {
-      // ── Floater image URL ────────────────────────────────────────────────────
       await tx
         .insert(pageFloaterVersions)
-        .values({ pageId: page.id, chapterId: headChapterId, imageUrl: floaterImageUrl })
+        .values({ pageId, chapterId: headChapterId, imageUrl: floaterImageUrl })
         .onConflictDoUpdate({
           target: [pageFloaterVersions.pageId, pageFloaterVersions.chapterId],
           set: { imageUrl: floaterImageUrl },
         });
 
-      // ── Floater row content ──────────────────────────────────────────────────
       for (const [floaterRowIdStr, content] of Object.entries(floaterRowContent)) {
         const floaterRowId = parseInt(floaterRowIdStr, 10);
         await tx
           .insert(pageFloaterRowVersions)
-          .values({ pageId: page.id, floaterRowId, chapterId: headChapterId, content })
+          .values({ pageId, floaterRowId, chapterId: headChapterId, content })
           .onConflictDoUpdate({
             target: [
               pageFloaterRowVersions.pageId,
@@ -156,38 +158,14 @@ export async function getPageContentAtChapter(
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
-  if (!serial) throw new Error('Serial not found');
-
-  const [schema] = await db
-    .select({ id: pageSchemas.id, hasFloater: pageSchemas.hasFloater })
-    .from(pageSchemas)
-    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
-    .limit(1);
-  if (!schema) throw new Error('Schema not found');
-
-  const [page] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .where(and(eq(pages.schemaId, schema.id), eq(pages.name, pageName)))
-    .limit(1);
-  if (!page) throw new Error('Page not found');
-
-  // Resolve chapterId → chapters.idx so it can be used as the subquery bound.
-  const [targetChapter] = await db
-    .select({ idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, chapterId))
-    .limit(1);
+  const [{ schema, pageId }, [targetChapter]] = await Promise.all([
+    resolvePageIds(serialSlug, schemaName, pageName),
+    db.select({ idx: chapters.idx }).from(chapters).where(eq(chapters.id, chapterId)).limit(1),
+  ]);
   if (!targetChapter) throw new Error('Chapter not found');
 
   const cutoffIdx = targetChapter.idx;
 
-  // ── Section content at cutoff ──────────────────────────────────────────────
   const sectionMaxIdxSq = db
     .select({
       sectionId: pageSectionVersions.sectionId,
@@ -195,7 +173,7 @@ export async function getPageContentAtChapter(
     })
     .from(pageSectionVersions)
     .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
-    .where(and(eq(pageSectionVersions.pageId, page.id), lte(chapters.idx, cutoffIdx)))
+    .where(and(eq(pageSectionVersions.pageId, pageId), lte(chapters.idx, cutoffIdx)))
     .groupBy(pageSectionVersions.sectionId)
     .as('section_max_idx_sq');
 
@@ -219,7 +197,7 @@ export async function getPageContentAtChapter(
           eq(chapters.idx, sectionMaxIdxSq.maxIdx),
         ),
       )
-      .where(eq(pageSectionVersions.pageId, page.id)),
+      .where(eq(pageSectionVersions.pageId, pageId)),
   ]);
 
   const contentBySectionId = new Map(sectionVersions.map((v) => [v.sectionId, v.content]));
@@ -228,69 +206,64 @@ export async function getPageContentAtChapter(
     content: contentBySectionId.get(s.id) ?? '',
   }));
 
-  // ── Floater data at cutoff ─────────────────────────────────────────────────
-  let floaterImageUrl: string | null = null;
-  let floaterRows: { id: number; content: string }[] = [];
+  if (!schema.hasFloater) {
+    return { sections, floaterImageUrl: null, floaterRows: [] };
+  }
 
-  if (schema.hasFloater) {
-    const floaterMaxIdxSq = db
-      .select({ maxIdx: max(chapters.idx).as('max_idx') })
+  const floaterMaxIdxSq = db
+    .select({ maxIdx: max(chapters.idx).as('max_idx') })
+    .from(pageFloaterVersions)
+    .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
+    .where(and(eq(pageFloaterVersions.pageId, pageId), lte(chapters.idx, cutoffIdx)))
+    .as('floater_max_idx_sq');
+
+  const floaterRowMaxIdxSq = db
+    .select({
+      floaterRowId: pageFloaterRowVersions.floaterRowId,
+      maxIdx: max(chapters.idx).as('max_idx'),
+    })
+    .from(pageFloaterRowVersions)
+    .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
+    .where(and(eq(pageFloaterRowVersions.pageId, pageId), lte(chapters.idx, cutoffIdx)))
+    .groupBy(pageFloaterRowVersions.floaterRowId)
+    .as('floater_row_max_idx_sq');
+
+  const [[floaterVersion], activeFloaterRows, floaterRowVersions] = await Promise.all([
+    db
+      .select({ imageUrl: pageFloaterVersions.imageUrl })
       .from(pageFloaterVersions)
       .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
-      .where(and(eq(pageFloaterVersions.pageId, page.id), lte(chapters.idx, cutoffIdx)))
-      .as('floater_max_idx_sq');
-
-    const floaterRowMaxIdxSq = db
+      .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
+      .where(eq(pageFloaterVersions.pageId, pageId))
+      .limit(1),
+    db
+      .select({ id: schemaFloaterRows.id })
+      .from(schemaFloaterRows)
+      .where(
+        and(eq(schemaFloaterRows.schemaId, schema.id), isNull(schemaFloaterRows.deletedAt)),
+      )
+      .orderBy(asc(schemaFloaterRows.displayOrder)),
+    db
       .select({
         floaterRowId: pageFloaterRowVersions.floaterRowId,
-        maxIdx: max(chapters.idx).as('max_idx'),
+        content: pageFloaterRowVersions.content,
       })
       .from(pageFloaterRowVersions)
       .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
-      .where(and(eq(pageFloaterRowVersions.pageId, page.id), lte(chapters.idx, cutoffIdx)))
-      .groupBy(pageFloaterRowVersions.floaterRowId)
-      .as('floater_row_max_idx_sq');
+      .innerJoin(
+        floaterRowMaxIdxSq,
+        and(
+          eq(pageFloaterRowVersions.floaterRowId, floaterRowMaxIdxSq.floaterRowId),
+          eq(chapters.idx, floaterRowMaxIdxSq.maxIdx),
+        ),
+      )
+      .where(eq(pageFloaterRowVersions.pageId, pageId)),
+  ]);
 
-    const [[floaterVersion], activeFloaterRows, floaterRowVersions] = await Promise.all([
-      db
-        .select({ imageUrl: pageFloaterVersions.imageUrl })
-        .from(pageFloaterVersions)
-        .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
-        .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
-        .where(eq(pageFloaterVersions.pageId, page.id))
-        .limit(1),
-      db
-        .select({ id: schemaFloaterRows.id })
-        .from(schemaFloaterRows)
-        .where(
-          and(eq(schemaFloaterRows.schemaId, schema.id), isNull(schemaFloaterRows.deletedAt)),
-        )
-        .orderBy(asc(schemaFloaterRows.displayOrder)),
-      db
-        .select({
-          floaterRowId: pageFloaterRowVersions.floaterRowId,
-          content: pageFloaterRowVersions.content,
-        })
-        .from(pageFloaterRowVersions)
-        .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
-        .innerJoin(
-          floaterRowMaxIdxSq,
-          and(
-            eq(pageFloaterRowVersions.floaterRowId, floaterRowMaxIdxSq.floaterRowId),
-            eq(chapters.idx, floaterRowMaxIdxSq.maxIdx),
-          ),
-        )
-        .where(eq(pageFloaterRowVersions.pageId, page.id)),
-    ]);
-
-    const rowContentMap = new Map(floaterRowVersions.map((v) => [v.floaterRowId, v.content]));
-
-    floaterImageUrl = floaterVersion?.imageUrl ?? null;
-    floaterRows = activeFloaterRows.map((r) => ({
-      id: r.id,
-      content: rowContentMap.get(r.id) ?? '',
-    }));
-  }
-
-  return { sections, floaterImageUrl, floaterRows };
+  const rowContentMap = new Map(floaterRowVersions.map((v) => [v.floaterRowId, v.content]));
+  return {
+    sections,
+    floaterImageUrl: floaterVersion?.imageUrl ?? null,
+    floaterRows: activeFloaterRows.map((r) => ({ id: r.id, content: rowContentMap.get(r.id) ?? '' })),
+  };
 }
