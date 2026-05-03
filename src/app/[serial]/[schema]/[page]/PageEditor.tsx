@@ -47,18 +47,32 @@ interface Props {
   floaterRows: FloaterRowData[];
   /** All chapters for this serial, used to populate the "Writing as of:" selector. */
   allChapters: ChapterData[];
-  /** The id of the head chapter (highest idx). Used as the default target for saves. */
+  /** The id of the head chapter (highest idx). Used as the fallback default target for saves. */
   headChapterId: number | null;
+  /**
+   * The chapter the reader is currently "reading up to" — set by ChapterSelector
+   * and stored in a cookie. When present, this is used as the initial default for
+   * the "Writing as of:" selector so editors write content that matches what they
+   * just read. Falls back to headChapterId when null (no cookie present).
+   */
+  readingChapterId: number | null;
 }
 
 /**
  * Renders the page body in read mode and switches to an inline edit mode where
- * each section gets an MDEditor, and floater fields get plain text inputs.
+ * each section gets an MDEditor alongside its current rendered value, and
+ * floater fields get plain text inputs.
  * On save, calls the `savePageContent` Server Action which writes via SCD Type 2.
  *
- * In edit mode, a "Writing as of:" chapter selector lets the editor target any
- * chapter. Changing the selection reloads draft content via `getPageContentAtChapter`
- * so the editor always sees what readers at that chapter currently see.
+ * In edit mode, the "Writing as of:" chapter selector defaults to the reader's
+ * current chapter (readingChapterId) so the editor writes content that aligns
+ * with where they are in the story. Changing the selection reloads draft content
+ * via `getPageContentAtChapter` so the editor always sees what readers at that
+ * chapter currently see.
+ *
+ * Each section is shown in a two-column layout: the left column shows the
+ * current saved value (read-only reference) and the right column contains the
+ * MDEditor for the draft being written.
  *
  * @example
  * <PageEditor
@@ -70,6 +84,7 @@ interface Props {
  *   floaterRows={[{ id: 2, label: 'Age', content: '19' }]}
  *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
  *   headChapterId={5}
+ *   readingChapterId={3}
  * />
  */
 export function PageEditor({
@@ -81,6 +96,7 @@ export function PageEditor({
   floaterRows,
   allChapters,
   headChapterId,
+  readingChapterId,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -89,6 +105,14 @@ export function PageEditor({
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
   >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
+
+  // The "current value" shown as a reference beside each editor field. Starts
+  // as the reader's chapter content (same as initial draft) and updates whenever
+  // the chapter selector changes to reflect what readers at that chapter see.
+  const [currentSectionContent, setCurrentSectionContent] = useState<
+    Record<number, string>
+  >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
+
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
   );
@@ -96,9 +120,11 @@ export function PageEditor({
     Record<number, string>
   >(() => Object.fromEntries(floaterRows.map((r) => [r.id, r.content])));
 
-  // The chapter the editor is currently targeting. Defaults to head.
+  // The chapter the editor is currently targeting.
+  // Defaults to the reader's current chapter so writing stays in sync with what
+  // the reader just read. Falls back to headChapterId when no reading chapter is set.
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
-    headChapterId,
+    readingChapterId ?? headChapterId,
   );
 
   const hasFloater = floaterImageUrl !== undefined;
@@ -107,18 +133,21 @@ export function PageEditor({
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
+    setCurrentSectionContent(
+      Object.fromEntries(sections.map((s) => [s.id, s.content])),
+    );
     setDraftFloaterImageUrl(floaterImageUrl ?? "");
     setDraftFloaterRowContent(
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
-    setSelectedChapterId(headChapterId);
+    setSelectedChapterId(readingChapterId ?? headChapterId);
     setIsEditing(false);
   }
 
   /**
    * When the editor picks a different target chapter, fetch the content that
-   * readers at that chapter currently see and replace the draft with it so the
-   * editor can review and then overwrite it.
+   * readers at that chapter currently see and replace both the reference view
+   * and the draft with it so the editor can review and then overwrite it.
    */
   function handleChapterChange(chapterId: number) {
     setSelectedChapterId(chapterId);
@@ -129,9 +158,11 @@ export function PageEditor({
         pageName,
         chapterId,
       );
-      setDraftSectionContent(
-        Object.fromEntries(data.sections.map((s) => [s.id, s.content])),
+      const newContent = Object.fromEntries(
+        data.sections.map((s) => [s.id, s.content]),
       );
+      setCurrentSectionContent(newContent);
+      setDraftSectionContent(newContent);
       if (hasFloater) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
@@ -268,18 +299,42 @@ export function PageEditor({
       {sections.map((section) => (
         <Box key={section.id} col className="gap-2">
           <Text variant="h2">{section.name}</Text>
-          <div data-color-mode="light">
-            <MDEditor
-              value={draftSectionContent[section.id] ?? ""}
-              onChange={(val) =>
-                setDraftSectionContent((prev) => ({
-                  ...prev,
-                  [section.id]: val ?? "",
-                }))
-              }
-              height={300}
-              preview="edit"
-            />
+          {/* Two-column layout: current saved value on the left, editor on the right */}
+          <div className="grid grid-cols-2 gap-4 items-start">
+            {/* Left: current saved value at the selected chapter */}
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
+              <Text
+                variant="label"
+                className="mb-2 block text-xs text-gray-400 uppercase tracking-wide"
+              >
+                Current value
+              </Text>
+              {currentSectionContent[section.id] ? (
+                <div className="prose prose-gray prose-sm max-w-none text-gray-700">
+                  <ReactMarkdown>
+                    {currentSectionContent[section.id]}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <Text muted className="text-sm">
+                  No content at this chapter.
+                </Text>
+              )}
+            </div>
+            {/* Right: markdown editor for the new draft */}
+            <div data-color-mode="light">
+              <MDEditor
+                value={draftSectionContent[section.id] ?? ""}
+                onChange={(val) =>
+                  setDraftSectionContent((prev) => ({
+                    ...prev,
+                    [section.id]: val ?? "",
+                  }))
+                }
+                height={300}
+                preview="edit"
+              />
+            </div>
           </div>
         </Box>
       ))}
