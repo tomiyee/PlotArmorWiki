@@ -7,14 +7,17 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { NavbarSerialData } from "@/types";
 
 interface NavbarSerialContextValue {
-  /** The slot content injected by the current serial route. Null when not on a serial page. */
-  serialSlot: ReactNode;
-  /** Called by the serial layout to inject its title + chapter selector into the navbar. */
-  setSerialSlot: (slot: ReactNode) => void;
-  /** Called on unmount to clear the slot. */
-  clearSerialSlot: () => void;
+  /** Typed left-side data for the serial breadcrumb and Pages dropdown. Null when not on a serial page. */
+  serialData: NavbarSerialData | null;
+  /** Pre-rendered ChapterSelector for the right side of the navbar. */
+  chapterSelectorSlot: ReactNode;
+  /** Called by SerialNavInjector on mount to populate both sides of the navbar. */
+  setSerial: (data: NavbarSerialData, slot: ReactNode) => void;
+  /** Called by SerialNavInjector on unmount to restore the default navbar. */
+  clearSerial: () => void;
 }
 
 const NavbarSerialContext = createContext<NavbarSerialContextValue | null>(
@@ -22,8 +25,8 @@ const NavbarSerialContext = createContext<NavbarSerialContextValue | null>(
 );
 
 /**
- * Provides a slot in the navbar for serial-scoped content (title + chapter
- * selector). Wrap the root layout with this provider so any serial route can
+ * Provides typed serial data and a pre-rendered ChapterSelector slot for the
+ * navbar. Wrap the root layout with this provider so any serial route can
  * inject content without prop-drilling across layout boundaries.
  *
  * @example
@@ -33,19 +36,23 @@ const NavbarSerialContext = createContext<NavbarSerialContextValue | null>(
  * </NavbarSerialProvider>
  */
 export function NavbarSerialProvider({ children }: { children: ReactNode }) {
-  const [serialSlot, setSerialSlotState] = useState<ReactNode>(null);
+  const [serialData, setSerialData] = useState<NavbarSerialData | null>(null);
+  const [chapterSelectorSlot, setChapterSelectorSlot] =
+    useState<ReactNode>(null);
 
-  const setSerialSlot = useCallback((slot: ReactNode) => {
-    setSerialSlotState(slot);
+  const setSerial = useCallback((data: NavbarSerialData, slot: ReactNode) => {
+    setSerialData(data);
+    setChapterSelectorSlot(slot);
   }, []);
 
-  const clearSerialSlot = useCallback(() => {
-    setSerialSlotState(null);
+  const clearSerial = useCallback(() => {
+    setSerialData(null);
+    setChapterSelectorSlot(null);
   }, []);
 
   return (
     <NavbarSerialContext.Provider
-      value={{ serialSlot, setSerialSlot, clearSerialSlot }}
+      value={{ serialData, chapterSelectorSlot, setSerial, clearSerial }}
     >
       {children}
     </NavbarSerialContext.Provider>
@@ -53,11 +60,11 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Returns the navbar serial slot context. Throws if used outside
+ * Returns the navbar serial context. Throws if used outside
  * `<NavbarSerialProvider>`.
  *
  * @example
- * const { serialSlot } = useNavbarSerialContext();
+ * const { serialData, chapterSelectorSlot } = useNavbarSerialContext();
  */
 export function useNavbarSerialContext(): NavbarSerialContextValue {
   const ctx = useContext(NavbarSerialContext);

@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { db } from "@/db/index";
-import { serials, volumes, chapters } from "@/db/schema";
+import { serials, volumes, chapters, pageSchemas } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
+import { ChapterData, NavbarSerialData } from "@/types";
 
 interface Props {
   children: React.ReactNode;
@@ -12,9 +12,8 @@ interface Props {
 }
 
 /**
- * Layout for all pages under /{serial}/…. Injects the serial title and
- * <ChapterSelector> into the global navbar via SerialNavInjector, replacing
- * the dark sub-bar that previously sat between the navbar and the page content.
+ * Layout for all pages under /{serial}/…. Injects typed serial data and a
+ * pre-rendered ChapterSelector into the global navbar via SerialNavInjector.
  *
  * @example
  * // Automatically applied to /[serial], /[serial]/[schema], /[serial]/[schema]/[page], etc.
@@ -32,7 +31,7 @@ export default async function SerialLayout({ children, params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList] = await Promise.all([
+  const [volumeList, chapterList, schemaList] = await Promise.all([
     db
       .select()
       .from(volumes)
@@ -49,38 +48,33 @@ export default async function SerialLayout({ children, params }: Props) {
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
+    db
+      .select({ id: pageSchemas.id, name: pageSchemas.name })
+      .from(pageSchemas)
+      .where(eq(pageSchemas.serialId, serial.id)),
   ]);
 
-  const chaptersByVolume: Record<
-    number,
-    { id: number; displayName: string; idx: number; volumeId: number }[]
-  > = {};
-  volumeList.forEach((v) => {
-    chaptersByVolume[v.id] = [];
-  });
-  chapterList.forEach((c) => {
-    chaptersByVolume[c.volumeId]?.push(c);
-  });
+  const chaptersByVolume: Partial<Record<number, ChapterData[]>> = {
+    ...Object.groupBy(chapterList, (c) => c.volumeId),
+  };
+
+  const serialNavData: NavbarSerialData = {
+    serialSlug,
+    serialTitle: serial.title,
+    schemas: schemaList,
+  };
 
   return (
     <>
-      {/* Inject serial title + chapter selector into the top navbar */}
       <SerialNavInjector
-        slot={
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href={`/${serialSlug}`}
-              className="hidden sm:block truncate text-sm font-medium text-gray-700 hover:text-gray-900 max-w-40"
-            >
-              {serial.title}
-            </Link>
-            <ChapterSelector
-              serialId={serial.id}
-              chapterType={serial.chapterType}
-              volumes={volumeList}
-              chaptersByVolume={chaptersByVolume}
-            />
-          </div>
+        data={serialNavData}
+        chapterSelectorSlot={
+          <ChapterSelector
+            serialId={serial.id}
+            chapterType={serial.chapterType}
+            volumes={volumeList}
+            chaptersByVolume={chaptersByVolume}
+          />
         }
       />
       <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>

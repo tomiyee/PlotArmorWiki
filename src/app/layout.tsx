@@ -19,11 +19,12 @@ export const metadata: Metadata = {
   description: "Spoiler-safe wiki for manga and light novels",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+type RootLayoutProps = Readonly<{
   children: React.ReactNode;
-}>) {
+}>;
+
+export default function RootLayout(props: RootLayoutProps) {
+  const { children } = props;
   return (
     <html
       lang="en"
