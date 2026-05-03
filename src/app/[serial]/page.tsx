@@ -138,6 +138,7 @@ export default async function SerialPage({ params }: Props) {
 
         {/* Volume and chapter list with edit mode */}
         <SerialEditor
+          serialId={serial.id}
           volumes={volumeList}
           chaptersByVolume={chaptersByVolume}
           chapterType={serial.chapterType}

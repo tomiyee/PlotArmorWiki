@@ -75,10 +75,9 @@ export function ChapterSelector({
 
   const firstChapterId = allChapters[0]?.id ?? null;
 
-  const [selectedChapterId, setSelectedChapterId] = usePersistedStore<number | null>(
-    `plotarmor:progress:${serialId}`,
-    firstChapterId,
-  );
+  const [selectedChapterId, setSelectedChapterId] = usePersistedStore<
+    number | null
+  >(`plotarmor:progress:${serialId}`, firstChapterId);
 
   // Callout is dismissed once the user has explicitly acknowledged it.
   // usePersistedStore returns the server snapshot (false) during SSR, so the
@@ -91,10 +90,9 @@ export function ChapterSelector({
 
   // Per-volume collapse state. Stored as Record<volumeId, boolean> where
   // true means collapsed. Default: all volumes expanded (not in the record).
-  const [volCollapsed, setVolCollapsed] = usePersistedStore<Record<number, boolean>>(
-    volCollapsedKey(serialId),
-    {},
-  );
+  const [volCollapsed, setVolCollapsed] = usePersistedStore<
+    Record<number, boolean>
+  >(volCollapsedKey(serialId), {});
 
   // Dropdown open/close state (not persisted — resets on page navigation).
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -120,7 +118,10 @@ export function ChapterSelector({
   useEffect(() => {
     if (!dropdownOpen) return;
     function handleOutsideClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     }
@@ -189,7 +190,11 @@ export function ChapterSelector({
 
       {/* Chapter selector with collapsible volume groups */}
       <Box className="items-center gap-2">
-        <Text variant="label" as="label" className="whitespace-nowrap text-gray-200 text-sm">
+        <Text
+          variant="label"
+          as="label"
+          className="whitespace-nowrap text-gray-200 text-sm"
+        >
           Reading up to:
         </Text>
 
@@ -231,9 +236,15 @@ export function ChapterSelector({
                       className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted"
                     >
                       {isCollapsed ? (
-                        <ChevronRightIcon className="size-3 shrink-0" aria-hidden />
+                        <ChevronRightIcon
+                          className="size-3 shrink-0"
+                          aria-hidden
+                        />
                       ) : (
-                        <ChevronDownIcon className="size-3 shrink-0" aria-hidden />
+                        <ChevronDownIcon
+                          className="size-3 shrink-0"
+                          aria-hidden
+                        />
                       )}
                       {volume.displayName}
                     </button>
@@ -244,7 +255,11 @@ export function ChapterSelector({
                         {chaps.map((chapter) => {
                           const isSelected = chapter.id === effectiveChapterId;
                           return (
-                            <li key={chapter.id} role="option" aria-selected={isSelected}>
+                            <li
+                              key={chapter.id}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
                               <button
                                 type="button"
                                 onClick={() => handleSelectChapter(chapter.id)}

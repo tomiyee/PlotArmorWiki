@@ -37,24 +37,24 @@
 
 ---
 
-## Step 4 — Consistent content widths
+## ~~Step 4 — Consistent content widths~~ ✓
 
-Pages currently have inconsistent max-widths and padding. Establish a single container constraint before adding more pages.
+~~Pages currently have inconsistent max-widths and padding. Establish a single container constraint before adding more pages.~~
 
-- Audit every page route for its root max-width class: `src/app/page.tsx`, `src/app/new/page.tsx`, `src/app/[serial]/page.tsx`, `src/app/[serial]/[schema]/page.tsx`, `src/app/[serial]/[schema]/new/page.tsx`, `src/app/[serial]/[schema]/[page]/page.tsx`.
-- Create `src/components/ui/page-container.tsx` — a `<div>` with `max-w-5xl mx-auto w-full px-4 py-6`. Accept a `className` prop for per-page overrides.
-- Replace ad-hoc width classes on each page's root element with `<PageContainer>`. The wiki page layout (with floater sidebar) may need `max-w-6xl` — override via `className`.
-- Commit: `feat: PageContainer component for consistent content width across all pages`
+~~- Audit every page route for its root max-width class: `src/app/page.tsx`, `src/app/new/page.tsx`, `src/app/[serial]/page.tsx`, `src/app/[serial]/[schema]/page.tsx`, `src/app/[serial]/[schema]/new/page.tsx`, `src/app/[serial]/[schema]/[page]/page.tsx`.~~
+~~- Create `src/components/ui/page-container.tsx` — a `<div>` with `max-w-5xl mx-auto w-full px-4 py-6`. Accept a `className` prop for per-page overrides.~~
+~~- Replace ad-hoc width classes on each page's root element with `<PageContainer>`. The wiki page layout (with floater sidebar) may need `max-w-6xl` — override via `className`.~~
+~~- Commit: `feat: PageContainer component for consistent content width across all pages`~~
 
 ---
 
-## Step 5 — Rename "Page Types" to "Page Categories"
+## ~~Step 5 — Rename "Page Types" to "Page Categories"~~ ✓
 
-The label "Page Types" is ambiguous. "Page Categories" communicates that schemas are categorical groupings of wiki pages, not type-system variants.
+~~The label "Page Types" is ambiguous. "Page Categories" communicates that schemas are categorical groupings of wiki pages, not type-system variants.~~
 
-- `grep -ri "page type" src/` to locate all display-facing strings — headings, labels, button text, placeholder text.
-- Update each occurrence. The internal identifier is `schema` throughout the codebase, so no DB migration or variable rename is needed — UI strings only.
-- Commit: `chore: rename "Page Types" to "Page Categories" in all UI text`
+~~- `grep -ri "page type" src/` to locate all display-facing strings — headings, labels, button text, placeholder text.~~
+~~- Update each occurrence. The internal identifier is `schema` throughout the codebase, so no DB migration or variable rename is needed — UI strings only.~~
+~~- Commit: `chore: rename "Page Types" to "Page Categories" in all UI text`~~
 
 ---
 
@@ -93,13 +93,13 @@ New wikis start empty. Adding default "Character" and "Location" schemas on crea
 
 ---
 
-## Step 9 — Collapsible volumes in chapter selector and TOC
+## ~~Step 9 — Collapsible volumes in chapter selector and TOC~~ ✓
 
-Long series have many volumes. Collapsing them makes the chapter selector and TOC navigable without scrolling through irrelevant entries.
+~~Long series have many volumes. Collapsing them makes the chapter selector and TOC navigable without scrolling through irrelevant entries.~~
 
-- In `<ChapterSelector>` (`src/components/ChapterSelector.tsx`): group options by volume. Render each volume as a collapsible header (`▶ / ▼ Volume Name`) with its chapters indented beneath. Default state: all volumes expanded; persist per-volume collapse state in `localStorage` under `plotarmor:vol-collapsed:{serialId}:{volumeId}`.
-- Apply the same collapsible pattern to the TOC component introduced in Step 10 — do this step first but leave a TODO comment if Step 10 is not yet complete.
-- Commit: `feat: collapsible volume groups in chapter selector and table of contents`
+~~- In `<ChapterSelector>` (`src/components/ChapterSelector.tsx`): group options by volume. Render each volume as a collapsible header (`▶ / ▼ Volume Name`) with its chapters indented beneath. Default state: all volumes expanded; persist per-volume collapse state in `localStorage` under `plotarmor:vol-collapsed:{serialId}:{volumeId}`.~~
+~~- Apply the same collapsible pattern to the TOC component introduced in Step 10 — do this step first but leave a TODO comment if Step 10 is not yet complete.~~
+~~- Commit: `feat: collapsible volume groups in chapter selector and table of contents`~~
 
 ---
 

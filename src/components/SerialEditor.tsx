@@ -8,6 +8,8 @@ import {
   faPlus,
   faTrash,
   faGripVertical,
+  faChevronDown,
+  faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   DndContext,
@@ -46,6 +48,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { useServerAction } from "@/hooks/useServerAction";
+import { usePersistedStore } from "@/hooks/usePersistedStore";
 import {
   CHAPTER_TYPE_OPTIONS,
   VOLUME_TYPE_OPTIONS,
@@ -73,6 +76,7 @@ interface PendingDelete {
 }
 
 interface SerialEditorProps {
+  serialId: number;
   volumes: Volume[];
   chaptersByVolume: Record<number, Chapter[]>;
   chapterType: ChapterType;
@@ -318,6 +322,8 @@ function SortableVolumeItem({
   chapters: vChapters,
   editing,
   isPending,
+  isCollapsed,
+  onToggleCollapse,
   isRenamingVolume,
   renamingChapterId,
   addingChapterToVolumeId,
@@ -344,6 +350,8 @@ function SortableVolumeItem({
   isRenamingVolume: boolean;
   renamingChapterId: number | null;
   addingChapterToVolumeId: number | null;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
   isVolumeDragging: boolean;
   onStartRenameVolume: () => void;
   onSaveRenameVolume: (fd: FormData) => void;
@@ -395,7 +403,7 @@ function SortableVolumeItem({
         ) : (
           <>
             <Box className="items-center gap-2 flex-1 min-w-0">
-              {editing && (
+              {editing ? (
                 <span
                   {...attributes}
                   {...listeners}
@@ -404,6 +412,18 @@ function SortableVolumeItem({
                 >
                   <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
                 </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  aria-label={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}
+                  className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                >
+                  <FontAwesomeIcon
+                    icon={isCollapsed ? faChevronRight : faChevronDown}
+                    className="h-3 w-3"
+                  />
+                </button>
               )}
               <Text
                 variant="h4"
@@ -434,7 +454,8 @@ function SortableVolumeItem({
       </Box>
 
       {/* Chapter list — SortableContext only; DndContext lives in the parent SerialEditor */}
-      {vChapters.length > 0 ? (
+      {/* Hidden when collapsed in read mode; always shown in edit mode. */}
+      {(editing || !isCollapsed) && (vChapters.length > 0 ? (
         <SortableContext
           items={vChapters.map((c) => c.id)}
           strategy={verticalListSortingStrategy}
@@ -462,7 +483,7 @@ function SortableVolumeItem({
         <Text muted className="pl-3">
           No {chapterType.toLowerCase()}s yet.
         </Text>
-      )}
+      ))}
 
       {/* Add chapter — toggle between button and inline form */}
       {editing &&
@@ -525,6 +546,7 @@ function SortableVolumeItem({
  * />
  */
 export function SerialEditor({
+  serialId,
   volumes: initialVolumes,
   chaptersByVolume: initialChaptersByVolume,
   chapterType,
@@ -541,6 +563,15 @@ export function SerialEditor({
 }: SerialEditorProps) {
   const { run, isPending } = useServerAction();
   const [editing, setEditing] = useState(false);
+
+  const [volCollapsed, setVolCollapsed] = usePersistedStore<Record<number, boolean>>(
+    `plotarmor:toc-collapsed:${serialId}`,
+    {},
+  );
+
+  function toggleVolume(volumeId: number) {
+    setVolCollapsed((prev) => ({ ...prev, [volumeId]: !prev[volumeId] }));
+  }
   const [currentChapterType, setCurrentChapterType] = useState(chapterType);
   const [currentVolumeType, setCurrentVolumeType] = useState(volumeType);
   const [renamingVolumeId, setRenamingVolumeId] = useState<number | null>(null);
@@ -866,6 +897,8 @@ export function SerialEditor({
                   chapters={chaptersByVolume[volume.id] ?? []}
                   editing={editing}
                   isPending={isPending}
+                  isCollapsed={!!volCollapsed[volume.id]}
+                  onToggleCollapse={() => toggleVolume(volume.id)}
                   isRenamingVolume={renamingVolumeId === volume.id}
                   renamingChapterId={renamingChapterId}
                   addingChapterToVolumeId={addingChapterToVolumeId}

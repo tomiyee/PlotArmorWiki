@@ -126,7 +126,7 @@ First-time visitors on any serial default to chapter 1 and see a callout prompti
 - `src/lib/slug.ts` — `titleToSlug` utility; slug is computed at creation time and stored in `serials.slug`.
 - `src/lib/utils.ts` — `cn()` utility for Tailwind class merging (Shadcn UI helper).
 - `src/hooks/usePersistedStore.ts` — `useState`-compatible hook backed by `localStorage`; built on `useSyncExternalStore` for SSR safety and cross-tab sync via the native `storage` event.
-- `src/components/ChapterSelector.tsx` — Client Component that reads/writes chapter progress via `usePersistedStore` (key `plotarmor:progress:{serialId}`) and mirrors the selection into a cookie (`plotarmor_chapter_{serialId}`) so Server Components can read the cutoff. Renders a dismissible first-visit callout prompting the user to set their chapter.
+- `src/components/ChapterSelector.tsx` — Client Component that reads/writes chapter progress via `usePersistedStore` (key `plotarmor:progress:{serialId}`) and mirrors the selection into a cookie (`plotarmor_chapter_{serialId}`) so Server Components can read the cutoff. Renders a dismissible first-visit callout prompting the user to set their chapter. Chapters are displayed in a custom dropdown grouped by volume; each volume header is collapsible and collapse state is persisted per-serial under `plotarmor:vol-collapsed:{serialId}` as a `Record<volumeId, boolean>`.
 
 ### UI component conventions
 
