@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useState } from "react";
+import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronDown,
   faChevronRight,
   faPen,
   faPlus,
   faTrash,
-} from '@fortawesome/free-solid-svg-icons';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+} from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/text";
+import { Box } from "@/components/ui/box";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogHeader,
@@ -23,9 +23,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from '@/components/ui/dialog';
-import { RenameForm } from '@/components/RenameForm';
-import { useServerAction } from '@/hooks/useServerAction';
+} from "@/components/ui/dialog";
+import { RenameForm } from "@/components/RenameForm";
+import { useServerAction } from "@/hooks/useServerAction";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ interface Schema {
 }
 
 interface PendingDelete {
-  type: 'schema' | 'section' | 'floaterRow';
+  type: "schema" | "section" | "floaterRow";
   id: number;
   name: string;
   schemaId?: number;
@@ -192,7 +192,9 @@ function SchemaDetail({
   addFloaterRowAction: (formData: FormData) => Promise<void>;
 }) {
   const { run, isPending } = useServerAction();
-  const [renamingSectionId, setRenamingSectionId] = useState<number | null>(null);
+  const [renamingSectionId, setRenamingSectionId] = useState<number | null>(
+    null,
+  );
   const [renamingRowId, setRenamingRowId] = useState<number | null>(null);
   const [addingSection, setAddingSection] = useState(false);
   const [addingFloaterRow, setAddingFloaterRow] = useState(false);
@@ -200,27 +202,27 @@ function SchemaDetail({
   const sections = schema.sections;
   const floaterRows = schema.floaterRows;
 
-  function moveSection(id: number, direction: 'up' | 'down') {
+  function moveSection(id: number, direction: "up" | "down") {
     const idx = sections.findIndex((s) => s.id === id);
     if (idx === -1) return;
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= sections.length) return;
     const newOrder = sections.map((s) => s.id);
     [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
     const fd = new FormData();
-    fd.set('orderedIds', JSON.stringify(newOrder));
+    fd.set("orderedIds", JSON.stringify(newOrder));
     run(reorderSectionsAction, fd);
   }
 
-  function moveFloaterRow(id: number, direction: 'up' | 'down') {
+  function moveFloaterRow(id: number, direction: "up" | "down") {
     const idx = floaterRows.findIndex((r) => r.id === id);
     if (idx === -1) return;
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= floaterRows.length) return;
     const newOrder = floaterRows.map((r) => r.id);
     [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
     const fd = new FormData();
-    fd.set('orderedIds', JSON.stringify(newOrder));
+    fd.set("orderedIds", JSON.stringify(newOrder));
     run(reorderFloaterRowsAction, fd);
   }
 
@@ -239,8 +241,8 @@ function SchemaDetail({
                 isLast={i === sections.length - 1}
                 isPending={isPending}
                 isRenaming={renamingSectionId === section.id}
-                onMoveUp={() => moveSection(section.id, 'up')}
-                onMoveDown={() => moveSection(section.id, 'down')}
+                onMoveUp={() => moveSection(section.id, "up")}
+                onMoveDown={() => moveSection(section.id, "down")}
                 onStartRename={() => setRenamingSectionId(section.id)}
                 onDelete={() => onDeleteSection(section.id, section.name)}
                 renameForm={
@@ -280,10 +282,19 @@ function SchemaDetail({
               placeholder="Section name…"
               autoFocus
               className="flex-1"
-              onKeyDown={(e) => e.key === 'Escape' && setAddingSection(false)}
+              onKeyDown={(e) => e.key === "Escape" && setAddingSection(false)}
             />
-            <Button type="submit" size="sm" disabled={isPending}>Add</Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setAddingSection(false)}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={isPending}>
+              Add
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setAddingSection(false)}
+            >
+              Cancel
+            </Button>
           </form>
         ) : (
           <Button
@@ -312,10 +323,12 @@ function SchemaDetail({
                   isLast={i === floaterRows.length - 1}
                   isPending={isPending}
                   isRenaming={renamingRowId === row.id}
-                  onMoveUp={() => moveFloaterRow(row.id, 'up')}
-                  onMoveDown={() => moveFloaterRow(row.id, 'down')}
+                  onMoveUp={() => moveFloaterRow(row.id, "up")}
+                  onMoveDown={() => moveFloaterRow(row.id, "down")}
                   onStartRename={() => setRenamingRowId(row.id)}
-                  onDelete={() => onDeleteFloaterRow(row.id, row.label, schema.id)}
+                  onDelete={() =>
+                    onDeleteFloaterRow(row.id, row.label, schema.id)
+                  }
                   renameForm={
                     <RenameForm
                       hiddenName="rowId"
@@ -353,10 +366,21 @@ function SchemaDetail({
                 placeholder="Row label…"
                 autoFocus
                 className="flex-1"
-                onKeyDown={(e) => e.key === 'Escape' && setAddingFloaterRow(false)}
+                onKeyDown={(e) =>
+                  e.key === "Escape" && setAddingFloaterRow(false)
+                }
               />
-              <Button type="submit" size="sm" disabled={isPending}>Add</Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setAddingFloaterRow(false)}>Cancel</Button>
+              <Button type="submit" size="sm" disabled={isPending}>
+                Add
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setAddingFloaterRow(false)}
+              >
+                Cancel
+              </Button>
             </form>
           ) : (
             <Button
@@ -416,11 +440,13 @@ export function SchemaManager({
   reorderFloaterRowsAction,
 }: SchemaManagerProps) {
   const { run, isPending } = useServerAction();
-  const [expandedSchemaIds, setExpandedSchemaIds] = useState<Set<number>>(new Set());
+  const [expandedSchemaIds, setExpandedSchemaIds] = useState(new Set<number>());
   const [renamingSchemaId, setRenamingSchemaId] = useState<number | null>(null);
   const [addingSchema, setAddingSchema] = useState(false);
   const [hasFloater, setHasFloater] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
+    null,
+  );
 
   function toggleExpand(schemaId: number) {
     setExpandedSchemaIds((prev) => {
@@ -437,35 +463,35 @@ export function SchemaManager({
   function confirmDelete() {
     if (!pendingDelete) return;
     const fd = new FormData();
-    if (pendingDelete.type === 'schema') {
-      fd.set('schemaId', String(pendingDelete.id));
+    if (pendingDelete.type === "schema") {
+      fd.set("schemaId", String(pendingDelete.id));
       run(deleteSchemaAction, fd, () => setPendingDelete(null));
-    } else if (pendingDelete.type === 'section') {
-      fd.set('sectionId', String(pendingDelete.id));
+    } else if (pendingDelete.type === "section") {
+      fd.set("sectionId", String(pendingDelete.id));
       run(deleteSectionAction, fd, () => setPendingDelete(null));
     } else {
-      fd.set('rowId', String(pendingDelete.id));
+      fd.set("rowId", String(pendingDelete.id));
       run(deleteFloaterRowAction, fd, () => setPendingDelete(null));
     }
   }
 
   const deleteDialogTitle =
-    pendingDelete?.type === 'schema'
+    pendingDelete?.type === "schema"
       ? `Delete page type "${pendingDelete.name}"?`
-      : pendingDelete?.type === 'section'
+      : pendingDelete?.type === "section"
         ? `Delete section "${pendingDelete.name}"?`
         : `Delete floater row "${pendingDelete?.name}"?`;
 
   const deleteDialogBody =
-    pendingDelete?.type === 'schema'
-      ? 'This will permanently delete this page type and all its pages. This action cannot be undone.'
-      : pendingDelete?.type === 'section'
-        ? 'This will remove this section from all wiki pages in this page type. This action cannot be undone.'
-        : 'This will remove this floater row from all wiki pages in this page type. This action cannot be undone.';
+    pendingDelete?.type === "schema"
+      ? "This will permanently delete this page type and all its pages. This action cannot be undone."
+      : pendingDelete?.type === "section"
+        ? "This will remove this section from all wiki pages in this page type. This action cannot be undone."
+        : "This will remove this floater row from all wiki pages in this page type. This action cannot be undone.";
 
   return (
     <section className="flex flex-col gap-4 mt-4">
-      <Text variant="h2">Page Types</Text>
+      <Text variant="h2">Page Categories</Text>
 
       {schemas.length > 0 ? (
         <Box col className="gap-3">
@@ -474,7 +500,11 @@ export function SchemaManager({
             const isRenaming = renamingSchemaId === schema.id;
 
             return (
-              <Box col key={schema.id} className="gap-2 rounded-lg border border-gray-200 p-3">
+              <Box
+                col
+                key={schema.id}
+                className="gap-2 rounded-lg border border-gray-200 p-3"
+              >
                 <Box className="items-center gap-2">
                   <Button
                     type="button"
@@ -482,7 +512,7 @@ export function SchemaManager({
                     size="icon-xs"
                     onClick={() => toggleExpand(schema.id)}
                     className="text-gray-500 hover:text-gray-700"
-                    title={isExpanded ? 'Collapse' : 'Expand'}
+                    title={isExpanded ? "Collapse" : "Expand"}
                     aria-expanded={isExpanded}
                   >
                     <FontAwesomeIcon
@@ -508,9 +538,13 @@ export function SchemaManager({
                         onClick={() => toggleExpand(schema.id)}
                         className="flex-1 justify-start h-auto p-0 hover:bg-transparent font-normal"
                       >
-                        <Text variant="h4" as="span">{schema.name}</Text>
+                        <Text variant="h4" as="span">
+                          {schema.name}
+                        </Text>
                         {schema.hasFloater && (
-                          <Text as="span" muted className="ml-2 text-xs">(has floater)</Text>
+                          <Text as="span" muted className="ml-2 text-xs">
+                            (has floater)
+                          </Text>
                         )}
                       </Button>
                       <Box className="items-center gap-1">
@@ -535,16 +569,28 @@ export function SchemaManager({
                           title={`Rename ${schema.name}`}
                           onClick={() => setRenamingSchemaId(schema.id)}
                         >
-                          <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
+                          <FontAwesomeIcon
+                            icon={faPen}
+                            className="h-2.5 w-2.5"
+                          />
                         </Button>
                         <Button
                           type="button"
                           variant="destructive"
                           size="icon-xs"
                           title={`Delete ${schema.name}`}
-                          onClick={() => setPendingDelete({ type: 'schema', id: schema.id, name: schema.name })}
+                          onClick={() =>
+                            setPendingDelete({
+                              type: "schema",
+                              id: schema.id,
+                              name: schema.name,
+                            })
+                          }
                         >
-                          <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+                          <FontAwesomeIcon
+                            icon={faTrash}
+                            className="h-2.5 w-2.5"
+                          />
                         </Button>
                       </Box>
                     </>
@@ -554,9 +600,16 @@ export function SchemaManager({
                 {isExpanded && (
                   <SchemaDetail
                     schema={schema}
-                    onDeleteSection={(id, name) => setPendingDelete({ type: 'section', id, name })}
+                    onDeleteSection={(id, name) =>
+                      setPendingDelete({ type: "section", id, name })
+                    }
                     onDeleteFloaterRow={(id, label, schemaId) =>
-                      setPendingDelete({ type: 'floaterRow', id, name: label, schemaId })
+                      setPendingDelete({
+                        type: "floaterRow",
+                        id,
+                        name: label,
+                        schemaId,
+                      })
                     }
                     renameSectionAction={renameSectionAction}
                     renameFloaterRowAction={renameFloaterRowAction}
@@ -571,7 +624,9 @@ export function SchemaManager({
           })}
         </Box>
       ) : (
-        <Text muted>No page types yet. Add a page type to define wiki page categories.</Text>
+        <Text muted>
+          No page types yet. Add a page type to define wiki page categories.
+        </Text>
       )}
 
       <div className="mt-2 pt-4 border-t border-gray-100">
@@ -581,7 +636,7 @@ export function SchemaManager({
               e.preventDefault();
               const form = e.currentTarget;
               const fd = new FormData(form);
-              fd.set('hasFloater', String(hasFloater));
+              fd.set("hasFloater", String(hasFloater));
               run(addSchemaAction, fd, () => {
                 form.reset();
                 setHasFloater(false);
@@ -598,7 +653,7 @@ export function SchemaManager({
                 required
                 placeholder="e.g. Characters, Locations…"
                 autoFocus
-                onKeyDown={(e) => e.key === 'Escape' && setAddingSchema(false)}
+                onKeyDown={(e) => e.key === "Escape" && setAddingSchema(false)}
               />
             </Box>
             <Box className="items-center gap-2">
@@ -612,7 +667,9 @@ export function SchemaManager({
               <Label htmlFor="hasFloater">Has floater sidebar</Label>
             </Box>
             <Box className="gap-2">
-              <Button type="submit" disabled={isPending}>Add page type</Button>
+              <Button type="submit" disabled={isPending}>
+                Add page type
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -649,9 +706,15 @@ export function SchemaManager({
           <DialogDescription>{deleteDialogBody}</DialogDescription>
         </DialogBody>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-          <Button variant="destructive" disabled={isPending} onClick={confirmDelete}>
-            {isPending ? 'Deleting…' : 'Delete'}
+          <DialogClose render={<Button variant="outline" />}>
+            Cancel
+          </DialogClose>
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={confirmDelete}
+          >
+            {isPending ? "Deleting…" : "Delete"}
           </Button>
         </DialogFooter>
       </Dialog>
