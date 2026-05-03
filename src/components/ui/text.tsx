@@ -1,7 +1,7 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-export type TextVariant = "h1" | "h2" | "h3" | "h4" | "body" | "label"
+export type TextVariant = "h1" | "h2" | "h3" | "h4" | "body" | "label";
 
 const variantStyles: Record<TextVariant, string> = {
   h1: "text-3xl font-bold",
@@ -10,7 +10,7 @@ const variantStyles: Record<TextVariant, string> = {
   h4: "text-base font-semibold",
   body: "text-base text-gray-700",
   label: "text-sm font-medium",
-}
+};
 
 const variantElement: Record<TextVariant, React.ElementType> = {
   h1: "h1",
@@ -19,15 +19,15 @@ const variantElement: Record<TextVariant, React.ElementType> = {
   h4: "h4",
   body: "p",
   label: "span",
-}
+};
 
 type TextProps<C extends React.ElementType> = {
-  variant?: TextVariant
-  as?: C
-  muted?: boolean
-  className?: string
-  children?: React.ReactNode
-} & Omit<React.ComponentPropsWithoutRef<C>, "className" | "children">
+  variant?: TextVariant;
+  as?: C;
+  muted?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+} & Omit<React.ComponentPropsWithoutRef<C>, "className" | "children">;
 
 /**
  * Typography component that maps semantic variants to Tailwind classes and
@@ -51,15 +51,19 @@ function Text<C extends React.ElementType = React.ElementType>({
   children,
   ...props
 }: TextProps<C>) {
-  const Component = (as ?? variantElement[variant]) as React.ElementType
+  const Component = as ?? variantElement[variant];
   return (
     <Component
-      className={cn(variantStyles[variant], muted && "text-gray-500", className)}
+      className={cn(
+        variantStyles[variant],
+        muted && "text-gray-500",
+        className,
+      )}
       {...props}
     >
       {children}
     </Component>
-  )
+  );
 }
 
-export { Text }
+export { Text };

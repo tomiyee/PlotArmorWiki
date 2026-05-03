@@ -302,8 +302,11 @@ export function PageEditor({
           {/* Two-column layout: current saved value on the left, editor on the right */}
           <div className="grid grid-cols-2 gap-4 items-start">
             {/* Left: current saved value at the selected chapter */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 min-h-[120px]">
-              <Text variant="label" className="mb-2 block text-xs text-gray-400 uppercase tracking-wide">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
+              <Text
+                variant="label"
+                className="mb-2 block text-xs text-gray-400 uppercase tracking-wide"
+              >
                 Current value
               </Text>
               {currentSectionContent[section.id] ? (
@@ -313,7 +316,7 @@ export function PageEditor({
                   </ReactMarkdown>
                 </div>
               ) : (
-                <Text variant="faint" className="text-sm">
+                <Text muted className="text-sm">
                   No content at this chapter.
                 </Text>
               )}
