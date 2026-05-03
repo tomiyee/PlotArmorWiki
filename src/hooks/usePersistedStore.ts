@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useRef,
   useSyncExternalStore,
   Dispatch,
   SetStateAction,
@@ -17,6 +18,10 @@ import {
  * - Cross-tab sync is handled by the native `storage` event.
  * - Same-tab sync uses a synthetic `StorageEvent` dispatched on write.
  *
+ * `defaultValue` is captured via a ref so callers can pass inline objects
+ * (e.g. `{}`) without triggering snapshot churn and the "getSnapshot should
+ * be cached" infinite-loop warning from `useSyncExternalStore`.
+ *
  * @param key          The localStorage key. Use a unique, namespaced string
  *                     (e.g. `"plotarmor:progress:42"`).
  * @param defaultValue The value to use when no stored value exists yet.
@@ -29,6 +34,18 @@ export function usePersistedStore<T>(
   key: string,
   defaultValue: T
 ): [T, Dispatch<SetStateAction<T>>] {
+  // Stabilize defaultValue so inline object literals don't cause snapshot churn.
+  const defaultRef = useRef(defaultValue);
+
+  // Cache the last snapshot keyed by raw localStorage string so getSnapshot
+  // returns a stable reference when the underlying value hasn't changed.
+  // `undefined` as the initial sentinel distinguishes "never read" from
+  // "key absent" (null).
+  const cacheRef = useRef<{ raw: string | null | undefined; value: T }>({
+    raw: undefined,
+    value: defaultRef.current,
+  });
+
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       function handleStorage(e: StorageEvent) {
@@ -41,22 +58,35 @@ export function usePersistedStore<T>(
   );
 
   const getSnapshot = useCallback((): T => {
+    let raw: string | null = null;
     try {
-      const raw = localStorage.getItem(key);
-      if (raw !== null) return JSON.parse(raw) as T;
+      raw = localStorage.getItem(key);
     } catch {}
-    return defaultValue;
-  }, [key, defaultValue]);
 
-  // Returns defaultValue on server to prevent SSR/client hydration mismatch.
-  const getServerSnapshot = useCallback((): T => defaultValue, [defaultValue]);
+    if (cacheRef.current.raw === raw) {
+      return cacheRef.current.value;
+    }
+
+    let value: T;
+    try {
+      value = raw !== null ? (JSON.parse(raw) as T) : defaultRef.current;
+    } catch {
+      value = defaultRef.current;
+    }
+
+    cacheRef.current = { raw, value };
+    return value;
+  }, [key]);
+
+  // Returns a stable default on the server to prevent SSR/client hydration mismatch.
+  const getServerSnapshot = useCallback((): T => defaultRef.current, []);
 
   const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setValue: Dispatch<SetStateAction<T>> = useCallback(
     (action) => {
       let prevRaw: string | null = null;
-      let prev: T = defaultValue;
+      let prev: T = defaultRef.current;
       try {
         prevRaw = localStorage.getItem(key);
         if (prevRaw !== null) prev = JSON.parse(prevRaw) as T;
@@ -84,7 +114,7 @@ export function usePersistedStore<T>(
         );
       } catch {}
     },
-    [key, defaultValue]
+    [key]
   );
 
   return [value, setValue];
