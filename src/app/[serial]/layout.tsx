@@ -3,8 +3,8 @@ import Link from "next/link";
 import { db } from "@/db/index";
 import { serials, volumes, chapters } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { Box } from "@/components/ui/box";
 import { ChapterSelector } from "@/components/ChapterSelector";
+import { SerialNavInjector } from "@/components/SerialNavInjector";
 
 interface Props {
   children: React.ReactNode;
@@ -12,8 +12,9 @@ interface Props {
 }
 
 /**
- * Layout for all pages under /{serial}/…. Renders a serial-scoped sub-bar
- * below the global navbar containing the <ChapterSelector> for this serial.
+ * Layout for all pages under /{serial}/…. Injects the serial title and
+ * <ChapterSelector> into the global navbar via SerialNavInjector, replacing
+ * the dark sub-bar that previously sat between the navbar and the page content.
  *
  * @example
  * // Automatically applied to /[serial], /[serial]/[schema], /[serial]/[schema]/[page], etc.
@@ -63,22 +64,25 @@ export default async function SerialLayout({ children, params }: Props) {
 
   return (
     <>
-      <div className="flex-none border-b bg-gray-800 px-6 py-2">
-        <Box className="mx-auto max-w-5xl items-center justify-between gap-4">
-          <Link
-            href={`/${serialSlug}`}
-            className="truncate text-sm font-medium text-gray-200 hover:text-white"
-          >
-            {serial.title}
-          </Link>
-          <ChapterSelector
-            serialId={serial.id}
-            chapterType={serial.chapterType}
-            volumes={volumeList}
-            chaptersByVolume={chaptersByVolume}
-          />
-        </Box>
-      </div>
+      {/* Inject serial title + chapter selector into the top navbar */}
+      <SerialNavInjector
+        slot={
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href={`/${serialSlug}`}
+              className="hidden sm:block truncate text-sm font-medium text-gray-700 hover:text-gray-900 max-w-40"
+            >
+              {serial.title}
+            </Link>
+            <ChapterSelector
+              serialId={serial.id}
+              chapterType={serial.chapterType}
+              volumes={volumeList}
+              chaptersByVolume={chaptersByVolume}
+            />
+          </div>
+        }
+      />
       <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>
     </>
   );
