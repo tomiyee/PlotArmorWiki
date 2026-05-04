@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
-import { ChevronDownIcon, ChevronRightIcon, XIcon } from "lucide-react";
+import {
+  useDropdown,
+  DropdownContainer,
+  DropdownTrigger,
+  DropdownPanel,
+  DropdownItem,
+  DropdownGroupHeader,
+} from "@/components/ui/dropdown";
+import { XIcon } from "lucide-react";
 import { ChapterData, Volume } from "@/types";
 
 interface Props {
@@ -76,10 +84,7 @@ export function ChapterSelector(props: Props) {
 
   const [volCollapsed, setVolCollapsed] = useCollapsedVolumes(serialId);
 
-  // Dropdown open/close state (not persisted — resets on page navigation).
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { containerRef, open, setOpen } = useDropdown();
 
   const router = useRouter();
 
@@ -96,21 +101,6 @@ export function ChapterSelector(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close dropdown when clicking outside.
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    function handleOutsideClick(e: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [dropdownOpen]);
-
   if (allChapters.length === 0) return null;
 
   const effectiveChapterId = selectedChapterId ?? firstChapterId;
@@ -126,7 +116,7 @@ export function ChapterSelector(props: Props) {
     setCalloutDismissed(true);
     // Set cookie synchronously before refresh so the server sees the new value.
     writeCookie(chapterId);
-    setDropdownOpen(false);
+    setOpen(false);
     router.refresh();
   }
 
@@ -176,90 +166,59 @@ export function ChapterSelector(props: Props) {
           Reading up to:
         </Text>
 
-        {/* Custom dropdown trigger + panel */}
-        <div ref={dropdownRef} className="relative">
-          {/* Trigger button — shows selected chapter */}
-          <button
-            type="button"
-            onClick={() => setDropdownOpen((o) => !o)}
-            aria-haspopup="listbox"
-            aria-expanded={dropdownOpen}
+        {/* Custom dropdown using shared ui/dropdown primitives */}
+        <DropdownContainer ref={containerRef}>
+          <DropdownTrigger
+            open={open}
+            onToggle={() => setOpen((o) => !o)}
+            className="w-52"
             aria-label="Select chapter progress"
-            className="flex h-9 w-52 items-center justify-between rounded-lg border border-input bg-background px-3 py-1 pr-8 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 truncate"
           >
-            <span className="truncate">{selectedLabel}</span>
-            <ChevronDownIcon
-              aria-hidden
-              className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-          </button>
+            {selectedLabel}
+          </DropdownTrigger>
 
-          {/* Dropdown panel */}
-          {dropdownOpen && (
-            <div
-              role="listbox"
-              aria-label="Chapter list"
-              className="absolute right-0 top-full z-50 mt-1 w-60 max-h-80 overflow-y-auto rounded-lg border border-border bg-background shadow-md"
-            >
-              {/* TODO: Step 10 — apply same collapsible pattern to SerialTOC when it is implemented */}
-              {visibleVolumes.map((volume) => {
-                const isCollapsed = !!volCollapsed[volume.id];
-                const chaps = chaptersByVolume[volume.id] ?? [];
-                return (
-                  <div key={volume.id}>
-                    {/* Volume header — click to toggle collapse */}
-                    <button
-                      type="button"
-                      onClick={() => toggleVolume(volume.id)}
-                      className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted"
-                    >
-                      {isCollapsed ? (
-                        <ChevronRightIcon
-                          className="size-3 shrink-0"
-                          aria-hidden
-                        />
-                      ) : (
-                        <ChevronDownIcon
-                          className="size-3 shrink-0"
-                          aria-hidden
-                        />
-                      )}
-                      {volume.displayName}
-                    </button>
+          <DropdownPanel
+            open={open}
+            align="right"
+            aria-label="Chapter list"
+            className="w-60 max-h-80"
+          >
+            {/* TODO: Step 10 — apply same collapsible pattern to SerialTOC when it is implemented */}
+            {visibleVolumes.map((volume) => {
+              const isCollapsed = !!volCollapsed[volume.id];
+              const chaps = chaptersByVolume[volume.id] ?? [];
+              return (
+                <div key={volume.id}>
+                  <DropdownGroupHeader
+                    collapsed={isCollapsed}
+                    onClick={() => toggleVolume(volume.id)}
+                  >
+                    {volume.displayName}
+                  </DropdownGroupHeader>
 
-                    {/* Chapter list — hidden when volume is collapsed */}
-                    {!isCollapsed && (
-                      <ul>
-                        {chaps.map((chapter) => {
-                          const isSelected = chapter.id === effectiveChapterId;
-                          return (
-                            <li
-                              key={chapter.id}
-                              role="option"
-                              aria-selected={isSelected}
+                  {!isCollapsed && (
+                    <ul>
+                      {chaps.map((chapter) => {
+                        const isSelected = chapter.id === effectiveChapterId;
+                        return (
+                          <li key={chapter.id}>
+                            <DropdownItem
+                              selected={isSelected}
+                              onClick={() => handleSelectChapter(chapter.id)}
+                              className="px-6"
                             >
-                              <button
-                                type="button"
-                                onClick={() => handleSelectChapter(chapter.id)}
-                                className={`w-full px-6 py-1.5 text-left text-sm hover:bg-muted ${
-                                  isSelected
-                                    ? "bg-primary/10 font-medium text-primary"
-                                    : "text-foreground"
-                                }`}
-                              >
-                                {chapterType} {chapter.displayName}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                              {chapterType} {chapter.displayName}
+                            </DropdownItem>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </DropdownPanel>
+        </DropdownContainer>
       </Box>
     </Box>
   );
