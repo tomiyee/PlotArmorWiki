@@ -7,6 +7,7 @@ import { NavbarSerialData } from "@/types";
 interface Props {
   data: NavbarSerialData;
   chapterSelectorSlot: ReactNode;
+  tocSlot: ReactNode;
 }
 
 /**
@@ -21,13 +22,17 @@ interface Props {
  * (a Server Component). This component itself renders nothing to the DOM.
  *
  * @example
- * <SerialNavInjector data={serialNavData} chapterSelectorSlot={<ChapterSelector ... />} />
+ * <SerialNavInjector
+ *   data={serialNavData}
+ *   chapterSelectorSlot={<ChapterSelector ... />}
+ *   tocSlot={<SerialTOCDrawer ... />}
+ * />
  */
-export function SerialNavInjector({ data, chapterSelectorSlot }: Props) {
+export function SerialNavInjector({ data, chapterSelectorSlot, tocSlot }: Props) {
   const { setSerial, clearSerial } = useNavbarSerialContext();
 
   useLayoutEffect(() => {
-    setSerial(data, chapterSelectorSlot);
+    setSerial(data, chapterSelectorSlot, tocSlot);
     return clearSerial;
     // `data` and `chapterSelectorSlot` are new references every render (RSC
     // serialisation); we only need to set on mount/unmount.
