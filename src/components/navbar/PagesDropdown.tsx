@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ChevronDownIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Menu } from "@/components/ui/menu";
 import { SchemaNavData } from "@/types";
 
 interface Props {
@@ -19,66 +22,48 @@ interface Props {
  */
 export function PagesDropdown({ serialSlug, schemas }: Props) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  function handleMouseDown(e: React.MouseEvent) {
-    if (
-      containerRef.current &&
-      !containerRef.current.contains(e.target as Node)
-    ) {
-      setOpen(false);
-    }
-  }
-
-  // Close on outside click via document listener
-  function handleToggle() {
-    if (!open) {
-      const close = (e: MouseEvent) => {
-        if (
-          containerRef.current &&
-          !containerRef.current.contains(e.target as Node)
-        ) {
-          setOpen(false);
-          document.removeEventListener("mousedown", close);
-        }
-      };
-      document.addEventListener("mousedown", close);
-    }
-    setOpen((v) => !v);
-  }
 
   return (
-    <div ref={containerRef} className="relative" onMouseDown={handleMouseDown}>
-      <button
-        onClick={handleToggle}
-        className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 rounded px-2 py-1 hover:bg-gray-100 transition-colors"
+    <Menu
+      isOpen={open}
+      onClose={() => setOpen(false)}
+      align="left"
+      role="menu"
+      aria-label="Page categories"
+      contents={
+        schemas.length === 0 ? (
+          <span className="block px-3 py-2 text-sm text-muted-foreground">
+            No pages yet
+          </span>
+        ) : (
+          schemas.map((schema) => (
+            <Link
+              key={schema.id}
+              href={`/${serialSlug}/${encodeURIComponent(schema.name)}`}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block px-3 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              {schema.name}
+            </Link>
+          ))
+        )
+      }
+    >
+      <Button
+        variant="ghost"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Pages menu"
+        className="font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 aria-expanded:bg-gray-100 aria-expanded:text-gray-900"
       >
         Pages
         <ChevronDownIcon
-          className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+          className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")}
         />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-20 min-w-40 rounded-md border bg-white shadow-md py-1">
-          {schemas.length === 0 ? (
-            <span className="block px-3 py-2 text-sm text-gray-400">
-              No pages yet
-            </span>
-          ) : (
-            schemas.map((schema) => (
-              <Link
-                key={schema.id}
-                href={`/${serialSlug}/${encodeURIComponent(schema.name)}`}
-                onClick={() => setOpen(false)}
-                className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
-                {schema.name}
-              </Link>
-            ))
-          )}
-        </div>
-      )}
-    </div>
+      </Button>
+    </Menu>
   );
 }

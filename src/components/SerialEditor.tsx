@@ -413,17 +413,18 @@ function SortableVolumeItem({
                   <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
                 </span>
               ) : (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={onToggleCollapse}
                   aria-label={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}
-                  className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
                 >
                   <FontAwesomeIcon
                     icon={isCollapsed ? faChevronRight : faChevronDown}
                     className="h-3 w-3"
                   />
-                </button>
+                </Button>
               )}
               <Text
                 variant="h4"
