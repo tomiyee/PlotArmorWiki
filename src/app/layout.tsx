@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,20 +19,28 @@ export const metadata: Metadata = {
   description: "Spoiler-safe wiki for manga and light novels",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+type RootLayoutProps = Readonly<{
   children: React.ReactNode;
-}>) {
+}>;
+
+export default function RootLayout(props: RootLayoutProps) {
+  const { children } = props;
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="h-full overflow-hidden flex flex-col" suppressHydrationWarning>
-        <Navbar />
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">{children}</div>
+      <body
+        className="h-full overflow-hidden flex flex-col"
+        suppressHydrationWarning
+      >
+        <NavbarSerialProvider>
+          <Navbar />
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {children}
+          </div>
+        </NavbarSerialProvider>
       </body>
     </html>
   );

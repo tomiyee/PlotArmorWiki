@@ -7,24 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
 import { ChevronDownIcon, ChevronRightIcon, XIcon } from "lucide-react";
-
-interface Chapter {
-  id: number;
-  displayName: string;
-  idx: number;
-  volumeId: number;
-}
-
-interface Volume {
-  id: number;
-  displayName: string;
-}
+import { ChapterData, Volume } from "@/types";
 
 interface Props {
   serialId: number;
   chapterType: string;
   volumes: Volume[];
-  chaptersByVolume: Record<number, Chapter[]>;
+  chaptersByVolume: Partial<Record<number, ChapterData[]>>;
 }
 
 /** Cookie name for storing the active chapter ID for a serial. */
@@ -62,12 +51,9 @@ function volCollapsedKey(serialId: number) {
  *   chaptersByVolume={chaptersByVolume}
  * />
  */
-export function ChapterSelector({
-  serialId,
-  chapterType,
-  volumes,
-  chaptersByVolume,
-}: Props) {
+export function ChapterSelector(props: Props) {
+  const { serialId, chapterType, volumes, chaptersByVolume } = props;
+
   // Collect all chapters in idx order to determine the default (first chapter).
   const allChapters = volumes
     .flatMap((v) => chaptersByVolume[v.id] ?? [])
@@ -88,11 +74,7 @@ export function ChapterSelector({
     false,
   );
 
-  // Per-volume collapse state. Stored as Record<volumeId, boolean> where
-  // true means collapsed. Default: all volumes expanded (not in the record).
-  const [volCollapsed, setVolCollapsed] = usePersistedStore<
-    Record<number, boolean>
-  >(volCollapsedKey(serialId), {});
+  const [volCollapsed, setVolCollapsed] = useCollapsedVolumes(serialId);
 
   // Dropdown open/close state (not persisted — resets on page navigation).
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -165,12 +147,12 @@ export function ChapterSelector({
   );
 
   return (
-    <Box col className="gap-1.5">
+    <Box col className="gap-1.5 justify-center">
       {/* First-visit callout. suppressHydrationWarning because the server always
           renders this as visible (defaultValue=false) while the client may have
           a stored dismissed=true in localStorage — a known intentional mismatch. */}
-      <div suppressHydrationWarning>
-        {!calloutDismissed && (
+      {!calloutDismissed && (
+        <div suppressHydrationWarning>
           <Box className="mb-1 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             <Text variant="label" className="flex-1 text-amber-800">
               Set your chapter to avoid spoilers.
@@ -185,16 +167,12 @@ export function ChapterSelector({
               <XIcon />
             </Button>
           </Box>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Chapter selector with collapsible volume groups */}
       <Box className="items-center gap-2">
-        <Text
-          variant="label"
-          as="label"
-          className="whitespace-nowrap text-gray-200 text-sm"
-        >
+        <Text variant="label" as="label" className="whitespace-nowrap text-sm">
           Reading up to:
         </Text>
 
@@ -286,3 +264,8 @@ export function ChapterSelector({
     </Box>
   );
 }
+
+// Per-volume collapse state. Stored as Record<volumeId, boolean> where
+// true means collapsed. Default: all volumes expanded (not in the record).
+const useCollapsedVolumes = (serialId: number) =>
+  usePersistedStore<Record<number, boolean>>(volCollapsedKey(serialId), {});

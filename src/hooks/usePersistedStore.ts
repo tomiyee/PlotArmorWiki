@@ -32,7 +32,7 @@ import {
  */
 export function usePersistedStore<T>(
   key: string,
-  defaultValue: T
+  defaultValue: T,
 ): [T, Dispatch<SetStateAction<T>>] {
   // Stabilize defaultValue so inline object literals don't cause snapshot churn.
   const defaultRef = useRef(defaultValue);
@@ -43,7 +43,7 @@ export function usePersistedStore<T>(
   // "key absent" (null).
   const cacheRef = useRef<{ raw: string | null | undefined; value: T }>({
     raw: undefined,
-    value: defaultRef.current,
+    value: defaultValue,
   });
 
   const subscribe = useCallback(
@@ -54,7 +54,7 @@ export function usePersistedStore<T>(
       window.addEventListener("storage", handleStorage);
       return () => window.removeEventListener("storage", handleStorage);
     },
-    [key]
+    [key],
   );
 
   const getSnapshot = useCallback((): T => {
@@ -110,11 +110,11 @@ export function usePersistedStore<T>(
             oldValue: prevRaw,
             storageArea: localStorage,
             url: window.location.href,
-          })
+          }),
         );
       } catch {}
     },
-    [key]
+    [key],
   );
 
   return [value, setValue];

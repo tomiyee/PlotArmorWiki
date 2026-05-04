@@ -4,57 +4,21 @@
 
 ## ~~Step 1 — Chapter-targeted write path~~ ✓
 
-~~The save action currently hardcodes the head chapter. This step makes the target chapter a parameter so editors can contribute data points at any chapter in the series, not just the latest one.~~
-
-~~- Add an optional `targetChapterId: number | undefined` parameter to `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts`.~~
-~~- When `targetChapterId` is provided, use it directly instead of calling `getHeadChapterId`.~~
-~~- When omitted, keep the existing behavior of writing at the head chapter.~~
-~~- No UI change in this step — `PageEditor` still passes `undefined`, behavior is identical to before.~~
-~~- Commit: `feat: accept target chapter in savePageContent`~~
-
 ---
 
 ## ~~Step 2 — Server action: fetch content at a given chapter~~ ✓
-
-~~Editors need to pre-fill the edit form with what exists at any chapter they select. The read query already exists in `page.tsx` but is embedded in the Server Component and tied to the reader's cookie cutoff. This step extracts it into a callable action.~~
-
-~~- Add `getPageContentAtChapter(serialSlug, schemaName, pageName, chapterId)` to `src/app/[serial]/[schema]/[page]/actions.ts`.~~
-~~- The function runs the same max-idx subquery join as `page.tsx` but takes an explicit `chapterId` (resolved to `chapters.idx`) instead of reading the cookie.~~
-~~- Returns `{ sections: { id, content }[], floaterImageUrl: string | null, floaterRows: { id, content }[] }`.~~
-~~- Commit: `feat: add getPageContentAtChapter server action`~~
 
 ---
 
 ## ~~Step 3 — Chapter selector in edit mode~~ ✓
 
-~~Wires Steps 1 and 2 into the UI so editors can pick which chapter their edits apply to.~~
-
-~~- In `src/app/[serial]/[schema]/[page]/page.tsx`, fetch all chapters for the serial (id, displayName, volumeName, idx) and pass them — alongside the head chapter id — to `<PageEditor>` as new props.~~
-~~- In `<PageEditor>`, add a `chapters` prop and a `headChapterId` prop. In edit mode, render a `<Select>` labeled "Writing as of:" that defaults to the head chapter.~~
-~~- When the selected chapter changes, call `getPageContentAtChapter` and replace the draft state with the returned content so the editor reflects what readers at that chapter currently see.~~
-~~- On save, pass the selected `targetChapterId` to `savePageContent`.~~
-~~- Commit: `feat: chapter selector in edit mode for targeted content versioning`~~
-
 ---
 
 ## ~~Step 4 — Consistent content widths~~ ✓
 
-~~Pages currently have inconsistent max-widths and padding. Establish a single container constraint before adding more pages.~~
-
-~~- Audit every page route for its root max-width class: `src/app/page.tsx`, `src/app/new/page.tsx`, `src/app/[serial]/page.tsx`, `src/app/[serial]/[schema]/page.tsx`, `src/app/[serial]/[schema]/new/page.tsx`, `src/app/[serial]/[schema]/[page]/page.tsx`.~~
-~~- Create `src/components/ui/page-container.tsx` — a `<div>` with `max-w-5xl mx-auto w-full px-4 py-6`. Accept a `className` prop for per-page overrides.~~
-~~- Replace ad-hoc width classes on each page's root element with `<PageContainer>`. The wiki page layout (with floater sidebar) may need `max-w-6xl` — override via `className`.~~
-~~- Commit: `feat: PageContainer component for consistent content width across all pages`~~
-
 ---
 
 ## ~~Step 5 — Rename "Page Types" to "Page Categories"~~ ✓
-
-~~The label "Page Types" is ambiguous. "Page Categories" communicates that schemas are categorical groupings of wiki pages, not type-system variants.~~
-
-~~- `grep -ri "page type" src/` to locate all display-facing strings — headings, labels, button text, placeholder text.~~
-~~- Update each occurrence. The internal identifier is `schema` throughout the codebase, so no DB migration or variable rename is needed — UI strings only.~~
-~~- Commit: `chore: rename "Page Types" to "Page Categories" in all UI text`~~
 
 ---
 
@@ -94,12 +58,6 @@ New wikis start empty. Adding default "Character" and "Location" schemas on crea
 ---
 
 ## ~~Step 9 — Collapsible volumes in chapter selector and TOC~~ ✓
-
-~~Long series have many volumes. Collapsing them makes the chapter selector and TOC navigable without scrolling through irrelevant entries.~~
-
-~~- In `<ChapterSelector>` (`src/components/ChapterSelector.tsx`): group options by volume. Render each volume as a collapsible header (`▶ / ▼ Volume Name`) with its chapters indented beneath. Default state: all volumes expanded; persist per-volume collapse state in `localStorage` under `plotarmor:vol-collapsed:{serialId}:{volumeId}`.~~
-~~- Apply the same collapsible pattern to the TOC component introduced in Step 10 — do this step first but leave a TODO comment if Step 10 is not yet complete.~~
-~~- Commit: `feat: collapsible volume groups in chapter selector and table of contents`~~
 
 ---
 
