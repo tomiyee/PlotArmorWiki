@@ -6,6 +6,7 @@ import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Menu } from "@/components/ui/menu";
+import { Text } from "@/components/ui/text";
 import { SchemaNavData } from "@/types";
 
 interface Props {
@@ -32,9 +33,9 @@ export function PagesDropdown({ serialSlug, schemas }: Props) {
       aria-label="Page categories"
       contents={
         schemas.length === 0 ? (
-          <span className="block px-3 py-2 text-sm text-muted-foreground">
+          <Text as="span" variant="label" className="block px-3 py-2 text-sm text-muted-foreground">
             No pages yet
-          </span>
+          </Text>
         ) : (
           schemas.map((schema) => (
             <Link
