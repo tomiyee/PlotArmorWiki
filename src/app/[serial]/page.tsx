@@ -6,8 +6,6 @@ import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   reorderVolumes, reorderAllChapters, updateSerialMetadata,
   addSchema, deleteSchema, renameSchema,
-  addSection, deleteSection, renameSection, reorderSections,
-  addFloaterRow, deleteFloaterRow, renameFloaterRow, reorderFloaterRows,
 } from './actions';
 import { Box } from '@/components/ui/box';
 import { PageContainer } from '@/components/ui/page-container';
@@ -114,14 +112,6 @@ export default async function SerialPage({ params }: Props) {
   const addSchemaForSerial = addSchema.bind(null, serial.id);
   const deleteSchemaForSerial = deleteSchema.bind(null, serial.id);
   const renameSchemaForSerial = renameSchema.bind(null, serial.id);
-  const addSectionForSerial = addSection.bind(null, serial.id);
-  const deleteSectionForSerial = deleteSection.bind(null, serial.id);
-  const renameSectionForSerial = renameSection.bind(null, serial.id);
-  const reorderSectionsForSerial = reorderSections.bind(null, serial.id);
-  const addFloaterRowForSerial = addFloaterRow.bind(null, serial.id);
-  const deleteFloaterRowForSerial = deleteFloaterRow.bind(null, serial.id);
-  const renameFloaterRowForSerial = renameFloaterRow.bind(null, serial.id);
-  const reorderFloaterRowsForSerial = reorderFloaterRows.bind(null, serial.id);
 
   return (
     <main>
@@ -168,14 +158,6 @@ export default async function SerialPage({ params }: Props) {
               addSchemaAction={addSchemaForSerial}
               deleteSchemaAction={deleteSchemaForSerial}
               renameSchemaAction={renameSchemaForSerial}
-              addSectionAction={addSectionForSerial}
-              deleteSectionAction={deleteSectionForSerial}
-              renameSectionAction={renameSectionForSerial}
-              reorderSectionsAction={reorderSectionsForSerial}
-              addFloaterRowAction={addFloaterRowForSerial}
-              deleteFloaterRowAction={deleteFloaterRowForSerial}
-              renameFloaterRowAction={renameFloaterRowForSerial}
-              reorderFloaterRowsAction={reorderFloaterRowsForSerial}
             />
           </Box>
         </PageContainer>
