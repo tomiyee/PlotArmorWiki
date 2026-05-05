@@ -4,6 +4,8 @@ import { serials, volumes, chapters, pageSchemas } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
+import { SerialTOC } from "@/components/SerialTOC";
+import { SerialTOCDrawer } from "@/components/SerialTOCDrawer";
 import { ChapterData, NavbarSerialData } from "@/types";
 
 interface Props {
@@ -64,6 +66,17 @@ export default async function SerialLayout({ children, params }: Props) {
     schemas: schemaList,
   };
 
+  const tocContent = (
+    <SerialTOC
+      serialId={serial.id}
+      serialSlug={serialSlug}
+      volumes={volumeList}
+      chaptersByVolume={chaptersByVolume}
+      chapterType={serial.chapterType}
+      volumeType={serial.volumeType}
+    />
+  );
+
   return (
     <>
       <SerialNavInjector
@@ -76,6 +89,7 @@ export default async function SerialLayout({ children, params }: Props) {
             chaptersByVolume={chaptersByVolume}
           />
         }
+        tocSlot={<SerialTOCDrawer tocContent={tocContent} />}
       />
       <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>
     </>

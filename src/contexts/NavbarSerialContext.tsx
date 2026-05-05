@@ -14,8 +14,10 @@ interface NavbarSerialContextValue {
   serialData: NavbarSerialData | null;
   /** Pre-rendered ChapterSelector for the right side of the navbar. */
   chapterSelectorSlot: ReactNode;
+  /** Pre-rendered SerialTOCDrawer (mobile Contents button) for the right side of the navbar. */
+  tocSlot: ReactNode;
   /** Called by SerialNavInjector on mount to populate both sides of the navbar. */
-  setSerial: (data: NavbarSerialData, slot: ReactNode) => void;
+  setSerial: (data: NavbarSerialData, chapterSlot: ReactNode, tocSlot: ReactNode) => void;
   /** Called by SerialNavInjector on unmount to restore the default navbar. */
   clearSerial: () => void;
 }
@@ -39,20 +41,26 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
   const [serialData, setSerialData] = useState<NavbarSerialData | null>(null);
   const [chapterSelectorSlot, setChapterSelectorSlot] =
     useState<ReactNode>(null);
+  const [tocSlot, setTocSlot] = useState<ReactNode>(null);
 
-  const setSerial = useCallback((data: NavbarSerialData, slot: ReactNode) => {
-    setSerialData(data);
-    setChapterSelectorSlot(slot);
-  }, []);
+  const setSerial = useCallback(
+    (data: NavbarSerialData, chapterSlot: ReactNode, toc: ReactNode) => {
+      setSerialData(data);
+      setChapterSelectorSlot(chapterSlot);
+      setTocSlot(toc);
+    },
+    [],
+  );
 
   const clearSerial = useCallback(() => {
     setSerialData(null);
     setChapterSelectorSlot(null);
+    setTocSlot(null);
   }, []);
 
   return (
     <NavbarSerialContext.Provider
-      value={{ serialData, chapterSelectorSlot, setSerial, clearSerial }}
+      value={{ serialData, chapterSelectorSlot, tocSlot, setSerial, clearSerial }}
     >
       {children}
     </NavbarSerialContext.Provider>

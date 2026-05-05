@@ -19,7 +19,7 @@ import { Text } from "@/components/ui/text";
  * <Navbar />
  */
 export default function Navbar() {
-  const { serialData, chapterSelectorSlot } = useNavbarSerialContext();
+  const { serialData, chapterSelectorSlot, tocSlot } = useNavbarSerialContext();
 
   return (
     <nav className="sticky top-0 z-10 border-b bg-white px-4 py-2 flex items-center justify-between gap-4 min-h-[54px]">
@@ -47,11 +47,12 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Right — chapter selector (search bar + profile icon added in a followup) */}
+      {/* Right — mobile TOC button + chapter selector (search bar + profile icon added in a followup) */}
       <div
         className="flex items-center gap-3 shrink-0"
         suppressHydrationWarning
       >
+        {tocSlot}
         {chapterSelectorSlot}
       </div>
     </nav>

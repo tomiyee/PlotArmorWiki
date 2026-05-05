@@ -11,9 +11,9 @@ import {
 } from './actions';
 import { Box } from '@/components/ui/box';
 import { PageContainer } from '@/components/ui/page-container';
-import { SerialEditor } from '@/components/SerialEditor';
 import { SchemaManager } from '@/components/SchemaManager';
 import { SerialMetadataEditor } from '@/components/SerialMetadataEditor';
+import { SerialTOCSidebar } from '@/components/SerialTOCSidebar';
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -125,53 +125,61 @@ export default async function SerialPage({ params }: Props) {
 
   return (
     <main>
-      <PageContainer>
-      <Box col className="gap-4">
-        {/* Serial header with inline edit */}
-        <SerialMetadataEditor
-          title={serial.title}
-          description={serial.description}
-          splashArtUrl={serial.splashArtUrl}
-          authors={authors.map((a) => a.name)}
-          updateMetadataAction={updateMetadataForSerial}
-        />
+      <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
+        {/* Left sidebar — sticky, independent scroll, desktop only */}
+        <aside className="hidden md:block w-56 shrink-0">
+          <div className="sticky top-6 overflow-y-auto max-h-[calc(100vh-5rem)] pr-1">
+            <SerialTOCSidebar
+              serialId={serial.id}
+              serialSlug={serialSlug}
+              volumes={volumeList}
+              chaptersByVolume={chaptersByVolume}
+              chapterType={serial.chapterType}
+              volumeType={serial.volumeType}
+              addChapterAction={addChapterForSerial}
+              addVolumeAction={addVolumeForSerial}
+              deleteChapterAction={deleteChapterForSerial}
+              deleteVolumeAction={deleteVolumeForSerial}
+              renameChapterAction={renameChapterForSerial}
+              renameVolumeAction={renameVolumeForSerial}
+              reorderVolumesAction={reorderVolumesForSerial}
+              reorderAllChaptersAction={reorderAllChaptersForSerial}
+              updateSerialTypesAction={updateSerialTypesForSerial}
+            />
+          </div>
+        </aside>
 
-        {/* Volume and chapter list with edit mode */}
-        <SerialEditor
-          serialId={serial.id}
-          volumes={volumeList}
-          chaptersByVolume={chaptersByVolume}
-          chapterType={serial.chapterType}
-          volumeType={serial.volumeType}
-          addChapterAction={addChapterForSerial}
-          addVolumeAction={addVolumeForSerial}
-          deleteChapterAction={deleteChapterForSerial}
-          deleteVolumeAction={deleteVolumeForSerial}
-          renameChapterAction={renameChapterForSerial}
-          renameVolumeAction={renameVolumeForSerial}
-          reorderVolumesAction={reorderVolumesForSerial}
-          reorderAllChaptersAction={reorderAllChaptersForSerial}
-          updateSerialTypesAction={updateSerialTypesForSerial}
-        />
+        {/* Main content */}
+        <PageContainer className="flex-1 min-w-0 mx-0 px-0 py-0">
+          <Box col className="gap-4">
+            {/* Serial header with inline edit */}
+            <SerialMetadataEditor
+              title={serial.title}
+              description={serial.description}
+              splashArtUrl={serial.splashArtUrl}
+              authors={authors.map((a) => a.name)}
+              updateMetadataAction={updateMetadataForSerial}
+            />
 
-        {/* Schema management */}
-        <SchemaManager
-          schemas={schemasWithDetails}
-          serialSlug={serialSlug}
-          addSchemaAction={addSchemaForSerial}
-          deleteSchemaAction={deleteSchemaForSerial}
-          renameSchemaAction={renameSchemaForSerial}
-          addSectionAction={addSectionForSerial}
-          deleteSectionAction={deleteSectionForSerial}
-          renameSectionAction={renameSectionForSerial}
-          reorderSectionsAction={reorderSectionsForSerial}
-          addFloaterRowAction={addFloaterRowForSerial}
-          deleteFloaterRowAction={deleteFloaterRowForSerial}
-          renameFloaterRowAction={renameFloaterRowForSerial}
-          reorderFloaterRowsAction={reorderFloaterRowsForSerial}
-        />
-      </Box>
-      </PageContainer>
+            {/* Schema management */}
+            <SchemaManager
+              schemas={schemasWithDetails}
+              serialSlug={serialSlug}
+              addSchemaAction={addSchemaForSerial}
+              deleteSchemaAction={deleteSchemaForSerial}
+              renameSchemaAction={renameSchemaForSerial}
+              addSectionAction={addSectionForSerial}
+              deleteSectionAction={deleteSectionForSerial}
+              renameSectionAction={renameSectionForSerial}
+              reorderSectionsAction={reorderSectionsForSerial}
+              addFloaterRowAction={addFloaterRowForSerial}
+              deleteFloaterRowAction={deleteFloaterRowForSerial}
+              renameFloaterRowAction={renameFloaterRowForSerial}
+              reorderFloaterRowsAction={reorderFloaterRowsForSerial}
+            />
+          </Box>
+        </PageContainer>
+      </div>
     </main>
   );
 }
