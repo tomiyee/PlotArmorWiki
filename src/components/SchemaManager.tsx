@@ -128,13 +128,15 @@ function ReorderableItem({
                 ▼
               </Button>
             </Box>
-            <span
+            <Text
+              as="span"
+              variant="label"
               className="cursor-pointer hover:text-primary transition-colors"
               title="Click to rename"
               onClick={onStartRename}
             >
               {label}
-            </span>
+            </Text>
           </Box>
           <Box className="items-center gap-1">
             <Button

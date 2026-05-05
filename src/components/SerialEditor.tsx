@@ -185,7 +185,7 @@ function VolumeDragPreview({
               key={chapter.id}
               className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
             >
-              <span className="truncate">{chapter.displayName}</span>
+              <Text as="span" variant="label" className="truncate">{chapter.displayName}</Text>
               <Text as="span" muted>
                 #{chapter.idx}
               </Text>
@@ -201,7 +201,7 @@ function VolumeDragPreview({
 function ChapterDragPreview({ chapter }: { chapter: Chapter }) {
   return (
     <li className="flex items-center justify-between rounded-md px-3 py-2 text-sm bg-white border border-gray-200 shadow-lg list-none">
-      <span className="truncate">{chapter.displayName}</span>
+      <Text as="span" variant="label" className="truncate">{chapter.displayName}</Text>
       <Text as="span" muted>
         #{chapter.idx}
       </Text>
@@ -284,13 +284,15 @@ function SortableChapterItem({
                 <FontAwesomeIcon icon={faGripVertical} className="h-3 w-3" />
               </span>
             )}
-            <span
+            <Text
+              as="span"
+              variant="label"
               className={`truncate ${editing ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
               onClick={editing ? onStartRename : undefined}
               title={editing ? "Click to rename" : undefined}
             >
               {chapter.displayName}
-            </span>
+            </Text>
           </Box>
           <Box className="items-center gap-2 shrink-0">
             <Text as="span" muted>

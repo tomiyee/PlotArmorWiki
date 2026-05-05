@@ -181,7 +181,7 @@ export function ChapterSelector(props: Props) {
             aria-label="Select chapter progress"
             className="w-52 justify-between px-3 border-input shadow-xs hover:bg-background aria-expanded:bg-background"
           >
-            <span className="truncate">{selectedLabel}</span>
+            <Text as="span" variant="label" className="truncate">{selectedLabel}</Text>
             <ChevronDownIcon
               aria-hidden
               className={cn(

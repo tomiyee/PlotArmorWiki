@@ -43,7 +43,7 @@ export default function SerialList({ serials }: Props) {
                 href={`/${serial.slug}`}
                 className="block rounded-lg border px-4 py-3 hover:bg-gray-50 transition-colors"
               >
-                <span className="font-medium">{serial.title}</span>
+                <Text as="span" variant="label" className="font-medium">{serial.title}</Text>
                 {serial.description && (
                   <Text muted className="mt-0.5 line-clamp-2">
                     {serial.description}
