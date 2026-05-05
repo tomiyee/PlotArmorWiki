@@ -73,11 +73,6 @@ export function SchemaManager({
                 >
                   {schema.pageCount}
                 </Text>
-                {schema.hasFloater && (
-                  <Text as="span" muted className="ml-1 text-xs">
-                    (has floater)
-                  </Text>
-                )}
               </Box>
               <Link
                 href={`/${serialSlug}/${encodeURIComponent(schema.name)}`}
@@ -134,7 +129,7 @@ export function SchemaManager({
             </Box>
             <Box className="gap-2">
               <Button type="submit" disabled={isPending}>
-                Add page type
+                Add page category
               </Button>
               <Button
                 type="button"
@@ -155,7 +150,7 @@ export function SchemaManager({
             onClick={() => setAddingSchema(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-            Add page type
+            Add page category
           </Button>
         )}
       </div>
