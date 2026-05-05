@@ -154,6 +154,14 @@ export const pageFloaterRowVersions = pgTable(
   (t) => [primaryKey({ columns: [t.pageId, t.floaterRowId, t.chapterId] })],
 );
 
+export const chapterSynopses = pgTable('chapter_synopses', {
+  chapterId: integer('chapter_id')
+    .primaryKey()
+    .references(() => chapters.id),
+  content: text('content').notNull().default(''),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   email: text('email').notNull().unique(),
