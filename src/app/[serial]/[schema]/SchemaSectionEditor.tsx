@@ -3,9 +3,6 @@
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
-import { Button } from "@/components/ui/button";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
 import {
   SectionEditorPanel,
   type Section,
@@ -56,43 +53,22 @@ export function SchemaSectionEditor({
   renameFloaterRowAction,
   reorderFloaterRowsAction,
 }: SchemaSectionEditorProps) {
-  const { isEditing, toggle } = useEditMode();
+  const { isEditing } = useEditMode();
 
   if (!isEditing) {
     return (
-      <Box className="items-center gap-2 py-1">
-        <Text muted className="text-sm">
-          {sections.length} section{sections.length !== 1 ? "s" : ""}
-          {hasFloater
-            ? `, ${floaterRows.length} floater row${floaterRows.length !== 1 ? "s" : ""}`
-            : ""}
-        </Text>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={toggle}
-          title="Edit schema structure"
-        >
-          <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
-        </Button>
-      </Box>
+      <Text muted className="text-sm py-1">
+        {sections.length} section{sections.length !== 1 ? "s" : ""}
+        {hasFloater
+          ? `, ${floaterRows.length} floater row${floaterRows.length !== 1 ? "s" : ""}`
+          : ""}
+      </Text>
     );
   }
 
   return (
     <Box col className="gap-4 rounded-lg border border-gray-200 p-4">
-      <Box className="items-center justify-between">
-        <Text variant="h3">Schema Structure</Text>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={toggle}
-        >
-          Done
-        </Button>
-      </Box>
+      <Text variant="h3">Schema Structure</Text>
       <SectionEditorPanel
         schemaId={schemaId}
         hasFloater={hasFloater}

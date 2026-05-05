@@ -7,9 +7,12 @@ import { and, eq, isNull, lte } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { buttonVariants } from "@/components/ui/button";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { PageContainer } from "@/components/ui/page-container";
 import {
   updateSchema,
+  deleteSchema,
   addSection,
   deleteSection,
   renameSection,
@@ -113,6 +116,7 @@ export default async function SchemaIndexPage({ params }: Props) {
   ]);
 
   const updateSchemaForSerial = updateSchema.bind(null, serial.id);
+  const deleteSchemaForSerial = deleteSchema.bind(null, serial.id);
   const addSectionForSerial = addSection.bind(null, serial.id);
   const deleteSectionForSerial = deleteSection.bind(null, serial.id);
   const renameSectionForSerial = renameSection.bind(null, serial.id);
@@ -138,6 +142,7 @@ export default async function SchemaIndexPage({ params }: Props) {
             initialBody={schema.body}
             serialSlug={serialSlug}
             updateSchemaAction={updateSchemaForSerial}
+            deleteSchemaAction={deleteSchemaForSerial}
           />
 
           <SchemaSectionEditor
@@ -162,6 +167,7 @@ export default async function SchemaIndexPage({ params }: Props) {
                 href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
                 className={buttonVariants({ size: "sm" })}
               >
+                <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
                 New page
               </Link>
             </Box>
