@@ -1,13 +1,11 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, serialAuthors, volumes, chapters, pageSchemas, schemaSections, schemaFloaterRows } from '@/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { serials, serialAuthors, volumes, chapters, pageSchemas, schemaSections, schemaFloaterRows, pages } from '@/db/schema';
+import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   reorderVolumes, reorderAllChapters, updateSerialMetadata,
-  addSchema, deleteSchema, renameSchema,
-  addSection, deleteSection, renameSection, reorderSections,
-  addFloaterRow, deleteFloaterRow, renameFloaterRow, reorderFloaterRows,
+  addSchema,
 } from './actions';
 import { Box } from '@/components/ui/box';
 import { PageContainer } from '@/components/ui/page-container';
@@ -83,6 +81,14 @@ export default async function SerialPage({ params }: Props) {
       .orderBy(schemaFloaterRows.displayOrder),
   ]);
 
+  const pageCountList = schemaList.length
+    ? await db
+        .select({ schemaId: pages.schemaId, pageCount: count(pages.id) })
+        .from(pages)
+        .where(inArray(pages.schemaId, schemaList.map((s) => s.id)))
+        .groupBy(pages.schemaId)
+    : [];
+
   const chaptersByVolume: Record<number, { id: number; displayName: string; idx: number; volumeId: number }[]> = {};
   volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
   chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
@@ -90,14 +96,17 @@ export default async function SerialPage({ params }: Props) {
   const schemaIds = new Set(schemaList.map((s) => s.id));
   const sectionsBySchema: Record<number, typeof sectionList> = {};
   const floaterRowsBySchema: Record<number, typeof floaterRowList> = {};
-  schemaIds.forEach((id) => { sectionsBySchema[id] = []; floaterRowsBySchema[id] = []; });
+  const pageCountBySchema: Record<number, number> = {};
+  schemaIds.forEach((id) => { sectionsBySchema[id] = []; floaterRowsBySchema[id] = []; pageCountBySchema[id] = 0; });
   sectionList.forEach((s) => { if (sectionsBySchema[s.schemaId]) sectionsBySchema[s.schemaId].push(s); });
   floaterRowList.forEach((r) => { if (floaterRowsBySchema[r.schemaId]) floaterRowsBySchema[r.schemaId].push(r); });
+  pageCountList.forEach((r) => { pageCountBySchema[r.schemaId] = r.pageCount; });
 
   const schemasWithDetails = schemaList.map((schema) => ({
     ...schema,
     sections: sectionsBySchema[schema.id] ?? [],
     floaterRows: floaterRowsBySchema[schema.id] ?? [],
+    pageCount: pageCountBySchema[schema.id] ?? 0,
   }));
 
   const updateMetadataForSerial = updateSerialMetadata.bind(null, serial.id);
@@ -112,16 +121,6 @@ export default async function SerialPage({ params }: Props) {
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
 
   const addSchemaForSerial = addSchema.bind(null, serial.id);
-  const deleteSchemaForSerial = deleteSchema.bind(null, serial.id);
-  const renameSchemaForSerial = renameSchema.bind(null, serial.id);
-  const addSectionForSerial = addSection.bind(null, serial.id);
-  const deleteSectionForSerial = deleteSection.bind(null, serial.id);
-  const renameSectionForSerial = renameSection.bind(null, serial.id);
-  const reorderSectionsForSerial = reorderSections.bind(null, serial.id);
-  const addFloaterRowForSerial = addFloaterRow.bind(null, serial.id);
-  const deleteFloaterRowForSerial = deleteFloaterRow.bind(null, serial.id);
-  const renameFloaterRowForSerial = renameFloaterRow.bind(null, serial.id);
-  const reorderFloaterRowsForSerial = reorderFloaterRows.bind(null, serial.id);
 
   return (
     <main>
@@ -166,16 +165,6 @@ export default async function SerialPage({ params }: Props) {
               schemas={schemasWithDetails}
               serialSlug={serialSlug}
               addSchemaAction={addSchemaForSerial}
-              deleteSchemaAction={deleteSchemaForSerial}
-              renameSchemaAction={renameSchemaForSerial}
-              addSectionAction={addSectionForSerial}
-              deleteSectionAction={deleteSectionForSerial}
-              renameSectionAction={renameSectionForSerial}
-              reorderSectionsAction={reorderSectionsForSerial}
-              addFloaterRowAction={addFloaterRowForSerial}
-              deleteFloaterRowAction={deleteFloaterRowForSerial}
-              renameFloaterRowAction={renameFloaterRowForSerial}
-              reorderFloaterRowsAction={reorderFloaterRowsForSerial}
             />
           </Box>
         </PageContainer>

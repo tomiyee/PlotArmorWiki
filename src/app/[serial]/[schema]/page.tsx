@@ -2,14 +2,28 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { db } from "@/db/index";
-import { serials, pageSchemas, pages, chapters } from "@/db/schema";
-import { and, eq, lte } from "drizzle-orm";
+import { serials, pageSchemas, schemaSections, schemaFloaterRows, pages, chapters } from "@/db/schema";
+import { and, eq, isNull, lte } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { buttonVariants } from "@/components/ui/button";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { PageContainer } from "@/components/ui/page-container";
-import { updateSchema } from "../actions";
+import {
+  updateSchema,
+  deleteSchema,
+  addSection,
+  deleteSection,
+  renameSection,
+  reorderSections,
+  addFloaterRow,
+  deleteFloaterRow,
+  renameFloaterRow,
+  reorderFloaterRows,
+} from "../actions";
 import { SchemaIndexEditor } from "./SchemaIndexEditor";
+import { SchemaSectionEditor } from "./SchemaSectionEditor";
 
 interface Props {
   params: Promise<{ serial: string; schema: string }>;
@@ -64,14 +78,53 @@ export default async function SchemaIndexPage({ params }: Props) {
 
   const cutoffIdx = await getChapterCutoffIdx(serial.id);
 
-  const pageList = await db
-    .select({ id: pages.id, name: pages.name })
-    .from(pages)
-    .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
-    .where(and(eq(pages.schemaId, schema.id), lte(chapters.idx, cutoffIdx)))
-    .orderBy(pages.name);
+  const [pageList, sectionList, floaterRowList] = await Promise.all([
+    db
+      .select({ id: pages.id, name: pages.name })
+      .from(pages)
+      .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
+      .where(and(eq(pages.schemaId, schema.id), lte(chapters.idx, cutoffIdx)))
+      .orderBy(pages.name),
+    db
+      .select({
+        id: schemaSections.id,
+        name: schemaSections.name,
+        displayOrder: schemaSections.displayOrder,
+      })
+      .from(schemaSections)
+      .where(
+        and(
+          eq(schemaSections.schemaId, schema.id),
+          isNull(schemaSections.deletedAt),
+        ),
+      )
+      .orderBy(schemaSections.displayOrder),
+    db
+      .select({
+        id: schemaFloaterRows.id,
+        label: schemaFloaterRows.label,
+        displayOrder: schemaFloaterRows.displayOrder,
+      })
+      .from(schemaFloaterRows)
+      .where(
+        and(
+          eq(schemaFloaterRows.schemaId, schema.id),
+          isNull(schemaFloaterRows.deletedAt),
+        ),
+      )
+      .orderBy(schemaFloaterRows.displayOrder),
+  ]);
 
   const updateSchemaForSerial = updateSchema.bind(null, serial.id);
+  const deleteSchemaForSerial = deleteSchema.bind(null, serial.id);
+  const addSectionForSerial = addSection.bind(null, serial.id);
+  const deleteSectionForSerial = deleteSection.bind(null, serial.id);
+  const renameSectionForSerial = renameSection.bind(null, serial.id);
+  const reorderSectionsForSerial = reorderSections.bind(null, serial.id);
+  const addFloaterRowForSerial = addFloaterRow.bind(null, serial.id);
+  const deleteFloaterRowForSerial = deleteFloaterRow.bind(null, serial.id);
+  const renameFloaterRowForSerial = renameFloaterRow.bind(null, serial.id);
+  const reorderFloaterRowsForSerial = reorderFloaterRows.bind(null, serial.id);
 
   return (
     <main>
@@ -89,6 +142,22 @@ export default async function SchemaIndexPage({ params }: Props) {
             initialBody={schema.body}
             serialSlug={serialSlug}
             updateSchemaAction={updateSchemaForSerial}
+            deleteSchemaAction={deleteSchemaForSerial}
+          />
+
+          <SchemaSectionEditor
+            schemaId={schema.id}
+            hasFloater={schema.hasFloater}
+            sections={sectionList}
+            floaterRows={floaterRowList}
+            addSectionAction={addSectionForSerial}
+            deleteSectionAction={deleteSectionForSerial}
+            renameSectionAction={renameSectionForSerial}
+            reorderSectionsAction={reorderSectionsForSerial}
+            addFloaterRowAction={addFloaterRowForSerial}
+            deleteFloaterRowAction={deleteFloaterRowForSerial}
+            renameFloaterRowAction={renameFloaterRowForSerial}
+            reorderFloaterRowsAction={reorderFloaterRowsForSerial}
           />
 
           <Box col className="gap-3">
@@ -98,6 +167,7 @@ export default async function SchemaIndexPage({ params }: Props) {
                 href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
                 className={buttonVariants({ size: "sm" })}
               >
+                <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
                 New page
               </Link>
             </Box>

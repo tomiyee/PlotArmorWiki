@@ -4,12 +4,22 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen } from '@fortawesome/free-solid-svg-icons';
+import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { useEditMode } from '@/contexts/EditModeContext';
 
 interface Props {
   schemaId: number;
@@ -17,12 +27,14 @@ interface Props {
   initialBody: string | null;
   serialSlug: string;
   updateSchemaAction: (fd: FormData) => Promise<void>;
+  deleteSchemaAction: (fd: FormData) => Promise<void>;
 }
 
 /**
  * Inline editor for a schema's name and markdown body. Toggles between a
  * read-only view (rendered markdown) and an edit form (text input + textarea).
  * Navigates to the new URL when the name changes, since the slug is name-based.
+ * Delete is confirmed via dialog and redirects to the serial page.
  *
  * @example
  * <SchemaIndexEditor
@@ -31,6 +43,7 @@ interface Props {
  *   initialBody={schema.body}
  *   serialSlug="one-piece"
  *   updateSchemaAction={updateSchemaForSerial}
+ *   deleteSchemaAction={deleteSchemaForSerial}
  * />
  */
 export function SchemaIndexEditor({
@@ -39,10 +52,12 @@ export function SchemaIndexEditor({
   initialBody,
   serialSlug,
   updateSchemaAction,
+  deleteSchemaAction,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [isEditing, setIsEditing] = useState(false);
+  const { isEditing, toggle } = useEditMode();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Committed = last saved values; draft = in-progress edits.
   const [committedName, setCommittedName] = useState(initialName);
@@ -63,7 +78,7 @@ export function SchemaIndexEditor({
       await updateSchemaAction(fd);
       setCommittedName(trimmedName);
       setCommittedBody(draftBody);
-      setIsEditing(false);
+      toggle();
       if (trimmedName !== committedName) {
         router.push(`/${serialSlug}/${encodeURIComponent(trimmedName)}`);
       } else {
@@ -75,7 +90,16 @@ export function SchemaIndexEditor({
   function handleCancel() {
     setDraftName(committedName);
     setDraftBody(committedBody);
-    setIsEditing(false);
+    toggle();
+  }
+
+  function handleDelete() {
+    const fd = new FormData();
+    fd.set('schemaId', String(schemaId));
+    startTransition(async () => {
+      await deleteSchemaAction(fd);
+      router.push(`/${serialSlug}`);
+    });
   }
 
   if (isEditing) {
@@ -115,23 +139,62 @@ export function SchemaIndexEditor({
   }
 
   return (
-    <Box className="items-start gap-2">
-      <Box col flex={1} className="gap-2">
-        <Text variant="h1">{committedName}</Text>
-        {committedBody && (
-          <div className="prose prose-gray max-w-none text-gray-700">
-            <ReactMarkdown>{committedBody}</ReactMarkdown>
-          </div>
-        )}
+    <>
+      <Box className="items-start gap-2">
+        <Box col flex={1} className="gap-2">
+          <Text variant="h1">{committedName}</Text>
+          {committedBody && (
+            <div className="prose prose-gray max-w-none text-gray-700">
+              <ReactMarkdown>{committedBody}</ReactMarkdown>
+            </div>
+          )}
+        </Box>
+        <Box className="items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggle}
+            title="Edit schema"
+          >
+            <FontAwesomeIcon icon={faPen} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setConfirmingDelete(true)}
+            title="Delete schema"
+            className="text-red-500 hover:text-red-600"
+          >
+            <FontAwesomeIcon icon={faTrash} />
+          </Button>
+        </Box>
       </Box>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsEditing(true)}
-        title="Edit schema"
+
+      <Dialog
+        isOpen={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        showCloseButton={false}
       >
-        <FontAwesomeIcon icon={faPen} />
-      </Button>
-    </Box>
+        <DialogHeader>
+          <DialogTitle>Delete &ldquo;{committedName}&rdquo;?</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <DialogDescription>
+            This will permanently delete this page type and all its pages. This
+            action cannot be undone.
+          </DialogDescription>
+        </DialogBody>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={handleDelete}
+          >
+            {isPending ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </>
   );
 }
