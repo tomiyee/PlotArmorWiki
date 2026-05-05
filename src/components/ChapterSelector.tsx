@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
 import { Menu, MenuItem } from "@/components/ui/menu";
-import { ChevronDownIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChapterData, Volume } from "@/types";
 
 interface Props {
   serialId: number;
+  serialSlug: string;
   chapterType: string;
   volumes: Volume[];
   chaptersByVolume: Partial<Record<number, ChapterData[]>>;
@@ -51,7 +53,7 @@ function volCollapsedKey(serialId: number) {
  * />
  */
 export function ChapterSelector(props: Props) {
-  const { serialId, chapterType, volumes, chaptersByVolume } = props;
+  const { serialId, serialSlug, chapterType, volumes, chaptersByVolume } = props;
 
   const allChapters = volumes
     .flatMap((v) => chaptersByVolume[v.id] ?? [])
@@ -165,7 +167,20 @@ export function ChapterSelector(props: Props) {
                     onClick={() => handleSelectChapter(chapter.id)}
                     className="px-6"
                   >
-                    {chapterType} {chapter.displayName}
+                    <Box className="items-center justify-between gap-1 w-full">
+                      <Text as="span" variant="label" className="truncate">
+                        {chapterType} {chapter.displayName}
+                      </Text>
+                      <Link
+                        href={`/${serialSlug}/chapter/${chapter.idx}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        aria-label={`View ${chapterType} ${chapter.displayName} page`}
+                        title={`View ${chapterType} ${chapter.displayName} page`}
+                      >
+                        <ExternalLinkIcon className="size-3" />
+                      </Link>
+                    </Box>
                   </MenuItem>
                 ))}
               </MenuItem>

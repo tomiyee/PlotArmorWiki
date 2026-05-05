@@ -1,5 +1,11 @@
 CREATE TYPE "public"."chapter_type" AS ENUM('Chapter', 'Episode', 'Issue', 'Part');--> statement-breakpoint
 CREATE TYPE "public"."volume_type" AS ENUM('Volume', 'Season', 'Arc', 'Book');--> statement-breakpoint
+CREATE TABLE "chapter_synopses" (
+	"chapter_id" integer PRIMARY KEY NOT NULL,
+	"content" text DEFAULT '' NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "chapters" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"volume_id" integer NOT NULL,
@@ -104,6 +110,7 @@ CREATE TABLE "volumes" (
 	"idx" integer NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "chapter_synopses" ADD CONSTRAINT "chapter_synopses_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_volume_id_volumes_id_fk" FOREIGN KEY ("volume_id") REFERENCES "public"."volumes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_floater_row_id_schema_floater_rows_id_fk" FOREIGN KEY ("floater_row_id") REFERENCES "public"."schema_floater_rows"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

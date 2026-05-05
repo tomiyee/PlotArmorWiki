@@ -99,7 +99,7 @@ export function SerialTOC({
                   {chaps.map((chapter) => (
                     <li key={chapter.id}>
                       <Link
-                        href={`/${serialSlug}`}
+                        href={`/${serialSlug}/chapter/${chapter.idx}`}
                         className="block rounded px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
                       >
                         {chapterType} {chapter.displayName}

@@ -84,6 +84,7 @@ export default async function SerialLayout({ children, params }: Props) {
         chapterSelectorSlot={
           <ChapterSelector
             serialId={serial.id}
+            serialSlug={serialSlug}
             chapterType={serial.chapterType}
             volumes={volumeList}
             chaptersByVolume={chaptersByVolume}
