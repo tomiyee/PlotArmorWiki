@@ -8,6 +8,7 @@ export interface ChapterData {
 export interface Volume {
   id: number;
   displayName: string;
+  idx: number;
 }
 
 export interface SchemaNavData {

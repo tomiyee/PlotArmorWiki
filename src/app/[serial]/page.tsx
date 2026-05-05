@@ -11,10 +11,9 @@ import {
 } from './actions';
 import { Box } from '@/components/ui/box';
 import { PageContainer } from '@/components/ui/page-container';
-import { SerialEditor } from '@/components/SerialEditor';
 import { SchemaManager } from '@/components/SchemaManager';
 import { SerialMetadataEditor } from '@/components/SerialMetadataEditor';
-import { SerialTOC } from '@/components/SerialTOC';
+import { SerialTOCSidebar } from '@/components/SerialTOCSidebar';
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -127,18 +126,25 @@ export default async function SerialPage({ params }: Props) {
   return (
     <main>
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
-        {/* Left sidebar — sticky TOC, desktop only */}
-        <aside className="hidden md:flex flex-col w-56 shrink-0">
-          <div className="sticky top-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-              Contents
-            </p>
-            <SerialTOC
+        {/* Left sidebar — sticky, independent scroll, desktop only */}
+        <aside className="hidden md:block w-56 shrink-0">
+          <div className="sticky top-6 overflow-y-auto max-h-[calc(100vh-5rem)] pr-1">
+            <SerialTOCSidebar
+              serialId={serial.id}
               serialSlug={serialSlug}
               volumes={volumeList}
               chaptersByVolume={chaptersByVolume}
               chapterType={serial.chapterType}
               volumeType={serial.volumeType}
+              addChapterAction={addChapterForSerial}
+              addVolumeAction={addVolumeForSerial}
+              deleteChapterAction={deleteChapterForSerial}
+              deleteVolumeAction={deleteVolumeForSerial}
+              renameChapterAction={renameChapterForSerial}
+              renameVolumeAction={renameVolumeForSerial}
+              reorderVolumesAction={reorderVolumesForSerial}
+              reorderAllChaptersAction={reorderAllChaptersForSerial}
+              updateSerialTypesAction={updateSerialTypesForSerial}
             />
           </div>
         </aside>
@@ -153,24 +159,6 @@ export default async function SerialPage({ params }: Props) {
               splashArtUrl={serial.splashArtUrl}
               authors={authors.map((a) => a.name)}
               updateMetadataAction={updateMetadataForSerial}
-            />
-
-            {/* Volume and chapter list with edit mode */}
-            <SerialEditor
-              serialId={serial.id}
-              volumes={volumeList}
-              chaptersByVolume={chaptersByVolume}
-              chapterType={serial.chapterType}
-              volumeType={serial.volumeType}
-              addChapterAction={addChapterForSerial}
-              addVolumeAction={addVolumeForSerial}
-              deleteChapterAction={deleteChapterForSerial}
-              deleteVolumeAction={deleteVolumeForSerial}
-              renameChapterAction={renameChapterForSerial}
-              renameVolumeAction={renameVolumeForSerial}
-              reorderVolumesAction={reorderVolumesForSerial}
-              reorderAllChaptersAction={reorderAllChaptersForSerial}
-              updateSerialTypesAction={updateSerialTypesForSerial}
             />
 
             {/* Schema management */}

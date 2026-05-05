@@ -68,6 +68,7 @@ export default async function SerialLayout({ children, params }: Props) {
 
   const tocContent = (
     <SerialTOC
+      serialId={serial.id}
       serialSlug={serialSlug}
       volumes={volumeList}
       chaptersByVolume={chaptersByVolume}

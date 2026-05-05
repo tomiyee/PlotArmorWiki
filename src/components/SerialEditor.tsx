@@ -81,6 +81,8 @@ interface SerialEditorProps {
   chaptersByVolume: Record<number, Chapter[]>;
   chapterType: ChapterType;
   volumeType: VolumeType;
+  /** When true, starts in edit mode. Useful when rendered inside a dialog. */
+  initialEditing?: boolean;
   addChapterAction: (formData: FormData) => Promise<void>;
   addVolumeAction: (formData: FormData) => Promise<void>;
   deleteChapterAction: (formData: FormData) => Promise<void>;
@@ -552,6 +554,7 @@ export function SerialEditor({
   chaptersByVolume: initialChaptersByVolume,
   chapterType,
   volumeType,
+  initialEditing = false,
   addChapterAction,
   addVolumeAction,
   deleteChapterAction,
@@ -563,7 +566,7 @@ export function SerialEditor({
   updateSerialTypesAction,
 }: SerialEditorProps) {
   const { run, isPending } = useServerAction();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditing);
 
   const [volCollapsed, setVolCollapsed] = usePersistedStore<Record<number, boolean>>(
     `plotarmor:toc-collapsed:${serialId}`,
