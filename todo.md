@@ -2,15 +2,7 @@
 
 ---
 
-## Step 1 — Tooltip wrapper for icon buttons
-
-Icon-only buttons have no visible label; users cannot discover their purpose without a tooltip.
-
-- Install or verify `@radix-ui/react-tooltip` is available (it ships with Shadcn).
-- Create `src/components/ui/tooltip.tsx` exporting a `<Tooltip content={ReactNode} side?="top"|"right"|"bottom"|"left">` wrapper that composes `TooltipProvider`, `TooltipTrigger`, and `TooltipContent` from Radix. The API should be `<Tooltip content="Edit schema"><Button .../></Tooltip>`.
-- Add `<TooltipProvider>` to `src/app/layout.tsx` so the provider is global.
-- Audit all icon-only buttons across `SerialEditor`, `SchemaManager`, `SchemaIndexEditor`, `PageEditor`, `SerialMetadataEditor`, and `Navbar`. Wrap each with the appropriate `<Tooltip content="…">`.
-- Commit: `feat: Tooltip wrapper component; add tooltips to all icon-only buttons`
+## Step 1 — ~~Tooltip wrapper for icon buttons~~
 
 ---
 
