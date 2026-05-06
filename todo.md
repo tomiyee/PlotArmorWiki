@@ -36,15 +36,7 @@ Adding chapters one at a time is tedious for a series with many entries. A bulk-
 
 ---
 
-## Step 6 — Empty states across the app
-
-Empty lists with no message leave users confused about whether content is loading, missing, or simply not yet created.
-
-- Serial page: if a serial has no volumes/chapters, show a prompt "No chapters yet — add your first one below" (visible always, not just in edit mode).
-- Schema index page: if a schema has no pages, show "No pages yet — create the first one" with a link to the new-page form.
-- Home page: if no serials exist at all, show a call-to-action "No wikis yet — create one" linking to `/new`.
-- Wiki page: if a section has no content for the user's chapter cutoff, show a faint "No content for this chapter yet" placeholder rather than a blank section.
-- Commit: `feat: empty state messages across serial, schema, page, and home views`
+## Step 6 — ~~Empty states across the app~~
 
 ---
 

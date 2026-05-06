@@ -191,7 +191,16 @@ export default async function SchemaIndexPage({ params }: Props) {
                   ))}
                 </ul>
               ) : (
-                <Text muted>No pages yet.</Text>
+                <Text variant="faint">
+                  No pages yet —{" "}
+                  <Link
+                    href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
+                    className="text-blue-500 hover:underline"
+                  >
+                    create the first one
+                  </Link>
+                  .
+                </Text>
               )}
             </CardContent>
           </Card>

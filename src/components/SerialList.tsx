@@ -64,7 +64,17 @@ export default function SerialList({ serials }: Props) {
         </ul>
       ) : (
         <Text muted className="mt-2">
-          {query.trim() ? 'No serials match your search.' : 'No wikis yet.'}
+          {query.trim() ? (
+            'No serials match your search.'
+          ) : (
+            <>
+              No wikis yet —{' '}
+              <Link href="/new" className="text-blue-600 hover:underline">
+                create one
+              </Link>
+              .
+            </>
+          )}
         </Text>
       )}
     </>
