@@ -220,7 +220,7 @@ export function PageEditor({
               {section.content ? (
                 <MarkdownRenderer>{section.content}</MarkdownRenderer>
               ) : (
-                <Text muted>No content yet.</Text>
+                <Text variant="faint">No content for this chapter yet.</Text>
               )}
             </Box>
           ))}
