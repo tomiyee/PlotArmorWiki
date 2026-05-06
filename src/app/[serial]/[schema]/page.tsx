@@ -7,6 +7,7 @@ import { and, eq, isNull, lte } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { buttonVariants } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { PageContainer } from "@/components/ui/page-container";
@@ -160,34 +161,40 @@ export default async function SchemaIndexPage({ params }: Props) {
             reorderFloaterRowsAction={reorderFloaterRowsForSerial}
           />
 
-          <Box col className="gap-3">
-            <Box className="flex items-center justify-between">
-              <Text variant="h2">Pages</Text>
-              <Link
-                href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
-                className={buttonVariants({ size: "sm" })}
-              >
-                <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-                New page
-              </Link>
-            </Box>
-            {pageList.length > 0 ? (
-              <ul className="flex flex-col gap-1">
-                {pageList.map((page) => (
-                  <li key={page.id}>
-                    <Link
-                      href={`/${serialSlug}/${encodeURIComponent(schema.name)}/${encodeURIComponent(page.name)}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {page.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Text muted>No pages yet.</Text>
-            )}
-          </Box>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <Text variant="h2">Pages</Text>
+              </CardTitle>
+              <CardAction>
+                <Link
+                  href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+                  New page
+                </Link>
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              {pageList.length > 0 ? (
+                <ul className="flex flex-col gap-1">
+                  {pageList.map((page) => (
+                    <li key={page.id}>
+                      <Link
+                        href={`/${serialSlug}/${encodeURIComponent(schema.name)}/${encodeURIComponent(page.name)}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {page.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Text muted>No pages yet.</Text>
+              )}
+            </CardContent>
+          </Card>
         </Box>
       </PageContainer>
     </main>
