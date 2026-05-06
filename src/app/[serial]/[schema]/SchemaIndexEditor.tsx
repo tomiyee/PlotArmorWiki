@@ -1,15 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import dynamic from "next/dynamic";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/text";
+import { Box } from "@/components/ui/box";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogHeader,
@@ -18,8 +19,10 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from '@/components/ui/dialog';
-import { useEditMode } from '@/contexts/EditModeContext';
+} from "@/components/ui/dialog";
+import { useEditMode } from "@/contexts/EditModeContext";
+
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
 interface Props {
   schemaId: number;
@@ -63,18 +66,18 @@ export function SchemaIndexEditor({
 
   // Committed = last saved values; draft = in-progress edits.
   const [committedName, setCommittedName] = useState(initialName);
-  const [committedBody, setCommittedBody] = useState(initialBody ?? '');
+  const [committedBody, setCommittedBody] = useState(initialBody ?? "");
   const [draftName, setDraftName] = useState(initialName);
-  const [draftBody, setDraftBody] = useState(initialBody ?? '');
+  const [draftBody, setDraftBody] = useState(initialBody ?? "");
 
   function handleSave() {
     const trimmedName = draftName.trim();
     if (!trimmedName) return;
 
     const fd = new FormData();
-    fd.set('schemaId', String(schemaId));
-    fd.set('name', trimmedName);
-    fd.set('body', draftBody);
+    fd.set("schemaId", String(schemaId));
+    fd.set("name", trimmedName);
+    fd.set("body", draftBody);
 
     startTransition(async () => {
       await updateSchemaAction(fd);
@@ -100,7 +103,7 @@ export function SchemaIndexEditor({
 
   function handleDelete() {
     const fd = new FormData();
-    fd.set('schemaId', String(schemaId));
+    fd.set("schemaId", String(schemaId));
     startTransition(async () => {
       await deleteSchemaAction(fd);
       router.push(`/${serialSlug}`);
@@ -109,16 +112,39 @@ export function SchemaIndexEditor({
 
   if (!isEditing) {
     return (
-      <>
-        <Box className="items-start gap-2">
-          <Box col flex={1} className="gap-2">
-            <Text variant="h1">{committedName}</Text>
-            {committedBody && (
-              <div className="prose prose-gray max-w-none text-gray-700">
-                <ReactMarkdown>{committedBody}</ReactMarkdown>
-              </div>
-            )}
-          </Box>
+      <Box col flex={1} className="gap-2">
+        <Text variant="h1">{committedName}</Text>
+        {committedBody && (
+          <div className="prose prose-gray max-w-none text-gray-700">
+            <ReactMarkdown>{committedBody}</ReactMarkdown>
+          </div>
+        )}
+      </Box>
+    );
+  }
+
+  return (
+    <>
+      <Box col className="gap-4">
+        <Box col className="gap-1.5">
+          <Label htmlFor="schema-name">Page Category Name</Label>
+          <Input
+            id="schema-name"
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            disabled={isPending}
+          />
+        </Box>
+        <Box col className="gap-1.5">
+          <Label htmlFor="schema-body">Description</Label>
+          <MDEditor
+            value={draftBody}
+            onChange={(v) => setDraftBody(v ?? "")}
+            preview="edit"
+            data-color-mode="light"
+          />
+        </Box>
+        <Box className="justify-end">
           <Button
             variant="ghost"
             size="icon"
@@ -129,59 +155,35 @@ export function SchemaIndexEditor({
             <FontAwesomeIcon icon={faTrash} />
           </Button>
         </Box>
-
-        <Dialog
-          isOpen={confirmingDelete}
-          onClose={() => setConfirmingDelete(false)}
-          showCloseButton={false}
-        >
-          <DialogHeader>
-            <DialogTitle>Delete &ldquo;{committedName}&rdquo;?</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              This will permanently delete this page type and all its pages. This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-            <Button
-              variant="destructive"
-              disabled={isPending}
-              onClick={handleDelete}
-            >
-              {isPending ? 'Deleting…' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </Dialog>
-      </>
-    );
-  }
-
-  return (
-    <Box col className="gap-4">
-      <Box col className="gap-1.5">
-        <Label htmlFor="schema-name">Name</Label>
-        <Input
-          id="schema-name"
-          value={draftName}
-          onChange={(e) => setDraftName(e.target.value)}
-          disabled={isPending}
-        />
       </Box>
-      <Box col className="gap-1.5">
-        <Label htmlFor="schema-body">Description (markdown)</Label>
-        <textarea
-          id="schema-body"
-          value={draftBody}
-          onChange={(e) => setDraftBody(e.target.value)}
-          disabled={isPending}
-          rows={8}
-          placeholder="Optional description in markdown…"
-          className="w-full resize-y rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-        />
-      </Box>
-    </Box>
+
+      <Dialog
+        isOpen={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        showCloseButton={false}
+      >
+        <DialogHeader>
+          <DialogTitle>Delete &ldquo;{committedName}&rdquo;?</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <DialogDescription>
+            This will permanently delete this page type and all its pages. This
+            action cannot be undone.
+          </DialogDescription>
+        </DialogBody>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>
+            Cancel
+          </DialogClose>
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={handleDelete}
+          >
+            {isPending ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </>
   );
 }
