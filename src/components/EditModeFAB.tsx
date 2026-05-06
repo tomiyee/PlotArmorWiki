@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { useEditMode } from "@/contexts/EditModeContext";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /**
  * Fixed bottom-right floating action button that drives the global edit mode.
@@ -28,15 +29,17 @@ export function EditModeFAB() {
   if (!isEditing) {
     return (
       <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          variant="default"
-          size="icon"
-          onClick={toggle}
-          title="Edit page"
-          className="shadow-lg rounded-full size-12"
-        >
-          <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-        </Button>
+        <Tooltip content="Edit page" side="left">
+          <Button
+            variant="default"
+            size="icon"
+            onClick={toggle}
+            aria-label="Edit page"
+            className="shadow-lg rounded-full size-12"
+          >
+            <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
+          </Button>
+        </Tooltip>
       </div>
     );
   }

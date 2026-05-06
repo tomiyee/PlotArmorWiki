@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModeFAB } from "@/components/EditModeFAB";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,15 +32,17 @@ export default function RootLayout(props: RootLayoutProps) {
         className="h-full overflow-hidden flex flex-col"
         suppressHydrationWarning
       >
-        <EditModeProvider>
-          <NavbarSerialProvider>
-            <Navbar />
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              {children}
-            </div>
-            <EditModeFAB />
-          </NavbarSerialProvider>
-        </EditModeProvider>
+        <TooltipProvider>
+          <EditModeProvider>
+            <NavbarSerialProvider>
+              <Navbar />
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                {children}
+              </div>
+              <EditModeFAB />
+            </NavbarSerialProvider>
+          </EditModeProvider>
+        </TooltipProvider>
       </body>
     </html>
   );

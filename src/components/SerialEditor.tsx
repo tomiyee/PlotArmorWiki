@@ -54,6 +54,7 @@ import {
   ChapterType,
   VolumeType,
 } from "@/lib/serial-types";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Chapter {
   id: number;
@@ -296,15 +297,17 @@ function SortableChapterItem({
               #{chapter.idx}
             </Text>
             {editing && (
-              <Button
-                type="button"
-                variant="destructive"
-                size="icon-xs"
-                title={`Delete ${chapter.displayName}`}
-                onClick={onDelete}
-              >
-                <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
-              </Button>
+              <Tooltip content={`Delete ${chapter.displayName}`}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-xs"
+                  aria-label={`Delete ${chapter.displayName}`}
+                  onClick={onDelete}
+                >
+                  <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+                </Button>
+              </Tooltip>
             )}
           </Box>
         </>
@@ -414,18 +417,20 @@ function SortableVolumeItem({
                   <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
                 </span>
               ) : (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={onToggleCollapse}
-                  aria-label={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
-                >
-                  <FontAwesomeIcon
-                    icon={isCollapsed ? faChevronRight : faChevronDown}
-                    className="h-3 w-3"
-                  />
-                </Button>
+                <Tooltip content={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={onToggleCollapse}
+                    aria-label={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}
+                    className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
+                  >
+                    <FontAwesomeIcon
+                      icon={isCollapsed ? faChevronRight : faChevronDown}
+                      className="h-3 w-3"
+                    />
+                  </Button>
+                </Tooltip>
               )}
               <Text
                 variant="h4"
@@ -441,15 +446,17 @@ function SortableVolumeItem({
               </Text>
             </Box>
             {editing && (
-              <Button
-                type="button"
-                variant="destructive"
-                size="icon-sm"
-                title={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}
-                onClick={onDeleteVolume}
-              >
-                <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
-              </Button>
+              <Tooltip content={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  aria-label={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}
+                  onClick={onDeleteVolume}
+                >
+                  <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
+                </Button>
+              </Tooltip>
             )}
           </>
         )}

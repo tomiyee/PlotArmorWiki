@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
+import { Tooltip } from "@/components/ui/tooltip";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -121,24 +122,28 @@ function ReorderableItem({
             </Text>
           </Box>
           <Box className="items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              title={`Rename ${label}`}
-              onClick={onStartRename}
-            >
-              <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon-xs"
-              title={`Delete ${label}`}
-              onClick={onDelete}
-            >
-              <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
-            </Button>
+            <Tooltip content={`Rename ${label}`}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`Rename ${label}`}
+                onClick={onStartRename}
+              >
+                <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={`Delete ${label}`}>
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon-xs"
+                aria-label={`Delete ${label}`}
+                onClick={onDelete}
+              >
+                <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+              </Button>
+            </Tooltip>
           </Box>
         </>
       )}

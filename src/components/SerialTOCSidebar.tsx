@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { SerialTOC } from "@/components/SerialTOC";
 import { SerialEditor } from "@/components/SerialEditor";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ChapterData, Volume } from "@/types";
 import { ChapterType, VolumeType } from "@/lib/serial-types";
 
@@ -73,15 +74,17 @@ export function SerialTOCSidebar({
         >
           Contents
         </Text>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => setEditOpen(true)}
-          title={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
-          className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
-        >
-          <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
-        </Button>
+        <Tooltip content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`} side="right">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => setEditOpen(true)}
+            aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
+            className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
+          >
+            <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
+          </Button>
+        </Tooltip>
       </div>
 
       <SerialTOC
