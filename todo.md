@@ -2,27 +2,7 @@
 
 ---
 
-## ~~Step 1 — Chapter-targeted write path~~ ✓
-
----
-
-## ~~Step 2 — Server action: fetch content at a given chapter~~ ✓
-
----
-
-## ~~Step 3 — Chapter selector in edit mode~~ ✓
-
----
-
-## ~~Step 4 — Consistent content widths~~ ✓
-
----
-
-## ~~Step 5 — Rename "Page Types" to "Page Categories"~~ ✓
-
----
-
-## Step 6 — Tooltip wrapper for icon buttons
+## Step 1 — Tooltip wrapper for icon buttons
 
 Icon-only buttons have no visible label; users cannot discover their purpose without a tooltip.
 
@@ -34,7 +14,7 @@ Icon-only buttons have no visible label; users cannot discover their purpose wit
 
 ---
 
-## Step 7 — Search no-match redirect to Create Wiki with prefilled title
+## Step 2 — Search no-match redirect to Create Wiki with prefilled title
 
 When a user types a wiki name and gets zero results, pressing Enter is a natural next action. Routing them directly to the creation form with their query pre-filled reduces friction.
 
@@ -45,7 +25,7 @@ When a user types a wiki name and gets zero results, pressing Enter is a natural
 
 ---
 
-## Step 8 — Seed new wikis with default page categories
+## Step 3 — Seed new wikis with default page categories
 
 New wikis start empty. Adding default "Character" and "Location" schemas on creation reduces the setup burden since these are near-universal categories.
 
@@ -57,34 +37,7 @@ New wikis start empty. Adding default "Character" and "Location" schemas on crea
 
 ---
 
-## ~~Step 9 — Collapsible volumes in chapter selector and TOC~~ ✓
-
----
-
-## Step 10 — Table of contents as left sidebar / mobile drawer
-
-The chapter list embedded inline in the serial page becomes unwieldy for long series. A persistent sidebar improves at-a-glance navigation.
-
-- Extract the volume/chapter list from `src/app/[serial]/page.tsx` into `src/components/SerialTOC.tsx` — a Server Component that accepts `volumes` (with nested chapters) and `serialSlug`.
-- On `md+` screens: render `<SerialTOC>` as a sticky left panel (`w-56 shrink-0`) alongside the main content using a two-column flex layout in `src/app/[serial]/page.tsx`.
-- On `sm` screens: hide the sidebar (`hidden md:block`). Add a "Contents" icon button in the serial sub-bar that opens `<SerialTOC>` inside a `<Dialog>` (or Shadcn `Sheet`) drawer.
-- Commit: `feat: table of contents as sticky left sidebar with mobile drawer`
-
----
-
-## Step 11 — Merge serial sub-bar into top navbar
-
-Two stacked nav bars feel heavy. Merging the serial name and chapter selector into the primary navbar reduces visual weight and saves vertical space.
-
-- Introduce an optional `serialSlot` render prop (or a `SerialNavContext`) that pages can use to inject content into the right side of `<Navbar>`.
-- In `src/app/[serial]/layout.tsx`: populate the slot with the serial title (linked to `/{serial}`) and `<ChapterSelector>`. Remove the dark sub-bar `<div>`.
-- When not on a serial route the slot renders nothing; the navbar shows only the logo and auth.
-- Adjust responsive styling so the serial title truncates gracefully at narrow widths.
-- Commit: `feat: merge serial name and chapter selector into top navbar`
-
----
-
-## Step 12 — Bulk chapter input
+## Step 4 — Bulk chapter input
 
 Adding chapters one at a time is tedious for a series with many entries. A bulk-entry textarea reduces this to a single action.
 
@@ -94,7 +47,7 @@ Adding chapters one at a time is tedious for a series with many entries. A bulk-
 
 ---
 
-## Step 13 — Consolidated floating edit mode
+## Step 5 — Consolidated floating edit mode
 
 Edit controls are currently scattered across every component. A single global edit-mode toggle gives a cleaner reading experience and a consistent editing workflow.
 
@@ -108,18 +61,7 @@ Edit controls are currently scattered across every component. A single global ed
 
 ---
 
-## Step 14 — Move schema section editor to schema index page
-
-Section management is currently buried inside `SchemaManager` on the serial page. Editors expect to manage a schema's structure while looking at the schema itself.
-
-- On `src/app/[serial]/[schema]/page.tsx`: pass section and floater-row data to a new `<SchemaSectionEditor>` Client Component rendered below the schema description. Visibility is gated on `useEditMode().isEditing` (Step 13).
-- `<SchemaSectionEditor>` reuses the add/rename/reorder/delete logic already in `SchemaManager`. Extract the shared pieces into `src/components/SectionEditorPanel.tsx` and import from both locations to avoid duplication.
-- In `SchemaManager` on the serial page, replace the expanded section editor with a condensed read-only row count and a "Manage →" link to the schema index page.
-- Commit: `feat: schema section editor on the schema index page`
-
----
-
-## Step 15 — Empty states across the app
+## Step 6 — Empty states across the app
 
 Empty lists with no message leave users confused about whether content is loading, missing, or simply not yet created.
 
@@ -131,7 +73,7 @@ Empty lists with no message leave users confused about whether content is loadin
 
 ---
 
-## Step 16 — Version history per section
+## Step 7 — Version history per section
 
 After Step 3, editors can write at any chapter, but have no way to see what data points already exist in the time series. This step surfaces that.
 
@@ -142,19 +84,7 @@ After Step 3, editors can write at any chapter, but have no way to see what data
 
 ---
 
-## Step 17 — Chapter pages with synopsis and introduced content
-
-Each chapter should have its own wiki page showing a synopsis and a list of schema pages (characters, locations, etc.) introduced in that chapter. This makes chapters first-class content objects.
-
-- Add a `chapter_synopses` table: `(chapter_id PK, content text, updated_at timestamptz)`. Run the squashed-migration workflow from CLAUDE.md.
-- Create route `src/app/[serial]/chapter/[chapterIdx]/page.tsx`. Resolve the chapter by `serial_id` + `idx`. Fetch synopsis content from `chapter_synopses`. Fetch all pages whose `intro_chapter_id` matches this chapter, grouped by schema.
-- Render: chapter title, synopsis (markdown, editable via Step 13's edit mode), then a grouped list of introduced pages (e.g. "Characters introduced: Anya, Yoru").
-- In `<SerialTOC>` (Step 10) and `<ChapterSelector>` (Step 9), link each chapter label to `/{serial}/chapter/{idx}`.
-- Commit: `feat: chapter pages with synopsis and list of introduced content`
-
----
-
-## Step 18 — Text wraps around the floater sidebar
+## Step 8 — Text wraps around the floater sidebar
 
 The current two-column grid layout for the wiki page body and floater sidebar places them in separate, rigid columns. Wrapping text around the floater creates a more natural reading layout.
 
@@ -165,7 +95,7 @@ The current two-column grid layout for the wiki page body and floater sidebar pl
 
 ---
 
-## Step 19 — Spoiler-aware search
+## Step 9 — Spoiler-aware search
 
 The home page currently filters serials by title client-side with substring matching. The spec calls for server-side full-text search across both serials and pages, with spoiler filtering on page results.
 
@@ -181,7 +111,7 @@ The home page currently filters serials by title client-side with substring matc
 
 ---
 
-## Step 20 — Auth.js setup
+## Step 10 — Auth.js setup
 
 Auth is intentionally deferred until all localStorage-based features are complete and working.
 
@@ -195,9 +125,9 @@ Auth is intentionally deferred until all localStorage-based features are complet
 
 ---
 
-## Step 21 — Progress sync for logged-in users + auth gate
+## Step 11 — Progress sync for logged-in users + auth gate
 
-Depends on Step 20.
+Depends on Step 10.
 
 - In `<ChapterSelector>`, add auth awareness:
   - If the user is authenticated: call a Server Action that upserts `user_progress (user_id, serial_id, chapter_id)` in addition to writing the cookie.
@@ -205,13 +135,13 @@ Depends on Step 20.
 - On serial page load, read progress in priority order:
   1. `user_progress` table row (if session exists).
   2. Cookie fallback (existing anonymous behavior).
-- Add auth gate to the content editor in `<PageEditor>`: only render the edit FAB (Step 13) for authenticated users.
+- Add auth gate to the content editor in `<PageEditor>`: only render the edit FAB (Step 5) for authenticated users.
 - Merge anonymous `localStorage` progress into the DB on sign-in (nice-to-have; not required for initial ship).
 - Commit: `feat: sync chapter progress to DB for authenticated users`
 
 ---
 
-## Step 22 — Dark mode
+## Step 12 — Dark mode
 
 Dark mode is deferred until the component palette is stable (after Steps 1–14 settle the layout) to avoid auditing twice.
 
