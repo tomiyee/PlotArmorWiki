@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
@@ -114,9 +114,7 @@ export function SchemaIndexEditor({
       <Box col flex={1} className="gap-2">
         <Text variant="h1">{committedName}</Text>
         {committedBody && (
-          <div className="prose prose-gray max-w-none text-gray-700">
-            <ReactMarkdown>{committedBody}</ReactMarkdown>
-          </div>
+          <MarkdownRenderer>{committedBody}</MarkdownRenderer>
         )}
       </Box>
     );

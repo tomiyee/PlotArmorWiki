@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import ReactMarkdown from "react-markdown";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { faPen } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
@@ -80,9 +80,7 @@ export function ChapterSynopsisEditor({
     <Box className="items-start gap-2">
       <Box col flex={1} className="gap-2">
         {committed ? (
-          <div className="prose prose-gray max-w-none text-gray-700">
-            <ReactMarkdown>{committed}</ReactMarkdown>
-          </div>
+          <MarkdownRenderer>{committed}</MarkdownRenderer>
         ) : (
           <Text muted>No synopsis written yet.</Text>
         )}
