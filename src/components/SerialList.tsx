@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
@@ -19,6 +20,7 @@ type Props = {
 
 export default function SerialList({ serials }: Props) {
   const [query, setQuery] = useState('');
+  const router = useRouter();
 
   const filtered = query.trim()
     ? serials.filter((s) =>
@@ -26,12 +28,19 @@ export default function SerialList({ serials }: Props) {
       )
     : serials;
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && query.trim() && filtered.length === 0) {
+      router.push('/new?title=' + encodeURIComponent(query.trim()));
+    }
+  }
+
   return (
     <>
       <Input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder="Search serials…"
         className="w-full max-w-md"
       />
