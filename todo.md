@@ -2,26 +2,11 @@
 
 ---
 
-## Step 1 — Tooltip wrapper for icon buttons
-
-Icon-only buttons have no visible label; users cannot discover their purpose without a tooltip.
-
-- Install or verify `@radix-ui/react-tooltip` is available (it ships with Shadcn).
-- Create `src/components/ui/tooltip.tsx` exporting a `<Tooltip content={ReactNode} side?="top"|"right"|"bottom"|"left">` wrapper that composes `TooltipProvider`, `TooltipTrigger`, and `TooltipContent` from Radix. The API should be `<Tooltip content="Edit schema"><Button .../></Tooltip>`.
-- Add `<TooltipProvider>` to `src/app/layout.tsx` so the provider is global.
-- Audit all icon-only buttons across `SerialEditor`, `SchemaManager`, `SchemaIndexEditor`, `PageEditor`, `SerialMetadataEditor`, and `Navbar`. Wrap each with the appropriate `<Tooltip content="…">`.
-- Commit: `feat: Tooltip wrapper component; add tooltips to all icon-only buttons`
+## Step 1 — ~~Tooltip wrapper for icon buttons~~
 
 ---
 
-## Step 2 — Search no-match redirect to Create Wiki with prefilled title
-
-When a user types a wiki name and gets zero results, pressing Enter is a natural next action. Routing them directly to the creation form with their query pre-filled reduces friction.
-
-- In `<SerialList>` (`src/components/SerialList.tsx`): add a `keydown` handler on the search `<Input>`. When the key is `Enter`, `query` is non-empty, and the filtered list has zero results, call `router.push('/new?title=' + encodeURIComponent(query))`.
-- In `src/app/new/page.tsx`: read `searchParams.title` (string | undefined) and pass it as a `defaultTitle` prop to the form client component.
-- In the new-serial form client component: attach a `ref` to the title `<Input>` and call `.focus()` inside a `useEffect` that fires when `defaultTitle` is non-empty.
-- Commit: `feat: redirect to Create Wiki with prefilled title on no-results Enter`
+## Step 2 — ~~Search no-match redirect to Create Wiki with prefilled title~~
 
 ---
 
