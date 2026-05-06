@@ -126,7 +126,21 @@ export function SchemaIndexEditor({
     <>
       <Box col className="gap-4">
         <Box col className="gap-1.5">
-          <Label htmlFor="schema-name">Page Category Name</Label>
+          <Box className="gap-1.5 items-center">
+            <Label htmlFor="schema-name">Page Category Name</Label>
+
+            <Tooltip content="Delete page category" side="left">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setConfirmingDelete(true)}
+                aria-label="Delete page category"
+                className="text-red-500 hover:text-red-600"
+              >
+                <FontAwesomeIcon icon={faTrash} />
+              </Button>
+            </Tooltip>
+          </Box>
           <Input
             id="schema-name"
             value={draftName}
@@ -142,19 +156,6 @@ export function SchemaIndexEditor({
             preview="edit"
             data-color-mode="light"
           />
-        </Box>
-        <Box className="justify-end">
-          <Tooltip content="Delete page category" side="left">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setConfirmingDelete(true)}
-              aria-label="Delete page category"
-              className="text-red-500 hover:text-red-600"
-            >
-              <FontAwesomeIcon icon={faTrash} />
-            </Button>
-          </Tooltip>
         </Box>
       </Box>
 
