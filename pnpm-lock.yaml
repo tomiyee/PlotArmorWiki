@@ -26,6 +26,9 @@ dependencies:
   '@fortawesome/react-fontawesome':
     specifier: ^3.3.1
     version: 3.3.1(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.4)
+  '@tailwindcss/typography':
+    specifier: ^0.5.19
+    version: 0.5.19(tailwindcss@4.2.4)
   '@uiw/react-md-editor':
     specifier: ^4.1.0
     version: 4.1.0(@types/react@19.2.14)(react-dom@19.2.4)(react@19.2.4)
@@ -56,6 +59,9 @@ dependencies:
   react-markdown:
     specifier: ^10.1.0
     version: 10.1.0(@types/react@19.2.14)(react@19.2.4)
+  remark-gfm:
+    specifier: ^4.0.1
+    version: 4.0.1
   shadcn:
     specifier: ^4.4.0
     version: 4.6.0(@types/node@20.19.39)(typescript@5.9.3)
@@ -2058,6 +2064,15 @@ packages:
       postcss: 8.5.12
       tailwindcss: 4.2.4
     dev: true
+
+  /@tailwindcss/typography@0.5.19(tailwindcss@4.2.4):
+    resolution: {integrity: sha512-w31dd8HOx3k9vPtcQh5QHP9GwKcgbMp87j58qi6xgiBnFFtKEAgCWnDw4qUT8aHwkCp8bKvb/KGKWWHedP0AAg==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || insiders || >=4.0.0-alpha.20 || >=4.0.0-beta.1'
+    dependencies:
+      postcss-selector-parser: 6.0.10
+      tailwindcss: 4.2.4
+    dev: false
 
   /@ts-morph/common@0.27.0:
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
@@ -6124,6 +6139,14 @@ packages:
     engines: {node: '>= 0.4'}
     dev: true
 
+  /postcss-selector-parser@6.0.10:
+    resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
+    engines: {node: '>=4'}
+    dependencies:
+      cssesc: 3.0.0
+      util-deprecate: 1.0.2
+    dev: false
+
   /postcss-selector-parser@7.1.1:
     resolution: {integrity: sha512-orRsuYpJVw8LdAwqqLykBj9ecS5/cRHlI5+nvTo8LcCKmzDmqVORXtOIYEEQuL9D4BxtA1lm5isAqzQZCoQ6Eg==}
     engines: {node: '>=4'}
@@ -7018,7 +7041,6 @@ packages:
 
   /tailwindcss@4.2.4:
     resolution: {integrity: sha512-HhKppgO81FQof5m6TEnuBWCZGgfRAWbaeOaGT00KOy/Pf/j6oUihdvBpA7ltCeAvZpFhW3j0PTclkxsd4IXYDA==}
-    dev: true
 
   /tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}

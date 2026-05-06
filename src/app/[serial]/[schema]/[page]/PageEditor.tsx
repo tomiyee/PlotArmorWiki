@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { Text } from "@/components/ui/text";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { Box } from "@/components/ui/box";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -218,9 +218,7 @@ export function PageEditor({
             <Box key={section.id} col className="gap-2">
               <Text variant="h2">{section.name}</Text>
               {section.content ? (
-                <div className="prose prose-gray max-w-none text-gray-700">
-                  <ReactMarkdown>{section.content}</ReactMarkdown>
-                </div>
+                <MarkdownRenderer>{section.content}</MarkdownRenderer>
               ) : (
                 <Text muted>No content yet.</Text>
               )}
@@ -310,11 +308,9 @@ export function PageEditor({
                 Current value
               </Text>
               {currentSectionContent[section.id] ? (
-                <div className="prose prose-gray prose-sm max-w-none text-gray-700">
-                  <ReactMarkdown>
-                    {currentSectionContent[section.id]}
-                  </ReactMarkdown>
-                </div>
+                <MarkdownRenderer sm>
+                  {currentSectionContent[section.id]}
+                </MarkdownRenderer>
               ) : (
                 <Text muted className="text-sm">
                   No content at this chapter.
