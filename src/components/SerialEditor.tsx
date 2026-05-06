@@ -4,7 +4,6 @@ import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faPen,
   faPlus,
   faTrash,
   faGripVertical,
@@ -81,8 +80,6 @@ interface SerialEditorProps {
   chaptersByVolume: Record<number, Chapter[]>;
   chapterType: ChapterType;
   volumeType: VolumeType;
-  /** When true, starts in edit mode. Useful when rendered inside a dialog. */
-  initialEditing?: boolean;
   addChapterAction: (formData: FormData) => Promise<void>;
   addVolumeAction: (formData: FormData) => Promise<void>;
   deleteChapterAction: (formData: FormData) => Promise<void>;
@@ -535,6 +532,7 @@ function SortableVolumeItem({
  *
  * @example
  * <SerialEditor
+ *   serialId={serial.id}
  *   volumes={volumeList}
  *   chaptersByVolume={chaptersByVolume}
  *   chapterType="Chapter"
@@ -556,7 +554,6 @@ export function SerialEditor({
   chaptersByVolume: initialChaptersByVolume,
   chapterType,
   volumeType,
-  initialEditing = false,
   addChapterAction,
   addVolumeAction,
   deleteChapterAction,
@@ -568,7 +565,9 @@ export function SerialEditor({
   updateSerialTypesAction,
 }: SerialEditorProps) {
   const { run, isPending } = useServerAction();
-  const [editing, setEditing] = useState(initialEditing);
+  // SerialEditor is always in edit mode; it is rendered inside a dialog that
+  // the user explicitly opens to manage volumes and chapters.
+  const editing = true;
 
   const [volCollapsed, setVolCollapsed] = usePersistedStore<Record<number, boolean>>(
     `plotarmor:toc-collapsed:${serialId}`,
@@ -826,62 +825,32 @@ export function SerialEditor({
 
   return (
     <section className="flex flex-col gap-4 mt-4">
-      <Box className="items-center justify-between">
-        <Text variant="h2">
-          {currentVolumeType}s &amp; {currentChapterType}s
+      <Box className="items-center gap-2 flex-wrap">
+        <Text variant="body" as="span">
+          Each
         </Text>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => {
-            setEditing((prev) => !prev);
-            setRenamingVolumeId(null);
-            setRenamingChapterId(null);
+        <Select
+          id="chapterType"
+          options={CHAPTER_TYPE_OPTIONS}
+          value={currentChapterType}
+          onChange={(val) => {
+            setCurrentChapterType(val);
+            runTypeUpdate(currentVolumeType, val);
           }}
-          title={
-            editing
-              ? "Exit edit mode"
-              : `Edit ${currentVolumeType.toLowerCase()}s and ${currentChapterType.toLowerCase()}s`
-          }
-          className={
-            editing
-              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-              : "text-gray-500 hover:text-gray-700"
-          }
-        >
-          <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-        </Button>
+        />
+        <Text variant="body" as="span">
+          is grouped by
+        </Text>
+        <Select
+          id="volumeType"
+          options={VOLUME_TYPE_OPTIONS}
+          value={currentVolumeType}
+          onChange={(val) => {
+            setCurrentVolumeType(val);
+            runTypeUpdate(val, currentChapterType);
+          }}
+        />
       </Box>
-
-      {editing && (
-        <Box className="items-center gap-2 flex-wrap">
-          <Text variant="body" as="span">
-            Each
-          </Text>
-          <Select
-            id="chapterType"
-            options={CHAPTER_TYPE_OPTIONS}
-            value={currentChapterType}
-            onChange={(val) => {
-              setCurrentChapterType(val);
-              runTypeUpdate(currentVolumeType, val);
-            }}
-          />
-          <Text variant="body" as="span">
-            is grouped by
-          </Text>
-          <Select
-            id="volumeType"
-            options={VOLUME_TYPE_OPTIONS}
-            value={currentVolumeType}
-            onChange={(val) => {
-              setCurrentVolumeType(val);
-              runTypeUpdate(val, currentChapterType);
-            }}
-          />
-        </Box>
-      )}
 
       <DndContext
         sensors={sensors}
