@@ -206,34 +206,15 @@ export function PageEditor({
 
   if (!isEditing) {
     return (
-      <div
-        className={
-          hasFloaterContent
-            ? "grid grid-cols-[1fr_280px] gap-8 items-start"
-            : undefined
-        }
-      >
-        <Box col className="gap-6">
-          {sections.map((section) => (
-            <Box key={section.id} col className="gap-2">
-              <Text variant="h2">{section.name}</Text>
-              {section.content ? (
-                <MarkdownRenderer>{section.content}</MarkdownRenderer>
-              ) : (
-                <Text variant="faint">No content for this chapter yet.</Text>
-              )}
-            </Box>
-          ))}
-        </Box>
-
+      <div className="overflow-hidden">
         {hasFloaterContent && (
-          <aside className="sticky top-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
+          <aside className="float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
             {floaterImageUrl && (
               <Image
                 src={floaterImageUrl}
                 alt="Floater image"
-                width={280}
-                height={280}
+                width={288}
+                height={288}
                 unoptimized
                 className="w-full rounded object-cover"
               />
@@ -253,6 +234,19 @@ export function PageEditor({
             )}
           </aside>
         )}
+
+        <Box col className="gap-6">
+          {sections.map((section) => (
+            <Box key={section.id} col className="gap-2">
+              <Text variant="h2">{section.name}</Text>
+              {section.content ? (
+                <MarkdownRenderer>{section.content}</MarkdownRenderer>
+              ) : (
+                <Text variant="faint">No content for this chapter yet.</Text>
+              )}
+            </Box>
+          ))}
+        </Box>
       </div>
     );
   }
