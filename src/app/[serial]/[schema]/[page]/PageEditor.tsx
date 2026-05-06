@@ -1,22 +1,17 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useState, useTransition } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { savePageContent, getPageContentAtChapter } from "./actions";
-
-// MDEditor uses browser-only APIs; dynamic import with ssr:false prevents
-// hydration mismatches in Next.js App Router.
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+import { useEditMode } from "@/contexts/EditModeContext";
+import { MDEditor } from "@/components/MDEditor";
 
 interface SectionData {
   id: number;
@@ -62,6 +57,8 @@ interface Props {
  * Renders the page body in read mode and switches to an inline edit mode where
  * each section gets an MDEditor alongside its current rendered value, and
  * floater fields get plain text inputs.
+ * Edit mode is driven by the global `EditModeContext`; the `<EditModeFAB>`
+ * triggers save and discard.
  * On save, calls the `savePageContent` Server Action which writes via SCD Type 2.
  *
  * In edit mode, the "Writing as of:" chapter selector defaults to the reader's
@@ -100,7 +97,7 @@ export function PageEditor({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [isEditing, setIsEditing] = useState(false);
+  const { isEditing, registerHandlers } = useEditMode();
 
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
@@ -129,7 +126,7 @@ export function PageEditor({
 
   const hasFloater = floaterImageUrl !== undefined;
 
-  function handleCancel() {
+  const handleDiscard = useCallback(() => {
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
@@ -141,8 +138,36 @@ export function PageEditor({
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setSelectedChapterId(readingChapterId ?? headChapterId);
-    setIsEditing(false);
-  }
+  }, [sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
+
+  const handleSave = useCallback(() => {
+    startTransition(async () => {
+      await savePageContent(
+        serialSlug,
+        schemaName,
+        pageName,
+        draftSectionContent,
+        hasFloater ? draftFloaterImageUrl.trim() || null : null,
+        hasFloater ? draftFloaterRowContent : {},
+        selectedChapterId ?? undefined,
+      );
+      router.refresh();
+    });
+  }, [
+    serialSlug,
+    schemaName,
+    pageName,
+    draftSectionContent,
+    hasFloater,
+    draftFloaterImageUrl,
+    draftFloaterRowContent,
+    selectedChapterId,
+    router,
+  ]);
+
+  useEffect(() => {
+    return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
+  }, [registerHandlers, handleSave, handleDiscard]);
 
   /**
    * When the editor picks a different target chapter, fetch the content that
@@ -169,22 +194,6 @@ export function PageEditor({
           Object.fromEntries(data.floaterRows.map((r) => [r.id, r.content])),
         );
       }
-    });
-  }
-
-  function handleSave() {
-    startTransition(async () => {
-      await savePageContent(
-        serialSlug,
-        schemaName,
-        pageName,
-        draftSectionContent,
-        hasFloater ? draftFloaterImageUrl.trim() || null : null,
-        hasFloater ? draftFloaterRowContent : {},
-        selectedChapterId ?? undefined,
-      );
-      setIsEditing(false);
-      router.refresh();
     });
   }
 
@@ -217,26 +226,17 @@ export function PageEditor({
               )}
             </Box>
           ))}
-
-          <Box className="pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(true)}
-            >
-              <FontAwesomeIcon icon={faPen} className="mr-1.5" />
-              Edit page
-            </Button>
-          </Box>
         </Box>
 
         {hasFloaterContent && (
           <aside className="sticky top-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
             {floaterImageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={floaterImageUrl}
                 alt="Floater image"
+                width={280}
+                height={280}
+                unoptimized
                 className="w-full rounded object-cover"
               />
             )}
@@ -375,15 +375,6 @@ export function PageEditor({
           ))}
         </Box>
       )}
-
-      <Box className="gap-2">
-        <Button onClick={handleSave} disabled={isPending}>
-          {isPending ? "Saving…" : "Save"}
-        </Button>
-        <Button variant="outline" onClick={handleCancel} disabled={isPending}>
-          Cancel
-        </Button>
-      </Box>
     </Box>
   );
 }

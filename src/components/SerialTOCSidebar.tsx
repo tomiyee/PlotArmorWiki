@@ -106,7 +106,6 @@ export function SerialTOCSidebar({
             chaptersByVolume={chaptersByVolume}
             chapterType={chapterType}
             volumeType={volumeType}
-            initialEditing
             addChapterAction={addChapterAction}
             addVolumeAction={addVolumeAction}
             deleteChapterAction={deleteChapterAction}

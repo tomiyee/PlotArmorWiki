@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 import { EditModeProvider } from "@/contexts/EditModeContext";
+import { EditModeFAB } from "@/components/EditModeFAB";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout(props: RootLayoutProps) {
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
               {children}
             </div>
+            <EditModeFAB />
           </NavbarSerialProvider>
         </EditModeProvider>
       </body>

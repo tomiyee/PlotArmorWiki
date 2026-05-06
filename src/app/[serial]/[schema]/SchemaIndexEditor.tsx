@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/text";
+import { Box } from "@/components/ui/box";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogHeader,
@@ -18,8 +18,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from '@/components/ui/dialog';
-import { useEditMode } from '@/contexts/EditModeContext';
+} from "@/components/ui/dialog";
+import { useEditMode } from "@/contexts/EditModeContext";
+import { MDEditor } from "@/components/MDEditor";
 
 interface Props {
   schemaId: number;
@@ -32,7 +33,9 @@ interface Props {
 
 /**
  * Inline editor for a schema's name and markdown body. Toggles between a
- * read-only view (rendered markdown) and an edit form (text input + textarea).
+ * read-only view (rendered markdown) and an edit form (text input + textarea)
+ * driven by the global `EditModeContext`. The `<EditModeFAB>` triggers save
+ * and discard via registered handlers.
  * Navigates to the new URL when the name changes, since the slug is name-based.
  * Delete is confirmed via dialog and redirects to the serial page.
  *
@@ -56,29 +59,28 @@ export function SchemaIndexEditor({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const { isEditing, toggle } = useEditMode();
+  const { isEditing, registerHandlers } = useEditMode();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Committed = last saved values; draft = in-progress edits.
   const [committedName, setCommittedName] = useState(initialName);
-  const [committedBody, setCommittedBody] = useState(initialBody ?? '');
+  const [committedBody, setCommittedBody] = useState(initialBody ?? "");
   const [draftName, setDraftName] = useState(initialName);
-  const [draftBody, setDraftBody] = useState(initialBody ?? '');
+  const [draftBody, setDraftBody] = useState(initialBody ?? "");
 
   function handleSave() {
     const trimmedName = draftName.trim();
     if (!trimmedName) return;
 
     const fd = new FormData();
-    fd.set('schemaId', String(schemaId));
-    fd.set('name', trimmedName);
-    fd.set('body', draftBody);
+    fd.set("schemaId", String(schemaId));
+    fd.set("name", trimmedName);
+    fd.set("body", draftBody);
 
     startTransition(async () => {
       await updateSchemaAction(fd);
       setCommittedName(trimmedName);
       setCommittedBody(draftBody);
-      toggle();
       if (trimmedName !== committedName) {
         router.push(`/${serialSlug}/${encodeURIComponent(trimmedName)}`);
       } else {
@@ -87,26 +89,43 @@ export function SchemaIndexEditor({
     });
   }
 
-  function handleCancel() {
+  function handleDiscard() {
     setDraftName(committedName);
     setDraftBody(committedBody);
-    toggle();
   }
+
+  useEffect(() => {
+    return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftName, draftBody, committedName, committedBody]);
 
   function handleDelete() {
     const fd = new FormData();
-    fd.set('schemaId', String(schemaId));
+    fd.set("schemaId", String(schemaId));
     startTransition(async () => {
       await deleteSchemaAction(fd);
       router.push(`/${serialSlug}`);
     });
   }
 
-  if (isEditing) {
+  if (!isEditing) {
     return (
+      <Box col flex={1} className="gap-2">
+        <Text variant="h1">{committedName}</Text>
+        {committedBody && (
+          <div className="prose prose-gray max-w-none text-gray-700">
+            <ReactMarkdown>{committedBody}</ReactMarkdown>
+          </div>
+        )}
+      </Box>
+    );
+  }
+
+  return (
+    <>
       <Box col className="gap-4">
         <Box col className="gap-1.5">
-          <Label htmlFor="schema-name">Name</Label>
+          <Label htmlFor="schema-name">Page Category Name</Label>
           <Input
             id="schema-name"
             value={draftName}
@@ -115,49 +134,15 @@ export function SchemaIndexEditor({
           />
         </Box>
         <Box col className="gap-1.5">
-          <Label htmlFor="schema-body">Description (markdown)</Label>
-          <textarea
-            id="schema-body"
+          <Label htmlFor="schema-body">Description</Label>
+          <MDEditor
             value={draftBody}
-            onChange={(e) => setDraftBody(e.target.value)}
-            disabled={isPending}
-            rows={8}
-            placeholder="Optional description in markdown…"
-            className="w-full resize-y rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+            onChange={(v) => setDraftBody(v ?? "")}
+            preview="edit"
+            data-color-mode="light"
           />
         </Box>
-        <Box className="gap-2">
-          <Button onClick={handleSave} disabled={isPending || draftName.trim() === ''}>
-            Save
-          </Button>
-          <Button variant="outline" onClick={handleCancel} disabled={isPending}>
-            Cancel
-          </Button>
-        </Box>
-      </Box>
-    );
-  }
-
-  return (
-    <>
-      <Box className="items-start gap-2">
-        <Box col flex={1} className="gap-2">
-          <Text variant="h1">{committedName}</Text>
-          {committedBody && (
-            <div className="prose prose-gray max-w-none text-gray-700">
-              <ReactMarkdown>{committedBody}</ReactMarkdown>
-            </div>
-          )}
-        </Box>
-        <Box className="items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggle}
-            title="Edit schema"
-          >
-            <FontAwesomeIcon icon={faPen} />
-          </Button>
+        <Box className="justify-end">
           <Button
             variant="ghost"
             size="icon"
@@ -185,13 +170,15 @@ export function SchemaIndexEditor({
           </DialogDescription>
         </DialogBody>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>
+            Cancel
+          </DialogClose>
           <Button
             variant="destructive"
             disabled={isPending}
             onClick={handleDelete}
           >
-            {isPending ? 'Deleting…' : 'Delete'}
+            {isPending ? "Deleting…" : "Delete"}
           </Button>
         </DialogFooter>
       </Dialog>

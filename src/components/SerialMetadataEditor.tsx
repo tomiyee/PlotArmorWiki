@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useServerAction } from '@/hooks/useServerAction';
+import { useEditMode } from '@/contexts/EditModeContext';
 
 interface SerialMetadataEditorProps {
   title: string;
@@ -20,8 +21,9 @@ interface SerialMetadataEditorProps {
 
 /**
  * Displays the serial's title, authors, description, and splash art in read
- * mode with a pen-icon toggle that swaps to an inline edit form. Submitting
- * the form calls `updateMetadataAction`, which may redirect if the slug changes.
+ * mode. Switches to an inline edit form when the global edit mode is active.
+ * Registers save/discard handlers with `EditModeContext` so the `<EditModeFAB>`
+ * can trigger them.
  *
  * @example
  * <SerialMetadataEditor
@@ -40,10 +42,14 @@ export function SerialMetadataEditor({
   updateMetadataAction,
 }: SerialMetadataEditorProps) {
   const { run, isPending } = useServerAction();
-  const [editing, setEditing] = useState(false);
+  const { isEditing, registerHandlers } = useEditMode();
   const [authorFields, setAuthorFields] = useState<string[]>(
     authors.length > 0 ? authors : ['']
   );
+  // Draft values for controlled form fields in edit mode.
+  const [draftTitle, setDraftTitle] = useState(title);
+  const [draftDescription, setDraftDescription] = useState(description ?? '');
+  const [draftSplashArtUrl, setDraftSplashArtUrl] = useState(splashArtUrl ?? '');
 
   function addAuthor() {
     setAuthorFields((prev) => [...prev, '']);
@@ -57,34 +63,33 @@ export function SerialMetadataEditor({
     setAuthorFields((prev) => prev.map((a, i) => (i === index ? value : a)));
   }
 
-  function handleCancel() {
-    setEditing(false);
-    // Reset author fields to the original values on cancel.
+  function handleDiscard() {
+    setDraftTitle(title);
+    setDraftDescription(description ?? '');
+    setDraftSplashArtUrl(splashArtUrl ?? '');
     setAuthorFields(authors.length > 0 ? authors : ['']);
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    run(updateMetadataAction, fd, () => setEditing(false));
+  function handleSave() {
+    const fd = new FormData();
+    fd.set('title', draftTitle.trim());
+    fd.set('description', draftDescription);
+    fd.set('splashArtUrl', draftSplashArtUrl);
+    for (const author of authorFields) {
+      fd.append('authors', author);
+    }
+    run(updateMetadataAction, fd);
   }
 
-  if (!editing) {
+  useEffect(() => {
+    return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftTitle, draftDescription, draftSplashArtUrl, authorFields]);
+
+  if (!isEditing) {
     return (
       <Box col className="gap-2">
-        <Box className="items-start justify-between gap-2">
-          <Text variant="h1">{title}</Text>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setEditing(true)}
-            title="Edit serial info"
-            className="text-gray-500 hover:text-gray-700 mt-1 shrink-0"
-          >
-            <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-          </Button>
-        </Box>
+        <Text variant="h1">{title}</Text>
         {authors.length > 0 && (
           <Text muted>{authors.join(', ')}</Text>
         )}
@@ -105,21 +110,9 @@ export function SerialMetadataEditor({
 
   return (
     <Box col className="gap-4">
-      <Box className="items-center justify-between">
-        <Text variant="h2">Edit serial info</Text>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={handleCancel}
-          title="Cancel editing"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-        >
-          <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-        </Button>
-      </Box>
+      <Text variant="h2">Edit serial info</Text>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <Box col className="gap-4">
         {/* Title */}
         <Box col className="gap-1">
           <Label htmlFor="meta-title">
@@ -129,7 +122,8 @@ export function SerialMetadataEditor({
             id="meta-title"
             name="title"
             required
-            defaultValue={title}
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
             placeholder="e.g. One Piece"
           />
         </Box>
@@ -141,7 +135,8 @@ export function SerialMetadataEditor({
             id="meta-description"
             name="description"
             rows={4}
-            defaultValue={description ?? ''}
+            value={draftDescription}
+            onChange={(e) => setDraftDescription(e.target.value)}
             placeholder="A brief spoiler-free synopsis…"
             className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black resize-none"
           />
@@ -192,20 +187,16 @@ export function SerialMetadataEditor({
             id="meta-splashArtUrl"
             name="splashArtUrl"
             type="url"
-            defaultValue={splashArtUrl ?? ''}
+            value={draftSplashArtUrl}
+            onChange={(e) => setDraftSplashArtUrl(e.target.value)}
             placeholder="https://example.com/cover.jpg"
           />
         </Box>
 
-        <Box className="gap-2 justify-end">
-          <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? 'Saving…' : 'Save changes'}
-          </Button>
-        </Box>
-      </form>
+        {isPending && (
+          <Text muted>Saving…</Text>
+        )}
+      </Box>
     </Box>
   );
 }

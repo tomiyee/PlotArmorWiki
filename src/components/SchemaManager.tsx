@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useServerAction } from "@/hooks/useServerAction";
+import { useEditMode } from "@/contexts/EditModeContext";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,9 +32,9 @@ interface SchemaManagerProps {
 // ─── Schema Manager ─────────────────────────────────────────────────────────────
 
 /**
- * Client component that lists page schemas for a serial. Provides inline add
- * and a link to each schema's index page for renaming, deletion, and section
- * management.
+ * Client component that lists page schemas for a serial. In edit mode, provides
+ * an inline add form; links to each schema's index page for renaming, deletion,
+ * and section management.
  *
  * @example
  * <SchemaManager
@@ -48,6 +49,7 @@ export function SchemaManager({
   addSchemaAction,
 }: SchemaManagerProps) {
   const { run, isPending } = useServerAction();
+  const { isEditing } = useEditMode();
   const [addingSchema, setAddingSchema] = useState(false);
   const [hasFloater, setHasFloater] = useState(false);
 
@@ -90,70 +92,72 @@ export function SchemaManager({
         </Text>
       )}
 
-      <div className="mt-2 pt-4 border-t border-gray-100">
-        {addingSchema ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              const fd = new FormData(form);
-              fd.set("hasFloater", String(hasFloater));
-              run(addSchemaAction, fd, () => {
-                form.reset();
-                setHasFloater(false);
-                setAddingSchema(false);
-              });
-            }}
-            className="flex flex-col gap-3"
-          >
-            <Box col className="gap-1 flex-1">
-              <Label htmlFor="schemaName">Page type name</Label>
-              <Input
-                id="schemaName"
-                name="name"
-                required
-                placeholder="e.g. Characters, Locations…"
-                autoFocus
-                onKeyDown={(e) => e.key === "Escape" && setAddingSchema(false)}
-              />
-            </Box>
-            <Box className="items-center gap-2">
-              <input
-                type="checkbox"
-                id="hasFloater"
-                checked={hasFloater}
-                onChange={(e) => setHasFloater(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="hasFloater">Has floater sidebar</Label>
-            </Box>
-            <Box className="gap-2">
-              <Button type="submit" disabled={isPending}>
-                Add page category
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setAddingSchema(false);
+      {isEditing && (
+        <div className="mt-2 pt-4 border-t border-gray-100">
+          {addingSchema ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const fd = new FormData(form);
+                fd.set("hasFloater", String(hasFloater));
+                run(addSchemaAction, fd, () => {
+                  form.reset();
                   setHasFloater(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </Box>
-          </form>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setAddingSchema(true)}
-          >
-            <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-            Add page category
-          </Button>
-        )}
-      </div>
+                  setAddingSchema(false);
+                });
+              }}
+              className="flex flex-col gap-3"
+            >
+              <Box col className="gap-1 flex-1">
+                <Label htmlFor="schemaName">Page type name</Label>
+                <Input
+                  id="schemaName"
+                  name="name"
+                  required
+                  placeholder="e.g. Characters, Locations…"
+                  autoFocus
+                  onKeyDown={(e) => e.key === "Escape" && setAddingSchema(false)}
+                />
+              </Box>
+              <Box className="items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="hasFloater"
+                  checked={hasFloater}
+                  onChange={(e) => setHasFloater(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="hasFloater">Has floater sidebar</Label>
+              </Box>
+              <Box className="gap-2">
+                <Button type="submit" disabled={isPending}>
+                  Add page category
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setAddingSchema(false);
+                    setHasFloater(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            </form>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAddingSchema(true)}
+            >
+              <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+              Add page category
+            </Button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
