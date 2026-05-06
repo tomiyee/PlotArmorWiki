@@ -7,6 +7,7 @@ import { faPen } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Props {
   serialSlug: string;
@@ -86,14 +87,16 @@ export function ChapterSynopsisEditor({
           <Text muted>No synopsis written yet.</Text>
         )}
       </Box>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsEditing(true)}
-        title="Edit synopsis"
-      >
-        <FontAwesomeIcon icon={faPen} />
-      </Button>
+      <Tooltip content="Edit synopsis" side="left">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsEditing(true)}
+          aria-label="Edit synopsis"
+        >
+          <FontAwesomeIcon icon={faPen} />
+        </Button>
+      </Tooltip>
     </Box>
   );
 }

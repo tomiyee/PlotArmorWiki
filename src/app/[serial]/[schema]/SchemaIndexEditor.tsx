@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { MDEditor } from "@/components/MDEditor";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Props {
   schemaId: number;
@@ -143,15 +144,17 @@ export function SchemaIndexEditor({
           />
         </Box>
         <Box className="justify-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setConfirmingDelete(true)}
-            title="Delete schema"
-            className="text-red-500 hover:text-red-600"
-          >
-            <FontAwesomeIcon icon={faTrash} />
-          </Button>
+          <Tooltip content="Delete page category" side="left">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirmingDelete(true)}
+              aria-label="Delete page category"
+              className="text-red-500 hover:text-red-600"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          </Tooltip>
         </Box>
       </Box>
 

@@ -11,6 +11,7 @@ import { Menu, MenuItem } from "@/components/ui/menu";
 import { ChevronDownIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChapterData, Volume } from "@/types";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Props {
   serialId: number;
@@ -124,15 +125,17 @@ export function ChapterSelector(props: Props) {
             <Text variant="label" className="flex-1 text-amber-800">
               Set your chapter to avoid spoilers.
             </Text>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setCalloutDismissed(true)}
-              aria-label="Dismiss"
-              className="text-amber-600 hover:bg-amber-100 hover:text-amber-800"
-            >
-              <XIcon />
-            </Button>
+            <Tooltip content="Dismiss">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setCalloutDismissed(true)}
+                aria-label="Dismiss"
+                className="text-amber-600 hover:bg-amber-100 hover:text-amber-800"
+              >
+                <XIcon />
+              </Button>
+            </Tooltip>
           </Box>
         </div>
       )}

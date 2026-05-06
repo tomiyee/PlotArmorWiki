@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useServerAction } from '@/hooks/useServerAction';
 import { useEditMode } from '@/contexts/EditModeContext';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface SerialMetadataEditorProps {
   title: string;
@@ -155,15 +156,17 @@ export function SerialMetadataEditor({
                 className="flex-1"
               />
               {authorFields.length > 1 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => removeAuthor(i)}
-                  title="Remove author"
-                >
-                  <FontAwesomeIcon icon={faXmark} className="h-3 w-3" />
-                </Button>
+                <Tooltip content="Remove author">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeAuthor(i)}
+                    aria-label="Remove author"
+                  >
+                    <FontAwesomeIcon icon={faXmark} className="h-3 w-3" />
+                  </Button>
+                </Tooltip>
               )}
             </Box>
           ))}

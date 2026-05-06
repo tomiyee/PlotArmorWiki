@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogBody,
 } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Props {
   /** Pre-rendered <SerialTOC> to display inside the drawer. */
@@ -28,15 +29,17 @@ export function SerialTOCDrawer({ tocContent }: Props) {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Open table of contents"
-        onClick={() => setOpen(true)}
-        className="md:hidden"
-      >
-        <TableOfContentsIcon />
-      </Button>
+      <Tooltip content="Table of contents" side="bottom">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Open table of contents"
+          onClick={() => setOpen(true)}
+          className="md:hidden"
+        >
+          <TableOfContentsIcon />
+        </Button>
+      </Tooltip>
 
       <Dialog isOpen={open} onClose={() => setOpen(false)}>
         <DialogHeader>
