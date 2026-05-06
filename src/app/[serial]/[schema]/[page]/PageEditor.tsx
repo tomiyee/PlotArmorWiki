@@ -235,18 +235,16 @@ export function PageEditor({
           </aside>
         )}
 
-        <Box col className="gap-6">
-          {sections.map((section) => (
-            <Box key={section.id} col className="gap-2">
-              <Text variant="h2">{section.name}</Text>
-              {section.content ? (
-                <MarkdownRenderer>{section.content}</MarkdownRenderer>
-              ) : (
-                <Text variant="faint">No content for this chapter yet.</Text>
-              )}
-            </Box>
-          ))}
-        </Box>
+        {sections.map((section) => (
+          <div key={section.id} className="mb-6 last:mb-0">
+            <Text variant="h2" className="mb-2">{section.name}</Text>
+            {section.content ? (
+              <MarkdownRenderer>{section.content}</MarkdownRenderer>
+            ) : (
+              <Text variant="faint">No content for this chapter yet.</Text>
+            )}
+          </div>
+        ))}
       </div>
     );
   }

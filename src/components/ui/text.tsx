@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export type TextVariant = "h1" | "h2" | "h3" | "h4" | "body" | "label";
+export type TextVariant = "h1" | "h2" | "h3" | "h4" | "body" | "faint" | "label";
 
 const variantStyles: Record<TextVariant, string> = {
   h1: "text-3xl font-bold",
@@ -9,6 +9,7 @@ const variantStyles: Record<TextVariant, string> = {
   h3: "text-lg font-semibold",
   h4: "text-base font-semibold",
   body: "text-base text-gray-700",
+  faint: "text-base text-gray-400",
   label: "text-sm font-medium",
 };
 
@@ -18,6 +19,7 @@ const variantElement: Record<TextVariant, React.ElementType> = {
   h3: "h3",
   h4: "h4",
   body: "p",
+  faint: "p",
   label: "span",
 };
 
