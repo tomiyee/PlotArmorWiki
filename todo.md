@@ -47,17 +47,7 @@ Adding chapters one at a time is tedious for a series with many entries. A bulk-
 
 ---
 
-## Step 5 — Consolidated floating edit mode
-
-Edit controls are currently scattered across every component. A single global edit-mode toggle gives a cleaner reading experience and a consistent editing workflow.
-
-- Create `src/contexts/EditModeContext.tsx` exporting `EditModeProvider` and `useEditMode()`. State: `{ isEditing: boolean; toggle(): void; registerHandlers(onSave, onDiscard): void }`. Each editable page registers its save/discard callbacks on mount and deregisters on unmount.
-- Create `src/components/EditModeFAB.tsx` — a fixed bottom-right floating button:
-  - **Read mode**: single pencil icon button (`<Tooltip content="Edit">`) that calls `toggle()`.
-  - **Edit mode**: two buttons — "Save" (calls registered `onSave`) and "Discard" (calls registered `onDiscard`), both labeled.
-- Wrap the root layout in `<EditModeProvider>` (`src/app/layout.tsx`). Render `<EditModeFAB>` inside the layout so it appears on every page.
-- Audit each editable component (`SerialEditor`, `SchemaManager`, `SchemaIndexEditor`, `PageEditor`, `SerialMetadataEditor`): remove their inline edit-toggle buttons; show edit controls/forms only when `useEditMode().isEditing` is `true`; wire their save/discard logic to `registerHandlers`.
-- Commit: `feat: consolidated floating edit mode FAB; remove per-component edit toggles`
+## Step 5 — ~~Consolidated floating edit mode~~
 
 ---
 
