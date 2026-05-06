@@ -8,7 +8,7 @@ import {
   chapters,
   chapterSynopses,
   pages,
-  pageSchemas,
+  pageCategories,
 } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
@@ -80,7 +80,7 @@ export default async function ChapterPage({ params }: Props) {
     .limit(1);
 
   let synopsisContent = "";
-  let groupedIntroductions: { schemaName: string; pages: { id: number; name: string }[] }[] = [];
+  let groupedIntroductions: { categoryName: string; pages: { id: number; name: string }[] }[] = [];
   let boundSaveAction: typeof saveChapterSynopsis | null = null;
 
   if (!spoilered) {
@@ -93,35 +93,35 @@ export default async function ChapterPage({ params }: Props) {
 
     synopsisContent = synopsisRow?.content ?? "";
 
-    // Fetch all pages introduced in this chapter, joined to their schema
+    // Fetch all pages introduced in this chapter, joined to their page category
     const introducedPages = await db
       .select({
         pageId: pages.id,
         pageName: pages.name,
-        schemaId: pageSchemas.id,
-        schemaName: pageSchemas.name,
+        categoryId: pageCategories.id,
+        categoryName: pageCategories.name,
       })
       .from(pages)
-      .innerJoin(pageSchemas, eq(pages.schemaId, pageSchemas.id))
+      .innerJoin(pageCategories, eq(pages.categoryId, pageCategories.id))
       .where(
         and(
-          eq(pageSchemas.serialId, serial.id),
+          eq(pageCategories.serialId, serial.id),
           eq(pages.introChapterId, chapter.id),
         ),
       )
-      .orderBy(pageSchemas.name, pages.name);
+      .orderBy(pageCategories.name, pages.name);
 
-    const bySchema = new Map<
+    const byCategory = new Map<
       number,
-      { schemaName: string; pages: { id: number; name: string }[] }
+      { categoryName: string; pages: { id: number; name: string }[] }
     >();
     for (const row of introducedPages) {
-      if (!bySchema.has(row.schemaId)) {
-        bySchema.set(row.schemaId, { schemaName: row.schemaName, pages: [] });
+      if (!byCategory.has(row.categoryId)) {
+        byCategory.set(row.categoryId, { categoryName: row.categoryName, pages: [] });
       }
-      bySchema.get(row.schemaId)!.pages.push({ id: row.pageId, name: row.pageName });
+      byCategory.get(row.categoryId)!.pages.push({ id: row.pageId, name: row.pageName });
     }
-    groupedIntroductions = Array.from(bySchema.values());
+    groupedIntroductions = Array.from(byCategory.values());
 
     boundSaveAction = saveChapterSynopsis.bind(null, serialSlug, chapterIdx);
   }
@@ -175,14 +175,14 @@ export default async function ChapterPage({ params }: Props) {
                 <Text variant="h2">Introduced in this {serial.chapterType.toLowerCase()}</Text>
                 {groupedIntroductions.length > 0 ? (
                   <Box col className="gap-4">
-                    {groupedIntroductions.map(({ schemaName, pages: schemaPages }) => (
-                      <Box col key={schemaName} className="gap-1.5">
-                        <Text variant="h4">{schemaName}</Text>
+                    {groupedIntroductions.map(({ categoryName, pages: categoryPages }) => (
+                      <Box col key={categoryName} className="gap-1.5">
+                        <Text variant="h4">{categoryName}</Text>
                         <ul className="flex flex-col gap-1">
-                          {schemaPages.map((page) => (
+                          {categoryPages.map((page) => (
                             <li key={page.id}>
                               <Link
-                                href={`/${serialSlug}/${encodeURIComponent(schemaName)}/${encodeURIComponent(page.name)}`}
+                                href={`/${serialSlug}/${encodeURIComponent(categoryName)}/${encodeURIComponent(page.name)}`}
                                 className="text-blue-600 hover:underline"
                               >
                                 {page.name}

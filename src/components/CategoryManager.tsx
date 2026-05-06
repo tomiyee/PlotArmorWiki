@@ -14,7 +14,7 @@ import { useEditMode } from "@/contexts/EditModeContext";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface Schema {
+interface Category {
   id: number;
   name: string;
   hasFloater: boolean;
@@ -23,63 +23,63 @@ interface Schema {
   floaterRows: { id: number; label: string; displayOrder: number }[];
 }
 
-interface SchemaManagerProps {
-  schemas: Schema[];
+interface CategoryManagerProps {
+  categories: Category[];
   serialSlug: string;
-  addSchemaAction: (formData: FormData) => Promise<void>;
+  addCategoryAction: (formData: FormData) => Promise<void>;
 }
 
-// ─── Schema Manager ─────────────────────────────────────────────────────────────
+// ─── Category Manager ──────────────────────────────────────────────────────────
 
 /**
- * Client component that lists page schemas for a serial. In edit mode, provides
- * an inline add form; links to each schema's index page for renaming, deletion,
- * and section management.
+ * Client component that lists page categories for a serial. In edit mode,
+ * provides an inline add form; links to each category's index page for
+ * renaming, deletion, and section management.
  *
  * @example
- * <SchemaManager
- *   schemas={schemas}
+ * <CategoryManager
+ *   categories={categories}
  *   serialSlug="one-piece"
- *   addSchemaAction={addSchemaAction}
+ *   addCategoryAction={addCategoryAction}
  * />
  */
-export function SchemaManager({
-  schemas,
+export function CategoryManager({
+  categories,
   serialSlug,
-  addSchemaAction,
-}: SchemaManagerProps) {
+  addCategoryAction,
+}: CategoryManagerProps) {
   const { run, isPending } = useServerAction();
   const { isEditing } = useEditMode();
-  const [addingSchema, setAddingSchema] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
   const [hasFloater, setHasFloater] = useState(false);
 
   return (
     <section className="flex flex-col gap-4 mt-4">
       <Text variant="h2">Page Categories</Text>
 
-      {schemas.length > 0 ? (
+      {categories.length > 0 ? (
         <Box col className="gap-3">
-          {schemas.map((schema) => (
+          {categories.map((category) => (
             <Box
-              key={schema.id}
+              key={category.id}
               className="items-center gap-2 rounded-lg border border-gray-200 p-3"
             >
               <Box className="flex-1 items-center gap-2">
                 <Text variant="h4" as="span">
-                  {schema.name}
+                  {category.name}
                 </Text>
                 <Text
                   as="span"
                   muted
                   className="rounded-full bg-gray-100 px-2 py-0.5 text-xs"
                 >
-                  {schema.pageCount}
+                  {category.pageCount}
                 </Text>
               </Box>
               <Link
-                href={`/${serialSlug}/${encodeURIComponent(schema.name)}`}
+                href={`/${serialSlug}/${encodeURIComponent(category.name)}`}
                 className="text-xs text-blue-600 hover:underline px-1"
-                title={`View ${schema.name} index page`}
+                title={`View ${category.name} index page`}
               >
                 View →
               </Link>
@@ -88,36 +88,36 @@ export function SchemaManager({
         </Box>
       ) : (
         <Text muted>
-          No page types yet. Add a page type to define wiki page categories.
+          No page categories yet. Add a page category to define wiki page types.
         </Text>
       )}
 
       {isEditing && (
         <div className="mt-2 pt-4 border-t border-gray-100">
-          {addingSchema ? (
+          {addingCategory ? (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
                 const fd = new FormData(form);
                 fd.set("hasFloater", String(hasFloater));
-                run(addSchemaAction, fd, () => {
+                run(addCategoryAction, fd, () => {
                   form.reset();
                   setHasFloater(false);
-                  setAddingSchema(false);
+                  setAddingCategory(false);
                 });
               }}
               className="flex flex-col gap-3"
             >
               <Box col className="gap-1 flex-1">
-                <Label htmlFor="schemaName">Page type name</Label>
+                <Label htmlFor="categoryName">Page category name</Label>
                 <Input
-                  id="schemaName"
+                  id="categoryName"
                   name="name"
                   required
                   placeholder="e.g. Characters, Locations…"
                   autoFocus
-                  onKeyDown={(e) => e.key === "Escape" && setAddingSchema(false)}
+                  onKeyDown={(e) => e.key === "Escape" && setAddingCategory(false)}
                 />
               </Box>
               <Box className="items-center gap-2">
@@ -138,7 +138,7 @@ export function SchemaManager({
                   type="button"
                   variant="ghost"
                   onClick={() => {
-                    setAddingSchema(false);
+                    setAddingCategory(false);
                     setHasFloater(false);
                   }}
                 >
@@ -150,7 +150,7 @@ export function SchemaManager({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setAddingSchema(true)}
+              onClick={() => setAddingCategory(true)}
             >
               <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
               Add page category

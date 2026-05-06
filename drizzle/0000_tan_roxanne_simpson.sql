@@ -1,5 +1,23 @@
 CREATE TYPE "public"."chapter_type" AS ENUM('Chapter', 'Episode', 'Issue', 'Part');--> statement-breakpoint
 CREATE TYPE "public"."volume_type" AS ENUM('Volume', 'Season', 'Arc', 'Book');--> statement-breakpoint
+CREATE TABLE "category_floater_rows" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"category_id" integer NOT NULL,
+	"label" text NOT NULL,
+	"display_order" integer NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"deleted_at" timestamp
+);
+--> statement-breakpoint
+CREATE TABLE "category_sections" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"category_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"display_order" integer NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"deleted_at" timestamp
+);
+--> statement-breakpoint
 CREATE TABLE "chapter_synopses" (
 	"chapter_id" integer PRIMARY KEY NOT NULL,
 	"content" text DEFAULT '' NOT NULL,
@@ -11,6 +29,14 @@ CREATE TABLE "chapters" (
 	"volume_id" integer NOT NULL,
 	"display_name" text NOT NULL,
 	"idx" integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "page_categories" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"serial_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"body" text,
+	"has_floater" boolean DEFAULT false NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "page_floater_row_versions" (
@@ -28,14 +54,6 @@ CREATE TABLE "page_floater_versions" (
 	CONSTRAINT "page_floater_versions_page_id_chapter_id_pk" PRIMARY KEY("page_id","chapter_id")
 );
 --> statement-breakpoint
-CREATE TABLE "page_schemas" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"serial_id" integer NOT NULL,
-	"name" text NOT NULL,
-	"body" text,
-	"has_floater" boolean DEFAULT false NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "page_section_versions" (
 	"page_id" integer NOT NULL,
 	"section_id" integer NOT NULL,
@@ -46,27 +64,9 @@ CREATE TABLE "page_section_versions" (
 --> statement-breakpoint
 CREATE TABLE "pages" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"schema_id" integer NOT NULL,
+	"category_id" integer NOT NULL,
 	"name" text NOT NULL,
 	"intro_chapter_id" integer NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "schema_floater_rows" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"schema_id" integer NOT NULL,
-	"label" text NOT NULL,
-	"display_order" integer NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"deleted_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "schema_sections" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"schema_id" integer NOT NULL,
-	"name" text NOT NULL,
-	"display_order" integer NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"deleted_at" timestamp
 );
 --> statement-breakpoint
 CREATE TABLE "serial_authors" (
@@ -110,21 +110,21 @@ CREATE TABLE "volumes" (
 	"idx" integer NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "category_floater_rows" ADD CONSTRAINT "category_floater_rows_category_id_page_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."page_categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "category_sections" ADD CONSTRAINT "category_sections_category_id_page_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."page_categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapter_synopses" ADD CONSTRAINT "chapter_synopses_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_volume_id_volumes_id_fk" FOREIGN KEY ("volume_id") REFERENCES "public"."volumes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_categories" ADD CONSTRAINT "page_categories_serial_id_serials_id_fk" FOREIGN KEY ("serial_id") REFERENCES "public"."serials"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_floater_row_id_schema_floater_rows_id_fk" FOREIGN KEY ("floater_row_id") REFERENCES "public"."schema_floater_rows"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_floater_row_id_category_floater_rows_id_fk" FOREIGN KEY ("floater_row_id") REFERENCES "public"."category_floater_rows"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_row_versions" ADD CONSTRAINT "page_floater_row_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_schemas" ADD CONSTRAINT "page_schemas_serial_id_serials_id_fk" FOREIGN KEY ("serial_id") REFERENCES "public"."serials"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_section_id_schema_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."schema_sections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_section_id_category_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."category_sections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "pages" ADD CONSTRAINT "pages_schema_id_page_schemas_id_fk" FOREIGN KEY ("schema_id") REFERENCES "public"."page_schemas"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "pages" ADD CONSTRAINT "pages_category_id_page_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."page_categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_intro_chapter_id_chapters_id_fk" FOREIGN KEY ("intro_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "schema_floater_rows" ADD CONSTRAINT "schema_floater_rows_schema_id_page_schemas_id_fk" FOREIGN KEY ("schema_id") REFERENCES "public"."page_schemas"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "schema_sections" ADD CONSTRAINT "schema_sections_schema_id_page_schemas_id_fk" FOREIGN KEY ("schema_id") REFERENCES "public"."page_schemas"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "serial_authors" ADD CONSTRAINT "serial_authors_serial_id_serials_id_fk" FOREIGN KEY ("serial_id") REFERENCES "public"."serials"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_progress" ADD CONSTRAINT "user_progress_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_progress" ADD CONSTRAINT "user_progress_serial_id_serials_id_fk" FOREIGN KEY ("serial_id") REFERENCES "public"."serials"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

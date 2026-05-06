@@ -11,7 +11,7 @@ export interface Volume {
   idx: number;
 }
 
-export interface SchemaNavData {
+export interface CategoryNavData {
   id: number;
   name: string;
 }
@@ -19,5 +19,5 @@ export interface SchemaNavData {
 export interface NavbarSerialData {
   serialSlug: string;
   serialTitle: string;
-  schemas: SchemaNavData[];
+  categories: CategoryNavData[];
 }

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/index";
-import { serials, volumes, chapters, pageSchemas } from "@/db/schema";
+import { serials, volumes, chapters, pageCategories } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
@@ -33,7 +33,7 @@ export default async function SerialLayout({ children, params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList, schemaList] = await Promise.all([
+  const [volumeList, chapterList, categoryList] = await Promise.all([
     db
       .select()
       .from(volumes)
@@ -51,9 +51,9 @@ export default async function SerialLayout({ children, params }: Props) {
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
     db
-      .select({ id: pageSchemas.id, name: pageSchemas.name })
-      .from(pageSchemas)
-      .where(eq(pageSchemas.serialId, serial.id)),
+      .select({ id: pageCategories.id, name: pageCategories.name })
+      .from(pageCategories)
+      .where(eq(pageCategories.serialId, serial.id)),
   ]);
 
   const chaptersByVolume: Partial<Record<number, ChapterData[]>> = {
@@ -63,7 +63,7 @@ export default async function SerialLayout({ children, params }: Props) {
   const serialNavData: NavbarSerialData = {
     serialSlug,
     serialTitle: serial.title,
-    schemas: schemaList,
+    categories: categoryList,
   };
 
   const tocContent = (

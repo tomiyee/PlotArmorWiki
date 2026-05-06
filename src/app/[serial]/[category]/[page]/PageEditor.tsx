@@ -34,10 +34,10 @@ interface ChapterData {
 
 interface Props {
   serialSlug: string;
-  schemaName: string;
+  categoryName: string;
   pageName: string;
   sections: SectionData[];
-  /** null when the schema has no floater */
+  /** null when the category has no floater */
   floaterImageUrl: string | null | undefined;
   floaterRows: FloaterRowData[];
   /** All chapters for this serial, used to populate the "Writing as of:" selector. */
@@ -74,7 +74,7 @@ interface Props {
  * @example
  * <PageEditor
  *   serialSlug="one-piece"
- *   schemaName="Characters"
+ *   categoryName="Characters"
  *   pageName="Luffy"
  *   sections={[{ id: 1, name: 'Overview', content: '...' }]}
  *   floaterImageUrl="https://..."
@@ -86,7 +86,7 @@ interface Props {
  */
 export function PageEditor({
   serialSlug,
-  schemaName,
+  categoryName,
   pageName,
   sections,
   floaterImageUrl,
@@ -144,7 +144,7 @@ export function PageEditor({
     startTransition(async () => {
       await savePageContent(
         serialSlug,
-        schemaName,
+        categoryName,
         pageName,
         draftSectionContent,
         hasFloater ? draftFloaterImageUrl.trim() || null : null,
@@ -155,7 +155,7 @@ export function PageEditor({
     });
   }, [
     serialSlug,
-    schemaName,
+    categoryName,
     pageName,
     draftSectionContent,
     hasFloater,
@@ -179,7 +179,7 @@ export function PageEditor({
     startTransition(async () => {
       const data = await getPageContentAtChapter(
         serialSlug,
-        schemaName,
+        categoryName,
         pageName,
         chapterId,
       );

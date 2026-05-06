@@ -4,13 +4,13 @@ import Link from "next/link";
 import { db } from "@/db/index";
 import {
   serials,
-  pageSchemas,
+  pageCategories,
   pages,
   chapters,
   volumes,
-  schemaSections,
+  categorySections,
   pageSectionVersions,
-  schemaFloaterRows,
+  categoryFloaterRows,
   pageFloaterVersions,
   pageFloaterRowVersions,
 } from "@/db/schema";
@@ -21,7 +21,7 @@ import { PageContainer } from "@/components/ui/page-container";
 import { PageEditor } from "./PageEditor";
 
 interface Props {
-  params: Promise<{ serial: string; schema: string; page: string }>;
+  params: Promise<{ serial: string; category: string; page: string }>;
 }
 
 /**
@@ -59,11 +59,11 @@ async function getChapterCutoff(
 export default async function PageView({ params }: Props) {
   const {
     serial: serialSlug,
-    schema: schemaSlug,
+    category: categorySlug,
     page: pageSlug,
   } = await params;
 
-  const schemaName = decodeURIComponent(schemaSlug);
+  const categoryName = decodeURIComponent(categorySlug);
   const pageName = decodeURIComponent(pageSlug);
 
   const [serial] = await db
@@ -76,14 +76,14 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [[schema], chapterCutoff, volumeList, chapterList] = await Promise.all([
+  const [[category], chapterCutoff, volumeList, chapterList] = await Promise.all([
     db
       .select()
-      .from(pageSchemas)
+      .from(pageCategories)
       .where(
         and(
-          eq(pageSchemas.serialId, serial.id),
-          eq(pageSchemas.name, schemaName),
+          eq(pageCategories.serialId, serial.id),
+          eq(pageCategories.name, categoryName),
         ),
       )
       .limit(1),
@@ -107,7 +107,7 @@ export default async function PageView({ params }: Props) {
   ]);
   const { cutoffIdx, readingChapterId } = chapterCutoff;
 
-  if (!schema) {
+  if (!category) {
     notFound();
   }
 
@@ -127,7 +127,7 @@ export default async function PageView({ params }: Props) {
   const [page] = await db
     .select()
     .from(pages)
-    .where(and(eq(pages.schemaId, schema.id), eq(pages.name, pageName)))
+    .where(and(eq(pages.categoryId, category.id), eq(pages.name, pageName)))
     .limit(1);
 
   if (!page) {
@@ -151,14 +151,14 @@ export default async function PageView({ params }: Props) {
               </Link>
               {" / "}
               <Link
-                href={`/${serialSlug}/${encodeURIComponent(schemaName)}`}
+                href={`/${serialSlug}/${encodeURIComponent(categoryName)}`}
                 className="hover:underline"
               >
-                {schemaName}
+                {categoryName}
               </Link>
             </Text>
             <Text variant="body">
-              This {schema.name} is introduced in {serial.chapterType}{" "}
+              This {category.name} is introduced in {serial.chapterType}{" "}
               {introChapter.displayName}. This page is hidden to prevent
               spoilers.
             </Text>
@@ -186,15 +186,15 @@ export default async function PageView({ params }: Props) {
 
   const [activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ id: schemaSections.id, name: schemaSections.name })
-      .from(schemaSections)
+      .select({ id: categorySections.id, name: categorySections.name })
+      .from(categorySections)
       .where(
         and(
-          eq(schemaSections.schemaId, schema.id),
-          isNull(schemaSections.deletedAt),
+          eq(categorySections.categoryId, category.id),
+          isNull(categorySections.deletedAt),
         ),
       )
-      .orderBy(asc(schemaSections.displayOrder)),
+      .orderBy(asc(categorySections.displayOrder)),
     db
       .select({
         sectionId: pageSectionVersions.sectionId,
@@ -222,11 +222,11 @@ export default async function PageView({ params }: Props) {
     content: contentBySectionId.get(s.id) ?? "",
   }));
 
-  // ── Floater data (only when schema.hasFloater) ────────────────────────────
+  // ── Floater data (only when category.hasFloater) ───────────────────────────
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
 
-  if (schema.hasFloater) {
+  if (category.hasFloater) {
     const floaterMaxIdxSq = db
       .select({ maxIdx: max(chapters.idx).as("max_idx") })
       .from(pageFloaterVersions)
@@ -265,15 +265,15 @@ export default async function PageView({ params }: Props) {
           .where(eq(pageFloaterVersions.pageId, page.id))
           .limit(1),
         db
-          .select({ id: schemaFloaterRows.id, label: schemaFloaterRows.label })
-          .from(schemaFloaterRows)
+          .select({ id: categoryFloaterRows.id, label: categoryFloaterRows.label })
+          .from(categoryFloaterRows)
           .where(
             and(
-              eq(schemaFloaterRows.schemaId, schema.id),
-              isNull(schemaFloaterRows.deletedAt),
+              eq(categoryFloaterRows.categoryId, category.id),
+              isNull(categoryFloaterRows.deletedAt),
             ),
           )
-          .orderBy(asc(schemaFloaterRows.displayOrder)),
+          .orderBy(asc(categoryFloaterRows.displayOrder)),
         db
           .select({
             floaterRowId: pageFloaterRowVersions.floaterRowId,
@@ -320,10 +320,10 @@ export default async function PageView({ params }: Props) {
             </Link>
             {" / "}
             <Link
-              href={`/${serialSlug}/${encodeURIComponent(schemaName)}`}
+              href={`/${serialSlug}/${encodeURIComponent(categoryName)}`}
               className="hover:underline"
             >
-              {schemaName}
+              {categoryName}
             </Link>
           </Text>
 
@@ -338,7 +338,7 @@ export default async function PageView({ params }: Props) {
 
           <PageEditor
             serialSlug={serialSlug}
-            schemaName={schemaName}
+            categoryName={categoryName}
             pageName={pageName}
             sections={sections}
             floaterImageUrl={floaterImageUrl}

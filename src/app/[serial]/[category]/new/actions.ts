@@ -2,21 +2,21 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, pageSchemas, pages } from '@/db/schema';
+import { serials, pageCategories, pages } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 /**
- * Creates a new wiki page within the given schema, then redirects to the page's
- * URL. Validates that the serial and schema exist before inserting.
+ * Creates a new wiki page within the given page category, then redirects to the
+ * page's URL. Validates that the serial and category exist before inserting.
  *
  * @example
  * // In a Server Component:
- * const createPageForSchema = createPage.bind(null, serialSlug, schemaName);
- * <form action={createPageForSchema}>…</form>
+ * const createPageForCategory = createPage.bind(null, serialSlug, categoryName);
+ * <form action={createPageForCategory}>…</form>
  */
 export async function createPage(
   serialSlug: string,
-  schemaName: string,
+  categoryName: string,
   formData: FormData,
 ) {
   const name = formData.get('name');
@@ -39,20 +39,20 @@ export async function createPage(
     .limit(1);
   if (!serial) throw new Error('Serial not found');
 
-  const [schema] = await db
-    .select({ id: pageSchemas.id })
-    .from(pageSchemas)
-    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
+  const [category] = await db
+    .select({ id: pageCategories.id })
+    .from(pageCategories)
+    .where(and(eq(pageCategories.serialId, serial.id), eq(pageCategories.name, categoryName)))
     .limit(1);
-  if (!schema) throw new Error('Schema not found');
+  if (!category) throw new Error('Category not found');
 
   await db.insert(pages).values({
-    schemaId: schema.id,
+    categoryId: category.id,
     name: name.trim(),
     introChapterId,
   });
 
   redirect(
-    `/${serialSlug}/${encodeURIComponent(schemaName)}/${encodeURIComponent(name.trim())}`,
+    `/${serialSlug}/${encodeURIComponent(categoryName)}/${encodeURIComponent(name.trim())}`,
   );
 }
