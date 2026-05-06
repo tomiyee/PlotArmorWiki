@@ -54,7 +54,7 @@ export function SerialTOC({
 
   if (visibleVolumes.length === 0) {
     return (
-      <Text variant="faint" className="text-sm">
+      <Text muted className="text-sm">
         No {chapterType.toLowerCase()}s yet — add your first one below.
       </Text>
     );

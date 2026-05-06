@@ -2,12 +2,25 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { db } from "@/db/index";
-import { serials, pageSchemas, schemaSections, schemaFloaterRows, pages, chapters } from "@/db/schema";
+import {
+  serials,
+  pageSchemas,
+  schemaSections,
+  schemaFloaterRows,
+  pages,
+  chapters,
+} from "@/db/schema";
 import { and, eq, isNull, lte } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardAction, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardAction,
+  CardContent,
+} from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { PageContainer } from "@/components/ui/page-container";
@@ -191,7 +204,7 @@ export default async function SchemaIndexPage({ params }: Props) {
                   ))}
                 </ul>
               ) : (
-                <Text variant="faint">
+                <Text muted>
                   No pages yet —{" "}
                   <Link
                     href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
