@@ -1,7 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useEffect, useState, useTransition } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { Text } from "@/components/ui/text";
@@ -11,10 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { savePageContent, getPageContentAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
-
-// MDEditor uses browser-only APIs; dynamic import with ssr:false prevents
-// hydration mismatches in Next.js App Router.
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+import { MDEditor } from "@/components/MDEditor";
 
 interface SectionData {
   id: number;
@@ -129,7 +126,7 @@ export function PageEditor({
 
   const hasFloater = floaterImageUrl !== undefined;
 
-  function handleDiscard() {
+  const handleDiscard = useCallback(() => {
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
@@ -141,9 +138,9 @@ export function PageEditor({
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }
+  }, [sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
 
-  function handleSave() {
+  const handleSave = useCallback(() => {
     startTransition(async () => {
       await savePageContent(
         serialSlug,
@@ -156,12 +153,21 @@ export function PageEditor({
       );
       router.refresh();
     });
-  }
+  }, [
+    serialSlug,
+    schemaName,
+    pageName,
+    draftSectionContent,
+    hasFloater,
+    draftFloaterImageUrl,
+    draftFloaterRowContent,
+    selectedChapterId,
+    router,
+  ]);
 
   useEffect(() => {
     return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftSectionContent, draftFloaterImageUrl, draftFloaterRowContent, selectedChapterId]);
+  }, [registerHandlers, handleSave, handleDiscard]);
 
   /**
    * When the editor picks a different target chapter, fetch the content that
@@ -225,10 +231,12 @@ export function PageEditor({
         {hasFloaterContent && (
           <aside className="sticky top-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
             {floaterImageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={floaterImageUrl}
                 alt="Floater image"
+                width={280}
+                height={280}
+                unoptimized
                 className="w-full rounded object-cover"
               />
             )}

@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -21,8 +20,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { useEditMode } from "@/contexts/EditModeContext";
-
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+import { MDEditor } from "@/components/MDEditor";
 
 interface Props {
   schemaId: number;
