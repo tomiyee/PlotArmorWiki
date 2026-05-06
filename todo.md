@@ -51,14 +51,7 @@ After Step 3, editors can write at any chapter, but have no way to see what data
 
 ---
 
-## Step 8 — Text wraps around the floater sidebar
-
-The current two-column grid layout for the wiki page body and floater sidebar places them in separate, rigid columns. Wrapping text around the floater creates a more natural reading layout.
-
-- In `src/app/[serial]/[schema]/[page]/PageEditor.tsx`: replace the two-column CSS grid with a single-column prose container where the floater uses `float: right` with appropriate margin (`mr-0 ml-4 mb-4`) and a fixed width (e.g. `w-72`).
-- The floater renders before the first section so text from all sections flows around it.
-- On mobile (`sm`), remove the float and stack the floater above the content: `float-none w-full`.
-- Commit: `feat: prose wraps around floater sidebar instead of rigid two-column layout`
+## Step 8 — ~~Text wraps around the floater sidebar~~
 
 ---
 
