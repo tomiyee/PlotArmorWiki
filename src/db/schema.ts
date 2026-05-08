@@ -154,6 +154,20 @@ export const pageFloaterRowVersions = pgTable(
   (t) => [primaryKey({ columns: [t.pageId, t.floaterRowId, t.chapterId] })],
 );
 
+export const pageSummaries = pgTable(
+  'page_summaries',
+  {
+    pageId: integer('page_id')
+      .notNull()
+      .references(() => pages.id),
+    chapterId: integer('chapter_id')
+      .notNull()
+      .references(() => chapters.id),
+    content: text('content').notNull().default(''),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
+);
+
 export const chapterSynopses = pgTable('chapter_synopses', {
   chapterId: integer('chapter_id')
     .primaryKey()

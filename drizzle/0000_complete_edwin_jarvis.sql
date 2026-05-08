@@ -62,6 +62,13 @@ CREATE TABLE "page_section_versions" (
 	CONSTRAINT "page_section_versions_page_id_section_id_chapter_id_pk" PRIMARY KEY("page_id","section_id","chapter_id")
 );
 --> statement-breakpoint
+CREATE TABLE "page_summaries" (
+	"page_id" integer NOT NULL,
+	"chapter_id" integer NOT NULL,
+	"content" text DEFAULT '' NOT NULL,
+	CONSTRAINT "page_summaries_page_id_chapter_id_pk" PRIMARY KEY("page_id","chapter_id")
+);
+--> statement-breakpoint
 CREATE TABLE "pages" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"category_id" integer NOT NULL,
@@ -123,6 +130,8 @@ ALTER TABLE "page_floater_versions" ADD CONSTRAINT "page_floater_versions_chapte
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_section_id_category_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."category_sections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "page_section_versions" ADD CONSTRAINT "page_section_versions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_summaries" ADD CONSTRAINT "page_summaries_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_summaries" ADD CONSTRAINT "page_summaries_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_category_id_page_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."page_categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_intro_chapter_id_chapters_id_fk" FOREIGN KEY ("intro_chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "serial_authors" ADD CONSTRAINT "serial_authors_serial_id_serials_id_fk" FOREIGN KEY ("serial_id") REFERENCES "public"."serials"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

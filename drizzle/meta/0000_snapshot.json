@@ -1,5 +1,5 @@
 {
-  "id": "633b19b4-9642-4208-8196-e62667159949",
+  "id": "6718dc3b-6b02-40c3-a54b-c43e25af6a95",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -519,6 +519,73 @@
           "columns": [
             "page_id",
             "section_id",
+            "chapter_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.page_summaries": {
+      "name": "page_summaries",
+      "schema": "",
+      "columns": {
+        "page_id": {
+          "name": "page_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chapter_id": {
+          "name": "chapter_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "page_summaries_page_id_pages_id_fk": {
+          "name": "page_summaries_page_id_pages_id_fk",
+          "tableFrom": "page_summaries",
+          "tableTo": "pages",
+          "columnsFrom": [
+            "page_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "page_summaries_chapter_id_chapters_id_fk": {
+          "name": "page_summaries_chapter_id_chapters_id_fk",
+          "tableFrom": "page_summaries",
+          "tableTo": "chapters",
+          "columnsFrom": [
+            "chapter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "page_summaries_page_id_chapter_id_pk": {
+          "name": "page_summaries_page_id_chapter_id_pk",
+          "columns": [
+            "page_id",
             "chapter_id"
           ]
         }
