@@ -7,9 +7,8 @@ import {
   pageCategories,
   pages,
   chapters,
-  categorySections,
   categoryFloaterRows,
-  pageSectionVersions,
+  pageSummaries,
   pageFloaterVersions,
   pageFloaterRowVersions,
 } from "@/db/schema";
@@ -115,56 +114,29 @@ export async function getWikiLinkPreview(
     };
   }
 
-  // Fetch first section content at the user's cutoff
-  const firstSection = await db
-    .select({ id: categorySections.id })
-    .from(categorySections)
+  // Fetch summary content at the user's cutoff — summary is always the first
+  // thing shown in the hover card preview.
+  const summaryMaxIdxSq = db
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageSummaries)
+    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
     .where(
       and(
-        eq(categorySections.categoryId, category.id),
-        isNull(categorySections.deletedAt),
+        eq(pageSummaries.pageId, page.id),
+        lte(chapters.idx, cutoffIdx),
       ),
     )
-    .orderBy(asc(categorySections.displayOrder))
+    .as("summary_max_idx_sq");
+
+  const [summaryVersion] = await db
+    .select({ content: pageSummaries.content })
+    .from(pageSummaries)
+    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+    .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
+    .where(eq(pageSummaries.pageId, page.id))
     .limit(1);
 
-  let firstSectionContent = "";
-  if (firstSection.length > 0) {
-    const sectionId = firstSection[0].id;
-
-    const sectionMaxIdxSq = db
-      .select({
-        sectionId: pageSectionVersions.sectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageSectionVersions)
-      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageSectionVersions.pageId, page.id),
-          eq(pageSectionVersions.sectionId, sectionId),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageSectionVersions.sectionId)
-      .as("section_max_idx_sq");
-
-    const [sectionVersion] = await db
-      .select({ content: pageSectionVersions.content })
-      .from(pageSectionVersions)
-      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
-      .innerJoin(
-        sectionMaxIdxSq,
-        and(
-          eq(pageSectionVersions.sectionId, sectionMaxIdxSq.sectionId),
-          eq(chapters.idx, sectionMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageSectionVersions.pageId, page.id))
-      .limit(1);
-
-    firstSectionContent = sectionVersion?.content ?? "";
-  }
+  const firstSectionContent = summaryVersion?.content ?? "";
 
   // Fetch floater data if the category has one
   let floaterImageUrl: string | null = null;

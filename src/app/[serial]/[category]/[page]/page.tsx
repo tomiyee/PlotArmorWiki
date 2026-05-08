@@ -10,6 +10,7 @@ import {
   volumes,
   categorySections,
   pageSectionVersions,
+  pageSummaries,
   categoryFloaterRows,
   pageFloaterVersions,
   pageFloaterRowVersions,
@@ -179,6 +180,19 @@ export default async function PageView({ params }: Props) {
     );
   }
 
+  // ── Summary content (chapter-versioned, always present) ───────────────────
+  const summaryMaxIdxSq = db
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageSummaries)
+    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+    .where(
+      and(
+        eq(pageSummaries.pageId, page.id),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .as("summary_max_idx_sq");
+
   const sectionMaxIdxSq = db
     .select({
       sectionId: pageSectionVersions.sectionId,
@@ -195,7 +209,14 @@ export default async function PageView({ params }: Props) {
     .groupBy(pageSectionVersions.sectionId)
     .as("section_max_idx_sq");
 
-  const [activeSections, sectionVersions] = await Promise.all([
+  const [summaryVersions, activeSections, sectionVersions] = await Promise.all([
+    db
+      .select({ content: pageSummaries.content })
+      .from(pageSummaries)
+      .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+      .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
+      .where(eq(pageSummaries.pageId, page.id))
+      .limit(1),
     db
       .select({ id: categorySections.id, name: categorySections.name })
       .from(categorySections)
@@ -223,6 +244,7 @@ export default async function PageView({ params }: Props) {
       .where(eq(pageSectionVersions.pageId, page.id)),
   ]);
 
+  const summaryContent = summaryVersions[0]?.content ?? "";
   const contentBySectionId = new Map(
     sectionVersions.map((v) => [v.sectionId, v.content]),
   );
@@ -351,6 +373,7 @@ export default async function PageView({ params }: Props) {
             serialSlug={serialSlug}
             categoryName={categoryName}
             pageName={pageName}
+            summaryContent={summaryContent}
             sections={sections}
             floaterImageUrl={floaterImageUrl}
             floaterRows={floaterRows}
