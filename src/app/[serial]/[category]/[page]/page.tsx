@@ -124,6 +124,17 @@ export default async function PageView({ params }: Props) {
   // Head chapter is the one with the highest idx (last in the ordered list).
   const headChapterId = chapterList.at(-1)?.id ?? null;
 
+  // Wiki pages visible to the reader at their current chapter cutoff.
+  // Chapter-cutoff filter mirrors the category index page so users can only
+  // autocomplete to pages they can already see — no accidental spoiler leaks.
+  const wikiPages = await db
+    .select({ category: pageCategories.name, name: pages.name })
+    .from(pages)
+    .innerJoin(pageCategories, eq(pages.categoryId, pageCategories.id))
+    .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(and(eq(pageCategories.serialId, serial.id), lte(chapters.idx, cutoffIdx)))
+    .orderBy(asc(pageCategories.name), asc(pages.name));
+
   const [page] = await db
     .select()
     .from(pages)
@@ -346,6 +357,7 @@ export default async function PageView({ params }: Props) {
             allChapters={allChapters}
             headChapterId={headChapterId}
             readingChapterId={readingChapterId}
+            wikiPages={wikiPages}
           />
         </Box>
       </PageContainer>
