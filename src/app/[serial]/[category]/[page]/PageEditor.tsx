@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { savePageContent, getPageContentAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
-import { MDEditor } from "@/components/MDEditor";
+import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 
 interface SectionData {
   id: number;
@@ -51,6 +51,9 @@ interface Props {
    * just read. Falls back to headChapterId when null (no cookie present).
    */
   readingChapterId: number | null;
+  /** Wiki pages visible to the reader at their chapter cutoff, used to power
+   * the `[[Category:Page]]` autocomplete in edit mode. */
+  wikiPages: { category: string; name: string }[];
 }
 
 /**
@@ -82,6 +85,7 @@ interface Props {
  *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
  *   headChapterId={5}
  *   readingChapterId={3}
+ *   wikiPages={[{ category: 'Characters', name: 'Luffy' }]}
  * />
  */
 export function PageEditor({
@@ -94,6 +98,7 @@ export function PageEditor({
   allChapters,
   headChapterId,
   readingChapterId,
+  wikiPages,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -241,7 +246,7 @@ export function PageEditor({
               {section.name}
             </Text>
             {section.content ? (
-              <MarkdownRenderer>{section.content}</MarkdownRenderer>
+              <MarkdownRenderer serialSlug={serialSlug}>{section.content}</MarkdownRenderer>
             ) : (
               <Text muted>No content for this chapter yet.</Text>
             )}
@@ -302,7 +307,7 @@ export function PageEditor({
                 Current value
               </Text>
               {currentSectionContent[section.id] ? (
-                <MarkdownRenderer sm>
+                <MarkdownRenderer serialSlug={serialSlug}>
                   {currentSectionContent[section.id]}
                 </MarkdownRenderer>
               ) : (
@@ -312,19 +317,19 @@ export function PageEditor({
               )}
             </div>
             {/* Right: markdown editor for the new draft */}
-            <div data-color-mode="light">
-              <MDEditor
-                value={draftSectionContent[section.id] ?? ""}
-                onChange={(val) =>
-                  setDraftSectionContent((prev) => ({
-                    ...prev,
-                    [section.id]: val ?? "",
-                  }))
-                }
-                height={300}
-                preview="edit"
-              />
-            </div>
+            <WikiLinkMDEditor
+              value={draftSectionContent[section.id] ?? ""}
+              onChange={(val) =>
+                setDraftSectionContent((prev) => ({
+                  ...prev,
+                  [section.id]: val ?? "",
+                }))
+              }
+              height={300}
+              preview="edit"
+              wikiPages={wikiPages}
+              serialSlug={serialSlug}
+            />
           </div>
         </Box>
       ))}
