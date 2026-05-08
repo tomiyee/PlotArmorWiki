@@ -8,7 +8,9 @@ import {
   pages,
   chapters,
   categoryFloaterRows,
+  categorySections,
   pageSummaries,
+  pageSectionVersions,
   pageFloaterVersions,
   pageFloaterRowVersions,
 } from "@/db/schema";
@@ -136,7 +138,52 @@ export async function getWikiLinkPreview(
     .where(eq(pageSummaries.pageId, page.id))
     .limit(1);
 
-  const firstSectionContent = summaryVersion?.content ?? "";
+  let firstSectionContent = summaryVersion?.content ?? "";
+
+  // Fall back to the first section if there is no summary yet
+  if (!firstSectionContent) {
+    const sectionMaxIdxSq = db
+      .select({
+        sectionId: pageSectionVersions.sectionId,
+        maxIdx: max(chapters.idx).as("max_idx"),
+      })
+      .from(pageSectionVersions)
+      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+      .where(
+        and(
+          eq(pageSectionVersions.pageId, page.id),
+          lte(chapters.idx, cutoffIdx),
+        ),
+      )
+      .groupBy(pageSectionVersions.sectionId)
+      .as("section_max_idx_sq");
+
+    const [firstSection] = await db
+      .select({ content: pageSectionVersions.content })
+      .from(pageSectionVersions)
+      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+      .innerJoin(
+        categorySections,
+        eq(pageSectionVersions.sectionId, categorySections.id),
+      )
+      .innerJoin(
+        sectionMaxIdxSq,
+        and(
+          eq(pageSectionVersions.sectionId, sectionMaxIdxSq.sectionId),
+          eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+        ),
+      )
+      .where(
+        and(
+          eq(pageSectionVersions.pageId, page.id),
+          isNull(categorySections.deletedAt),
+        ),
+      )
+      .orderBy(asc(categorySections.displayOrder))
+      .limit(1);
+
+    firstSectionContent = firstSection?.content ?? "";
+  }
 
   // Fetch floater data if the category has one
   let floaterImageUrl: string | null = null;

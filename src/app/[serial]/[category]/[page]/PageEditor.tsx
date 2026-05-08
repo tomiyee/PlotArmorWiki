@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { savePageContent, getPageContentAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
+import { InfoIcon } from "@/components/ui/info-icon";
 
 interface SectionData {
   id: number;
@@ -321,13 +322,7 @@ export function PageEditor({
       <Box col className="gap-2">
         <Box className="items-center gap-2">
           <Text variant="h2">Summary</Text>
-          <Text
-            as="span"
-            muted
-            className="text-xs rounded-full bg-gray-100 px-2 py-0.5"
-          >
-            shown at top, no heading
-          </Text>
+          <InfoIcon contents="Shown at the top of the page with no heading." />
         </Box>
         <div className="grid grid-cols-2 gap-4 items-start">
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
