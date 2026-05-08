@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { MDEditor } from "@/components/MDEditor";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 
@@ -200,11 +200,18 @@ export function WikiLinkMDEditor({
           ),
         }}
         textareaProps={{
-          ref: textareaRef,
           onInput: handleInput,
           onKeyDown: handleKeyDown,
           onCompositionStart: () => setIsComposing(true),
           onCompositionEnd: () => setIsComposing(false),
+          renderTextarea: (props) => (
+            <textarea
+              {...(props as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+              ref={(el) => {
+                textareaRef.current = el;
+              }}
+            />
+          ),
         }}
       />
 
