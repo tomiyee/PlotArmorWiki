@@ -1,7 +1,9 @@
 import ReactMarkdown, { Components } from "react-markdown";
+import type { PluggableList } from "unified";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
+import { remarkWikiLinks } from "@/lib/remark-wiki-links";
 
 interface Props {
   children: string;
@@ -9,6 +11,12 @@ interface Props {
   className?: string;
   /** Use smaller text sizing (e.g. inside reference panels). Defaults to false. */
   sm?: boolean;
+  /**
+   * When provided, `[[Category:Page]]` wiki link syntax is converted to
+   * clickable links scoped to this serial slug. Omit when rendering content
+   * that is not within a serial context (e.g. the home page).
+   */
+  serialSlug?: string;
 }
 
 const COMPONENTS: Components = {
@@ -155,15 +163,22 @@ const SM_COMPONENTS: Components = {
  * classes on each element — does not depend on @tailwindcss/typography so
  * heading sizes and weights are always correct.
  *
+ * When `serialSlug` is provided, `[[Category:Page]]` wiki link syntax is
+ * converted to clickable links. Links inside backticks are left as-is.
+ *
  * @example
  * <MarkdownRenderer>{section.content}</MarkdownRenderer>
  * <MarkdownRenderer sm className="mt-2">{schema.body}</MarkdownRenderer>
+ * <MarkdownRenderer serialSlug="one-piece">{section.content}</MarkdownRenderer>
  */
-export function MarkdownRenderer({ children, className, sm = false }: Props) {
+export function MarkdownRenderer({ children, className, sm = false, serialSlug }: Props) {
+  const remarkPlugins: PluggableList = [remarkGfm];
+  if (serialSlug) remarkPlugins.push(remarkWikiLinks(serialSlug));
+
   return (
     <div className={cn("max-w-none", className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkPlugins}
         components={sm ? SM_COMPONENTS : COMPONENTS}
       >
         {children}
