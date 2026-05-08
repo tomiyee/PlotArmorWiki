@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { HoverCard } from "@/components/ui/hovercard";
 import { Text } from "@/components/ui/text";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { getWikiLinkPreview } from "@/lib/wiki-link-preview-action";
 import type { WikiLinkPreviewData } from "@/lib/wiki-link-preview-action";
 
@@ -69,7 +70,7 @@ export function WikiLinkPreview({
 
   return (
     <HoverCard trigger={anchor}>
-      <PreviewContent preview={preview} categoryName={categoryName} pageName={pageName} />
+      <PreviewContent preview={preview} categoryName={categoryName} pageName={pageName} serialSlug={serialSlug} />
     </HoverCard>
   );
 }
@@ -78,9 +79,10 @@ interface PreviewContentProps {
   preview: WikiLinkPreviewData | "loading" | "missing";
   categoryName: string;
   pageName: string;
+  serialSlug: string;
 }
 
-function PreviewContent({ preview, categoryName, pageName }: PreviewContentProps) {
+function PreviewContent({ preview, categoryName, pageName, serialSlug }: PreviewContentProps) {
   if (preview === "loading") {
     return (
       <Text muted className="text-sm">
@@ -149,23 +151,25 @@ function PreviewContent({ preview, categoryName, pageName }: PreviewContentProps
             .filter((r) => r.content)
             .slice(0, 4)
             .map((row) => (
-              <>
-                <dt key={`dt-${row.label}`} className="text-gray-500 font-medium whitespace-nowrap">
+              <Fragment key={row.label}>
+                <dt className="text-gray-500 font-medium whitespace-nowrap">
                   {row.label}
                 </dt>
-                <dd key={`dd-${row.label}`} className="text-gray-800 truncate">
+                <dd className="text-gray-800 truncate">
                   {row.content}
                 </dd>
-              </>
+              </Fragment>
             ))}
         </dl>
       )}
 
       {/* First section text */}
       {truncatedContent && (
-        <p className="text-xs text-gray-700 leading-relaxed border-t border-gray-100 pt-2">
-          {truncatedContent}
-        </p>
+        <div className="border-t border-gray-100 pt-2">
+          <MarkdownRenderer sm serialSlug={serialSlug} className="[&_p]:mb-1 [&_p:last-child]:mb-0">
+            {truncatedContent}
+          </MarkdownRenderer>
+        </div>
       )}
 
       {!truncatedContent && preview.floaterRows.length === 0 && (
