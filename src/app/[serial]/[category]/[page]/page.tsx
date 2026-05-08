@@ -211,7 +211,7 @@ export default async function PageView({ params }: Props) {
 
   const [summaryVersions, activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ content: pageSummaries.content })
+      .select({ content: pageSummaries.content, chapterIdx: chapters.idx })
       .from(pageSummaries)
       .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
       .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
@@ -231,6 +231,7 @@ export default async function PageView({ params }: Props) {
       .select({
         sectionId: pageSectionVersions.sectionId,
         content: pageSectionVersions.content,
+        chapterIdx: chapters.idx,
       })
       .from(pageSectionVersions)
       .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
@@ -245,15 +246,20 @@ export default async function PageView({ params }: Props) {
   ]);
 
   const summaryContent = summaryVersions[0]?.content ?? "";
-  const contentBySectionId = new Map(
-    sectionVersions.map((v) => [v.sectionId, v.content]),
+  const summaryLastUpdatedChapterIdx = summaryVersions[0]?.chapterIdx ?? null;
+  const versionBySectionId = new Map(
+    sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
   );
 
-  const sections = activeSections.map((s) => ({
-    id: s.id,
-    name: s.name,
-    content: contentBySectionId.get(s.id) ?? "",
-  }));
+  const sections = activeSections.map((s) => {
+    const v = versionBySectionId.get(s.id);
+    return {
+      id: s.id,
+      name: s.name,
+      content: v?.content ?? "",
+      lastUpdatedChapterIdx: v?.chapterIdx ?? null,
+    };
+  });
 
   // ── Floater data (only when category.hasFloater) ───────────────────────────
   let floaterImageUrl: string | null | undefined = undefined;
@@ -374,6 +380,7 @@ export default async function PageView({ params }: Props) {
             categoryName={categoryName}
             pageName={pageName}
             summaryContent={summaryContent}
+            summaryLastUpdatedChapterIdx={summaryLastUpdatedChapterIdx}
             sections={sections}
             floaterImageUrl={floaterImageUrl}
             floaterRows={floaterRows}
