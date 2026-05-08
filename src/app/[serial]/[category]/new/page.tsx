@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/db/index';
-import { serials, pageSchemas, volumes, chapters } from '@/db/schema';
+import { serials, pageCategories, volumes, chapters } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
@@ -13,13 +13,13 @@ import { PageContainer } from '@/components/ui/page-container';
 import { createPage } from './actions';
 
 interface Props {
-  params: Promise<{ serial: string; schema: string }>;
+  params: Promise<{ serial: string; category: string }>;
 }
 
 export default async function NewPagePage({ params }: Props) {
-  const { serial: serialSlug, schema: schemaSlug } = await params;
+  const { serial: serialSlug, category: categorySlug } = await params;
 
-  const schemaName = decodeURIComponent(schemaSlug);
+  const categoryName = decodeURIComponent(categorySlug);
 
   const [serial] = await db
     .select()
@@ -31,13 +31,13 @@ export default async function NewPagePage({ params }: Props) {
     notFound();
   }
 
-  const [schema] = await db
+  const [category] = await db
     .select()
-    .from(pageSchemas)
-    .where(and(eq(pageSchemas.serialId, serial.id), eq(pageSchemas.name, schemaName)))
+    .from(pageCategories)
+    .where(and(eq(pageCategories.serialId, serial.id), eq(pageCategories.name, categoryName)))
     .limit(1);
 
-  if (!schema) {
+  if (!category) {
     notFound();
   }
 
@@ -81,7 +81,7 @@ export default async function NewPagePage({ params }: Props) {
 
   const firstChapterId = chapterList[0]?.id;
 
-  const createPageAction = createPage.bind(null, serialSlug, schemaName);
+  const createPageAction = createPage.bind(null, serialSlug, categoryName);
 
   return (
     <main>
@@ -94,15 +94,15 @@ export default async function NewPagePage({ params }: Props) {
           </Link>
           {' / '}
           <Link
-            href={`/${serialSlug}/${encodeURIComponent(schemaName)}`}
+            href={`/${serialSlug}/${encodeURIComponent(categoryName)}`}
             className="hover:underline"
           >
-            {schemaName}
+            {categoryName}
           </Link>
         </Text>
 
         <Text variant="h1" className="text-2xl">
-          New {schemaName} page
+          New {categoryName} page
         </Text>
 
         <form action={createPageAction} className="flex flex-col gap-5">

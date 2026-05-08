@@ -4,9 +4,9 @@ import { cookies } from "next/headers";
 import { db } from "@/db/index";
 import {
   serials,
-  pageSchemas,
-  schemaSections,
-  schemaFloaterRows,
+  pageCategories,
+  categorySections,
+  categoryFloaterRows,
   pages,
   chapters,
 } from "@/db/schema";
@@ -25,8 +25,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { PageContainer } from "@/components/ui/page-container";
 import {
-  updateSchema,
-  deleteSchema,
+  updateCategory,
+  deleteCategory,
   addSection,
   deleteSection,
   renameSection,
@@ -36,11 +36,11 @@ import {
   renameFloaterRow,
   reorderFloaterRows,
 } from "../actions";
-import { SchemaIndexEditor } from "./SchemaIndexEditor";
-import { SchemaSectionEditor } from "./SchemaSectionEditor";
+import { CategoryIndexEditor } from "./CategoryIndexEditor";
+import { CategorySectionEditor } from "./CategorySectionEditor";
 
 interface Props {
-  params: Promise<{ serial: string; schema: string }>;
+  params: Promise<{ serial: string; category: string }>;
 }
 
 async function getChapterCutoffIdx(serialId: number): Promise<number> {
@@ -60,10 +60,10 @@ async function getChapterCutoffIdx(serialId: number): Promise<number> {
   return row?.idx ?? 0;
 }
 
-export default async function SchemaIndexPage({ params }: Props) {
-  const { serial: serialSlug, schema: schemaSlug } = await params;
+export default async function CategoryIndexPage({ params }: Props) {
+  const { serial: serialSlug, category: categorySlug } = await params;
 
-  const schemaName = decodeURIComponent(schemaSlug);
+  const categoryName = decodeURIComponent(categorySlug);
 
   const [serial] = await db
     .select()
@@ -75,18 +75,18 @@ export default async function SchemaIndexPage({ params }: Props) {
     notFound();
   }
 
-  const [schema] = await db
+  const [category] = await db
     .select()
-    .from(pageSchemas)
+    .from(pageCategories)
     .where(
       and(
-        eq(pageSchemas.serialId, serial.id),
-        eq(pageSchemas.name, schemaName),
+        eq(pageCategories.serialId, serial.id),
+        eq(pageCategories.name, categoryName),
       ),
     )
     .limit(1);
 
-  if (!schema) {
+  if (!category) {
     notFound();
   }
 
@@ -97,40 +97,40 @@ export default async function SchemaIndexPage({ params }: Props) {
       .select({ id: pages.id, name: pages.name })
       .from(pages)
       .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
-      .where(and(eq(pages.schemaId, schema.id), lte(chapters.idx, cutoffIdx)))
+      .where(and(eq(pages.categoryId, category.id), lte(chapters.idx, cutoffIdx)))
       .orderBy(pages.name),
     db
       .select({
-        id: schemaSections.id,
-        name: schemaSections.name,
-        displayOrder: schemaSections.displayOrder,
+        id: categorySections.id,
+        name: categorySections.name,
+        displayOrder: categorySections.displayOrder,
       })
-      .from(schemaSections)
+      .from(categorySections)
       .where(
         and(
-          eq(schemaSections.schemaId, schema.id),
-          isNull(schemaSections.deletedAt),
+          eq(categorySections.categoryId, category.id),
+          isNull(categorySections.deletedAt),
         ),
       )
-      .orderBy(schemaSections.displayOrder),
+      .orderBy(categorySections.displayOrder),
     db
       .select({
-        id: schemaFloaterRows.id,
-        label: schemaFloaterRows.label,
-        displayOrder: schemaFloaterRows.displayOrder,
+        id: categoryFloaterRows.id,
+        label: categoryFloaterRows.label,
+        displayOrder: categoryFloaterRows.displayOrder,
       })
-      .from(schemaFloaterRows)
+      .from(categoryFloaterRows)
       .where(
         and(
-          eq(schemaFloaterRows.schemaId, schema.id),
-          isNull(schemaFloaterRows.deletedAt),
+          eq(categoryFloaterRows.categoryId, category.id),
+          isNull(categoryFloaterRows.deletedAt),
         ),
       )
-      .orderBy(schemaFloaterRows.displayOrder),
+      .orderBy(categoryFloaterRows.displayOrder),
   ]);
 
-  const updateSchemaForSerial = updateSchema.bind(null, serial.id);
-  const deleteSchemaForSerial = deleteSchema.bind(null, serial.id);
+  const updateCategoryForSerial = updateCategory.bind(null, serial.id);
+  const deleteCategoryForSerial = deleteCategory.bind(null, serial.id);
   const addSectionForSerial = addSection.bind(null, serial.id);
   const deleteSectionForSerial = deleteSection.bind(null, serial.id);
   const renameSectionForSerial = renameSection.bind(null, serial.id);
@@ -150,18 +150,18 @@ export default async function SchemaIndexPage({ params }: Props) {
             </Link>
           </Text>
 
-          <SchemaIndexEditor
-            schemaId={schema.id}
-            initialName={schema.name}
-            initialBody={schema.body}
+          <CategoryIndexEditor
+            categoryId={category.id}
+            initialName={category.name}
+            initialBody={category.body}
             serialSlug={serialSlug}
-            updateSchemaAction={updateSchemaForSerial}
-            deleteSchemaAction={deleteSchemaForSerial}
+            updateCategoryAction={updateCategoryForSerial}
+            deleteCategoryAction={deleteCategoryForSerial}
           />
 
-          <SchemaSectionEditor
-            schemaId={schema.id}
-            hasFloater={schema.hasFloater}
+          <CategorySectionEditor
+            categoryId={category.id}
+            hasFloater={category.hasFloater}
             sections={sectionList}
             floaterRows={floaterRowList}
             addSectionAction={addSectionForSerial}
@@ -181,7 +181,7 @@ export default async function SchemaIndexPage({ params }: Props) {
               </CardTitle>
               <CardAction>
                 <Link
-                  href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
+                  href={`/${serialSlug}/${encodeURIComponent(category.name)}/new`}
                   className={buttonVariants({ size: "sm" })}
                 >
                   <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
@@ -195,7 +195,7 @@ export default async function SchemaIndexPage({ params }: Props) {
                   {pageList.map((page) => (
                     <li key={page.id}>
                       <Link
-                        href={`/${serialSlug}/${encodeURIComponent(schema.name)}/${encodeURIComponent(page.name)}`}
+                        href={`/${serialSlug}/${encodeURIComponent(category.name)}/${encodeURIComponent(page.name)}`}
                         className="text-blue-600 hover:underline"
                       >
                         {page.name}
@@ -207,7 +207,7 @@ export default async function SchemaIndexPage({ params }: Props) {
                 <Text muted>
                   No pages yet —{" "}
                   <Link
-                    href={`/${serialSlug}/${encodeURIComponent(schema.name)}/new`}
+                    href={`/${serialSlug}/${encodeURIComponent(category.name)}/new`}
                     className="text-blue-500 hover:underline"
                   >
                     create the first one

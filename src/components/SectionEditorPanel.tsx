@@ -41,7 +41,7 @@ interface PendingDelete {
 }
 
 interface SectionEditorPanelProps {
-  schemaId: number;
+  categoryId: number;
   hasFloater: boolean;
   sections: Section[];
   floaterRows: FloaterRow[];
@@ -154,14 +154,14 @@ function ReorderableItem({
 // ─── SectionEditorPanel ────────────────────────────────────────────────────────
 
 /**
- * Reusable panel for managing a schema's sections and (optionally) floater rows.
- * Shared between `SchemaManager` (serial page) and `SchemaSectionEditor`
- * (schema index page).
+ * Reusable panel for managing a page category's sections and (optionally) floater rows.
+ * Shared between `CategoryManager` (serial page) and `CategorySectionEditor`
+ * (category index page).
  *
  * @example
  * <SectionEditorPanel
- *   schemaId={schema.id}
- *   hasFloater={schema.hasFloater}
+ *   categoryId={category.id}
+ *   hasFloater={category.hasFloater}
  *   sections={sections}
  *   floaterRows={floaterRows}
  *   addSectionAction={addSectionAction}
@@ -169,7 +169,7 @@ function ReorderableItem({
  * />
  */
 export function SectionEditorPanel({
-  schemaId,
+  categoryId,
   hasFloater,
   sections,
   floaterRows,
@@ -294,7 +294,7 @@ export function SectionEditorPanel({
             }}
             className="flex gap-2 items-center"
           >
-            <input type="hidden" name="schemaId" value={schemaId} />
+            <input type="hidden" name="categoryId" value={categoryId} />
             <Input
               name="name"
               required
@@ -382,7 +382,7 @@ export function SectionEditorPanel({
               }}
               className="flex gap-2 items-center"
             >
-              <input type="hidden" name="schemaId" value={schemaId} />
+              <input type="hidden" name="categoryId" value={categoryId} />
               <Input
                 name="label"
                 required

@@ -3,12 +3,12 @@
 import { db } from "@/db/index";
 import {
   serials,
-  pageSchemas,
+  pageCategories,
   pages,
   chapters,
   volumes,
-  schemaSections,
-  schemaFloaterRows,
+  categorySections,
+  categoryFloaterRows,
   pageSectionVersions,
   pageFloaterVersions,
   pageFloaterRowVersions,
@@ -34,22 +34,22 @@ async function getHeadChapterId(serialId: number): Promise<number> {
 }
 
 /**
- * Resolves the database IDs for a given serial, schema, and page.
+ * Resolves the database IDs for a given serial, page category, and page.
  *
- * This function takes slug identifiers for a serial, schema, and page, and
+ * This function takes slug identifiers for a serial, category, and page, and
  * retrieves their corresponding database IDs. It performs three sequential
- * database queries to find the serial, schema, and page, throwing an error
+ * database queries to find the serial, category, and page, throwing an error
  * if any of them are not found.
  *
  * @param serialSlug - The URL-friendly slug identifier for the serial
- * @param schemaName - The name of the page schema to find
+ * @param categoryName - The name of the page category to find
  * @param pageName - The name of the page to find
- * @returns An object containing the serial ID, schema object (with hasFloater property), and page ID
- * @throws Error if the serial, schema, or page is not found in the database
+ * @returns An object containing the serial ID, category object (with hasFloater property), and page ID
+ * @throws Error if the serial, category, or page is not found in the database
  */
 async function resolvePageIds(
   serialSlug: string,
-  schemaName: string,
+  categoryName: string,
   pageName: string,
 ) {
   const [serial] = await db
@@ -59,26 +59,26 @@ async function resolvePageIds(
     .limit(1);
   if (!serial) throw new Error("Serial not found");
 
-  const [schema] = await db
-    .select({ id: pageSchemas.id, hasFloater: pageSchemas.hasFloater })
-    .from(pageSchemas)
+  const [category] = await db
+    .select({ id: pageCategories.id, hasFloater: pageCategories.hasFloater })
+    .from(pageCategories)
     .where(
       and(
-        eq(pageSchemas.serialId, serial.id),
-        eq(pageSchemas.name, schemaName),
+        eq(pageCategories.serialId, serial.id),
+        eq(pageCategories.name, categoryName),
       ),
     )
     .limit(1);
-  if (!schema) throw new Error("Schema not found");
+  if (!category) throw new Error("Category not found");
 
   const [page] = await db
     .select({ id: pages.id })
     .from(pages)
-    .where(and(eq(pages.schemaId, schema.id), eq(pages.name, pageName)))
+    .where(and(eq(pages.categoryId, category.id), eq(pages.name, pageName)))
     .limit(1);
   if (!page) throw new Error("Page not found");
 
-  return { serialId: serial.id, schema, pageId: page.id };
+  return { serialId: serial.id, category, pageId: page.id };
 }
 
 /**
@@ -92,24 +92,24 @@ async function resolvePageIds(
  *
  * @example
  * // Write at head (default behaviour — UI passes undefined)
- * await savePageContent(serialSlug, schemaName, pageName, sectionContent, floaterImageUrl, floaterRowContent);
+ * await savePageContent(serialSlug, categoryName, pageName, sectionContent, floaterImageUrl, floaterRowContent);
  *
  * @example
  * // Write at a specific chapter (used by the chapter selector in edit mode)
- * await savePageContent(serialSlug, schemaName, pageName, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
+ * await savePageContent(serialSlug, categoryName, pageName, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
  */
 export async function savePageContent(
   serialSlug: string,
-  schemaName: string,
+  categoryName: string,
   pageName: string,
   sectionContent: Record<number, string>,
   floaterImageUrl: string | null,
   floaterRowContent: Record<number, string>,
   targetChapterId?: number,
 ): Promise<void> {
-  const { serialId, schema, pageId } = await resolvePageIds(
+  const { serialId, category, pageId } = await resolvePageIds(
     serialSlug,
-    schemaName,
+    categoryName,
     pageName,
   );
   const headChapterId = targetChapterId ?? (await getHeadChapterId(serialId));
@@ -130,7 +130,7 @@ export async function savePageContent(
         });
     }
 
-    if (schema.hasFloater) {
+    if (category.hasFloater) {
       await tx
         .insert(pageFloaterVersions)
         .values({ pageId, chapterId: headChapterId, imageUrl: floaterImageUrl })
@@ -179,7 +179,7 @@ export async function savePageContent(
  */
 export async function getPageContentAtChapter(
   serialSlug: string,
-  schemaName: string,
+  categoryName: string,
   pageName: string,
   chapterId: number,
 ): Promise<{
@@ -187,8 +187,8 @@ export async function getPageContentAtChapter(
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
-  const [{ schema, pageId }, [targetChapter]] = await Promise.all([
-    resolvePageIds(serialSlug, schemaName, pageName),
+  const [{ category, pageId }, [targetChapter]] = await Promise.all([
+    resolvePageIds(serialSlug, categoryName, pageName),
     db
       .select({ idx: chapters.idx })
       .from(chapters)
@@ -214,15 +214,15 @@ export async function getPageContentAtChapter(
 
   const [activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ id: schemaSections.id })
-      .from(schemaSections)
+      .select({ id: categorySections.id })
+      .from(categorySections)
       .where(
         and(
-          eq(schemaSections.schemaId, schema.id),
-          isNull(schemaSections.deletedAt),
+          eq(categorySections.categoryId, category.id),
+          isNull(categorySections.deletedAt),
         ),
       )
-      .orderBy(asc(schemaSections.displayOrder)),
+      .orderBy(asc(categorySections.displayOrder)),
     db
       .select({
         sectionId: pageSectionVersions.sectionId,
@@ -248,7 +248,7 @@ export async function getPageContentAtChapter(
     content: contentBySectionId.get(s.id) ?? "",
   }));
 
-  if (!schema.hasFloater) {
+  if (!category.hasFloater) {
     return { sections, floaterImageUrl: null, floaterRows: [] };
   }
 
@@ -287,15 +287,15 @@ export async function getPageContentAtChapter(
         .where(eq(pageFloaterVersions.pageId, pageId))
         .limit(1),
       db
-        .select({ id: schemaFloaterRows.id })
-        .from(schemaFloaterRows)
+        .select({ id: categoryFloaterRows.id })
+        .from(categoryFloaterRows)
         .where(
           and(
-            eq(schemaFloaterRows.schemaId, schema.id),
-            isNull(schemaFloaterRows.deletedAt),
+            eq(categoryFloaterRows.categoryId, category.id),
+            isNull(categoryFloaterRows.deletedAt),
           ),
         )
-        .orderBy(asc(schemaFloaterRows.displayOrder)),
+        .orderBy(asc(categoryFloaterRows.displayOrder)),
       db
         .select({
           floaterRowId: pageFloaterRowVersions.floaterRowId,

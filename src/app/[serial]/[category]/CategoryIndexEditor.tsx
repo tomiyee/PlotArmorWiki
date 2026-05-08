@@ -24,16 +24,16 @@ import { MDEditor } from "@/components/MDEditor";
 import { Tooltip } from "@/components/ui/tooltip";
 
 interface Props {
-  schemaId: number;
+  categoryId: number;
   initialName: string;
   initialBody: string | null;
   serialSlug: string;
-  updateSchemaAction: (fd: FormData) => Promise<void>;
-  deleteSchemaAction: (fd: FormData) => Promise<void>;
+  updateCategoryAction: (fd: FormData) => Promise<void>;
+  deleteCategoryAction: (fd: FormData) => Promise<void>;
 }
 
 /**
- * Inline editor for a schema's name and markdown body. Toggles between a
+ * Inline editor for a page category's name and markdown body. Toggles between a
  * read-only view (rendered markdown) and an edit form (text input + textarea)
  * driven by the global `EditModeContext`. The `<EditModeFAB>` triggers save
  * and discard via registered handlers.
@@ -41,22 +41,22 @@ interface Props {
  * Delete is confirmed via dialog and redirects to the serial page.
  *
  * @example
- * <SchemaIndexEditor
- *   schemaId={schema.id}
- *   initialName={schema.name}
- *   initialBody={schema.body}
+ * <CategoryIndexEditor
+ *   categoryId={category.id}
+ *   initialName={category.name}
+ *   initialBody={category.body}
  *   serialSlug="one-piece"
- *   updateSchemaAction={updateSchemaForSerial}
- *   deleteSchemaAction={deleteSchemaForSerial}
+ *   updateCategoryAction={updateCategoryForSerial}
+ *   deleteCategoryAction={deleteCategoryForSerial}
  * />
  */
-export function SchemaIndexEditor({
-  schemaId,
+export function CategoryIndexEditor({
+  categoryId,
   initialName,
   initialBody,
   serialSlug,
-  updateSchemaAction,
-  deleteSchemaAction,
+  updateCategoryAction,
+  deleteCategoryAction,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -74,12 +74,12 @@ export function SchemaIndexEditor({
     if (!trimmedName) return;
 
     const fd = new FormData();
-    fd.set("schemaId", String(schemaId));
+    fd.set("categoryId", String(categoryId));
     fd.set("name", trimmedName);
     fd.set("body", draftBody);
 
     startTransition(async () => {
-      await updateSchemaAction(fd);
+      await updateCategoryAction(fd);
       setCommittedName(trimmedName);
       setCommittedBody(draftBody);
       if (trimmedName !== committedName) {
@@ -102,9 +102,9 @@ export function SchemaIndexEditor({
 
   function handleDelete() {
     const fd = new FormData();
-    fd.set("schemaId", String(schemaId));
+    fd.set("categoryId", String(categoryId));
     startTransition(async () => {
-      await deleteSchemaAction(fd);
+      await deleteCategoryAction(fd);
       router.push(`/${serialSlug}`);
     });
   }
@@ -125,7 +125,7 @@ export function SchemaIndexEditor({
       <Box col className="gap-4">
         <Box col className="gap-1.5">
           <Box className="gap-1.5 items-center">
-            <Label htmlFor="schema-name">Page Category Name</Label>
+            <Label htmlFor="category-name">Page Category Name</Label>
 
             <Tooltip content="Delete page category" side="left">
               <Button
@@ -140,14 +140,14 @@ export function SchemaIndexEditor({
             </Tooltip>
           </Box>
           <Input
-            id="schema-name"
+            id="category-name"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
             disabled={isPending}
           />
         </Box>
         <Box col className="gap-1.5">
-          <Label htmlFor="schema-body">Description</Label>
+          <Label htmlFor="category-body">Description</Label>
           <MDEditor
             value={draftBody}
             onChange={(v) => setDraftBody(v ?? "")}
@@ -167,7 +167,7 @@ export function SchemaIndexEditor({
         </DialogHeader>
         <DialogBody>
           <DialogDescription>
-            This will permanently delete this page type and all its pages. This
+            This will permanently delete this page category and all its pages. This
             action cannot be undone.
           </DialogDescription>
         </DialogBody>

@@ -7,21 +7,21 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Menu } from "@/components/ui/menu";
 import { Text } from "@/components/ui/text";
-import { SchemaNavData } from "@/types";
+import { CategoryNavData } from "@/types";
 
 interface Props {
   serialSlug: string;
-  schemas: SchemaNavData[];
+  categories: CategoryNavData[];
 }
 
 /**
- * Dropdown listing the page schemas (categories) for the current serial.
- * Each entry links to /{serialSlug}/{schemaName}.
+ * Dropdown listing the page categories for the current serial.
+ * Each entry links to /{serialSlug}/{categoryName}.
  *
  * @example
- * <PagesDropdown serialSlug="my-serial" schemas={[{ id: 1, name: "Characters" }]} />
+ * <PagesDropdown serialSlug="my-serial" categories={[{ id: 1, name: "Characters" }]} />
  */
-export function PagesDropdown({ serialSlug, schemas }: Props) {
+export function PagesDropdown({ serialSlug, categories }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -32,20 +32,20 @@ export function PagesDropdown({ serialSlug, schemas }: Props) {
       role="menu"
       aria-label="Page categories"
       contents={
-        schemas.length === 0 ? (
+        categories.length === 0 ? (
           <Text as="span" variant="label" className="block px-3 py-2 text-sm text-muted-foreground">
             No pages yet
           </Text>
         ) : (
-          schemas.map((schema) => (
+          categories.map((category) => (
             <Link
-              key={schema.id}
-              href={`/${serialSlug}/${encodeURIComponent(schema.name)}`}
+              key={category.id}
+              href={`/${serialSlug}/${encodeURIComponent(category.name)}`}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="block px-3 py-2 text-sm text-foreground hover:bg-muted"
             >
-              {schema.name}
+              {category.name}
             </Link>
           ))
         )

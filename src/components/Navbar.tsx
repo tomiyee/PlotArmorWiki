@@ -41,7 +41,7 @@ export default function Navbar() {
             </Link>
             <PagesDropdown
               serialSlug={serialData.serialSlug}
-              schemas={serialData.schemas}
+              categories={serialData.categories}
             />
           </>
         )}

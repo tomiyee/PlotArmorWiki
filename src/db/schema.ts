@@ -63,7 +63,7 @@ export const chapters = pgTable('chapters', {
   idx: integer('idx').notNull(),
 });
 
-export const pageSchemas = pgTable('page_schemas', {
+export const pageCategories = pgTable('page_categories', {
   id: serial('id').primaryKey(),
   serialId: integer('serial_id')
     .notNull()
@@ -73,22 +73,22 @@ export const pageSchemas = pgTable('page_schemas', {
   hasFloater: boolean('has_floater').notNull().default(false),
 });
 
-export const schemaSections = pgTable('schema_sections', {
+export const categorySections = pgTable('category_sections', {
   id: serial('id').primaryKey(),
-  schemaId: integer('schema_id')
+  categoryId: integer('category_id')
     .notNull()
-    .references(() => pageSchemas.id),
+    .references(() => pageCategories.id),
   name: text('name').notNull(),
   displayOrder: integer('display_order').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
 });
 
-export const schemaFloaterRows = pgTable('schema_floater_rows', {
+export const categoryFloaterRows = pgTable('category_floater_rows', {
   id: serial('id').primaryKey(),
-  schemaId: integer('schema_id')
+  categoryId: integer('category_id')
     .notNull()
-    .references(() => pageSchemas.id),
+    .references(() => pageCategories.id),
   label: text('label').notNull(),
   displayOrder: integer('display_order').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -97,9 +97,9 @@ export const schemaFloaterRows = pgTable('schema_floater_rows', {
 
 export const pages = pgTable('pages', {
   id: serial('id').primaryKey(),
-  schemaId: integer('schema_id')
+  categoryId: integer('category_id')
     .notNull()
-    .references(() => pageSchemas.id),
+    .references(() => pageCategories.id),
   name: text('name').notNull(),
   introChapterId: integer('intro_chapter_id')
     .notNull()
@@ -114,7 +114,7 @@ export const pageSectionVersions = pgTable(
       .references(() => pages.id),
     sectionId: integer('section_id')
       .notNull()
-      .references(() => schemaSections.id),
+      .references(() => categorySections.id),
     chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),
@@ -145,7 +145,7 @@ export const pageFloaterRowVersions = pgTable(
       .references(() => pages.id),
     floaterRowId: integer('floater_row_id')
       .notNull()
-      .references(() => schemaFloaterRows.id),
+      .references(() => categoryFloaterRows.id),
     chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),

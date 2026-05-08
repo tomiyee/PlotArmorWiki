@@ -1,15 +1,15 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, serialAuthors, volumes, chapters, pageSchemas, schemaSections, schemaFloaterRows, pages } from '@/db/schema';
+import { serials, serialAuthors, volumes, chapters, pageCategories, categorySections, categoryFloaterRows, pages } from '@/db/schema';
 import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   reorderVolumes, reorderAllChapters, updateSerialMetadata,
-  addSchema,
+  addCategory,
 } from './actions';
 import { Box } from '@/components/ui/box';
 import { PageContainer } from '@/components/ui/page-container';
-import { SchemaManager } from '@/components/SchemaManager';
+import { CategoryManager } from '@/components/CategoryManager';
 import { SerialMetadataEditor } from '@/components/SerialMetadataEditor';
 import { SerialTOCSidebar } from '@/components/SerialTOCSidebar';
 
@@ -30,7 +30,7 @@ export default async function SerialPage({ params }: Props) {
     notFound();
   }
 
-  const [authors, volumeList, chapterList, schemaList, sectionList, floaterRowList] = await Promise.all([
+  const [authors, volumeList, chapterList, categoryList, sectionList, floaterRowList] = await Promise.all([
     db
       .select()
       .from(serialAuthors)
@@ -54,59 +54,59 @@ export default async function SerialPage({ params }: Props) {
       .orderBy(chapters.idx),
     db
       .select()
-      .from(pageSchemas)
-      .where(eq(pageSchemas.serialId, serial.id))
-      .orderBy(pageSchemas.id),
+      .from(pageCategories)
+      .where(eq(pageCategories.serialId, serial.id))
+      .orderBy(pageCategories.id),
     db
       .select({
-        id: schemaSections.id,
-        schemaId: schemaSections.schemaId,
-        name: schemaSections.name,
-        displayOrder: schemaSections.displayOrder,
+        id: categorySections.id,
+        categoryId: categorySections.categoryId,
+        name: categorySections.name,
+        displayOrder: categorySections.displayOrder,
       })
-      .from(schemaSections)
-      .innerJoin(pageSchemas, eq(schemaSections.schemaId, pageSchemas.id))
-      .where(and(isNull(schemaSections.deletedAt), eq(pageSchemas.serialId, serial.id)))
-      .orderBy(schemaSections.displayOrder),
+      .from(categorySections)
+      .innerJoin(pageCategories, eq(categorySections.categoryId, pageCategories.id))
+      .where(and(isNull(categorySections.deletedAt), eq(pageCategories.serialId, serial.id)))
+      .orderBy(categorySections.displayOrder),
     db
       .select({
-        id: schemaFloaterRows.id,
-        schemaId: schemaFloaterRows.schemaId,
-        label: schemaFloaterRows.label,
-        displayOrder: schemaFloaterRows.displayOrder,
+        id: categoryFloaterRows.id,
+        categoryId: categoryFloaterRows.categoryId,
+        label: categoryFloaterRows.label,
+        displayOrder: categoryFloaterRows.displayOrder,
       })
-      .from(schemaFloaterRows)
-      .innerJoin(pageSchemas, eq(schemaFloaterRows.schemaId, pageSchemas.id))
-      .where(and(isNull(schemaFloaterRows.deletedAt), eq(pageSchemas.serialId, serial.id)))
-      .orderBy(schemaFloaterRows.displayOrder),
+      .from(categoryFloaterRows)
+      .innerJoin(pageCategories, eq(categoryFloaterRows.categoryId, pageCategories.id))
+      .where(and(isNull(categoryFloaterRows.deletedAt), eq(pageCategories.serialId, serial.id)))
+      .orderBy(categoryFloaterRows.displayOrder),
   ]);
 
-  const pageCountList = schemaList.length
+  const pageCountList = categoryList.length
     ? await db
-        .select({ schemaId: pages.schemaId, pageCount: count(pages.id) })
+        .select({ categoryId: pages.categoryId, pageCount: count(pages.id) })
         .from(pages)
-        .where(inArray(pages.schemaId, schemaList.map((s) => s.id)))
-        .groupBy(pages.schemaId)
+        .where(inArray(pages.categoryId, categoryList.map((c) => c.id)))
+        .groupBy(pages.categoryId)
     : [];
 
   const chaptersByVolume: Record<number, { id: number; displayName: string; idx: number; volumeId: number }[]> = {};
   volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
   chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
 
-  const schemaIds = new Set(schemaList.map((s) => s.id));
-  const sectionsBySchema: Record<number, typeof sectionList> = {};
-  const floaterRowsBySchema: Record<number, typeof floaterRowList> = {};
-  const pageCountBySchema: Record<number, number> = {};
-  schemaIds.forEach((id) => { sectionsBySchema[id] = []; floaterRowsBySchema[id] = []; pageCountBySchema[id] = 0; });
-  sectionList.forEach((s) => { if (sectionsBySchema[s.schemaId]) sectionsBySchema[s.schemaId].push(s); });
-  floaterRowList.forEach((r) => { if (floaterRowsBySchema[r.schemaId]) floaterRowsBySchema[r.schemaId].push(r); });
-  pageCountList.forEach((r) => { pageCountBySchema[r.schemaId] = r.pageCount; });
+  const categoryIds = new Set(categoryList.map((c) => c.id));
+  const sectionsByCategory: Record<number, typeof sectionList> = {};
+  const floaterRowsByCategory: Record<number, typeof floaterRowList> = {};
+  const pageCountByCategory: Record<number, number> = {};
+  categoryIds.forEach((id) => { sectionsByCategory[id] = []; floaterRowsByCategory[id] = []; pageCountByCategory[id] = 0; });
+  sectionList.forEach((s) => { if (sectionsByCategory[s.categoryId]) sectionsByCategory[s.categoryId].push(s); });
+  floaterRowList.forEach((r) => { if (floaterRowsByCategory[r.categoryId]) floaterRowsByCategory[r.categoryId].push(r); });
+  pageCountList.forEach((r) => { pageCountByCategory[r.categoryId] = r.pageCount; });
 
-  const schemasWithDetails = schemaList.map((schema) => ({
-    ...schema,
-    sections: sectionsBySchema[schema.id] ?? [],
-    floaterRows: floaterRowsBySchema[schema.id] ?? [],
-    pageCount: pageCountBySchema[schema.id] ?? 0,
+  const categoriesWithDetails = categoryList.map((category) => ({
+    ...category,
+    sections: sectionsByCategory[category.id] ?? [],
+    floaterRows: floaterRowsByCategory[category.id] ?? [],
+    pageCount: pageCountByCategory[category.id] ?? 0,
   }));
 
   const updateMetadataForSerial = updateSerialMetadata.bind(null, serial.id);
@@ -120,7 +120,7 @@ export default async function SerialPage({ params }: Props) {
   const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
 
-  const addSchemaForSerial = addSchema.bind(null, serial.id);
+  const addCategoryForSerial = addCategory.bind(null, serial.id);
 
   return (
     <main>
@@ -160,11 +160,11 @@ export default async function SerialPage({ params }: Props) {
               updateMetadataAction={updateMetadataForSerial}
             />
 
-            {/* Schema management */}
-            <SchemaManager
-              schemas={schemasWithDetails}
+            {/* Category management */}
+            <CategoryManager
+              categories={categoriesWithDetails}
               serialSlug={serialSlug}
-              addSchemaAction={addSchemaForSerial}
+              addCategoryAction={addCategoryForSerial}
             />
           </Box>
         </PageContainer>

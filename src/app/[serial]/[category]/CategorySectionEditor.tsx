@@ -9,8 +9,8 @@ import {
   type FloaterRow,
 } from "@/components/SectionEditorPanel";
 
-interface SchemaSectionEditorProps {
-  schemaId: number;
+interface CategorySectionEditorProps {
+  categoryId: number;
   hasFloater: boolean;
   sections: Section[];
   floaterRows: FloaterRow[];
@@ -25,22 +25,22 @@ interface SchemaSectionEditorProps {
 }
 
 /**
- * Schema structure editor embedded in the schema index page. Visibility is
+ * Category structure editor embedded in the category index page. Visibility is
  * gated on the global edit mode so the editor only appears when the user has
  * explicitly activated editing.
  *
  * @example
- * <SchemaSectionEditor
- *   schemaId={schema.id}
- *   hasFloater={schema.hasFloater}
+ * <CategorySectionEditor
+ *   categoryId={category.id}
+ *   hasFloater={category.hasFloater}
  *   sections={sections}
  *   floaterRows={floaterRows}
  *   addSectionAction={addSectionAction}
  *   {...otherActions}
  * />
  */
-export function SchemaSectionEditor({
-  schemaId,
+export function CategorySectionEditor({
+  categoryId,
   hasFloater,
   sections,
   floaterRows,
@@ -52,7 +52,7 @@ export function SchemaSectionEditor({
   deleteFloaterRowAction,
   renameFloaterRowAction,
   reorderFloaterRowsAction,
-}: SchemaSectionEditorProps) {
+}: CategorySectionEditorProps) {
   const { isEditing } = useEditMode();
 
   if (!isEditing) {
@@ -68,9 +68,9 @@ export function SchemaSectionEditor({
 
   return (
     <Box col className="gap-4 rounded-lg border border-gray-200 p-4">
-      <Text variant="h3">Schema Structure</Text>
+      <Text variant="h3">Category Structure</Text>
       <SectionEditorPanel
-        schemaId={schemaId}
+        categoryId={categoryId}
         hasFloater={hasFloater}
         sections={sections}
         floaterRows={floaterRows}

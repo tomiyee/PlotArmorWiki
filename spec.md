@@ -23,8 +23,8 @@ Standard wikis always show the latest state of any character, location, or other
 Wiki pages follow a consistent URL pattern:
 
 ```
-/{serial}/{schema}           # schema index: name, description, page list
-/{serial}/{schema}/{page-name}
+/{serial}/{category}           # category index: name, description, page list
+/{serial}/{category}/{page-name}
 ```
 
 The root path `/` serves the home page (see below).
@@ -45,19 +45,19 @@ A serial is the top-level container for a wiki. It has the following properties:
 - **Description** — a spoiler-free summary of the serial, similar in style to a Netflix synopsis. This is a social convention; the system does not enforce it.
 - **Splash art** _(optional)_ — a cover or banner image representing the serial.
 
-### Schema
+### Page Category
 
-A schema defines a *type* of wiki page within a serial — for example, a serial might have a Character schema and a Location schema. Every wiki page belongs to exactly one schema, and all pages of that schema share the same structure.
+A page category defines a *type* of wiki page within a serial — for example, a serial might have a Character category and a Location category. Every wiki page belongs to exactly one category, and all pages of that category share the same structure.
 
-Schemas are serial-specific: a serial can have many schemas, and each schema belongs to exactly one serial.
+Page categories are serial-specific: a serial can have many categories, and each category belongs to exactly one serial.
 
-A schema has an optional **description** (`body`) — a markdown text field shown on the schema index page (`/{serial}/{schema}`) explaining what this category covers (e.g. "Characters introduced throughout the series").
+A page category has an optional **description** (`body`) — a markdown text field shown on the category index page (`/{serial}/{category}`) explaining what this category covers (e.g. "Characters introduced throughout the series").
 
-Every wiki page has the following required system property, regardless of schema:
+Every wiki page has the following required system property, regardless of category:
 
 - **Introduction chapter** — the chapter in which the subject is first introduced in the serial. Used to determine whether the page is visible to a given user.
 
-A schema also defines two structural components for its pages:
+A page category also defines two structural components for its pages:
 
 - **Body** — an ordered list of named sections. Each section stores Markdown text.
 - **Floater** _(optional)_ — a sidebar panel that floats in the top-right of the page, containing:
@@ -86,7 +86,7 @@ All links and search results are filtered through the user's current progress st
 **Blocked pages**
 If a user navigates to or follows a link to a page whose introduction chapter is beyond their current progress, the page content is hidden entirely. In its place, a message is shown:
 
-> *"This [page type] is introduced in [chapter name]. This page is hidden to prevent spoilers."*
+> *"This [page category] is introduced in [chapter name]. This page is hidden to prevent spoilers."*
 
 The page's title is also withheld to avoid revealing names the user has not yet encountered.
 
@@ -116,12 +116,12 @@ A user visiting a serial wiki for the first time defaults to the first chapter. 
 
 All wiki page content is stored using **single-timestamp versioning**. Every versioned row carries a `chapter_id` — the chapter when that content was introduced or last changed. There is at most one revision per `(page, section, chapter)` tuple; the primary key enforces this.
 
-Schema structure (sections, floater rows) and page content are versioned on separate axes:
+Category structure (sections, floater rows) and page content are versioned on separate axes:
 
-- **Schema structure** — versioned by wall-clock time (`created_at` / `deleted_at`). Changes take effect immediately for all editors.
+- **Category structure** — versioned by wall-clock time (`created_at` / `deleted_at`). Changes take effect immediately for all editors.
 - **Page content** — versioned by chapter identity. Readers see only content from chapters at or before their progress cutoff.
 
-Each section and floater row has a **stable ID** so that content rows survive renames and reordering of schema attributes without modification.
+Each section and floater row has a **stable ID** so that content rows survive renames and reordering of category attributes without modification.
 
 **Read rule**: To read a content value as of the user's cutoff chapter (idx N), find the revision for that dimension with the highest `chapter.idx` that is ≤ N:
 
@@ -146,7 +146,7 @@ HAVING chapters.idx = MAX(chapters.idx)
 - If a revision already exists at the target chapter for that dimension, update it in-place.
 - Otherwise insert a new revision row at the target chapter.
 
-This is implemented in `savePageContent` in `src/app/[serial]/[schema]/[page]/actions.ts` and runs inside a single transaction.
+This is implemented in `savePageContent` in `src/app/[serial]/[category]/[page]/actions.ts` and runs inside a single transaction.
 
 ---
 
@@ -170,26 +170,26 @@ chapters
 
 `chapters.idx` is a **global, serial-level** integer used in all range comparisons — it is strictly increasing across all volumes (all chapters in Volume N come before Volume N+1). Volumes are an organizational grouping layer only; they do not affect the chapter-range query logic.
 
-#### Schema definition (wall-clock versioned)
+#### Page category definition (wall-clock versioned)
 
 ```
-page_schemas
+page_categories
   id, serial_id, name, body, has_floater
 
-schema_sections
-  id, schema_id, name, display_order, created_at, deleted_at
+category_sections
+  id, category_id, name, display_order, created_at, deleted_at
 
-schema_floater_rows
-  id, schema_id, label, display_order, created_at, deleted_at
+category_floater_rows
+  id, category_id, label, display_order, created_at, deleted_at
 ```
 
-`schema_floater_rows` only applies when `schemas.has_floater = true`. All floater rows store markdown text, identical in structure to sections.
+`category_floater_rows` only applies when `page_categories.has_floater = true`. All floater rows store markdown text, identical in structure to sections.
 
 #### Pages (chapter-versioned content)
 
 ```
 pages
-  id, schema_id, name, intro_chapter_id
+  id, category_id, name, intro_chapter_id
 
 page_section_versions
   page_id, section_id, chapter_id, content
@@ -226,7 +226,7 @@ Anonymous user progress is stored client-side in `localStorage` per serial — n
 ## Tech Stack
 
 ### Framework: Next.js (App Router)
-The URL pattern `/{serial}/{schema}/{page-name}` maps directly to file-based routing. SSR is required because spoiler filtering is user-specific — content is rendered per-request with the user's chapter cutoff. Next.js handles the API layer (auth, progress saves) in the same project.
+The URL pattern `/{serial}/{category}/{page-name}` maps directly to file-based routing. SSR is required because spoiler filtering is user-specific — content is rendered per-request with the user's chapter cutoff. Next.js handles the API layer (auth, progress saves) in the same project.
 
 ### Database: PostgreSQL
 The versioned content queries (finding the latest revision per group at or before a chapter cutoff) involve grouped aggregates and self-joins. PostgreSQL handles these cleanly, and the data model is inherently relational with multiple join paths.

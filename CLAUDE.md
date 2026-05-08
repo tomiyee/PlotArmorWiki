@@ -40,13 +40,13 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 
 ```
 /                           # home — search serials, create new wiki
-/{serial}/{schema}          # schema index page (name, body description, page list)
-/{serial}/{schema}/{page}   # wiki page
+/{serial}/{category}        # category index page (name, body description, page list)
+/{serial}/{category}/{page} # wiki page
 ```
 
 ### Tech stack
 
-Database, ORM, home page UI, serial/chapter/schema/page management, markdown rendering, floater sidebar, and chapter progress selector (localStorage) are implemented. Auth and Search are not yet.
+Database, ORM, home page UI, serial/chapter/category/page management, markdown rendering, floater sidebar, and chapter progress selector (localStorage) are implemented. Auth and Search are not yet.
 
 | Layer | Choice |
 |---|---|
@@ -70,10 +70,10 @@ SELECT ... GROUP BY section_id HAVING chapters.idx = MAX(chapters.idx)
 WHERE page_id = ? AND chapters.idx <= N
 ```
 
-**Schema structure** (sections, floater rows) is wall-clock versioned (`created_at`/`deleted_at`).  
+**Category structure** (sections, floater rows) is wall-clock versioned (`created_at`/`deleted_at`).  
 **Page content** is chapter-versioned. These are separate axes.
 
-Stable IDs on `schema_sections` and `schema_floater_rows` decouple content rows from renames/reorders.
+Stable IDs on `category_sections` and `category_floater_rows` decouple content rows from renames/reorders.
 
 ### Server/Client Component boundary
 
@@ -105,20 +105,20 @@ First-time visitors on any serial default to chapter 1 and see a callout prompti
 - `src/app/page.tsx` — home page; async Server Component that fetches all serials and passes them to `<SerialList>`.
 - `src/app/new/page.tsx` — serial creation form (title, description, authors, splash art URL, volume type, chapter type).
 - `src/app/new/actions.ts` — `createSerial` Server Action; inserts into `serials` and `serial_authors` (storing the computed slug, chapter type, and volume type), redirects to `/{slug}`.
-- `src/app/[serial]/page.tsx` — serial detail page; resolves serial via `WHERE slug = ?`, lists chapters grouped by volume, delegates editing to `<SerialEditor>` and schema management to `<SchemaManager>`.
-- `src/app/[serial]/actions.ts` — Server Actions for volume/chapter CRUD (`addVolume`, `addChapter`, `deleteVolume`, `deleteChapter`, `renameVolume`, `renameChapter`, `updateSerialTypes`, `reorderVolumes`, `reorderChapters`, `reorderAllChapters`) and schema/section/floater-row CRUD (`addSchema`, `deleteSchema`, `renameSchema`, `updateSchema`, `addSection`, `deleteSection`, `renameSection`, `reorderSections`, `addFloaterRow`, `deleteFloaterRow`, `renameFloaterRow`, `reorderFloaterRows`). Reorder actions reassign `chapters.idx` — no post-reorder version repair is needed because content revisions are keyed by `chapter_id` and follow their chapter's new position automatically.
-- `src/app/[serial]/[schema]/page.tsx` — schema index page; resolves serial via slug and schema via `WHERE serial_id = ? AND name = ?`, renders `<SchemaIndexEditor>` and a chapter-filtered list of pages (hides pages whose `intro_chapter_idx` exceeds the user's cutoff) linking to `/{serial}/{schema}/{page}`.
-- `src/app/[serial]/[schema]/SchemaIndexEditor.tsx` — Client Component for inline editing of a schema's name and markdown body; toggles between rendered view and edit form, navigates to the new URL when the name changes.
-- `src/app/[serial]/[schema]/new/page.tsx` — page creation form; collects page name and intro chapter (chapters grouped by volume via optgroup), submits via `createPage` Server Action.
-- `src/app/[serial]/[schema]/new/actions.ts` — `createPage` Server Action; validates serial and schema exist, inserts into `pages`, redirects to `/{serial}/{schema}/{page}`.
+- `src/app/[serial]/page.tsx` — serial detail page; resolves serial via `WHERE slug = ?`, lists chapters grouped by volume, delegates editing to `<SerialEditor>` and category management to `<CategoryManager>`.
+- `src/app/[serial]/actions.ts` — Server Actions for volume/chapter CRUD (`addVolume`, `addChapter`, `deleteVolume`, `deleteChapter`, `renameVolume`, `renameChapter`, `updateSerialTypes`, `reorderVolumes`, `reorderChapters`, `reorderAllChapters`) and category/section/floater-row CRUD (`addCategory`, `deleteCategory`, `renameCategory`, `updateCategory`, `addSection`, `deleteSection`, `renameSection`, `reorderSections`, `addFloaterRow`, `deleteFloaterRow`, `renameFloaterRow`, `reorderFloaterRows`). Reorder actions reassign `chapters.idx` — no post-reorder version repair is needed because content revisions are keyed by `chapter_id` and follow their chapter's new position automatically.
+- `src/app/[serial]/[category]/page.tsx` — category index page; resolves serial via slug and category via `WHERE serial_id = ? AND name = ?`, renders `<CategoryIndexEditor>` and a chapter-filtered list of pages (hides pages whose `intro_chapter_idx` exceeds the user's cutoff) linking to `/{serial}/{category}/{page}`.
+- `src/app/[serial]/[category]/CategoryIndexEditor.tsx` — Client Component for inline editing of a category's name and markdown body; toggles between rendered view and edit form, navigates to the new URL when the name changes.
+- `src/app/[serial]/[category]/new/page.tsx` — page creation form; collects page name and intro chapter (chapters grouped by volume via optgroup), submits via `createPage` Server Action.
+- `src/app/[serial]/[category]/new/actions.ts` — `createPage` Server Action; validates serial and category exist, inserts into `pages`, redirects to `/{serial}/{category}/{page}`.
 - `src/app/[serial]/layout.tsx` — serial-scoped nested layout; fetches the serial, its volumes, and chapters, then renders a dark sub-bar with `<ChapterSelector>` above all `/{serial}/…` pages.
-- `src/app/[serial]/[schema]/[page]/page.tsx` — wiki page view; resolves serial/schema/page, reads the user's chapter cutoff from cookie, fetches chapter-filtered section content and floater data (subquery-join: max `chapters.idx` ≤ cutoff per section/floater-row), fetches all chapters and the head chapter id for the edit-mode chapter selector, then delegates all rendering (read and edit modes) to `<PageEditor>`.
-- `src/app/[serial]/[schema]/[page]/PageEditor.tsx` — Client Component that owns the page body layout. In read mode renders sections and floater directly from props (so `router.refresh()` after a chapter change immediately reflects new content). In edit mode each section gets a dynamically-imported `<MDEditor>` (SSR disabled), floater fields get text inputs, and a "Writing as of:" `<Select>` lets the editor target any chapter. Changing the chapter calls `getPageContentAtChapter` to pre-fill drafts; on save, calls `savePageContent` with the selected `targetChapterId` then refreshes.
-- `src/app/[serial]/[schema]/[page]/actions.ts` — `savePageContent` Server Action and `getPageContentAtChapter` Server Action. `savePageContent` resolves serial/schema/page by slug/name and upserts each section/floater field at `(pageId, sectionId, chapterId)` — uses the optional `targetChapterId` when provided, otherwise defaults to the head chapter. `getPageContentAtChapter` runs the same max-idx subquery join but against an explicit chapter id instead of the cookie, returning `{ sections, floaterImageUrl, floaterRows }` for use by the edit-mode chapter selector.
+- `src/app/[serial]/[category]/[page]/page.tsx` — wiki page view; resolves serial/category/page, reads the user's chapter cutoff from cookie, fetches chapter-filtered section content and floater data (subquery-join: max `chapters.idx` ≤ cutoff per section/floater-row), fetches all chapters and the head chapter id for the edit-mode chapter selector, then delegates all rendering (read and edit modes) to `<PageEditor>`.
+- `src/app/[serial]/[category]/[page]/PageEditor.tsx` — Client Component that owns the page body layout. In read mode renders sections and floater directly from props (so `router.refresh()` after a chapter change immediately reflects new content). In edit mode each section gets a dynamically-imported `<MDEditor>` (SSR disabled), floater fields get text inputs, and a "Writing as of:" `<Select>` lets the editor target any chapter. Changing the chapter calls `getPageContentAtChapter` to pre-fill drafts; on save, calls `savePageContent` with the selected `targetChapterId` then refreshes.
+- `src/app/[serial]/[category]/[page]/actions.ts` — `savePageContent` Server Action and `getPageContentAtChapter` Server Action. `savePageContent` resolves serial/category/page by slug/name and upserts each section/floater field at `(pageId, sectionId, chapterId)` — uses the optional `targetChapterId` when provided, otherwise defaults to the head chapter. `getPageContentAtChapter` runs the same max-idx subquery join but against an explicit chapter id instead of the cookie, returning `{ sections, floaterImageUrl, floaterRows }` for use by the edit-mode chapter selector.
 - `src/components/SerialMetadataEditor.tsx` — Client Component for inline editing of a serial's title, description, authors, and splash art URL; pen-icon toggle swaps between read view and edit form; redirects if the title (slug) changes.
 - `src/components/SerialEditor.tsx` — Client Component managing edit mode for the serial's volumes and chapters; in edit mode shows inline volume/chapter type selectors (persisted immediately on change) rendered as "Each [chapterType] is grouped by [volumeType]", inline rename forms, add-volume/chapter forms, delete confirmations, and drag-and-drop reordering via `@dnd-kit`. All labels, placeholders, and confirmation messages use the serial's chosen type names (e.g. "Episode"/"Season") instead of generic "chapter"/"volume".
-- `src/components/SchemaManager.tsx` — Client Component for managing page schemas; accepts `serialSlug` to render a "View" link to each schema's index page, expand/collapse per-schema detail with section and floater-row add/rename/reorder/delete.
-- `src/components/RenameForm.tsx` — shared generic inline rename form (hidden ID field + text input + Save/Cancel); used by `SchemaManager`.
+- `src/components/CategoryManager.tsx` — Client Component for managing page categories; accepts `serialSlug` to render a "View" link to each category's index page, expand/collapse per-category detail with section and floater-row add/rename/reorder/delete.
+- `src/components/RenameForm.tsx` — shared generic inline rename form (hidden ID field + text input + Save/Cancel); used by `CategoryManager`.
 - `src/components/Navbar.tsx` — shared navbar with site logo and auth placeholder.
 - `src/components/SerialList.tsx` — Client Component owning the search input; filters serial list client-side by title.
 - `src/hooks/useServerAction.ts` — `useServerAction()` hook; wraps a server action in `useTransition` + `router.refresh()`. Returns `{ run, isPending }`. Use in all Client Components that call Server Actions.

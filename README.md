@@ -20,12 +20,12 @@ Progress is stored in `localStorage` for anonymous users and synced to their acc
 |------|------------|
 | **Serial** | The story a wiki covers (a book series, TV show, etc.) |
 | **Chapter** | A single installment — episode, book chapter, volume, etc. |
-| **Schema** | A page type within a serial (e.g. Characters, Locations) |
-| **Page** | A single wiki entry belonging to a schema |
+| **Page Category** | A page type within a serial (e.g. Characters, Locations) |
+| **Page** | A single wiki entry belonging to a category |
 
 ### Pages
 
-Every page belongs to a schema. Schemas define two layout components:
+Every page belongs to a category. Page categories define two layout components:
 
 - **Body** — an ordered list of named sections, each storing Markdown text.
 - **Floater** *(optional)* — a sidebar panel with a header, image, and labeled rows.
@@ -35,8 +35,8 @@ Every page also records the chapter it was first introduced in, which determines
 ### URL structure
 
 ```
-/{serial}/{schema}           # schema index page
-/{serial}/{schema}/{page-name}
+/{serial}/{category}           # category index page
+/{serial}/{category}/{page-name}
 ```
 
 ## Data model
@@ -48,7 +48,7 @@ SELECT ... GROUP BY section_id HAVING chapters.idx = MAX(chapters.idx)
 WHERE page_id = ? AND chapters.idx <= N
 ```
 
-Schema structure (sections, floater rows) is versioned by wall-clock time. Page content is versioned by chapter index. These two axes are independent.
+Category structure (sections, floater rows) is versioned by wall-clock time. Page content is versioned by chapter index. These two axes are independent.
 
 ### Tables
 
@@ -58,11 +58,11 @@ serial_authors   serial_id, name, display_order
 volumes          id, serial_id, display_name, idx
 chapters         id, volume_id, display_name, idx
 
-page_schemas         id, serial_id, name, body, has_floater
-schema_sections      id, schema_id, name, display_order, created_at, deleted_at
-schema_floater_rows  id, schema_id, label, display_order, created_at, deleted_at
+page_categories          id, serial_id, name, body, has_floater
+category_sections        id, category_id, name, display_order, created_at, deleted_at
+category_floater_rows    id, category_id, label, display_order, created_at, deleted_at
 
-pages                    id, schema_id, name, intro_chapter_id
+pages                    id, category_id, name, intro_chapter_id
 page_section_versions    page_id, section_id, chapter_id, content
 page_floater_versions    page_id, chapter_id, image_url
 page_floater_row_versions  page_id, floater_row_id, chapter_id, content
