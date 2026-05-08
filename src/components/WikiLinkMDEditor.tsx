@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { MDEditor } from "@/components/MDEditor";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 
 interface WikiPage {
   category: string;
@@ -50,10 +51,8 @@ export function WikiLinkMDEditor({
   height = 300,
   preview = "edit",
   wikiPages,
-  serialSlug: _serialSlug,
+  serialSlug,
 }: Props) {
-  // _serialSlug is reserved for a future live-preview link resolver.
-  void _serialSlug;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -193,6 +192,13 @@ export function WikiLinkMDEditor({
         onChange={onChange}
         height={height}
         preview={preview}
+        components={{
+          preview: (source) => (
+            <MarkdownRenderer serialSlug={serialSlug} className="p-4">
+              {source}
+            </MarkdownRenderer>
+          ),
+        }}
         textareaProps={{
           ref: textareaRef,
           onInput: handleInput,

@@ -307,7 +307,7 @@ export function PageEditor({
                 Current value
               </Text>
               {currentSectionContent[section.id] ? (
-                <MarkdownRenderer sm serialSlug={serialSlug}>
+                <MarkdownRenderer serialSlug={serialSlug}>
                   {currentSectionContent[section.id]}
                 </MarkdownRenderer>
               ) : (
