@@ -10,6 +10,7 @@ import {
   categorySections,
   categoryFloaterRows,
   pageSectionVersions,
+  pageSummaries,
   pageFloaterVersions,
   pageFloaterRowVersions,
 } from "@/db/schema";
@@ -88,20 +89,22 @@ async function resolvePageIds(
  *
  * Each section/floater field is an upsert keyed by (pageId, …, chapterId).
  * Readers at an earlier chapter cutoff see the previous version via the
- * max-idx subquery read path.
+ * max-idx subquery read path. `summaryContent` is saved to the dedicated
+ * `page_summaries` table using the same versioning pattern.
  *
  * @example
  * // Write at head (default behaviour — UI passes undefined)
- * await savePageContent(serialSlug, categoryName, pageName, sectionContent, floaterImageUrl, floaterRowContent);
+ * await savePageContent(serialSlug, categoryName, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent);
  *
  * @example
  * // Write at a specific chapter (used by the chapter selector in edit mode)
- * await savePageContent(serialSlug, categoryName, pageName, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
+ * await savePageContent(serialSlug, categoryName, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
  */
 export async function savePageContent(
   serialSlug: string,
   categoryName: string,
   pageName: string,
+  summaryContent: string,
   sectionContent: Record<number, string>,
   floaterImageUrl: string | null,
   floaterRowContent: Record<number, string>,
@@ -115,6 +118,15 @@ export async function savePageContent(
   const headChapterId = targetChapterId ?? (await getHeadChapterId(serialId));
 
   await db.transaction(async (tx) => {
+    // Upsert the summary content
+    await tx
+      .insert(pageSummaries)
+      .values({ pageId, chapterId: headChapterId, content: summaryContent })
+      .onConflictDoUpdate({
+        target: [pageSummaries.pageId, pageSummaries.chapterId],
+        set: { content: summaryContent },
+      });
+
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
       const sectionId = parseInt(sectionIdStr, 10);
       await tx
@@ -173,6 +185,7 @@ export async function savePageContent(
  *
  * @example
  * const data = await getPageContentAtChapter('my-serial', 'Characters', 'Anya', 42);
+ * // data.summaryContent: '...'
  * // data.sections: [{ id: 1, content: '...' }, ...]
  * // data.floaterImageUrl: 'https://...' | null
  * // data.floaterRows: [{ id: 3, content: '...' }, ...]
@@ -183,6 +196,7 @@ export async function getPageContentAtChapter(
   pageName: string,
   chapterId: number,
 ): Promise<{
+  summaryContent: string;
   sections: { id: number; content: string }[];
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
@@ -199,6 +213,16 @@ export async function getPageContentAtChapter(
 
   const cutoffIdx = targetChapter.idx;
 
+  // Summary max-idx subquery
+  const summaryMaxIdxSq = db
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageSummaries)
+    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+    .where(
+      and(eq(pageSummaries.pageId, pageId), lte(chapters.idx, cutoffIdx)),
+    )
+    .as("summary_max_idx_sq");
+
   const sectionMaxIdxSq = db
     .select({
       sectionId: pageSectionVersions.sectionId,
@@ -212,7 +236,14 @@ export async function getPageContentAtChapter(
     .groupBy(pageSectionVersions.sectionId)
     .as("section_max_idx_sq");
 
-  const [activeSections, sectionVersions] = await Promise.all([
+  const [summaryVersions, activeSections, sectionVersions] = await Promise.all([
+    db
+      .select({ content: pageSummaries.content })
+      .from(pageSummaries)
+      .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+      .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
+      .where(eq(pageSummaries.pageId, pageId))
+      .limit(1),
     db
       .select({ id: categorySections.id })
       .from(categorySections)
@@ -240,6 +271,7 @@ export async function getPageContentAtChapter(
       .where(eq(pageSectionVersions.pageId, pageId)),
   ]);
 
+  const summaryContent = summaryVersions[0]?.content ?? "";
   const contentBySectionId = new Map(
     sectionVersions.map((v) => [v.sectionId, v.content]),
   );
@@ -249,7 +281,7 @@ export async function getPageContentAtChapter(
   }));
 
   if (!category.hasFloater) {
-    return { sections, floaterImageUrl: null, floaterRows: [] };
+    return { summaryContent, sections, floaterImageUrl: null, floaterRows: [] };
   }
 
   const floaterMaxIdxSq = db
@@ -320,6 +352,7 @@ export async function getPageContentAtChapter(
     floaterRowVersions.map((v) => [v.floaterRowId, v.content]),
   );
   return {
+    summaryContent,
     sections,
     floaterImageUrl: floaterVersion?.imageUrl ?? null,
     floaterRows: activeFloaterRows.map((r) => ({

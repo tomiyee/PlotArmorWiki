@@ -7,8 +7,9 @@ import {
   pageCategories,
   pages,
   chapters,
-  categorySections,
   categoryFloaterRows,
+  categorySections,
+  pageSummaries,
   pageSectionVersions,
   pageFloaterVersions,
   pageFloaterRowVersions,
@@ -115,23 +116,32 @@ export async function getWikiLinkPreview(
     };
   }
 
-  // Fetch first section content at the user's cutoff
-  const firstSection = await db
-    .select({ id: categorySections.id })
-    .from(categorySections)
+  // Fetch summary content at the user's cutoff — summary is always the first
+  // thing shown in the hover card preview.
+  const summaryMaxIdxSq = db
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageSummaries)
+    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
     .where(
       and(
-        eq(categorySections.categoryId, category.id),
-        isNull(categorySections.deletedAt),
+        eq(pageSummaries.pageId, page.id),
+        lte(chapters.idx, cutoffIdx),
       ),
     )
-    .orderBy(asc(categorySections.displayOrder))
+    .as("summary_max_idx_sq");
+
+  const [summaryVersion] = await db
+    .select({ content: pageSummaries.content })
+    .from(pageSummaries)
+    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+    .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
+    .where(eq(pageSummaries.pageId, page.id))
     .limit(1);
 
-  let firstSectionContent = "";
-  if (firstSection.length > 0) {
-    const sectionId = firstSection[0].id;
+  let firstSectionContent = summaryVersion?.content ?? "";
 
+  // Fall back to the first section if there is no summary yet
+  if (!firstSectionContent) {
     const sectionMaxIdxSq = db
       .select({
         sectionId: pageSectionVersions.sectionId,
@@ -142,17 +152,20 @@ export async function getWikiLinkPreview(
       .where(
         and(
           eq(pageSectionVersions.pageId, page.id),
-          eq(pageSectionVersions.sectionId, sectionId),
           lte(chapters.idx, cutoffIdx),
         ),
       )
       .groupBy(pageSectionVersions.sectionId)
       .as("section_max_idx_sq");
 
-    const [sectionVersion] = await db
+    const [firstSection] = await db
       .select({ content: pageSectionVersions.content })
       .from(pageSectionVersions)
       .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+      .innerJoin(
+        categorySections,
+        eq(pageSectionVersions.sectionId, categorySections.id),
+      )
       .innerJoin(
         sectionMaxIdxSq,
         and(
@@ -160,10 +173,16 @@ export async function getWikiLinkPreview(
           eq(chapters.idx, sectionMaxIdxSq.maxIdx),
         ),
       )
-      .where(eq(pageSectionVersions.pageId, page.id))
+      .where(
+        and(
+          eq(pageSectionVersions.pageId, page.id),
+          isNull(categorySections.deletedAt),
+        ),
+      )
+      .orderBy(asc(categorySections.displayOrder))
       .limit(1);
 
-    firstSectionContent = sectionVersion?.content ?? "";
+    firstSectionContent = firstSection?.content ?? "";
   }
 
   // Fetch floater data if the category has one

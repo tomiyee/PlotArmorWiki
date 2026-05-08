@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { savePageContent, getPageContentAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
+import { InfoIcon } from "@/components/ui/info-icon";
 
 interface SectionData {
   id: number;
@@ -36,6 +37,11 @@ interface Props {
   serialSlug: string;
   categoryName: string;
   pageName: string;
+  /**
+   * Chapter-versioned summary content shown at the top of the page with no
+   * section header in read mode. Always present; empty string means no content yet.
+   */
+  summaryContent: string;
   sections: SectionData[];
   /** null when the category has no floater */
   floaterImageUrl: string | null | undefined;
@@ -79,6 +85,7 @@ interface Props {
  *   serialSlug="one-piece"
  *   categoryName="Characters"
  *   pageName="Luffy"
+ *   summaryContent="Monkey D. Luffy is the captain of the Straw Hat Pirates."
  *   sections={[{ id: 1, name: 'Overview', content: '...' }]}
  *   floaterImageUrl="https://..."
  *   floaterRows={[{ id: 2, label: 'Age', content: '19' }]}
@@ -92,6 +99,7 @@ export function PageEditor({
   serialSlug,
   categoryName,
   pageName,
+  summaryContent,
   sections,
   floaterImageUrl,
   floaterRows,
@@ -103,6 +111,10 @@ export function PageEditor({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isEditing, registerHandlers } = useEditMode();
+
+  const [draftSummaryContent, setDraftSummaryContent] = useState<string>(summaryContent);
+  // Reference view for summary in edit mode — same as draft initially; updates on chapter change.
+  const [currentSummaryContent, setCurrentSummaryContent] = useState<string>(summaryContent);
 
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
@@ -132,6 +144,8 @@ export function PageEditor({
   const hasFloater = floaterImageUrl !== undefined;
 
   const handleDiscard = useCallback(() => {
+    setDraftSummaryContent(summaryContent);
+    setCurrentSummaryContent(summaryContent);
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
@@ -143,7 +157,7 @@ export function PageEditor({
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }, [sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
+  }, [summaryContent, sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
@@ -151,6 +165,7 @@ export function PageEditor({
         serialSlug,
         categoryName,
         pageName,
+        draftSummaryContent,
         draftSectionContent,
         hasFloater ? draftFloaterImageUrl.trim() || null : null,
         hasFloater ? draftFloaterRowContent : {},
@@ -162,6 +177,7 @@ export function PageEditor({
     serialSlug,
     categoryName,
     pageName,
+    draftSummaryContent,
     draftSectionContent,
     hasFloater,
     draftFloaterImageUrl,
@@ -188,6 +204,8 @@ export function PageEditor({
         pageName,
         chapterId,
       );
+      setCurrentSummaryContent(data.summaryContent);
+      setDraftSummaryContent(data.summaryContent);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
@@ -238,6 +256,13 @@ export function PageEditor({
               </dl>
             )}
           </aside>
+        )}
+
+        {/* Summary — shown at the top with no header */}
+        {summaryContent && (
+          <div className="mb-6">
+            <MarkdownRenderer serialSlug={serialSlug}>{summaryContent}</MarkdownRenderer>
+          </div>
         )}
 
         {sections.map((section) => (
@@ -292,6 +317,41 @@ export function PageEditor({
           />
         </Box>
       )}
+
+      {/* Summary — always first; labeled in edit mode but has no header in read mode */}
+      <Box col className="gap-2">
+        <Box className="items-center gap-2">
+          <Text variant="h2">Summary</Text>
+          <InfoIcon contents="Shown at the top of the page with no heading." />
+        </Box>
+        <div className="grid grid-cols-2 gap-4 items-start">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
+            <Text
+              variant="label"
+              className="mb-2 block text-xs text-gray-400 uppercase tracking-wide"
+            >
+              Current value
+            </Text>
+            {currentSummaryContent ? (
+              <MarkdownRenderer serialSlug={serialSlug}>
+                {currentSummaryContent}
+              </MarkdownRenderer>
+            ) : (
+              <Text muted className="text-sm">
+                No content at this chapter.
+              </Text>
+            )}
+          </div>
+          <WikiLinkMDEditor
+            value={draftSummaryContent}
+            onChange={(val) => setDraftSummaryContent(val ?? "")}
+            height={300}
+            preview="edit"
+            wikiPages={wikiPages}
+            serialSlug={serialSlug}
+          />
+        </div>
+      </Box>
 
       {sections.map((section) => (
         <Box key={section.id} col className="gap-2">
