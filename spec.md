@@ -116,7 +116,7 @@ A user visiting a serial wiki for the first time defaults to the first chapter. 
 
 All wiki page content is stored using **single-timestamp versioning**. Every versioned row carries a `chapter_id` — the chapter when that content was introduced or last changed. There is at most one revision per `(page, section, chapter)` tuple; the primary key enforces this.
 
-Schema structure (sections, floater rows) and page content are versioned on separate axes:
+Category structure (sections, floater rows) and page content are versioned on separate axes:
 
 - **Category structure** — versioned by wall-clock time (`created_at` / `deleted_at`). Changes take effect immediately for all editors.
 - **Page content** — versioned by chapter identity. Readers see only content from chapters at or before their progress cutoff.
