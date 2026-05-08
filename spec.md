@@ -79,6 +79,17 @@ All wiki page attributes are stored as a **time series**: every value is associa
 
 This is the core mechanism behind spoiler protection — when an audience member sets their chapter cutoff, the system renders only attribute values from chapters at or before that point.
 
+### Wiki Links
+
+Page content can cross-link to other pages within the same serial using the `[[Category:Page]]` syntax:
+
+```
+[[Characters:Luffy]]          → /serial/Characters/Luffy
+[[Characters:Luffy|Luffy]]    → same URL, display text "Luffy"
+```
+
+The parser (`src/lib/wiki-links.ts`) and remark plugin (`src/lib/remark-wiki-links.ts`) convert these tokens into standard markdown links at render time. The editor (`WikiLinkMDEditor`) provides autocomplete for valid `[[` tokens and uses the same renderer for its preview pane so the editor preview matches the final output exactly. Links inside backticks are left as literal text.
+
 ### Spoiler-Aware Navigation
 
 All links and search results are filtered through the user's current progress state.
