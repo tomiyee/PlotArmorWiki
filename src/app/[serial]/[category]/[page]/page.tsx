@@ -388,6 +388,7 @@ export default async function PageView({ params }: Props) {
             headChapterId={headChapterId}
             readingChapterId={readingChapterId}
             wikiPages={wikiPages}
+            introChapterIdx={introChapter?.idx ?? null}
           />
         </Box>
       </PageContainer>

@@ -64,6 +64,8 @@ interface Props {
   /** Wiki pages visible to the reader at their chapter cutoff, used to power
    * the `[[Category:Page]]` autocomplete in edit mode. */
   wikiPages: { category: string; name: string }[];
+  /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
+  introChapterIdx: number | null;
 }
 
 /**
@@ -113,6 +115,7 @@ export function PageEditor({
   headChapterId,
   readingChapterId,
   wikiPages,
+  introChapterIdx,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -308,6 +311,7 @@ export function PageEditor({
   const selectedChapterIdx = allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
   // Build Select options: volumes as optgroups, chapters as options inside each.
+  // Chapters before the page's intro chapter are disabled — content can't predate the page.
   const chapterSelectOptions = (() => {
     const volumeMap = new Map<
       string,
@@ -321,7 +325,11 @@ export function PageEditor({
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
       label: volumeName,
       value: -1 as number, // group node — value unused
-      children: chaps.map((c) => ({ label: c.label, value: c.value })),
+      children: chaps.map((c) => ({
+        label: c.label,
+        value: c.value,
+        disabled: introChapterIdx !== null && c.idx < introChapterIdx,
+      })),
     }));
   })();
 
@@ -329,16 +337,33 @@ export function PageEditor({
    * Returns a short human-readable label describing when the currently shown
    * "current value" was last updated relative to the selected target chapter.
    * - `null` when there is no content (nothing to annotate).
-   * - `"this chapter"` when the last update is at exactly the selected chapter.
-   * - `"last updated N chapter(s) ago"` when the last update is before the selected chapter.
+   * - `"This Chapter"` when the last update is at exactly the selected chapter.
+   * - `"Last Updated N Chapter(s) Ago"` when the last update is before the selected chapter.
    */
   function lastUpdatedLabel(lastUpdatedIdx: number | null): string | null {
     if (lastUpdatedIdx === null) return null;
     if (selectedChapterIdx === null) return null;
     const delta = selectedChapterIdx - lastUpdatedIdx;
-    if (delta === 0) return "this chapter";
-    if (delta === 1) return "last updated 1 chapter ago";
-    return `last updated ${delta} chapters ago`;
+    if (delta === 0) return "This Chapter";
+    if (delta === 1) return "Last Updated 1 Chapter Ago";
+    return `Last Updated ${delta} Chapters Ago`;
+  }
+
+  function LastUpdatedTag({ lastUpdatedIdx }: { lastUpdatedIdx: number | null }) {
+    const label = lastUpdatedLabel(lastUpdatedIdx);
+    if (!label) return null;
+    const isCurrent = lastUpdatedIdx === selectedChapterIdx;
+    return (
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+          isCurrent
+            ? "bg-blue-100 text-blue-700"
+            : "bg-gray-100 text-gray-500"
+        }`}
+      >
+        {label}
+      </span>
+    );
   }
 
   return (
@@ -367,18 +392,14 @@ export function PageEditor({
         </Box>
         <div className="grid grid-cols-2 gap-4 items-start">
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
-            <div className="mb-2 flex items-baseline gap-2">
+            <div className="mb-2 flex items-center gap-2">
               <Text
                 variant="label"
                 className="block text-xs text-gray-400 uppercase tracking-wide"
               >
                 Current value
               </Text>
-              {lastUpdatedLabel(currentSummaryLastUpdatedIdx) && (
-                <Text variant="label" className="text-xs text-gray-400 normal-case tracking-normal">
-                  · {lastUpdatedLabel(currentSummaryLastUpdatedIdx)}
-                </Text>
-              )}
+              <LastUpdatedTag lastUpdatedIdx={currentSummaryLastUpdatedIdx} />
             </div>
             {currentSummaryContent ? (
               <MarkdownRenderer serialSlug={serialSlug}>
@@ -408,18 +429,14 @@ export function PageEditor({
           <div className="grid grid-cols-2 gap-4 items-start">
             {/* Left: current saved value at the selected chapter */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
-              <div className="mb-2 flex items-baseline gap-2">
+              <div className="mb-2 flex items-center gap-2">
                 <Text
                   variant="label"
                   className="block text-xs text-gray-400 uppercase tracking-wide"
                 >
                   Current value
                 </Text>
-                {lastUpdatedLabel(currentSectionLastUpdatedIdx[section.id] ?? null) && (
-                  <Text variant="label" className="text-xs text-gray-400 normal-case tracking-normal">
-                    · {lastUpdatedLabel(currentSectionLastUpdatedIdx[section.id] ?? null)}
-                  </Text>
-                )}
+                <LastUpdatedTag lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null} />
               </div>
               {currentSectionContent[section.id] ? (
                 <MarkdownRenderer serialSlug={serialSlug}>
