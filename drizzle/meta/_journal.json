@@ -8,6 +8,13 @@
       "when": 1778217557059,
       "tag": "0000_complete_edwin_jarvis",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1747008000000,
+      "tag": "0001_uuid_users_authjs_tables_serial_admins",
+      "breakpoints": true
     }
   ]
 }

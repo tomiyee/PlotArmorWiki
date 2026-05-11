@@ -69,6 +69,48 @@ interface Props {
 }
 
 /**
+ * Returns a short human-readable label describing when the currently shown
+ * "current value" was last updated relative to the selected target chapter.
+ * - `null` when there is no content (nothing to annotate).
+ * - `"This Chapter"` when the last update is at exactly the selected chapter.
+ * - `"Last Updated N Chapter(s) Ago"` when the last update is before the selected chapter.
+ */
+function lastUpdatedLabel(
+  lastUpdatedIdx: number | null,
+  selectedChapterIdx: number | null,
+): string | null {
+  if (lastUpdatedIdx === null) return null;
+  if (selectedChapterIdx === null) return null;
+  const delta = selectedChapterIdx - lastUpdatedIdx;
+  if (delta === 0) return "This Chapter";
+  if (delta === 1) return "Last Updated 1 Chapter Ago";
+  return `Last Updated ${delta} Chapters Ago`;
+}
+
+function LastUpdatedTag({
+  lastUpdatedIdx,
+  selectedChapterIdx,
+}: {
+  lastUpdatedIdx: number | null;
+  selectedChapterIdx: number | null;
+}) {
+  const label = lastUpdatedLabel(lastUpdatedIdx, selectedChapterIdx);
+  if (!label) return null;
+  const isCurrent = lastUpdatedIdx === selectedChapterIdx;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+        isCurrent
+          ? "bg-blue-100 text-blue-700"
+          : "bg-gray-100 text-gray-500"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
+/**
  * Renders the page body in read mode and switches to an inline edit mode where
  * each section gets an MDEditor alongside its current rendered value, and
  * floater fields get plain text inputs.
@@ -333,39 +375,6 @@ export function PageEditor({
     }));
   })();
 
-  /**
-   * Returns a short human-readable label describing when the currently shown
-   * "current value" was last updated relative to the selected target chapter.
-   * - `null` when there is no content (nothing to annotate).
-   * - `"This Chapter"` when the last update is at exactly the selected chapter.
-   * - `"Last Updated N Chapter(s) Ago"` when the last update is before the selected chapter.
-   */
-  function lastUpdatedLabel(lastUpdatedIdx: number | null): string | null {
-    if (lastUpdatedIdx === null) return null;
-    if (selectedChapterIdx === null) return null;
-    const delta = selectedChapterIdx - lastUpdatedIdx;
-    if (delta === 0) return "This Chapter";
-    if (delta === 1) return "Last Updated 1 Chapter Ago";
-    return `Last Updated ${delta} Chapters Ago`;
-  }
-
-  function LastUpdatedTag({ lastUpdatedIdx }: { lastUpdatedIdx: number | null }) {
-    const label = lastUpdatedLabel(lastUpdatedIdx);
-    if (!label) return null;
-    const isCurrent = lastUpdatedIdx === selectedChapterIdx;
-    return (
-      <span
-        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-          isCurrent
-            ? "bg-blue-100 text-blue-700"
-            : "bg-gray-100 text-gray-500"
-        }`}
-      >
-        {label}
-      </span>
-    );
-  }
-
   return (
     <Box col className="gap-6">
       {allChapters.length > 0 && (
@@ -399,7 +408,7 @@ export function PageEditor({
               >
                 Current value
               </Text>
-              <LastUpdatedTag lastUpdatedIdx={currentSummaryLastUpdatedIdx} />
+              <LastUpdatedTag lastUpdatedIdx={currentSummaryLastUpdatedIdx} selectedChapterIdx={selectedChapterIdx} />
             </div>
             {currentSummaryContent ? (
               <MarkdownRenderer serialSlug={serialSlug}>
@@ -436,7 +445,7 @@ export function PageEditor({
                 >
                   Current value
                 </Text>
-                <LastUpdatedTag lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null} />
+                <LastUpdatedTag lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null} selectedChapterIdx={selectedChapterIdx} />
               </div>
               {currentSectionContent[section.id] ? (
                 <MarkdownRenderer serialSlug={serialSlug}>

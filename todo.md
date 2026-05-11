@@ -43,9 +43,8 @@ Primary key: (userId, serialId)
 
 After schema edits:
 
-1. Delete `drizzle/0000_*.sql`.
-2. `pnpm drizzle-kit generate` → regenerates the single squashed migration.
-3. `pnpm drizzle-kit migrate` (Neon).
+1. `pnpm drizzle-kit generate` → creates a new incremental migration file.
+2. `pnpm drizzle-kit migrate` (Neon).
 
 - Commit: `feat: schema — uuid users, Auth.js adapter tables, serial_admins`
 
