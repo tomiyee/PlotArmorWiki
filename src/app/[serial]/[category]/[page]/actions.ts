@@ -197,7 +197,9 @@ export async function getPageContentAtChapter(
   chapterId: number,
 ): Promise<{
   summaryContent: string;
-  sections: { id: number; content: string }[];
+  /** The chapters.idx of the revision that is currently active for the summary, or null if no content exists yet. */
+  summaryLastUpdatedChapterIdx: number | null;
+  sections: { id: number; content: string; lastUpdatedChapterIdx: number | null }[];
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
@@ -238,7 +240,7 @@ export async function getPageContentAtChapter(
 
   const [summaryVersions, activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ content: pageSummaries.content })
+      .select({ content: pageSummaries.content, chapterIdx: chapters.idx })
       .from(pageSummaries)
       .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
       .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
@@ -258,6 +260,7 @@ export async function getPageContentAtChapter(
       .select({
         sectionId: pageSectionVersions.sectionId,
         content: pageSectionVersions.content,
+        chapterIdx: chapters.idx,
       })
       .from(pageSectionVersions)
       .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
@@ -272,16 +275,21 @@ export async function getPageContentAtChapter(
   ]);
 
   const summaryContent = summaryVersions[0]?.content ?? "";
-  const contentBySectionId = new Map(
-    sectionVersions.map((v) => [v.sectionId, v.content]),
+  const summaryLastUpdatedChapterIdx = summaryVersions[0]?.chapterIdx ?? null;
+  const versionBySectionId = new Map(
+    sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
   );
-  const sections = activeSections.map((s) => ({
-    id: s.id,
-    content: contentBySectionId.get(s.id) ?? "",
-  }));
+  const sections = activeSections.map((s) => {
+    const v = versionBySectionId.get(s.id);
+    return {
+      id: s.id,
+      content: v?.content ?? "",
+      lastUpdatedChapterIdx: v?.chapterIdx ?? null,
+    };
+  });
 
   if (!category.hasFloater) {
-    return { summaryContent, sections, floaterImageUrl: null, floaterRows: [] };
+    return { summaryContent, summaryLastUpdatedChapterIdx, sections, floaterImageUrl: null, floaterRows: [] };
   }
 
   const floaterMaxIdxSq = db
@@ -353,6 +361,7 @@ export async function getPageContentAtChapter(
   );
   return {
     summaryContent,
+    summaryLastUpdatedChapterIdx,
     sections,
     floaterImageUrl: floaterVersion?.imageUrl ?? null,
     floaterRows: activeFloaterRows.map((r) => ({

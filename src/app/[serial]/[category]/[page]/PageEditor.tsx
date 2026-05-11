@@ -18,6 +18,8 @@ interface SectionData {
   id: number;
   name: string;
   content: string;
+  /** The chapters.idx of the revision currently active at the reader's cutoff, or null if no content yet. */
+  lastUpdatedChapterIdx: number | null;
 }
 
 interface FloaterRowData {
@@ -42,6 +44,8 @@ interface Props {
    * section header in read mode. Always present; empty string means no content yet.
    */
   summaryContent: string;
+  /** The chapters.idx of the active summary revision at the reader's cutoff, or null if no content yet. */
+  summaryLastUpdatedChapterIdx: number | null;
   sections: SectionData[];
   /** null when the category has no floater */
   floaterImageUrl: string | null | undefined;
@@ -60,6 +64,8 @@ interface Props {
   /** Wiki pages visible to the reader at their chapter cutoff, used to power
    * the `[[Category:Page]]` autocomplete in edit mode. */
   wikiPages: { category: string; name: string }[];
+  /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
+  introChapterIdx: number | null;
 }
 
 /**
@@ -86,7 +92,8 @@ interface Props {
  *   categoryName="Characters"
  *   pageName="Luffy"
  *   summaryContent="Monkey D. Luffy is the captain of the Straw Hat Pirates."
- *   sections={[{ id: 1, name: 'Overview', content: '...' }]}
+ *   summaryLastUpdatedChapterIdx={1}
+ *   sections={[{ id: 1, name: 'Overview', content: '...', lastUpdatedChapterIdx: 1 }]}
  *   floaterImageUrl="https://..."
  *   floaterRows={[{ id: 2, label: 'Age', content: '19' }]}
  *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
@@ -100,6 +107,7 @@ export function PageEditor({
   categoryName,
   pageName,
   summaryContent,
+  summaryLastUpdatedChapterIdx,
   sections,
   floaterImageUrl,
   floaterRows,
@@ -107,6 +115,7 @@ export function PageEditor({
   headChapterId,
   readingChapterId,
   wikiPages,
+  introChapterIdx,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -115,6 +124,10 @@ export function PageEditor({
   const [draftSummaryContent, setDraftSummaryContent] = useState<string>(summaryContent);
   // Reference view for summary in edit mode — same as draft initially; updates on chapter change.
   const [currentSummaryContent, setCurrentSummaryContent] = useState<string>(summaryContent);
+  // The chapters.idx of the revision currently shown in the summary "Current value" panel.
+  const [currentSummaryLastUpdatedIdx, setCurrentSummaryLastUpdatedIdx] = useState<number | null>(
+    summaryLastUpdatedChapterIdx,
+  );
 
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
@@ -126,6 +139,10 @@ export function PageEditor({
   const [currentSectionContent, setCurrentSectionContent] = useState<
     Record<number, string>
   >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
+  // The chapters.idx of the revision currently shown for each section in the "Current value" panel.
+  const [currentSectionLastUpdatedIdx, setCurrentSectionLastUpdatedIdx] = useState<
+    Record<number, number | null>
+  >(() => Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])));
 
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
@@ -146,18 +163,22 @@ export function PageEditor({
   const handleDiscard = useCallback(() => {
     setDraftSummaryContent(summaryContent);
     setCurrentSummaryContent(summaryContent);
+    setCurrentSummaryLastUpdatedIdx(summaryLastUpdatedChapterIdx);
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
     setCurrentSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
+    setCurrentSectionLastUpdatedIdx(
+      Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
+    );
     setDraftFloaterImageUrl(floaterImageUrl ?? "");
     setDraftFloaterRowContent(
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }, [summaryContent, sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
+  }, [summaryContent, summaryLastUpdatedChapterIdx, sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
@@ -206,11 +227,15 @@ export function PageEditor({
       );
       setCurrentSummaryContent(data.summaryContent);
       setDraftSummaryContent(data.summaryContent);
+      setCurrentSummaryLastUpdatedIdx(data.summaryLastUpdatedChapterIdx);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
       setCurrentSectionContent(newContent);
       setDraftSectionContent(newContent);
+      setCurrentSectionLastUpdatedIdx(
+        Object.fromEntries(data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
+      );
       if (hasFloater) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
@@ -282,7 +307,11 @@ export function PageEditor({
   }
 
   // ── Edit mode ────────────────────────────────────────────────────────────────
+  // The chapters.idx for the currently selected target chapter (for label computation).
+  const selectedChapterIdx = allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
+
   // Build Select options: volumes as optgroups, chapters as options inside each.
+  // Chapters before the page's intro chapter are disabled — content can't predate the page.
   const chapterSelectOptions = (() => {
     const volumeMap = new Map<
       string,
@@ -296,9 +325,46 @@ export function PageEditor({
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
       label: volumeName,
       value: -1 as number, // group node — value unused
-      children: chaps.map((c) => ({ label: c.label, value: c.value })),
+      children: chaps.map((c) => ({
+        label: c.label,
+        value: c.value,
+        disabled: introChapterIdx !== null && c.idx < introChapterIdx,
+      })),
     }));
   })();
+
+  /**
+   * Returns a short human-readable label describing when the currently shown
+   * "current value" was last updated relative to the selected target chapter.
+   * - `null` when there is no content (nothing to annotate).
+   * - `"This Chapter"` when the last update is at exactly the selected chapter.
+   * - `"Last Updated N Chapter(s) Ago"` when the last update is before the selected chapter.
+   */
+  function lastUpdatedLabel(lastUpdatedIdx: number | null): string | null {
+    if (lastUpdatedIdx === null) return null;
+    if (selectedChapterIdx === null) return null;
+    const delta = selectedChapterIdx - lastUpdatedIdx;
+    if (delta === 0) return "This Chapter";
+    if (delta === 1) return "Last Updated 1 Chapter Ago";
+    return `Last Updated ${delta} Chapters Ago`;
+  }
+
+  function LastUpdatedTag({ lastUpdatedIdx }: { lastUpdatedIdx: number | null }) {
+    const label = lastUpdatedLabel(lastUpdatedIdx);
+    if (!label) return null;
+    const isCurrent = lastUpdatedIdx === selectedChapterIdx;
+    return (
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+          isCurrent
+            ? "bg-blue-100 text-blue-700"
+            : "bg-gray-100 text-gray-500"
+        }`}
+      >
+        {label}
+      </span>
+    );
+  }
 
   return (
     <Box col className="gap-6">
@@ -326,12 +392,15 @@ export function PageEditor({
         </Box>
         <div className="grid grid-cols-2 gap-4 items-start">
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
-            <Text
-              variant="label"
-              className="mb-2 block text-xs text-gray-400 uppercase tracking-wide"
-            >
-              Current value
-            </Text>
+            <div className="mb-2 flex items-center gap-2">
+              <Text
+                variant="label"
+                className="block text-xs text-gray-400 uppercase tracking-wide"
+              >
+                Current value
+              </Text>
+              <LastUpdatedTag lastUpdatedIdx={currentSummaryLastUpdatedIdx} />
+            </div>
             {currentSummaryContent ? (
               <MarkdownRenderer serialSlug={serialSlug}>
                 {currentSummaryContent}
@@ -360,12 +429,15 @@ export function PageEditor({
           <div className="grid grid-cols-2 gap-4 items-start">
             {/* Left: current saved value at the selected chapter */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
-              <Text
-                variant="label"
-                className="mb-2 block text-xs text-gray-400 uppercase tracking-wide"
-              >
-                Current value
-              </Text>
+              <div className="mb-2 flex items-center gap-2">
+                <Text
+                  variant="label"
+                  className="block text-xs text-gray-400 uppercase tracking-wide"
+                >
+                  Current value
+                </Text>
+                <LastUpdatedTag lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null} />
+              </div>
               {currentSectionContent[section.id] ? (
                 <MarkdownRenderer serialSlug={serialSlug}>
                   {currentSectionContent[section.id]}
