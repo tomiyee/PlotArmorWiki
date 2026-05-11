@@ -16,6 +16,12 @@ interface NavbarSerialContextValue {
   chapterSelectorSlot: ReactNode;
   /** Pre-rendered SerialTOCDrawer (mobile Contents button) for the right side of the navbar. */
   tocSlot: ReactNode;
+  /**
+   * Server-rendered auth section (Sign In button or user avatar + Sign Out).
+   * Passed from the root layout so auth state resolves server-side even though
+   * the Navbar itself is a Client Component.
+   */
+  authSlot: ReactNode;
   /** Called by SerialNavInjector on mount to populate both sides of the navbar. */
   setSerial: (data: NavbarSerialData, chapterSlot: ReactNode, tocSlot: ReactNode) => void;
   /** Called by SerialNavInjector on unmount to restore the default navbar. */
@@ -26,18 +32,27 @@ const NavbarSerialContext = createContext<NavbarSerialContextValue | null>(
   null,
 );
 
+interface NavbarSerialProviderProps {
+  children: ReactNode;
+  /** Server-rendered auth section passed from root layout. */
+  authSlot?: ReactNode;
+}
+
 /**
  * Provides typed serial data and a pre-rendered ChapterSelector slot for the
  * navbar. Wrap the root layout with this provider so any serial route can
  * inject content without prop-drilling across layout boundaries.
  *
+ * Pass `authSlot` from the root layout (a Server Component) so auth state is
+ * resolved server-side and injected into the client Navbar.
+ *
  * @example
- * <NavbarSerialProvider>
+ * <NavbarSerialProvider authSlot={<NavbarAuthSection />}>
  *   <Navbar />
  *   {children}
  * </NavbarSerialProvider>
  */
-export function NavbarSerialProvider({ children }: { children: ReactNode }) {
+export function NavbarSerialProvider({ children, authSlot }: NavbarSerialProviderProps) {
   const [serialData, setSerialData] = useState<NavbarSerialData | null>(null);
   const [chapterSelectorSlot, setChapterSelectorSlot] =
     useState<ReactNode>(null);
@@ -60,7 +75,7 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
 
   return (
     <NavbarSerialContext.Provider
-      value={{ serialData, chapterSelectorSlot, tocSlot, setSerial, clearSerial }}
+      value={{ serialData, chapterSelectorSlot, tocSlot, authSlot: authSlot ?? null, setSerial, clearSerial }}
     >
       {children}
     </NavbarSerialContext.Provider>

@@ -5,6 +5,7 @@ import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModeFAB } from "@/components/EditModeFAB";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NavbarAuthSection } from "@/components/auth/NavbarAuthSection";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,7 +21,7 @@ type RootLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-export default function RootLayout(props: RootLayoutProps) {
+export default async function RootLayout(props: RootLayoutProps) {
   const { children } = props;
   return (
     <html
@@ -34,7 +35,7 @@ export default function RootLayout(props: RootLayoutProps) {
       >
         <TooltipProvider>
           <EditModeProvider>
-            <NavbarSerialProvider>
+            <NavbarSerialProvider authSlot={<NavbarAuthSection />}>
               <Navbar />
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 {children}
