@@ -1,277 +1,392 @@
-# PlotArmor — Design Spec
+# PlotArmor Wiki
 
-**PlotArmor** is a wiki platform for serial entertainment (books, TV shows, etc.) that protects readers from spoilers by only surfacing information up to a chapter they choose.
+## Overview
 
-Standard wikis always show the latest state of any character, location, or other entry. This is a problem for readers mid-series: looking something up exposes them to events they haven't reached yet. PlotArmor solves this by treating every piece of wiki content as a time series tied to specific chapters, so the wiki can render a "snapshot" of the world as of any point in the story.
+**PlotArmor** is a spoiler-protected wiki platform for serial media such as novels, comics, anime, manga, and TV shows.
 
----
-
-## Vocabulary
-
-| Term         | Definition                                                               |
-| ------------ | ------------------------------------------------------------------------ |
-| **Serial**   | The story a wiki covers (a book series, TV show, etc.)                   |
-| **Audience** | A reader or viewer consuming the series                                  |
-| **Chapter**  | A single installment of the series (episode, book chapter, volume, etc.) |
+Traditional wikis always display the latest known state of characters, locations, and events, which exposes readers to spoilers. PlotArmor solves this by treating all wiki content as **time-versioned data tied to chapters**. Readers select their current progress, and the wiki renders a snapshot of the story world only up to that point.
 
 ---
 
-## Concepts
+# Core Concepts
 
-### URL Structure
+## Serials, Volumes, and Chapters
 
-Wiki pages follow a consistent URL pattern:
+### Definitions
 
-```
-/{serial}/{category}           # category index: name, description, page list
-/{serial}/{category}/{page-name}
-```
+- **Serial** — a complete story or franchise.
+- **Volume** — a collection of chapters.
+- **Chapter** — the smallest progression unit in a serial.
 
-The root path `/` serves the home page (see below).
+The exact terminology for Chapter and Volume can change per Serial. For example, for a TV show, it could be Seasons and Episodes. For a book series, it could be Books and Chapters.
 
-### Home Page
+### Ordering Rules
 
-The home page is the entry point for users who are not navigating directly to a wiki. It provides:
+- Volumes and chapters are strictly ordered.
+- Every chapter belongs to exactly one volume.
+- Chapters never occur simultaneously.
+- Chapter ordering defines the canonical story timeline.
 
-- **Search** — a search bar for finding existing serial wikis by name.
-- **Wiki creation** — users can create a new wiki if one does not already exist for a given serial. This is expected to be an uncommon action.
+### IDs vs Indices
 
-### Serial
+Each volume and chapter has:
 
-A serial is the top-level container for a wiki. It has the following properties:
+- A stable **ID**
+- A mutable **index/order**
 
-- **Title** — the name of the serial.
-- **Authors** — one or more creators of the serial (writer, showrunner, etc.).
-- **Description** — a spoiler-free summary of the serial, similar in style to a Netflix synopsis. This is a social convention; the system does not enforce it.
-- **Splash art** _(optional)_ — a cover or banner image representing the serial.
+All references use the stable **chapter ID**, not the index.
 
-### Page Category
+This allows:
 
-A page category defines a *type* of wiki page within a serial — for example, a serial might have a Character category and a Location category. Every wiki page belongs to exactly one category, and all pages of that category share the same structure.
+- Reordering chapters
+- Inserting chapters retroactively
+- Preserving existing references
 
-Page categories are serial-specific: a serial can have many categories, and each category belongs to exactly one serial.
+### Constraints
 
-A page category has an optional **description** (`body`) — a markdown text field shown on the category index page (`/{serial}/{category}`) explaining what this category covers (e.g. "Characters introduced throughout the series").
-
-Every wiki page has the following required system property, regardless of category:
-
-- **Introduction chapter** — the chapter in which the subject is first introduced in the serial. Used to determine whether the page is visible to a given user.
-
-A page category also defines two structural components for its pages:
-
-- **Body** — an ordered list of named sections. Each section stores Markdown text.
-- **Floater** _(optional)_ — a sidebar panel that floats in the top-right of the page, containing:
-  - A header
-  - An image URL
-  - An arbitrary list of rows, where each row is a string or a list of tags/strings
-
-### Chapters
-
-Chapters are the atomic unit of progression in a serial. Key properties:
-
-- Each chapter has a **display name** as it appears in the series (e.g., "Episode 4", "Act II", "Chapter 12").
-- Each chapter is assigned an **internal index** for sorting.
-- Not every series uses well-structured numbering, so the display name is always stored separately from the index.
-
-### Chapter Revisions
-
-All wiki page attributes are stored as a **time series**: every value is associated with the chapter in which it was introduced or last changed.
-
-This is the core mechanism behind spoiler protection — when an audience member sets their chapter cutoff, the system renders only attribute values from chapters at or before that point.
-
-### Wiki Links
-
-Page content can cross-link to other pages within the same serial using the `[[Category:Page]]` syntax:
-
-```
-[[Characters:Luffy]]          → /serial/Characters/Luffy
-[[Characters:Luffy|Luffy]]    → same URL, display text "Luffy"
-```
-
-The parser (`src/lib/wiki-links.ts`) and remark plugin (`src/lib/remark-wiki-links.ts`) convert these tokens into standard markdown links at render time. The editor (`WikiLinkMDEditor`) provides autocomplete for valid `[[` tokens and uses the same renderer for its preview pane so the editor preview matches the final output exactly. Links inside backticks are left as literal text.
-
-### Spoiler-Aware Navigation
-
-All links and search results are filtered through the user's current progress state.
-
-**Blocked pages**
-If a user navigates to or follows a link to a page whose introduction chapter is beyond their current progress, the page content is hidden entirely. In its place, a message is shown:
-
-> *"This [page category] is introduced in [chapter name]. This page is hidden to prevent spoilers."*
-
-The page's title is also withheld to avoid revealing names the user has not yet encountered.
-
-**Search**
-Search results exclude any pages whose introduction chapter is beyond the user's current progress. Those pages are invisible to the user as if they do not exist.
-
-### User Progress State
-
-A user's current chapter is their **progress state** for a given serial. It acts as the cutoff for all spoiler-protected rendering on that wiki.
-
-**Setting the chapter**
-The navbar exposes a chapter selector (menu or icon) on every wiki page. The user can open it at any time to change their current chapter for that serial.
-
-**First-time visitors**
-A user visiting a serial wiki for the first time defaults to the first chapter. A temporary callout is displayed to inform them of this default and prompt them to select the chapter they are actually on.
-
-**Persistence**
-
-- _Anonymous users_ — progress state is saved in browser storage (localStorage) per serial. Selections persist across sessions on the same device/browser.
-- _Logged-in users_ — the selected chapter is saved to their account per serial. When they return or log in, their last saved chapter is restored automatically.
+- Chapters or volumes may only be deleted if nothing references them.
+- Temporal data always references chapter IDs.
 
 ---
 
-## Data Model
+# User Progress System
 
-### Versioning Strategy
+Each user has a **progress chapter** per serial. This acts as the spoiler cutoff for all rendering.
 
-All wiki page content is stored using **single-timestamp versioning**. Every versioned row carries a `chapter_id` — the chapter when that content was introduced or last changed. There is at most one revision per `(page, section, chapter)` tuple; the primary key enforces this.
+## First-Time Visitors
 
-Category structure (sections, floater rows) and page content are versioned on separate axes:
+- New visitors default to the first chapter.
+- A temporary callout prompts them to select their actual progress.
 
-- **Category structure** — versioned by wall-clock time (`created_at` / `deleted_at`). Changes take effect immediately for all editors.
-- **Page content** — versioned by chapter identity. Readers see only content from chapters at or before their progress cutoff.
+## Persistence
 
-Each section and floater row has a **stable ID** so that content rows survive renames and reordering of category attributes without modification.
+### Anonymous Users
 
-**Read rule**: To read a content value as of the user's cutoff chapter (idx N), find the revision for that dimension with the highest `chapter.idx` that is ≤ N:
+- Progress is stored in `localStorage`
+- Scoped per serial
+- Persists across browser sessions
 
-```sql
-SELECT ... FROM page_section_versions
-JOIN chapters ON chapter_id = chapters.id
-WHERE page_id = ? AND chapters.idx <= N
-GROUP BY section_id
-HAVING chapters.idx = MAX(chapters.idx)
-```
+### Logged-In Users
 
-**Chapter reordering**: Because revisions are keyed by `chapter_id` (not `chapters.idx`), reassigning `idx` during a reorder has no effect on which revision is "latest at or before" a given chapter — revisions naturally follow their chapter's new position. No post-reorder repair step is needed.
-
-**User progress follows chapter identity, not position**: Anonymous progress is stored as a chapter ID (not an idx). If a user sets their cutoff to "Book 2, Chapter 3" and the author later inserts an earlier chapter before it, the user's cutoff chapter ID is unchanged — they are now implicitly past the new chapter too. This is intentional: a new chapter inserted before the user's current position is assumed to have been read, since the user self-reported being at the later chapter.
-
-**Introduction chapter follows chapter identity**: `pages.intro_chapter_id` stores a chapter ID. If that chapter is reordered to a later position, the page becomes visible to fewer users; if moved earlier, it becomes visible to more. This is intentional — the author is making a structural correction to when the subject was first introduced, and visibility should follow that correction.
-
-### Write Path
-
-`savePageContent` accepts an optional `targetChapterId`. When provided it writes at that chapter directly; when omitted it defaults to the **head chapter** (the latest chapter in the serial) so fully-caught-up readers see changes immediately. For each versioned dimension being saved, it performs a single upsert keyed by `(pageId, sectionId, chapterId)`:
-
-- If a revision already exists at the target chapter for that dimension, update it in-place.
-- Otherwise insert a new revision row at the target chapter.
-
-This is implemented in `savePageContent` in `src/app/[serial]/[category]/[page]/actions.ts` and runs inside a single transaction.
+- Progress is stored server-side per serial
+- Automatically restored on login or revisit
 
 ---
 
-### Tables
+# Wiki Pages
 
-#### Core structure
+## Structure
 
-```
-serials
-  id, title, slug, description, splash_art_url, chapter_type, volume_type
+Every wiki page belongs to a single serial and contains temporal content.
 
-serial_authors
-  serial_id, name, display_order
+A page consists of:
 
-volumes
-  id, serial_id, display_name, idx
-
-chapters
-  id, volume_id, display_name, idx
-```
-
-`chapters.idx` is a **global, serial-level** integer used in all range comparisons — it is strictly increasing across all volumes (all chapters in Volume N come before Volume N+1). Volumes are an organizational grouping layer only; they do not affect the chapter-range query logic.
-
-#### Page category definition (wall-clock versioned)
-
-```
-page_categories
-  id, serial_id, name, body, has_floater
-
-category_sections
-  id, category_id, name, display_order, created_at, deleted_at
-
-category_floater_rows
-  id, category_id, label, display_order, created_at, deleted_at
-```
-
-`category_floater_rows` only applies when `page_categories.has_floater = true`. All floater rows store markdown text, identical in structure to sections.
-
-#### Pages (chapter-versioned content)
-
-```
-pages
-  id, category_id, name, intro_chapter_id
-
-page_section_versions
-  page_id, section_id, chapter_id, content
-  PK: (page_id, section_id, chapter_id)
-
-page_floater_versions
-  page_id, chapter_id, image_url
-  PK: (page_id, chapter_id)
-
-page_floater_row_versions
-  page_id, floater_row_id, chapter_id, content
-  PK: (page_id, floater_row_id, chapter_id)
-```
-
-Each `chapter_id` is the chapter when that content was introduced or last changed. At most one revision per `(page, section, chapter)` — the PK enforces uniqueness.
-
-The floater header is always rendered from `pages.name` and is not stored separately. The image URL is versioned independently of row content to avoid unnecessary row closures when only one changes.
-
-#### Users
-
-```
-users
-  id, email, display_name, created_at
-
-user_progress
-  user_id, serial_id, chapter_id, updated_at
-  PK: (user_id, serial_id)
-```
-
-Anonymous user progress is stored client-side in `localStorage` per serial — no server row is created.
+- Temporal page visibility
+- Temporal titles
+- Ordered page sections
+- Optional infoboxes
+- Temporal relationships to other pages
 
 ---
 
-## Tech Stack
+## Temporal Rendering Model
 
-### Framework: Next.js (App Router)
-The URL pattern `/{serial}/{category}/{page-name}` maps directly to file-based routing. SSR is required because spoiler filtering is user-specific — content is rendered per-request with the user's chapter cutoff. Next.js handles the API layer (auth, progress saves) in the same project.
+Every piece of content becomes visible starting at a specific chapter ID.
 
-### Database: PostgreSQL
-The versioned content queries (finding the latest revision per group at or before a chapter cutoff) involve grouped aggregates and self-joins. PostgreSQL handles these cleanly, and the data model is inherently relational with multiple join paths.
+When rendering a page for a user:
 
-### ORM: Drizzle ORM
-The versioned queries are too custom for Prisma's generated queries to handle ergonomically. Drizzle allows typed SQL directly where needed, without fighting the abstraction. Schemas map 1:1 to the tables defined above.
-
-### Auth: Auth.js (NextAuth v5)
-Handles the anonymous → logged-in transition. Anonymous users fall through to `localStorage` for progress; logged-in users write to `user_progress`. Auth.js sessions expose `user_id` in Server Components cleanly.
-
-### Search: PostgreSQL full-text search (tsvector)
-Filtered search (excluding pages beyond the user's chapter) requires server-side filtering, making client-side or external search engines (Meilisearch, Typesense) more complex to sync. PG full-text search keeps the chapter filter as a plain SQL `WHERE` clause in the same query.
-
-### Markdown: `@uiw/react-md-editor` + `react-markdown`
-Editor for contributors, renderer for readers.
-
-### Styling: Tailwind CSS
-
-### Hosting: Vercel
-Vercel hosts the app with free tiers sufficient for early development.
+1. Determine the user's cutoff chapter
+2. Fetch the latest valid revision whose chapter index is less than or equal to the cutoff
+3. Hide all future revisions
 
 ---
 
-### Key Trade-offs
+## Page Visibility
 
-| Decision | Chosen | Alternative | Rationale |
-|---|---|---|---|
-| Framework | Next.js | Remix | Larger ecosystem; RSC reduces client bundle on content-heavy pages. Remix is the strongest alternative — its loader/action model maps cleanly to per-request versioned content fetching. |
-| ORM | Drizzle | Prisma | Drizzle wins when queries are custom SQL-heavy |
-| Search | PG FTS | Meilisearch | Meilisearch is faster/fuzzier but requires a sync pipeline |
-| DB host | Serverless Postgres | Supabase, Railway | Supabase adds an auth layer that duplicates Auth.js |
+The page itself is temporal.
 
-### Known Risks
+A page only exists for users once its visibility chapter has been reached.
 
-- **App Router complexity** — The chapter selector (reactive, in the navbar) must be a Client Component while the rest of the page can be a Server Component. Getting this boundary wrong causes unnecessary client JS or stale renders.
-- **Vercel alignment** — Next.js works everywhere, but some features (Server Actions) have rough edges when self-hosting or deploying to Cloudflare Workers.
-- **Versioned content read path** — Rendering a wiki page requires a subquery-join to find the latest revision per section/floater-row at or before the user's cutoff idx. The subquery groups by dimension, aggregates the max idx, then joins back for the content row.
+---
+
+## Temporal Titles
+
+Page titles are versioned over time.
+
+Each title revision includes:
+
+- The title text
+- The chapter ID where it becomes valid
+
+---
+
+## Page Sections
+
+Each wiki page contains ordered sections.
+
+### Properties
+
+- Section order is permanent
+- Section names are permanent
+- Section visibility is temporal
+- Section content is versioned over time
+
+Each section includes:
+
+- Visibility chapter ID
+- Temporal content revisions
+
+---
+
+## Infoboxes
+
+Pages may optionally include an infobox.
+
+### Infobox Structure
+
+- Optional image
+- Ordered infobox sections
+- Temporal values
+
+Each infobox section includes:
+
+- Visibility chapter ID
+- Versioned values over time
+
+---
+
+# Wiki Page Relationships
+
+Wiki pages form a **directed acyclic graph (DAG)**.
+
+## Rules
+
+- Pages may have multiple parents
+- Pages may have multiple children
+- Relationships are temporal
+- Cycles are forbidden
+
+The serial index page:
+
+- Has no parent
+- Serves as the DAG root
+
+All other pages:
+
+- Must have at least one parent
+
+---
+
+## Temporal Relationships
+
+Parent-child relationships can change over time.
+
+Examples:
+
+- Pages gaining new parents
+- Pages losing parents
+- Reorganizing page hierarchies
+
+At any chapter snapshot:
+
+- The graph must still remain acyclic
+
+---
+
+## Common Query
+
+Given:
+
+- A wiki page
+- A chapter ID
+
+Return:
+
+- All visible parent pages
+- All visible child pages
+
+---
+
+# URL and Slug System
+
+## Slugs
+
+Each page has a unique slug within its serial.
+
+### Requirements
+
+- Generated from the earliest visible title
+- Must avoid spoiler-sensitive names
+- Deduplicated with numeric suffixes
+
+Example:
+
+- `john-doe`
+- `john-doe-2`
+
+---
+
+## URL Format
+
+```txt
+/{serial-slug}/{page-slug}
+```
+
+---
+
+# Templates
+
+Each serial may define reusable page templates.
+
+## Template Features
+
+Templates may define:
+
+- Page sections
+- Infobox presence
+- Infobox sections
+
+## Usage
+
+When creating a page, contributors may choose a template to initialize the page structure.
+
+Templates are manageable from the serial index page by administrators in edit mode.
+
+---
+
+# Home Page
+
+The home page provides:
+
+## Search
+
+Users can search for existing serial wikis.
+
+## Wiki Creation
+
+Users can create a new serial wiki if one does not already exist.
+
+---
+
+# Versioning Strategy
+
+PlotArmor uses **single-timestamp versioning**.
+
+## Read Rule
+
+To resolve content for chapter `N`:
+
+- Find the latest revision whose chapter index is `<= N`
+
+---
+
+## Progress Semantics
+
+User progress stores a **chapter ID**, not a positional index.
+
+This ensures:
+
+- Reordering chapters does not invalidate progress
+- Inserted earlier chapters are implicitly considered read
+
+Example:
+
+- User selects "Book 2, Chapter 3"
+- A new earlier chapter is inserted later
+- User progress still points to the same chapter ID
+
+This behavior is intentional.
+
+---
+
+# Technical Stack
+
+## Frontend Framework — Next.js (App Router)
+
+Reasons:
+
+- File-based routing
+- SSR support for user-specific spoiler filtering
+- Unified frontend and API layer
+
+Example route:
+
+```txt
+/{serial}/{page}
+```
+
+---
+
+## Database — PostgreSQL
+
+Chosen for:
+
+- Relational data modeling
+- Temporal queries
+- Aggregate + self-join support
+- DAG relationship handling
+
+---
+
+## ORM — Drizzle ORM
+
+Chosen because:
+
+- Temporal queries require custom SQL
+- Strong TypeScript integration
+- Minimal abstraction overhead
+
+---
+
+## Authentication — Auth.js (NextAuth v5)
+
+Responsibilities:
+
+- User authentication
+- Session management
+- Anonymous-to-account progress migration
+
+---
+
+## Search — PostgreSQL Full-Text Search
+
+Chosen because:
+
+- Spoiler filtering must happen server-side
+- Search queries integrate naturally with chapter visibility filtering
+- Avoids syncing external search infrastructure
+
+Uses:
+
+- `tsvector`
+- SQL `WHERE` filtering by chapter visibility
+
+---
+
+## Markdown Editor
+
+### Editing
+
+- `@uiw/react-md-editor`
+
+### Rendering
+
+- `react-markdown`
+
+---
+
+## Styling
+
+- Tailwind CSS
+
+---
+
+## Hosting
+
+### Vercel
+
+Chosen for:
+
+- Simple deployment workflow
+- SSR support
+- Free-tier viability during early development
