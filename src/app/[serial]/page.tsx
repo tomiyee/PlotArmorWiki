@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/db/index';
-import { serials, serialAuthors, volumes, chapters, pages, pageRelationships } from '@/db/schema';
-import { and, eq, notExists } from 'drizzle-orm';
+import { serials, serialAuthors, volumes, chapters, pages } from '@/db/schema';
+import { asc, eq } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   reorderVolumes, reorderAllChapters, updateSerialMetadata,
@@ -52,23 +52,12 @@ export default async function SerialPage({ params }: Props) {
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
-    // Top-level pages: pages in this serial that have no entry in page_relationships
-    // as a child (i.e., no parent assigned). These are the DAG roots.
+    // All pages in this serial, alphabetically — used for the wiki navigation list.
     db
       .select({ id: pages.id, name: pages.name, slug: pages.slug })
       .from(pages)
-      .where(
-        and(
-          eq(pages.serialId, serial.id),
-          notExists(
-            db
-              .select({ childPageId: pageRelationships.childPageId })
-              .from(pageRelationships)
-              .where(eq(pageRelationships.childPageId, pages.id))
-              .limit(1),
-          ),
-        ),
-      ),
+      .where(eq(pages.serialId, serial.id))
+      .orderBy(asc(pages.name)),
   ]);
 
   const chaptersByVolume: Record<number, { id: number; displayName: string; idx: number; volumeId: number }[]> = {};
@@ -144,8 +133,10 @@ function WikiPageList({ pages: pageList, serialSlug }: WikiPageListProps) {
       <section className="flex flex-col gap-2 mt-2">
         <Text variant="h2">Wiki</Text>
         <Text muted>
-          No wiki pages yet. Add a {/* chapter type */} chapter to get started —
-          the home page will be created automatically.
+          No wiki pages yet.{' '}
+          <Link href={`/${serialSlug}/new`} className="text-blue-600 hover:underline">
+            Create the first page.
+          </Link>
         </Text>
       </section>
     );

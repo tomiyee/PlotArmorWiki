@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/index";
-import { serials, volumes, chapters } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { serials, volumes, chapters, pages, pageRelationships } from "@/db/schema";
+import { and, asc, eq, notExists } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
@@ -33,7 +33,7 @@ export default async function SerialLayout({ children, params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList] = await Promise.all([
+  const [volumeList, chapterList, rootPageList] = await Promise.all([
     db
       .select()
       .from(volumes)
@@ -50,6 +50,23 @@ export default async function SerialLayout({ children, params }: Props) {
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
+    // Root pages: pages in this serial with no parent relationship, for the navbar Pages dropdown.
+    db
+      .select({ id: pages.id, name: pages.name, slug: pages.slug })
+      .from(pages)
+      .where(
+        and(
+          eq(pages.serialId, serial.id),
+          notExists(
+            db
+              .select({ c: pageRelationships.childPageId })
+              .from(pageRelationships)
+              .where(eq(pageRelationships.childPageId, pages.id))
+              .limit(1),
+          ),
+        ),
+      )
+      .orderBy(asc(pages.name)),
   ]);
 
   const chaptersByVolume: Partial<Record<number, ChapterData[]>> = {
@@ -59,7 +76,7 @@ export default async function SerialLayout({ children, params }: Props) {
   const serialNavData: NavbarSerialData = {
     serialSlug,
     serialTitle: serial.title,
-    categories: [],
+    categories: rootPageList,
   };
 
   const tocContent = (

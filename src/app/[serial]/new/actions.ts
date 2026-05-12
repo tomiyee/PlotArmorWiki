@@ -72,11 +72,13 @@ export async function createPage(serialSlug: string, formData: FormData) {
   const introChapterId = parseInt(introChapterIdRaw, 10);
   if (isNaN(introChapterId)) throw new Error('Invalid chapter ID');
 
-  const parentPageId =
+  const parentPageIdParsed =
     parentPageIdRaw && typeof parentPageIdRaw === 'string' && parentPageIdRaw !== ''
       ? parseInt(parentPageIdRaw, 10)
       : null;
-  if (parentPageId !== null && isNaN(parentPageId)) throw new Error('Invalid parent page ID');
+  if (parentPageIdParsed !== null && isNaN(parentPageIdParsed)) throw new Error('Invalid parent page ID');
+  // 0 is the "None (root page)" sentinel from the form — treat it as no parent.
+  const parentPageId = parentPageIdParsed !== null && parentPageIdParsed !== 0 ? parentPageIdParsed : null;
 
   const [serial] = await db
     .select({ id: serials.id })

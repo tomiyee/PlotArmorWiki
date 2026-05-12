@@ -40,7 +40,7 @@ export function PagesDropdown({ serialSlug, categories }: Props) {
           categories.map((category) => (
             <Link
               key={category.id}
-              href={`/${serialSlug}/${encodeURIComponent(category.name)}`}
+              href={`/${serialSlug}/${category.slug}`}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="block px-3 py-2 text-sm text-foreground hover:bg-muted"
