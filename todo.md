@@ -4,48 +4,13 @@
 
 ## ~~Step 1 — Neon DB + Vercel project setup~~
 
-~~Do this first so every subsequent step can be tested against the real hosted DB.~~
-
-- ~~Create a Neon project (e.g. `plot-armor-wiki`). Copy the pooled connection string.~~
-- ~~Create a Vercel project linked to the GitHub repo. Set the framework to Next.js.~~
-- ~~Add `DATABASE_URL` (Neon pooled URL) to both `.env.local` and Vercel environment variables.~~
-- ~~Run the squashed migration against Neon: `pnpm drizzle-kit migrate`.~~
-- ~~Smoke-test: `pnpm dev` with the Neon URL — confirm the home page loads data.~~
-
 ---
 
 ## ~~Step 2 — Schema: extend users + add auth tables + serial_admins~~
 
-~~Auth.js's Drizzle adapter requires specific table shapes. Align the schema before wiring anything up.~~
-
-- ~~Change `users.id` from `serial` to `text` UUID, add `username`, `image`, rename `displayName` → `name`.~~
-- ~~Add Auth.js adapter tables: `accounts`, `sessions`, `verification_tokens`.~~
-- ~~Add `serial_admins (userId, serialId, grantedAt)`.~~
-
 ---
 
 ## ~~Step 3 — Schema: replace categories with DAG + per-page structure~~
-
-~~The category system is removed entirely. Pages now belong directly to a serial and relate to each other via a directed acyclic graph. Sections and infoboxes move from the category level to the individual page. Titles become temporally versioned.~~
-
-~~**Remove tables:**~~
-~~- `page_categories`~~
-~~- `category_sections`~~
-~~- `category_floater_rows`~~
-~~- `page_section_versions`~~
-~~- `page_floater_versions`~~
-~~- `page_floater_row_versions`~~
-~~- `page_summaries`~~
-
-~~**Update `pages` table:**~~
-~~- Remove `category_id` FK; add `serial_id` FK → `serials.id`.~~
-~~- Add `slug text NOT NULL` with a unique index on `(serial_id, slug)`.~~
-~~- Keep `intro_chapter_id` (temporal page visibility — unchanged).~~
-~~- Keep `name` temporarily to seed initial `page_titles` entries; drop in a later migration once data is migrated.~~
-
-~~**Add tables:** `page_titles`, `page_sections`, `page_section_revisions`, `page_infobox_sections`, `page_infobox_revisions`, `page_infobox_image_revisions`, `page_relationships`, `templates`, `template_sections`, `template_infobox_sections`~~
-
-~~After schema edits: `pnpm drizzle-kit generate` → `pnpm drizzle-kit migrate`.~~
 
 ---
 
