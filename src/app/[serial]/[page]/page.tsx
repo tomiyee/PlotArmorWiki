@@ -12,6 +12,7 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  pageRelationships,
 } from "@/db/schema";
 import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
@@ -299,6 +300,44 @@ export default async function PageView({ params }: Props) {
     }));
   }
 
+  // ── Child pages (active at the user's cutoff) ──────────────────────────────
+  // Find the latest page_relationships row per (parent, child) pair where
+  // chapter_idx ≤ cutoff, and keep only those where is_active = true.
+  // Using a subquery-join (same max-idx pattern as section content).
+  const relMaxIdxSq = db
+    .select({
+      childPageId: pageRelationships.childPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .where(
+      and(
+        eq(pageRelationships.parentPageId, page.id),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .groupBy(pageRelationships.childPageId)
+    .as("rel_max_idx_sq");
+
+  const childPagesRaw = await db
+    .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+    .from(pageRelationships)
+    .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      relMaxIdxSq,
+      and(
+        eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+        eq(chapters.idx, relMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(eq(pageRelationships.parentPageId, page.id));
+
+  const childPages = childPagesRaw
+    .filter((r) => r.isActive)
+    .map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+
   return (
     <main>
       <PageContainer>
@@ -333,6 +372,7 @@ export default async function PageView({ params }: Props) {
             readingChapterId={readingChapterId}
             wikiPages={wikiPages}
             introChapterIdx={introChapter?.idx ?? null}
+            childPages={childPages}
           />
         </Box>
       </PageContainer>

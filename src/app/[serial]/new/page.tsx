@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/db/index';
-import { serials, volumes, chapters } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { serials, volumes, chapters, pages } from '@/db/schema';
+import { asc, eq } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ export default async function NewPagePage({ params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList] = await Promise.all([
+  const [volumeList, chapterList, existingPages] = await Promise.all([
     db
       .select()
       .from(volumes)
@@ -46,6 +46,12 @@ export default async function NewPagePage({ params }: Props) {
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
+    // All pages in this serial, ordered by name, for the parent dropdown.
+    db
+      .select({ id: pages.id, name: pages.name })
+      .from(pages)
+      .where(eq(pages.serialId, serial.id))
+      .orderBy(asc(pages.name)),
   ]);
 
   // Build grouped options: one optgroup per volume
@@ -67,7 +73,17 @@ export default async function NewPagePage({ params }: Props) {
       })),
     }));
 
-  const firstChapterId = chapterList[0]?.id;
+  // Parent page options: a blank "None (root page)" option followed by all existing pages.
+  const parentPageOptions = [
+    { label: 'None (root page)', value: 0 },
+    ...existingPages.map((p) => ({ label: p.name, value: p.id })),
+  ];
+
+  // Default to the latest chapter so the intro chapter selector starts at the end.
+  const headChapterId =
+    chapterList.length > 0
+      ? chapterList.reduce((prev, cur) => (cur.idx > prev.idx ? cur : prev)).id
+      : chapterList[0]?.id;
 
   const createPageAction = createPage.bind(null, serialSlug);
 
@@ -112,7 +128,7 @@ export default async function NewPagePage({ params }: Props) {
                   id="introChapterId"
                   name="introChapterId"
                   options={chapterOptions}
-                  defaultValue={firstChapterId}
+                  defaultValue={headChapterId}
                 />
               ) : (
                 <Text muted className="text-sm">
@@ -122,6 +138,20 @@ export default async function NewPagePage({ params }: Props) {
                   </Link>
                 </Text>
               )}
+            </Box>
+
+            {/* Parent page (optional) */}
+            <Box col className="gap-1">
+              <Label htmlFor="parentPageId">Parent page</Label>
+              <Select
+                id="parentPageId"
+                name="parentPageId"
+                options={parentPageOptions}
+                defaultValue={0}
+              />
+              <Text muted className="text-xs">
+                Choose a parent to place this page in the wiki DAG hierarchy.
+              </Text>
             </Box>
 
             <Button

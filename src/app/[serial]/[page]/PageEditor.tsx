@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Text } from "@/components/ui/text";
@@ -66,6 +67,12 @@ interface Props {
   wikiPages: { name: string }[];
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
+  /**
+   * Child pages that are actively related to this page at the reader's chapter
+   * cutoff (derived from `page_relationships`). Rendered as a sub-page list
+   * below the content in read mode.
+   */
+  childPages: { id: number; name: string; slug: string }[];
 }
 
 /**
@@ -158,6 +165,7 @@ export function PageEditor({
   readingChapterId,
   wikiPages,
   introChapterIdx,
+  childPages,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -341,6 +349,28 @@ export function PageEditor({
             )}
           </div>
         ))}
+
+        {childPages.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <Text variant="h3" className="mb-3">
+              Related pages
+            </Text>
+            <ul className="flex flex-col gap-2">
+              {childPages.map((child) => (
+                <li key={child.id}>
+                  <Link
+                    href={`/${serialSlug}/${child.slug}`}
+                    className="rounded-lg border border-gray-200 px-4 py-2 flex items-center hover:bg-gray-50 transition-colors"
+                  >
+                    <Text variant="body" as="span">
+                      {child.name}
+                    </Text>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   }
