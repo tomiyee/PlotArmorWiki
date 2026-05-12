@@ -2,28 +2,19 @@
 
 ---
 
-## ~~Step 1 — Neon DB + Vercel project setup~~
+## - [X] Step 1 — Neon DB + Vercel project setup
 
 ---
 
-## ~~Step 2 — Schema: extend users + add auth tables + serial_admins~~
+## - [X] Step 2 — Schema: extend users + add auth tables + serial_admins
 
 ---
 
-## ~~Step 3 — Schema: replace categories with DAG + per-page structure~~
+## - [X] Step 3 — Schema: replace categories with DAG + per-page structure
 
 ---
 
-## - [ ] Step 4 — Routing: collapse `/{serial}/{category}/{page}` → `/{serial}/{page-slug}`
-
-The category segment is removed from all URLs.
-
-- Delete `src/app/[serial]/[category]/` directory tree (all routes, editors, actions).
-- Create `src/app/[serial]/[page]/page.tsx` — resolves page by `slug` within the serial (query: `WHERE serial_id = ? AND slug = ?`); passes page data to `<PageEditor>`.
-- Move page creation to `src/app/[serial]/new/` (was `[serial]/[category]/new/`).
-- Update `src/app/[serial]/actions.ts` — remove all category/section/floater Server Actions; they are replaced in Steps 6–9.
-- Update the `remarkWikiLinks` plugin and `slugifyWikiName` to emit 2-level URLs (`/{serial}/{page-slug}`), dropping the category prefix.
-- Update wiki link autocomplete in `WikiLinkMDEditor` to remove the category segment from suggestions.
+## - [X] Step 4 — Routing: collapse `/{serial}/{category}/{page}` → `/{serial}/{page-slug}`
 
 ---
 
@@ -31,7 +22,7 @@ The category segment is removed from all URLs.
 
 The serial detail page (`/{serial}`) no longer shows a category list. It becomes the entry point to the wiki page tree.
 
-- When creating a serial (`createSerial` action): automatically insert a root wiki page (`slug = "index"`, `intro_chapter_id` = first chapter) into `pages` and seed an initial entry in `page_titles`. This root page has no row in `page_relationships` (no parent — it is the DAG root).
+- When creating a serial (`createSerial` action): automatically insert a root wiki page (`slug = "home"`, `intro_chapter_id` = first chapter) into `pages` and seed an initial entry in `page_titles`. This root page has no row in `page_relationships` (no parent — it is the DAG root).
 - On `/{serial}`: remove `<CategoryManager>`. In its place show a list of top-level wiki pages (pages whose only parent is the root, or the root page itself), linking to `/{serial}/{slug}`.
 - Remove `SerialMetadataEditor`'s category-aware redirect logic; the serial slug change redirect remains.
 - Remove all category-related imports and Server Actions from `src/app/[serial]/actions.ts` and `src/app/[serial]/page.tsx`.
