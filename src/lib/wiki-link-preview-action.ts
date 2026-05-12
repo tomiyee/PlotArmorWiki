@@ -4,15 +4,13 @@ import { cookies } from "next/headers";
 import { db } from "@/db/index";
 import {
   serials,
-  pageCategories,
   pages,
   chapters,
-  categoryFloaterRows,
-  categorySections,
-  pageSummaries,
-  pageSectionVersions,
-  pageFloaterVersions,
-  pageFloaterRowVersions,
+  pageInfoboxSections,
+  pageInfoboxRevisions,
+  pageInfoboxImageRevisions,
+  pageSections,
+  pageSectionRevisions,
 } from "@/db/schema";
 import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
 
@@ -35,17 +33,17 @@ export interface WikiLinkPreviewData {
  * Respects the user's chapter cutoff cookie — hidden pages return `hidden: true`
  * so the UI can display a spoiler-safe placeholder instead.
  *
- * Returns `null` when the serial/category/page cannot be resolved (e.g. a
- * wiki link that points to a page that doesn't exist yet).
+ * Returns `null` when the serial/page cannot be resolved (e.g. a wiki link
+ * that points to a page that doesn't exist yet).
  *
  * @example
- * const preview = await getWikiLinkPreview("one-piece", "Characters", "Luffy");
+ * const preview = await getWikiLinkPreview("one-piece", "Characters", "luffy");
  * if (preview?.hidden) { ... }
  */
 export async function getWikiLinkPreview(
   serialSlug: string,
-  categoryName: string,
-  pageName: string,
+  _categoryName: string,
+  pageSlug: string,
 ): Promise<WikiLinkPreviewData | null> {
   // Resolve serial
   const [serial] = await db
@@ -71,24 +69,11 @@ export async function getWikiLinkPreview(
     }
   }
 
-  // Resolve category
-  const [category] = await db
-    .select({ id: pageCategories.id, hasFloater: pageCategories.hasFloater })
-    .from(pageCategories)
-    .where(
-      and(
-        eq(pageCategories.serialId, serial.id),
-        eq(pageCategories.name, categoryName),
-      ),
-    )
-    .limit(1);
-  if (!category) return null;
-
-  // Resolve page
+  // Resolve page by slug within the serial
   const [page] = await db
-    .select({ id: pages.id, introChapterId: pages.introChapterId })
+    .select({ id: pages.id, name: pages.name, introChapterId: pages.introChapterId })
     .from(pages)
-    .where(and(eq(pages.categoryId, category.id), eq(pages.name, pageName)))
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
     .limit(1);
   if (!page) return null;
 
@@ -106,8 +91,8 @@ export async function getWikiLinkPreview(
   // Check spoiler visibility
   if (introChapterRow && introChapterRow.idx > cutoffIdx) {
     return {
-      pageName,
-      categoryName,
+      pageName: page.name,
+      categoryName: "",
       introChapterName,
       hidden: true,
       firstSectionContent: "",
@@ -116,169 +101,134 @@ export async function getWikiLinkPreview(
     };
   }
 
-  // Fetch summary content at the user's cutoff — summary is always the first
-  // thing shown in the hover card preview.
-  const summaryMaxIdxSq = db
-    .select({ maxIdx: max(chapters.idx).as("max_idx") })
-    .from(pageSummaries)
-    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
+  // Fetch the first section content at the user's cutoff
+  const sectionMaxIdxSq = db
+    .select({
+      sectionId: pageSectionRevisions.sectionId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageSectionRevisions)
+    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
     .where(
       and(
-        eq(pageSummaries.pageId, page.id),
+        eq(pageSectionRevisions.pageId, page.id),
         lte(chapters.idx, cutoffIdx),
       ),
     )
-    .as("summary_max_idx_sq");
+    .groupBy(pageSectionRevisions.sectionId)
+    .as("section_max_idx_sq");
 
-  const [summaryVersion] = await db
-    .select({ content: pageSummaries.content })
-    .from(pageSummaries)
-    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
-    .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
-    .where(eq(pageSummaries.pageId, page.id))
+  const [firstSection] = await db
+    .select({ content: pageSectionRevisions.content })
+    .from(pageSectionRevisions)
+    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+    .innerJoin(
+      pageSections,
+      eq(pageSectionRevisions.sectionId, pageSections.id),
+    )
+    .innerJoin(
+      sectionMaxIdxSq,
+      and(
+        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+        eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(
+      and(
+        eq(pageSectionRevisions.pageId, page.id),
+        isNull(pageSections.deletedAt),
+      ),
+    )
+    .orderBy(asc(pageSections.displayOrder))
     .limit(1);
 
-  let firstSectionContent = summaryVersion?.content ?? "";
+  const firstSectionContent = firstSection?.content ?? "";
 
-  // Fall back to the first section if there is no summary yet
-  if (!firstSectionContent) {
-    const sectionMaxIdxSq = db
-      .select({
-        sectionId: pageSectionVersions.sectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageSectionVersions)
-      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageSectionVersions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageSectionVersions.sectionId)
-      .as("section_max_idx_sq");
+  // Fetch infobox data
+  const activeInfoboxRows = await db
+    .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
+    .from(pageInfoboxSections)
+    .where(
+      and(
+        eq(pageInfoboxSections.pageId, page.id),
+        isNull(pageInfoboxSections.deletedAt),
+      ),
+    )
+    .orderBy(asc(pageInfoboxSections.displayOrder));
 
-    const [firstSection] = await db
-      .select({ content: pageSectionVersions.content })
-      .from(pageSectionVersions)
-      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
-      .innerJoin(
-        categorySections,
-        eq(pageSectionVersions.sectionId, categorySections.id),
-      )
-      .innerJoin(
-        sectionMaxIdxSq,
-        and(
-          eq(pageSectionVersions.sectionId, sectionMaxIdxSq.sectionId),
-          eq(chapters.idx, sectionMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(
-        and(
-          eq(pageSectionVersions.pageId, page.id),
-          isNull(categorySections.deletedAt),
-        ),
-      )
-      .orderBy(asc(categorySections.displayOrder))
-      .limit(1);
-
-    firstSectionContent = firstSection?.content ?? "";
-  }
-
-  // Fetch floater data if the category has one
   let floaterImageUrl: string | null = null;
   let floaterRows: { label: string; content: string }[] = [];
 
-  if (category.hasFloater) {
+  if (activeInfoboxRows.length > 0) {
     const floaterMaxIdxSq = db
       .select({ maxIdx: max(chapters.idx).as("max_idx") })
-      .from(pageFloaterVersions)
-      .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
+      .from(pageInfoboxImageRevisions)
+      .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
       .where(
         and(
-          eq(pageFloaterVersions.pageId, page.id),
+          eq(pageInfoboxImageRevisions.pageId, page.id),
           lte(chapters.idx, cutoffIdx),
         ),
       )
       .as("floater_max_idx_sq");
 
-    const floaterRowMaxIdxSq = db
+    const infoboxRowMaxIdxSq = db
       .select({
-        floaterRowId: pageFloaterRowVersions.floaterRowId,
+        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
         maxIdx: max(chapters.idx).as("max_idx"),
       })
-      .from(pageFloaterRowVersions)
-      .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
+      .from(pageInfoboxRevisions)
+      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
       .where(
         and(
-          eq(pageFloaterRowVersions.pageId, page.id),
+          eq(pageInfoboxRevisions.pageId, page.id),
           lte(chapters.idx, cutoffIdx),
         ),
       )
-      .groupBy(pageFloaterRowVersions.floaterRowId)
-      .as("floater_row_max_idx_sq");
+      .groupBy(pageInfoboxRevisions.infoboxSectionId)
+      .as("infobox_row_max_idx_sq");
 
-    const [
-      [floaterVersion],
-      activeFloaterRows,
-      floaterRowVersions,
-    ] = await Promise.all([
+    const [[floaterVersion], infoboxRowVersions] = await Promise.all([
       db
-        .select({ imageUrl: pageFloaterVersions.imageUrl })
-        .from(pageFloaterVersions)
-        .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
+        .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
+        .from(pageInfoboxImageRevisions)
+        .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
         .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
-        .where(eq(pageFloaterVersions.pageId, page.id))
+        .where(eq(pageInfoboxImageRevisions.pageId, page.id))
         .limit(1),
       db
         .select({
-          id: categoryFloaterRows.id,
-          label: categoryFloaterRows.label,
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          content: pageInfoboxRevisions.content,
         })
-        .from(categoryFloaterRows)
-        .where(
-          and(
-            eq(categoryFloaterRows.categoryId, category.id),
-            isNull(categoryFloaterRows.deletedAt),
-          ),
-        )
-        .orderBy(asc(categoryFloaterRows.displayOrder)),
-      db
-        .select({
-          floaterRowId: pageFloaterRowVersions.floaterRowId,
-          content: pageFloaterRowVersions.content,
-        })
-        .from(pageFloaterRowVersions)
+        .from(pageInfoboxRevisions)
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
         .innerJoin(
-          chapters,
-          eq(pageFloaterRowVersions.chapterId, chapters.id),
-        )
-        .innerJoin(
-          floaterRowMaxIdxSq,
+          infoboxRowMaxIdxSq,
           and(
             eq(
-              pageFloaterRowVersions.floaterRowId,
-              floaterRowMaxIdxSq.floaterRowId,
+              pageInfoboxRevisions.infoboxSectionId,
+              infoboxRowMaxIdxSq.infoboxSectionId,
             ),
-            eq(chapters.idx, floaterRowMaxIdxSq.maxIdx),
+            eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
           ),
         )
-        .where(eq(pageFloaterRowVersions.pageId, page.id)),
+        .where(eq(pageInfoboxRevisions.pageId, page.id)),
     ]);
 
     floaterImageUrl = floaterVersion?.imageUrl ?? null;
     const rowContentMap = new Map(
-      floaterRowVersions.map((v) => [v.floaterRowId, v.content]),
+      infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]),
     );
-    floaterRows = activeFloaterRows.map((r) => ({
+    floaterRows = activeInfoboxRows.map((r) => ({
       label: r.label,
       content: rowContentMap.get(r.id) ?? "",
     }));
   }
 
   return {
-    pageName,
-    categoryName,
+    pageName: page.name,
+    categoryName: "",
     introChapterName,
     hidden: false,
     firstSectionContent,

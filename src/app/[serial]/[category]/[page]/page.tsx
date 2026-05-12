@@ -4,16 +4,14 @@ import Link from "next/link";
 import { db } from "@/db/index";
 import {
   serials,
-  pageCategories,
   pages,
   chapters,
   volumes,
-  categorySections,
-  pageSectionVersions,
-  pageSummaries,
-  categoryFloaterRows,
-  pageFloaterVersions,
-  pageFloaterRowVersions,
+  pageSections,
+  pageSectionRevisions,
+  pageInfoboxSections,
+  pageInfoboxRevisions,
+  pageInfoboxImageRevisions,
 } from "@/db/schema";
 import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
@@ -65,7 +63,7 @@ export default async function PageView({ params }: Props) {
   } = await params;
 
   const categoryName = decodeURIComponent(categorySlug);
-  const pageName = decodeURIComponent(pageSlug);
+  const decodedPageSlug = decodeURIComponent(pageSlug);
 
   const [serial] = await db
     .select()
@@ -77,17 +75,7 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [[category], chapterCutoff, volumeList, chapterList] = await Promise.all([
-    db
-      .select()
-      .from(pageCategories)
-      .where(
-        and(
-          eq(pageCategories.serialId, serial.id),
-          eq(pageCategories.name, categoryName),
-        ),
-      )
-      .limit(1),
+  const [chapterCutoff, volumeList, chapterList] = await Promise.all([
     getChapterCutoff(serial.id),
     db
       .select({ id: volumes.id, displayName: volumes.displayName })
@@ -108,12 +96,7 @@ export default async function PageView({ params }: Props) {
   ]);
   const { cutoffIdx, readingChapterId } = chapterCutoff;
 
-  if (!category) {
-    notFound();
-  }
-
   // Build a structured chapter list for the chapter selector in edit mode.
-  // Each volume becomes an optgroup with its chapters as options.
   const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
   const allChapters = chapterList.map((c) => ({
     id: c.id,
@@ -126,20 +109,18 @@ export default async function PageView({ params }: Props) {
   const headChapterId = chapterList.at(-1)?.id ?? null;
 
   // Wiki pages visible to the reader at their current chapter cutoff.
-  // Chapter-cutoff filter mirrors the category index page so users can only
-  // autocomplete to pages they can already see — no accidental spoiler leaks.
-  const wikiPages = await db
-    .select({ category: pageCategories.name, name: pages.name })
+  const rawWikiPages = await db
+    .select({ name: pages.name })
     .from(pages)
-    .innerJoin(pageCategories, eq(pages.categoryId, pageCategories.id))
     .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
-    .where(and(eq(pageCategories.serialId, serial.id), lte(chapters.idx, cutoffIdx)))
-    .orderBy(asc(pageCategories.name), asc(pages.name));
+    .where(and(eq(pages.serialId, serial.id), lte(chapters.idx, cutoffIdx)))
+    .orderBy(asc(pages.name));
+  const wikiPages = rawWikiPages.map((p) => ({ category: "", name: p.name }));
 
   const [page] = await db
     .select()
     .from(pages)
-    .where(and(eq(pages.categoryId, category.id), eq(pages.name, pageName)))
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, decodedPageSlug)))
     .limit(1);
 
   if (!page) {
@@ -170,7 +151,7 @@ export default async function PageView({ params }: Props) {
               </Link>
             </Text>
             <Text variant="body">
-              This {category.name} is introduced in {serial.chapterType}{" "}
+              This page is introduced in {serial.chapterType}{" "}
               {introChapter.displayName}. This page is hidden to prevent
               spoilers.
             </Text>
@@ -180,73 +161,52 @@ export default async function PageView({ params }: Props) {
     );
   }
 
-  // ── Summary content (chapter-versioned, always present) ───────────────────
-  const summaryMaxIdxSq = db
-    .select({ maxIdx: max(chapters.idx).as("max_idx") })
-    .from(pageSummaries)
-    .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSummaries.pageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .as("summary_max_idx_sq");
-
+  // ── Section content (chapter-versioned) ───────────────────────────────────
   const sectionMaxIdxSq = db
     .select({
-      sectionId: pageSectionVersions.sectionId,
+      sectionId: pageSectionRevisions.sectionId,
       maxIdx: max(chapters.idx).as("max_idx"),
     })
-    .from(pageSectionVersions)
-    .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+    .from(pageSectionRevisions)
+    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
     .where(
       and(
-        eq(pageSectionVersions.pageId, page.id),
+        eq(pageSectionRevisions.pageId, page.id),
         lte(chapters.idx, cutoffIdx),
       ),
     )
-    .groupBy(pageSectionVersions.sectionId)
+    .groupBy(pageSectionRevisions.sectionId)
     .as("section_max_idx_sq");
 
-  const [summaryVersions, activeSections, sectionVersions] = await Promise.all([
+  const [activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ content: pageSummaries.content, chapterIdx: chapters.idx })
-      .from(pageSummaries)
-      .innerJoin(chapters, eq(pageSummaries.chapterId, chapters.id))
-      .innerJoin(summaryMaxIdxSq, eq(chapters.idx, summaryMaxIdxSq.maxIdx))
-      .where(eq(pageSummaries.pageId, page.id))
-      .limit(1),
-    db
-      .select({ id: categorySections.id, name: categorySections.name })
-      .from(categorySections)
+      .select({ id: pageSections.id, name: pageSections.name })
+      .from(pageSections)
       .where(
         and(
-          eq(categorySections.categoryId, category.id),
-          isNull(categorySections.deletedAt),
+          eq(pageSections.pageId, page.id),
+          isNull(pageSections.deletedAt),
         ),
       )
-      .orderBy(asc(categorySections.displayOrder)),
+      .orderBy(asc(pageSections.displayOrder)),
     db
       .select({
-        sectionId: pageSectionVersions.sectionId,
-        content: pageSectionVersions.content,
+        sectionId: pageSectionRevisions.sectionId,
+        content: pageSectionRevisions.content,
         chapterIdx: chapters.idx,
       })
-      .from(pageSectionVersions)
-      .innerJoin(chapters, eq(pageSectionVersions.chapterId, chapters.id))
+      .from(pageSectionRevisions)
+      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
       .innerJoin(
         sectionMaxIdxSq,
         and(
-          eq(pageSectionVersions.sectionId, sectionMaxIdxSq.sectionId),
+          eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
           eq(chapters.idx, sectionMaxIdxSq.maxIdx),
         ),
       )
-      .where(eq(pageSectionVersions.pageId, page.id)),
+      .where(eq(pageSectionRevisions.pageId, page.id)),
   ]);
 
-  const summaryContent = summaryVersions[0]?.content ?? "";
-  const summaryLastUpdatedChapterIdx = summaryVersions[0]?.chapterIdx ?? null;
   const versionBySectionId = new Map(
     sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
   );
@@ -261,87 +221,87 @@ export default async function PageView({ params }: Props) {
     };
   });
 
-  // ── Floater data (only when category.hasFloater) ───────────────────────────
+  // ── Infobox data ───────────────────────────────────────────────────────────
+  const activeInfoboxRows = await db
+    .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
+    .from(pageInfoboxSections)
+    .where(
+      and(
+        eq(pageInfoboxSections.pageId, page.id),
+        isNull(pageInfoboxSections.deletedAt),
+      ),
+    )
+    .orderBy(asc(pageInfoboxSections.displayOrder));
+
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
 
-  if (category.hasFloater) {
+  if (activeInfoboxRows.length > 0) {
     const floaterMaxIdxSq = db
       .select({ maxIdx: max(chapters.idx).as("max_idx") })
-      .from(pageFloaterVersions)
-      .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
+      .from(pageInfoboxImageRevisions)
+      .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
       .where(
         and(
-          eq(pageFloaterVersions.pageId, page.id),
+          eq(pageInfoboxImageRevisions.pageId, page.id),
           lte(chapters.idx, cutoffIdx),
         ),
       )
       .as("floater_max_idx_sq");
 
-    const floaterRowMaxIdxSq = db
+    const infoboxRowMaxIdxSq = db
       .select({
-        floaterRowId: pageFloaterRowVersions.floaterRowId,
+        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
         maxIdx: max(chapters.idx).as("max_idx"),
       })
-      .from(pageFloaterRowVersions)
-      .innerJoin(chapters, eq(pageFloaterRowVersions.chapterId, chapters.id))
+      .from(pageInfoboxRevisions)
+      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
       .where(
         and(
-          eq(pageFloaterRowVersions.pageId, page.id),
+          eq(pageInfoboxRevisions.pageId, page.id),
           lte(chapters.idx, cutoffIdx),
         ),
       )
-      .groupBy(pageFloaterRowVersions.floaterRowId)
-      .as("floater_row_max_idx_sq");
+      .groupBy(pageInfoboxRevisions.infoboxSectionId)
+      .as("infobox_row_max_idx_sq");
 
-    const [[floaterVersion], fetchedRows, floaterRowVersions] =
-      await Promise.all([
-        db
-          .select({ imageUrl: pageFloaterVersions.imageUrl })
-          .from(pageFloaterVersions)
-          .innerJoin(chapters, eq(pageFloaterVersions.chapterId, chapters.id))
-          .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
-          .where(eq(pageFloaterVersions.pageId, page.id))
-          .limit(1),
-        db
-          .select({ id: categoryFloaterRows.id, label: categoryFloaterRows.label })
-          .from(categoryFloaterRows)
-          .where(
-            and(
-              eq(categoryFloaterRows.categoryId, category.id),
-              isNull(categoryFloaterRows.deletedAt),
+    const [[floaterVersion], infoboxRowVersions] = await Promise.all([
+      db
+        .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
+        .from(pageInfoboxImageRevisions)
+        .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
+        .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
+        .where(eq(pageInfoboxImageRevisions.pageId, page.id))
+        .limit(1),
+      db
+        .select({
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          content: pageInfoboxRevisions.content,
+        })
+        .from(pageInfoboxRevisions)
+        .innerJoin(
+          chapters,
+          eq(pageInfoboxRevisions.chapterId, chapters.id),
+        )
+        .innerJoin(
+          infoboxRowMaxIdxSq,
+          and(
+            eq(
+              pageInfoboxRevisions.infoboxSectionId,
+              infoboxRowMaxIdxSq.infoboxSectionId,
             ),
-          )
-          .orderBy(asc(categoryFloaterRows.displayOrder)),
-        db
-          .select({
-            floaterRowId: pageFloaterRowVersions.floaterRowId,
-            content: pageFloaterRowVersions.content,
-          })
-          .from(pageFloaterRowVersions)
-          .innerJoin(
-            chapters,
-            eq(pageFloaterRowVersions.chapterId, chapters.id),
-          )
-          .innerJoin(
-            floaterRowMaxIdxSq,
-            and(
-              eq(
-                pageFloaterRowVersions.floaterRowId,
-                floaterRowMaxIdxSq.floaterRowId,
-              ),
-              eq(chapters.idx, floaterRowMaxIdxSq.maxIdx),
-            ),
-          )
-          .where(eq(pageFloaterRowVersions.pageId, page.id)),
-      ]);
+            eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageInfoboxRevisions.pageId, page.id)),
+    ]);
 
     const rowContentMap = new Map(
-      floaterRowVersions.map((v) => [v.floaterRowId, v.content]),
+      infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]),
     );
 
     floaterImageUrl = floaterVersion?.imageUrl ?? null;
-    floaterRows = fetchedRows.map((r) => ({
+    floaterRows = activeInfoboxRows.map((r) => ({
       id: r.id,
       label: r.label,
       content: rowContentMap.get(r.id) ?? "",
@@ -378,9 +338,9 @@ export default async function PageView({ params }: Props) {
           <PageEditor
             serialSlug={serialSlug}
             categoryName={categoryName}
-            pageName={pageName}
-            summaryContent={summaryContent}
-            summaryLastUpdatedChapterIdx={summaryLastUpdatedChapterIdx}
+            pageName={decodedPageSlug}
+            summaryContent=""
+            summaryLastUpdatedChapterIdx={null}
             sections={sections}
             floaterImageUrl={floaterImageUrl}
             floaterRows={floaterRows}

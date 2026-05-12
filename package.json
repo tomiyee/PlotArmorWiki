@@ -17,6 +17,7 @@
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
     "@fortawesome/free-solid-svg-icons": "^7.2.0",
     "@fortawesome/react-fontawesome": "^3.3.1",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.2.4",
     "@tailwindcss/typography": "^0.5.19",
     "@types/mdast": "^4.0.4",
     "@uiw/react-md-editor": "^4.1.0",

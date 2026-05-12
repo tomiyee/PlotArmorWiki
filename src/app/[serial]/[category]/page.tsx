@@ -4,13 +4,10 @@ import { cookies } from "next/headers";
 import { db } from "@/db/index";
 import {
   serials,
-  pageCategories,
-  categorySections,
-  categoryFloaterRows,
   pages,
   chapters,
 } from "@/db/schema";
-import { and, eq, isNull, lte } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { buttonVariants } from "@/components/ui/button";
@@ -24,20 +21,6 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { PageContainer } from "@/components/ui/page-container";
-import {
-  updateCategory,
-  deleteCategory,
-  addSection,
-  deleteSection,
-  renameSection,
-  reorderSections,
-  addFloaterRow,
-  deleteFloaterRow,
-  renameFloaterRow,
-  reorderFloaterRows,
-} from "../actions";
-import { CategoryIndexEditor } from "./CategoryIndexEditor";
-import { CategorySectionEditor } from "./CategorySectionEditor";
 
 interface Props {
   params: Promise<{ serial: string; category: string }>;
@@ -63,8 +46,6 @@ async function getChapterCutoffIdx(serialId: number): Promise<number> {
 export default async function CategoryIndexPage({ params }: Props) {
   const { serial: serialSlug, category: categorySlug } = await params;
 
-  const categoryName = decodeURIComponent(categorySlug);
-
   const [serial] = await db
     .select()
     .from(serials)
@@ -75,70 +56,14 @@ export default async function CategoryIndexPage({ params }: Props) {
     notFound();
   }
 
-  const [category] = await db
-    .select()
-    .from(pageCategories)
-    .where(
-      and(
-        eq(pageCategories.serialId, serial.id),
-        eq(pageCategories.name, categoryName),
-      ),
-    )
-    .limit(1);
-
-  if (!category) {
-    notFound();
-  }
-
   const cutoffIdx = await getChapterCutoffIdx(serial.id);
 
-  const [pageList, sectionList, floaterRowList] = await Promise.all([
-    db
-      .select({ id: pages.id, name: pages.name })
-      .from(pages)
-      .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
-      .where(and(eq(pages.categoryId, category.id), lte(chapters.idx, cutoffIdx)))
-      .orderBy(pages.name),
-    db
-      .select({
-        id: categorySections.id,
-        name: categorySections.name,
-        displayOrder: categorySections.displayOrder,
-      })
-      .from(categorySections)
-      .where(
-        and(
-          eq(categorySections.categoryId, category.id),
-          isNull(categorySections.deletedAt),
-        ),
-      )
-      .orderBy(categorySections.displayOrder),
-    db
-      .select({
-        id: categoryFloaterRows.id,
-        label: categoryFloaterRows.label,
-        displayOrder: categoryFloaterRows.displayOrder,
-      })
-      .from(categoryFloaterRows)
-      .where(
-        and(
-          eq(categoryFloaterRows.categoryId, category.id),
-          isNull(categoryFloaterRows.deletedAt),
-        ),
-      )
-      .orderBy(categoryFloaterRows.displayOrder),
-  ]);
-
-  const updateCategoryForSerial = updateCategory.bind(null, serial.id);
-  const deleteCategoryForSerial = deleteCategory.bind(null, serial.id);
-  const addSectionForSerial = addSection.bind(null, serial.id);
-  const deleteSectionForSerial = deleteSection.bind(null, serial.id);
-  const renameSectionForSerial = renameSection.bind(null, serial.id);
-  const reorderSectionsForSerial = reorderSections.bind(null, serial.id);
-  const addFloaterRowForSerial = addFloaterRow.bind(null, serial.id);
-  const deleteFloaterRowForSerial = deleteFloaterRow.bind(null, serial.id);
-  const renameFloaterRowForSerial = renameFloaterRow.bind(null, serial.id);
-  const reorderFloaterRowsForSerial = reorderFloaterRows.bind(null, serial.id);
+  const pageList = await db
+    .select({ id: pages.id, name: pages.name, slug: pages.slug })
+    .from(pages)
+    .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(and(eq(pages.serialId, serial.id), lte(chapters.idx, cutoffIdx)))
+    .orderBy(pages.name);
 
   return (
     <main>
@@ -150,29 +75,7 @@ export default async function CategoryIndexPage({ params }: Props) {
             </Link>
           </Text>
 
-          <CategoryIndexEditor
-            categoryId={category.id}
-            initialName={category.name}
-            initialBody={category.body}
-            serialSlug={serialSlug}
-            updateCategoryAction={updateCategoryForSerial}
-            deleteCategoryAction={deleteCategoryForSerial}
-          />
-
-          <CategorySectionEditor
-            categoryId={category.id}
-            hasFloater={category.hasFloater}
-            sections={sectionList}
-            floaterRows={floaterRowList}
-            addSectionAction={addSectionForSerial}
-            deleteSectionAction={deleteSectionForSerial}
-            renameSectionAction={renameSectionForSerial}
-            reorderSectionsAction={reorderSectionsForSerial}
-            addFloaterRowAction={addFloaterRowForSerial}
-            deleteFloaterRowAction={deleteFloaterRowForSerial}
-            renameFloaterRowAction={renameFloaterRowForSerial}
-            reorderFloaterRowsAction={reorderFloaterRowsForSerial}
-          />
+          <Text variant="h1">{decodeURIComponent(categorySlug)}</Text>
 
           <Card>
             <CardHeader>
@@ -181,7 +84,7 @@ export default async function CategoryIndexPage({ params }: Props) {
               </CardTitle>
               <CardAction>
                 <Link
-                  href={`/${serialSlug}/${encodeURIComponent(category.name)}/new`}
+                  href={`/${serialSlug}/${categorySlug}/new`}
                   className={buttonVariants({ size: "sm" })}
                 >
                   <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
@@ -195,7 +98,7 @@ export default async function CategoryIndexPage({ params }: Props) {
                   {pageList.map((page) => (
                     <li key={page.id}>
                       <Link
-                        href={`/${serialSlug}/${encodeURIComponent(category.name)}/${encodeURIComponent(page.name)}`}
+                        href={`/${serialSlug}/${categorySlug}/${encodeURIComponent(page.slug)}`}
                         className="text-blue-600 hover:underline"
                       >
                         {page.name}
@@ -207,7 +110,7 @@ export default async function CategoryIndexPage({ params }: Props) {
                 <Text muted>
                   No pages yet —{" "}
                   <Link
-                    href={`/${serialSlug}/${encodeURIComponent(category.name)}/new`}
+                    href={`/${serialSlug}/${categorySlug}/new`}
                     className="text-blue-500 hover:underline"
                   >
                     create the first one

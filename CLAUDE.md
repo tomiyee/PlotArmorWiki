@@ -68,10 +68,10 @@ SELECT ... GROUP BY section_id HAVING chapters.idx = MAX(chapters.idx)
 WHERE page_id = ? AND chapters.idx <= N
 ```
 
-**Category structure** (sections, floater rows) is wall-clock versioned (`created_at`/`deleted_at`).  
+**Page structure** (sections, infobox sections) is wall-clock versioned (`created_at`/`deleted_at`).  
 **Page content** is chapter-versioned. These are separate axes.
 
-Stable IDs on `category_sections` and `category_floater_rows` decouple content rows from renames/reorders.
+Stable IDs on `page_sections` and `page_infobox_sections` decouple content rows from renames/reorders.
 
 ### Server/Client Component boundary
 

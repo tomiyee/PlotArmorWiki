@@ -8,7 +8,6 @@ import {
   chapters,
   chapterSynopses,
   pages,
-  pageCategories,
 } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
@@ -93,35 +92,29 @@ export default async function ChapterPage({ params }: Props) {
 
     synopsisContent = synopsisRow?.content ?? "";
 
-    // Fetch all pages introduced in this chapter, joined to their page category
+    // Fetch all pages introduced in this chapter
     const introducedPages = await db
       .select({
         pageId: pages.id,
         pageName: pages.name,
-        categoryId: pageCategories.id,
-        categoryName: pageCategories.name,
       })
       .from(pages)
-      .innerJoin(pageCategories, eq(pages.categoryId, pageCategories.id))
       .where(
         and(
-          eq(pageCategories.serialId, serial.id),
+          eq(pages.serialId, serial.id),
           eq(pages.introChapterId, chapter.id),
         ),
       )
-      .orderBy(pageCategories.name, pages.name);
+      .orderBy(pages.name);
 
-    const byCategory = new Map<
-      number,
-      { categoryName: string; pages: { id: number; name: string }[] }
-    >();
-    for (const row of introducedPages) {
-      if (!byCategory.has(row.categoryId)) {
-        byCategory.set(row.categoryId, { categoryName: row.categoryName, pages: [] });
-      }
-      byCategory.get(row.categoryId)!.pages.push({ id: row.pageId, name: row.pageName });
+    if (introducedPages.length > 0) {
+      groupedIntroductions = [
+        {
+          categoryName: "",
+          pages: introducedPages.map((r) => ({ id: r.pageId, name: r.pageName })),
+        },
+      ];
     }
-    groupedIntroductions = Array.from(byCategory.values());
 
     boundSaveAction = saveChapterSynopsis.bind(null, serialSlug, chapterIdx);
   }
