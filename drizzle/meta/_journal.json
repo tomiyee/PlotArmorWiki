@@ -15,6 +15,13 @@
       "when": 1747008000000,
       "tag": "0001_uuid_users_authjs_tables_serial_admins",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778552083470,
+      "tag": "0002_smart_epoch",
+      "breakpoints": true
     }
   ]
 }
