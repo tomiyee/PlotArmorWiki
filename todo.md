@@ -18,14 +18,7 @@
 
 ---
 
-## - [ ] Step 5 — Serial page: replace category list with wiki page DAG navigation
-
-The serial detail page (`/{serial}`) no longer shows a category list. It becomes the entry point to the wiki page tree.
-
-- When creating a serial (`createSerial` action): automatically insert a root wiki page (`slug = "home"`, `intro_chapter_id` = first chapter) into `pages` and seed an initial entry in `page_titles`. This root page has no row in `page_relationships` (no parent — it is the DAG root).
-- On `/{serial}`: remove `<CategoryManager>`. In its place show a list of top-level wiki pages (pages whose only parent is the root, or the root page itself), linking to `/{serial}/{slug}`.
-- Remove `SerialMetadataEditor`'s category-aware redirect logic; the serial slug change redirect remains.
-- Remove all category-related imports and Server Actions from `src/app/[serial]/actions.ts` and `src/app/[serial]/page.tsx`.
+## - [X] Step 5 — Serial page: replace category list with wiki page DAG navigation
 
 ---
 

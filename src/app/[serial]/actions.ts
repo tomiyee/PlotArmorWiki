@@ -2,8 +2,8 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, serialAuthors, volumes, chapters } from '@/db/schema';
-import { and, asc, eq, gte, gt, inArray, lte, max, sql } from 'drizzle-orm';
+import { serials, serialAuthors, volumes, chapters, pages, pageTitles } from '@/db/schema';
+import { and, asc, count, eq, gte, gt, inArray, lte, max, sql } from 'drizzle-orm';
 import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 import { titleToSlug } from '@/lib/slug';
 
@@ -329,10 +329,48 @@ export async function addChapter(serialId: number, formData: FormData) {
       .where(inArray(chapters.id, toShift.map((c) => c.id)));
   }
 
-  await db.insert(chapters).values({
-    volumeId,
-    displayName: displayName.trim(),
-    idx: newIdx,
-  });
+  // Check whether this is the first chapter for the serial before inserting.
+  const [{ existingCount }] = await db
+    .select({ existingCount: count(chapters.id) })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .where(eq(volumes.serialId, serialId));
+
+  const isFirstChapter = existingCount === 0;
+
+  const [newChapter] = await db
+    .insert(chapters)
+    .values({
+      volumeId,
+      displayName: displayName.trim(),
+      idx: newIdx,
+    })
+    .returning({ id: chapters.id });
+
+  // Seed the root "Home" wiki page when the first chapter is added to a serial.
+  if (isFirstChapter) {
+    const [{ pageCount }] = await db
+      .select({ pageCount: count(pages.id) })
+      .from(pages)
+      .where(eq(pages.serialId, serialId));
+
+    if (pageCount === 0) {
+      const [homePage] = await db
+        .insert(pages)
+        .values({
+          serialId,
+          name: 'Home',
+          slug: 'home',
+          introChapterId: newChapter.id,
+        })
+        .returning({ id: pages.id });
+
+      await db.insert(pageTitles).values({
+        pageId: homePage.id,
+        chapterId: newChapter.id,
+        title: 'Home',
+      });
+    }
+  }
 }
 
