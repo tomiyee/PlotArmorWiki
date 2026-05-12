@@ -22,18 +22,7 @@
 
 ---
 
-## - [ ] Step 6 — Page creation with parent assignment and slug generation
-
-New pages are created under a chosen parent page (not a category).
-
-- Page creation form at `src/app/[serial]/new/page.tsx`: fields for page name, intro chapter (grouped by volume), and parent page (dropdown of all pages visible at the head chapter).
-- `createPage` Server Action in `src/app/[serial]/new/actions.ts`:
-  1. Insert into `pages` (`serial_id`, `slug`, `intro_chapter_id`).
-  2. Insert initial title into `page_titles` at `intro_chapter_id`.
-  3. Slug generation: `titleToSlug(name)` deduped with a numeric suffix on collision within the serial.
-  4. Insert a `page_relationships` row (`parent_page_id`, `child_page_id = new page`, `chapter_id = head chapter`, `is_active = true`).
-  5. Redirect to `/{serial}/{slug}`.
-- Show child pages in `<PageEditor>` read mode: query `page_relationships` for active children at the user's chapter cutoff; list them below the page content.
+## - [X] Step 6 — Page creation with parent assignment and slug generation
 
 ---
 
