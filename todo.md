@@ -18,7 +18,7 @@
 
 ---
 
-## - [ ] Step 5 — Serial page: replace category list with wiki page DAG navigation
+## - [X] Step 5 — Serial page: replace category list with wiki page DAG navigation
 
 The serial detail page (`/{serial}`) no longer shows a category list. It becomes the entry point to the wiki page tree.
 
