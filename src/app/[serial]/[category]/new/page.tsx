@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/db/index';
-import { serials, pageCategories, volumes, chapters } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { serials, volumes, chapters } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Input } from '@/components/ui/input';
@@ -28,16 +28,6 @@ export default async function NewPagePage({ params }: Props) {
     .limit(1);
 
   if (!serial) {
-    notFound();
-  }
-
-  const [category] = await db
-    .select()
-    .from(pageCategories)
-    .where(and(eq(pageCategories.serialId, serial.id), eq(pageCategories.name, categoryName)))
-    .limit(1);
-
-  if (!category) {
     notFound();
   }
 

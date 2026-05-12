@@ -24,56 +24,28 @@
 
 ---
 
-## - [ ] Step 3 — Schema: replace categories with DAG + per-page structure
+## ~~Step 3 — Schema: replace categories with DAG + per-page structure~~
 
-The category system is removed entirely. Pages now belong directly to a serial and relate to each other via a directed acyclic graph. Sections and infoboxes move from the category level to the individual page. Titles become temporally versioned.
+~~The category system is removed entirely. Pages now belong directly to a serial and relate to each other via a directed acyclic graph. Sections and infoboxes move from the category level to the individual page. Titles become temporally versioned.~~
 
-**Remove tables:**
-- `page_categories`
-- `category_sections`
-- `category_floater_rows`
-- `page_section_versions`
-- `page_floater_versions`
-- `page_floater_row_versions`
-- `page_summaries`
+~~**Remove tables:**~~
+~~- `page_categories`~~
+~~- `category_sections`~~
+~~- `category_floater_rows`~~
+~~- `page_section_versions`~~
+~~- `page_floater_versions`~~
+~~- `page_floater_row_versions`~~
+~~- `page_summaries`~~
 
-**Update `pages` table:**
-- Remove `category_id` FK; add `serial_id` FK → `serials.id`.
-- Add `slug text NOT NULL` with a unique index on `(serial_id, slug)`.
-- Keep `intro_chapter_id` (temporal page visibility — unchanged).
-- Keep `name` temporarily to seed initial `page_titles` entries; drop in a later migration once data is migrated.
+~~**Update `pages` table:**~~
+~~- Remove `category_id` FK; add `serial_id` FK → `serials.id`.~~
+~~- Add `slug text NOT NULL` with a unique index on `(serial_id, slug)`.~~
+~~- Keep `intro_chapter_id` (temporal page visibility — unchanged).~~
+~~- Keep `name` temporarily to seed initial `page_titles` entries; drop in a later migration once data is migrated.~~
 
-**Add tables:**
-```
-page_titles        (page_id FK, chapter_id FK, title text)
-                   PK (page_id, chapter_id)
+~~**Add tables:** `page_titles`, `page_sections`, `page_section_revisions`, `page_infobox_sections`, `page_infobox_revisions`, `page_infobox_image_revisions`, `page_relationships`, `templates`, `template_sections`, `template_infobox_sections`~~
 
-page_sections      (id serial PK, page_id FK, name text, display_order int, created_at, deleted_at)
-
-page_section_revisions  (page_id FK, section_id FK, chapter_id FK, content text)
-                         PK (page_id, section_id, chapter_id)
-
-page_infobox_sections   (id serial PK, page_id FK, label text, display_order int, created_at, deleted_at)
-
-page_infobox_revisions  (page_id FK, infobox_section_id FK, chapter_id FK, content text)
-                         PK (page_id, infobox_section_id, chapter_id)
-
-page_infobox_image_revisions  (page_id FK, chapter_id FK, image_url text)
-                               PK (page_id, chapter_id)
-
-page_relationships  (parent_page_id FK, child_page_id FK, chapter_id FK, is_active boolean)
-                    — each row is a snapshot: read the latest row per (parent, child) pair
-                      where chapter_idx <= cutoff to determine current relationship state
-                    PK (parent_page_id, child_page_id, chapter_id)
-
-templates           (id serial PK, serial_id FK, name text, has_infobox boolean default false)
-
-template_sections   (id serial PK, template_id FK, name text, display_order int)
-
-template_infobox_sections  (id serial PK, template_id FK, label text, display_order int)
-```
-
-After schema edits: `pnpm drizzle-kit generate` → `pnpm drizzle-kit migrate`.
+~~After schema edits: `pnpm drizzle-kit generate` → `pnpm drizzle-kit migrate`.~~
 
 ---
 

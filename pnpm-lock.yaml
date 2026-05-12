@@ -26,6 +26,9 @@ dependencies:
   '@fortawesome/react-fontawesome':
     specifier: ^3.3.1
     version: 3.3.1(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.4)
+  '@tailwindcss/oxide-linux-x64-gnu':
+    specifier: 4.2.4
+    version: 4.2.4
   '@tailwindcss/typography':
     specifier: ^0.5.19
     version: 0.5.19(tailwindcss@4.2.4)
@@ -2001,8 +2004,6 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
-    optional: true
 
   /@tailwindcss/oxide-linux-x64-musl@4.2.4:
     resolution: {integrity: sha512-2wwJRF7nyhOR0hhHoChc04xngV3iS+akccHTGtz965FwF0up4b2lOdo6kI1EbDaEXKgvcrFBYcYQQ/rrnWFVfA==}

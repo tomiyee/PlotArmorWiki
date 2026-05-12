@@ -2,12 +2,13 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, pageCategories, pages } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { serials, pages } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { titleToSlug } from '@/lib/slug';
 
 /**
- * Creates a new wiki page within the given page category, then redirects to the
- * page's URL. Validates that the serial and category exist before inserting.
+ * Creates a new wiki page under the given serial, then redirects to the
+ * page's URL. Validates that the serial exists before inserting.
  *
  * @example
  * // In a Server Component:
@@ -39,20 +40,17 @@ export async function createPage(
     .limit(1);
   if (!serial) throw new Error('Serial not found');
 
-  const [category] = await db
-    .select({ id: pageCategories.id })
-    .from(pageCategories)
-    .where(and(eq(pageCategories.serialId, serial.id), eq(pageCategories.name, categoryName)))
-    .limit(1);
-  if (!category) throw new Error('Category not found');
+  const trimmedName = name.trim();
+  const slug = titleToSlug(trimmedName);
 
   await db.insert(pages).values({
-    categoryId: category.id,
-    name: name.trim(),
+    serialId: serial.id,
+    name: trimmedName,
+    slug,
     introChapterId,
   });
 
   redirect(
-    `/${serialSlug}/${encodeURIComponent(categoryName)}/${encodeURIComponent(name.trim())}`,
+    `/${serialSlug}/${encodeURIComponent(categoryName)}/${encodeURIComponent(slug)}`,
   );
 }

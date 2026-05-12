@@ -7,6 +7,7 @@ import {
   boolean,
   timestamp,
   primaryKey,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 export const chapterTypeEnum = pgEnum('chapter_type', [
@@ -63,68 +64,129 @@ export const chapters = pgTable('chapters', {
   idx: integer('idx').notNull(),
 });
 
-export const pageCategories = pgTable('page_categories', {
-  id: serial('id').primaryKey(),
-  serialId: integer('serial_id')
-    .notNull()
-    .references(() => serials.id),
-  name: text('name').notNull(),
-  body: text('body'),
-  hasFloater: boolean('has_floater').notNull().default(false),
-});
+/**
+ * Wiki pages belonging directly to a serial.
+ *
+ * `name` is kept temporarily to seed `page_titles` entries; it will be
+ * dropped in a later migration once data is migrated.
+ *
+ * `slug` is unique per serial and is used in URL routing.
+ */
+export const pages = pgTable(
+  'pages',
+  {
+    id: serial('id').primaryKey(),
+    serialId: integer('serial_id')
+      .notNull()
+      .references(() => serials.id),
+    /** Kept temporarily; will be replaced by `page_titles` entries. */
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    introChapterId: integer('intro_chapter_id')
+      .notNull()
+      .references(() => chapters.id),
+  },
+  (t) => [uniqueIndex('pages_serial_id_slug_idx').on(t.serialId, t.slug)],
+);
 
-export const categorySections = pgTable('category_sections', {
+/**
+ * Temporal page titles — a page's display name can change over story
+ * progression. Follows the same max-idx read pattern as section content.
+ */
+export const pageTitles = pgTable(
+  'page_titles',
+  {
+    pageId: integer('page_id')
+      .notNull()
+      .references(() => pages.id),
+    chapterId: integer('chapter_id')
+      .notNull()
+      .references(() => chapters.id),
+    title: text('title').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
+);
+
+/**
+ * Wall-clock versioned section structure per page.
+ * Soft-deleted via `deleted_at`.
+ */
+export const pageSections = pgTable('page_sections', {
   id: serial('id').primaryKey(),
-  categoryId: integer('category_id')
+  pageId: integer('page_id')
     .notNull()
-    .references(() => pageCategories.id),
+    .references(() => pages.id),
   name: text('name').notNull(),
   displayOrder: integer('display_order').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
 });
 
-export const categoryFloaterRows = pgTable('category_floater_rows', {
-  id: serial('id').primaryKey(),
-  categoryId: integer('category_id')
-    .notNull()
-    .references(() => pageCategories.id),
-  label: text('label').notNull(),
-  displayOrder: integer('display_order').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  deletedAt: timestamp('deleted_at'),
-});
-
-export const pages = pgTable('pages', {
-  id: serial('id').primaryKey(),
-  categoryId: integer('category_id')
-    .notNull()
-    .references(() => pageCategories.id),
-  name: text('name').notNull(),
-  introChapterId: integer('intro_chapter_id')
-    .notNull()
-    .references(() => chapters.id),
-});
-
-export const pageSectionVersions = pgTable(
-  'page_section_versions',
+/**
+ * Chapter-versioned section content.
+ * Read pattern: max `chapters.idx` ≤ cutoff per `(page_id, section_id)`.
+ */
+export const pageSectionRevisions = pgTable(
+  'page_section_revisions',
   {
     pageId: integer('page_id')
       .notNull()
       .references(() => pages.id),
     sectionId: integer('section_id')
       .notNull()
-      .references(() => categorySections.id),
+      .references(() => pageSections.id),
     chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),
-    content: text('content').notNull().default(''),
+    content: text('content'),
   },
   (t) => [primaryKey({ columns: [t.pageId, t.sectionId, t.chapterId] })],
 );
 
-export const pageFloaterVersions = pgTable(
-  'page_floater_versions',
+/**
+ * Wall-clock versioned infobox rows per page.
+ * Soft-deleted via `deleted_at`.
+ */
+export const pageInfoboxSections = pgTable('page_infobox_sections', {
+  id: serial('id').primaryKey(),
+  pageId: integer('page_id')
+    .notNull()
+    .references(() => pages.id),
+  label: text('label').notNull(),
+  displayOrder: integer('display_order').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+});
+
+/**
+ * Chapter-versioned infobox row content.
+ * Read pattern: max `chapters.idx` ≤ cutoff per `(page_id, infobox_section_id)`.
+ */
+export const pageInfoboxRevisions = pgTable(
+  'page_infobox_revisions',
+  {
+    pageId: integer('page_id')
+      .notNull()
+      .references(() => pages.id),
+    infoboxSectionId: integer('infobox_section_id')
+      .notNull()
+      .references(() => pageInfoboxSections.id),
+    chapterId: integer('chapter_id')
+      .notNull()
+      .references(() => chapters.id),
+    content: text('content'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.pageId, t.infoboxSectionId, t.chapterId] }),
+  ],
+);
+
+/**
+ * Chapter-versioned infobox image per page.
+ * Read pattern: max `chapters.idx` ≤ cutoff per `page_id`.
+ */
+export const pageInfoboxImageRevisions = pgTable(
+  'page_infobox_image_revisions',
   {
     pageId: integer('page_id')
       .notNull()
@@ -137,36 +199,64 @@ export const pageFloaterVersions = pgTable(
   (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
 );
 
-export const pageFloaterRowVersions = pgTable(
-  'page_floater_row_versions',
+/**
+ * DAG edges between wiki pages.
+ *
+ * Each row is a snapshot; read the latest row per `(parent_page_id, child_page_id)`
+ * where `chapter_idx <= cutoff` to determine whether the relationship is
+ * currently active. `is_active = false` rows act as tombstones.
+ */
+export const pageRelationships = pgTable(
+  'page_relationships',
   {
-    pageId: integer('page_id')
+    parentPageId: integer('parent_page_id')
       .notNull()
       .references(() => pages.id),
-    floaterRowId: integer('floater_row_id')
+    childPageId: integer('child_page_id')
       .notNull()
-      .references(() => categoryFloaterRows.id),
+      .references(() => pages.id),
     chapterId: integer('chapter_id')
       .notNull()
       .references(() => chapters.id),
-    content: text('content').notNull().default(''),
+    isActive: boolean('is_active').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.pageId, t.floaterRowId, t.chapterId] })],
+  (t) => [
+    primaryKey({ columns: [t.parentPageId, t.childPageId, t.chapterId] }),
+  ],
 );
 
-export const pageSummaries = pgTable(
-  'page_summaries',
-  {
-    pageId: integer('page_id')
-      .notNull()
-      .references(() => pages.id),
-    chapterId: integer('chapter_id')
-      .notNull()
-      .references(() => chapters.id),
-    content: text('content').notNull().default(''),
-  },
-  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
-);
+/**
+ * Reusable page templates per serial.
+ * A template defines the section and infobox structure for a category of pages.
+ */
+export const templates = pgTable('templates', {
+  id: serial('id').primaryKey(),
+  serialId: integer('serial_id')
+    .notNull()
+    .references(() => serials.id),
+  name: text('name').notNull(),
+  hasInfobox: boolean('has_infobox').notNull().default(false),
+});
+
+/** Section slots defined by a template. */
+export const templateSections = pgTable('template_sections', {
+  id: serial('id').primaryKey(),
+  templateId: integer('template_id')
+    .notNull()
+    .references(() => templates.id),
+  name: text('name').notNull(),
+  displayOrder: integer('display_order').notNull(),
+});
+
+/** Infobox row slots defined by a template. */
+export const templateInfoboxSections = pgTable('template_infobox_sections', {
+  id: serial('id').primaryKey(),
+  templateId: integer('template_id')
+    .notNull()
+    .references(() => templates.id),
+  label: text('label').notNull(),
+  displayOrder: integer('display_order').notNull(),
+});
 
 export const chapterSynopses = pgTable('chapter_synopses', {
   chapterId: integer('chapter_id')
