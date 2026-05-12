@@ -37,8 +37,8 @@ interface ChapterData {
 
 interface Props {
   serialSlug: string;
-  categoryName: string;
   pageName: string;
+  pageSlug: string;
   /**
    * Chapter-versioned summary content shown at the top of the page with no
    * section header in read mode. Always present; empty string means no content yet.
@@ -47,7 +47,7 @@ interface Props {
   /** The chapters.idx of the active summary revision at the reader's cutoff, or null if no content yet. */
   summaryLastUpdatedChapterIdx: number | null;
   sections: SectionData[];
-  /** null when the category has no floater */
+  /** null when the page has no infobox */
   floaterImageUrl: string | null | undefined;
   floaterRows: FloaterRowData[];
   /** All chapters for this serial, used to populate the "Writing as of:" selector. */
@@ -62,8 +62,8 @@ interface Props {
    */
   readingChapterId: number | null;
   /** Wiki pages visible to the reader at their chapter cutoff, used to power
-   * the `[[Category:Page]]` autocomplete in edit mode. */
-  wikiPages: { category: string; name: string }[];
+   * the `[[Page]]` autocomplete in edit mode. */
+  wikiPages: { name: string }[];
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
 }
@@ -131,8 +131,8 @@ function LastUpdatedTag({
  * @example
  * <PageEditor
  *   serialSlug="one-piece"
- *   categoryName="Characters"
  *   pageName="Luffy"
+ *   pageSlug="luffy"
  *   summaryContent="Monkey D. Luffy is the captain of the Straw Hat Pirates."
  *   summaryLastUpdatedChapterIdx={1}
  *   sections={[{ id: 1, name: 'Overview', content: '...', lastUpdatedChapterIdx: 1 }]}
@@ -141,13 +141,13 @@ function LastUpdatedTag({
  *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
  *   headChapterId={5}
  *   readingChapterId={3}
- *   wikiPages={[{ category: 'Characters', name: 'Luffy' }]}
+ *   wikiPages={[{ name: 'Luffy' }]}
  * />
  */
 export function PageEditor({
   serialSlug,
-  categoryName,
-  pageName,
+  pageName: _pageName,
+  pageSlug,
   summaryContent,
   summaryLastUpdatedChapterIdx,
   sections,
@@ -226,8 +226,7 @@ export function PageEditor({
     startTransition(async () => {
       await savePageContent(
         serialSlug,
-        categoryName,
-        pageName,
+        pageSlug,
         draftSummaryContent,
         draftSectionContent,
         hasFloater ? draftFloaterImageUrl.trim() || null : null,
@@ -238,8 +237,7 @@ export function PageEditor({
     });
   }, [
     serialSlug,
-    categoryName,
-    pageName,
+    pageSlug,
     draftSummaryContent,
     draftSectionContent,
     hasFloater,
@@ -263,8 +261,7 @@ export function PageEditor({
     startTransition(async () => {
       const data = await getPageContentAtChapter(
         serialSlug,
-        categoryName,
-        pageName,
+        pageSlug,
         chapterId,
       );
       setCurrentSummaryContent(data.summaryContent);

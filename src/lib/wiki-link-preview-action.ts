@@ -16,7 +16,6 @@ import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
 
 export interface WikiLinkPreviewData {
   pageName: string;
-  categoryName: string;
   introChapterName: string | null;
   /** Whether the page is hidden due to the user's chapter cutoff. */
   hidden: boolean;
@@ -37,12 +36,11 @@ export interface WikiLinkPreviewData {
  * that points to a page that doesn't exist yet).
  *
  * @example
- * const preview = await getWikiLinkPreview("one-piece", "Characters", "luffy");
+ * const preview = await getWikiLinkPreview("one-piece", "luffy");
  * if (preview?.hidden) { ... }
  */
 export async function getWikiLinkPreview(
   serialSlug: string,
-  _categoryName: string,
   pageSlug: string,
 ): Promise<WikiLinkPreviewData | null> {
   // Resolve serial
@@ -92,7 +90,6 @@ export async function getWikiLinkPreview(
   if (introChapterRow && introChapterRow.idx > cutoffIdx) {
     return {
       pageName: page.name,
-      categoryName: "",
       introChapterName,
       hidden: true,
       firstSectionContent: "",
@@ -228,7 +225,6 @@ export async function getWikiLinkPreview(
 
   return {
     pageName: page.name,
-    categoryName: "",
     introChapterName,
     hidden: false,
     firstSectionContent,

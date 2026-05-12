@@ -5,15 +5,23 @@
  * component from drifting apart over time. All wiki link parsing goes through
  * this module.
  *
+ * Wiki link syntax: `[[PageName]]` — links directly to a page within the
+ * current serial. The old `[[Category:Page]]` form is still parsed for
+ * backwards compatibility; the category segment is ignored in URL generation
+ * (URLs are now 2-level: `/{serial}/{page-slug}`).
+ *
+ * @example
+ * const parts = parseWikiLink("Harry Potter");
+ * // → { page: "Harry Potter" }
+ *
  * @example
  * const parts = parseWikiLink("Characters:Harry Potter");
- * // → { category: "Characters", page: "Harry Potter" }
+ * // → { page: "Harry Potter" }  (category ignored)
  */
 
 export interface WikiLinkParts {
-  category: string;
   page: string;
-  /** Reserved for future `[[Category:Page|Alias]]` syntax. */
+  /** Reserved for future `[[Page|Alias]]` syntax. */
   alias?: string;
 }
 
@@ -30,27 +38,36 @@ export interface WikiLinkParts {
 export const WIKI_LINK_RE = /\[\[([^|\]]+)(?:\|([^\]]*))?\]\]/g;
 
 /**
- * Parse the inner content of a `[[…]]` token into its category and page
- * components. Returns `null` if the content is not a valid `Category:Page`
- * link (e.g. no colon).
+ * Parse the inner content of a `[[…]]` token into its page component.
+ * Accepts both `[[PageName]]` and the legacy `[[Category:Page]]` form —
+ * in the latter case the category prefix is stripped and only the page name
+ * is returned.
+ *
+ * Returns `null` if the content is empty after trimming.
  *
  * @example
- * parseWikiLink("Characters:Harry Potter") // → { category: "Characters", page: "Harry Potter" }
- * parseWikiLink("Characters:Harry Potter|Harry") // → { category: "Characters", page: "Harry Potter", alias: "Harry" }
- * parseWikiLink("NotALink") // → null
+ * parseWikiLink("Harry Potter") // → { page: "Harry Potter" }
+ * parseWikiLink("Characters:Harry Potter") // → { page: "Harry Potter" }
+ * parseWikiLink("Harry Potter|Harry") // → { page: "Harry Potter", alias: "Harry" }
  */
 export function parseWikiLink(raw: string, alias?: string): WikiLinkParts | null {
-  const colonIdx = raw.indexOf(":");
-  if (colonIdx === -1) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // Strip legacy `Category:Page` prefix — keep only the page part.
+  const colonIdx = trimmed.indexOf(":");
+  const page = colonIdx !== -1 ? trimmed.slice(colonIdx + 1).trim() : trimmed;
+
+  if (!page) return null;
+
   return {
-    category: raw.slice(0, colonIdx).trim(),
-    page: raw.slice(colonIdx + 1).trim(),
+    page,
     alias: alias?.trim() || undefined,
   };
 }
 
 /**
- * Canonical URL slug for a wiki page or category name.
+ * Canonical URL slug for a wiki page name.
  *
  * Starting simple with `encodeURIComponent` — centralising the call site
  * means it can evolve (e.g. case-normalisation, whitespace collapsing) without

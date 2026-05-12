@@ -79,7 +79,7 @@ export default async function ChapterPage({ params }: Props) {
     .limit(1);
 
   let synopsisContent = "";
-  let groupedIntroductions: { categoryName: string; pages: { id: number; name: string }[] }[] = [];
+  let groupedIntroductions: { categoryName: string; pages: { id: number; name: string; slug: string }[] }[] = [];
   let boundSaveAction: typeof saveChapterSynopsis | null = null;
 
   if (!spoilered) {
@@ -97,6 +97,7 @@ export default async function ChapterPage({ params }: Props) {
       .select({
         pageId: pages.id,
         pageName: pages.name,
+        pageSlug: pages.slug,
       })
       .from(pages)
       .where(
@@ -111,7 +112,7 @@ export default async function ChapterPage({ params }: Props) {
       groupedIntroductions = [
         {
           categoryName: "",
-          pages: introducedPages.map((r) => ({ id: r.pageId, name: r.pageName })),
+          pages: introducedPages.map((r) => ({ id: r.pageId, name: r.pageName, slug: r.pageSlug })),
         },
       ];
     }
@@ -175,7 +176,7 @@ export default async function ChapterPage({ params }: Props) {
                           {categoryPages.map((page) => (
                             <li key={page.id}>
                               <Link
-                                href={`/${serialSlug}/${encodeURIComponent(categoryName)}/${encodeURIComponent(page.name)}`}
+                                href={`/${serialSlug}/${encodeURIComponent(page.slug)}`}
                                 className="text-blue-600 hover:underline"
                               >
                                 {page.name}

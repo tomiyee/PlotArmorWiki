@@ -20,7 +20,7 @@ import { PageContainer } from "@/components/ui/page-container";
 import { PageEditor } from "./PageEditor";
 
 interface Props {
-  params: Promise<{ serial: string; category: string; page: string }>;
+  params: Promise<{ serial: string; page: string }>;
 }
 
 /**
@@ -58,12 +58,10 @@ async function getChapterCutoff(
 export default async function PageView({ params }: Props) {
   const {
     serial: serialSlug,
-    category: categorySlug,
-    page: pageSlug,
+    page: pageParam,
   } = await params;
 
-  const categoryName = decodeURIComponent(categorySlug);
-  const decodedPageSlug = decodeURIComponent(pageSlug);
+  const decodedPageSlug = decodeURIComponent(pageParam);
 
   const [serial] = await db
     .select()
@@ -115,7 +113,7 @@ export default async function PageView({ params }: Props) {
     .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
     .where(and(eq(pages.serialId, serial.id), lte(chapters.idx, cutoffIdx)))
     .orderBy(asc(pages.name));
-  const wikiPages = rawWikiPages.map((p) => ({ category: "", name: p.name }));
+  const wikiPages = rawWikiPages.map((p) => ({ name: p.name }));
 
   const [page] = await db
     .select()
@@ -141,13 +139,6 @@ export default async function PageView({ params }: Props) {
             <Text muted className="text-sm">
               <Link href={`/${serialSlug}`} className="hover:underline">
                 {serial.title}
-              </Link>
-              {" / "}
-              <Link
-                href={`/${serialSlug}/${encodeURIComponent(categoryName)}`}
-                className="hover:underline"
-              >
-                {categoryName}
               </Link>
             </Text>
             <Text variant="body">
@@ -317,13 +308,6 @@ export default async function PageView({ params }: Props) {
             <Link href={`/${serialSlug}`} className="hover:underline">
               {serial.title}
             </Link>
-            {" / "}
-            <Link
-              href={`/${serialSlug}/${encodeURIComponent(categoryName)}`}
-              className="hover:underline"
-            >
-              {categoryName}
-            </Link>
           </Text>
 
           <Box col className="gap-2">
@@ -337,8 +321,8 @@ export default async function PageView({ params }: Props) {
 
           <PageEditor
             serialSlug={serialSlug}
-            categoryName={categoryName}
-            pageName={decodedPageSlug}
+            pageName={page.name}
+            pageSlug={decodedPageSlug}
             summaryContent=""
             summaryLastUpdatedChapterIdx={null}
             sections={sections}
