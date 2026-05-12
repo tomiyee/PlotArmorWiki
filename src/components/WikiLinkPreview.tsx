@@ -14,9 +14,7 @@ interface Props {
   children: React.ReactNode;
   /** Serial slug — used to fetch the preview. */
   serialSlug: string;
-  /** Category name of the linked page. */
-  categoryName: string;
-  /** Page name of the linked page. */
+  /** Page name (slug) of the linked page. */
   pageName: string;
 }
 
@@ -34,9 +32,8 @@ const PREVIEW_CHARS = 200;
  *
  * @example
  * <WikiLinkPreview
- *   href="/my-serial/Characters/Luffy"
+ *   href="/my-serial/luffy"
  *   serialSlug="my-serial"
- *   categoryName="Characters"
  *   pageName="Luffy"
  * >
  *   Luffy
@@ -46,7 +43,6 @@ export function WikiLinkPreview({
   href,
   children,
   serialSlug,
-  categoryName,
   pageName,
 }: Props) {
   const [preview, setPreview] = useState<WikiLinkPreviewData | "loading" | "missing">("loading");
@@ -54,7 +50,7 @@ export function WikiLinkPreview({
   async function handleMouseEnter() {
     // Only fetch once
     if (preview !== "loading") return;
-    const data = await getWikiLinkPreview(serialSlug, categoryName, pageName);
+    const data = await getWikiLinkPreview(serialSlug, pageName);
     setPreview(data ?? "missing");
   }
 
@@ -70,19 +66,18 @@ export function WikiLinkPreview({
 
   return (
     <HoverCard trigger={anchor}>
-      <PreviewContent preview={preview} categoryName={categoryName} pageName={pageName} serialSlug={serialSlug} />
+      <PreviewContent preview={preview} pageName={pageName} serialSlug={serialSlug} />
     </HoverCard>
   );
 }
 
 interface PreviewContentProps {
   preview: WikiLinkPreviewData | "loading" | "missing";
-  categoryName: string;
   pageName: string;
   serialSlug: string;
 }
 
-function PreviewContent({ preview, categoryName, pageName, serialSlug }: PreviewContentProps) {
+function PreviewContent({ preview, pageName, serialSlug }: PreviewContentProps) {
   if (preview === "loading") {
     return (
       <Text muted className="text-sm">
@@ -97,9 +92,6 @@ function PreviewContent({ preview, categoryName, pageName, serialSlug }: Preview
         <Text variant="label" className="font-semibold text-gray-900">
           {pageName}
         </Text>
-        <Text muted className="text-xs">
-          {categoryName}
-        </Text>
         <Text muted className="text-sm mt-1">
           This page has not been created yet.
         </Text>
@@ -111,10 +103,7 @@ function PreviewContent({ preview, categoryName, pageName, serialSlug }: Preview
     return (
       <div className="flex flex-col gap-1">
         <Text variant="label" className="font-semibold text-gray-900">
-          {pageName}
-        </Text>
-        <Text muted className="text-xs">
-          {categoryName}
+          {preview.pageName}
         </Text>
         <Text muted className="text-sm mt-1">
           Introduced in {preview.introChapterName ?? "a future chapter"}. Hidden
@@ -136,12 +125,11 @@ function PreviewContent({ preview, categoryName, pageName, serialSlug }: Preview
         <Text variant="label" className="font-semibold text-gray-900 text-sm">
           {preview.pageName}
         </Text>
-        <Text muted as="span" className="text-xs block">
-          {preview.categoryName}
-          {preview.introChapterName && (
-            <span className="ml-2 text-gray-400">· {preview.introChapterName}</span>
-          )}
-        </Text>
+        {preview.introChapterName && (
+          <Text muted as="span" className="text-xs block">
+            <span className="text-gray-400">{preview.introChapterName}</span>
+          </Text>
+        )}
       </div>
 
       {/* Floater rows */}

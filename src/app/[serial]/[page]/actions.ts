@@ -40,10 +40,7 @@ async function getHeadChapterId(serialId: number): Promise<number> {
  * @returns An object containing the serial ID and page record
  * @throws Error if the serial or page is not found in the database
  */
-async function resolvePageIds(
-  serialSlug: string,
-  pageSlug: string,
-) {
+async function resolvePageIds(serialSlug: string, pageSlug: string) {
   const [serial] = await db
     .select({ id: serials.id })
     .from(serials)
@@ -72,15 +69,14 @@ async function resolvePageIds(
  *
  * @example
  * // Write at head (default behaviour — UI passes undefined)
- * await savePageContent(serialSlug, categoryName, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent);
+ * await savePageContent(serialSlug, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent);
  *
  * @example
  * // Write at a specific chapter (used by the chapter selector in edit mode)
- * await savePageContent(serialSlug, categoryName, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
+ * await savePageContent(serialSlug, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent, chapterId);
  */
 export async function savePageContent(
   serialSlug: string,
-  _categoryName: string,
   pageSlug: string,
   _summaryContent: string,
   sectionContent: Record<number, string>,
@@ -144,14 +140,13 @@ export async function savePageContent(
  * chapter — the caller should treat these as blank-slate values.
  *
  * @example
- * const data = await getPageContentAtChapter('my-serial', 'Characters', 'anya', 42);
+ * const data = await getPageContentAtChapter('my-serial', 'anya', 42);
  * // data.sections: [{ id: 1, content: '...' }, ...]
  * // data.floaterImageUrl: 'https://...' | null
  * // data.floaterRows: [{ id: 3, content: '...' }, ...]
  */
 export async function getPageContentAtChapter(
   serialSlug: string,
-  _categoryName: string,
   pageSlug: string,
   chapterId: number,
 ): Promise<{

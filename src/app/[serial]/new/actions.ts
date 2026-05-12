@@ -12,14 +12,10 @@ import { titleToSlug } from '@/lib/slug';
  *
  * @example
  * // In a Server Component:
- * const createPageForCategory = createPage.bind(null, serialSlug, categoryName);
- * <form action={createPageForCategory}>…</form>
+ * const createPageForSerial = createPage.bind(null, serialSlug);
+ * <form action={createPageForSerial}>…</form>
  */
-export async function createPage(
-  serialSlug: string,
-  categoryName: string,
-  formData: FormData,
-) {
+export async function createPage(serialSlug: string, formData: FormData) {
   const name = formData.get('name');
   const introChapterIdRaw = formData.get('introChapterId');
 
@@ -50,7 +46,5 @@ export async function createPage(
     introChapterId,
   });
 
-  redirect(
-    `/${serialSlug}/${encodeURIComponent(categoryName)}/${encodeURIComponent(slug)}`,
-  );
+  redirect(`/${serialSlug}/${encodeURIComponent(slug)}`);
 }

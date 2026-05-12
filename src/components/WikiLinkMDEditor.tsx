@@ -5,7 +5,6 @@ import { MDEditor } from "@/components/MDEditor";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 
 interface WikiPage {
-  category: string;
   name: string;
 }
 
@@ -21,17 +20,18 @@ interface Props {
 }
 
 interface Suggestion {
-  category: string;
   name: string;
 }
 
 /**
- * Wraps `<MDEditor>` with `[[Category:Page]]` wiki link autocomplete.
+ * Wraps `<MDEditor>` with `[[Page]]` wiki link autocomplete.
  *
- * Autocomplete is triggered by typing `[[` anywhere in the editor. Before the
- * `:` the dropdown filters by category name; after the `:` it filters by page
- * name within that category. Selecting a suggestion replaces the open `[[…`
- * fragment with the completed `[[Category:Page]]` token.
+ * Autocomplete is triggered by typing `[[` anywhere in the editor. The
+ * dropdown filters pages by name as the user types. Selecting a suggestion
+ * replaces the open `[[…` fragment with the completed `[[PageName]]` token.
+ *
+ * The legacy `[[Category:Page]]` syntax is still valid in markdown (the
+ * remark plugin handles both), but new completions only emit `[[PageName]]`.
  *
  * Uses `onInput` (not `onKeyUp`) to catch paste, IME, and programmatic edits.
  * IME composition state is tracked via `onCompositionStart`/`onCompositionEnd`
@@ -85,32 +85,14 @@ export function WikiLinkMDEditor({
     }
 
     const triggerText = before.slice(lastOpen + 2); // text after `[[`
+
+    // Strip a legacy `Category:` prefix if present — filter by the page part.
     const colonIdx = triggerText.indexOf(":");
+    const pageQuery = (colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText).toLowerCase();
 
-    let next: Suggestion[];
-
-    if (colonIdx === -1) {
-      // Before colon → filter categories, show first page per matching category
-      const query = triggerText.toLowerCase();
-      const seen = new Set<string>();
-      next = wikiPages
-        .filter((p) => {
-          if (!p.category.toLowerCase().startsWith(query)) return false;
-          if (seen.has(p.category)) return false;
-          seen.add(p.category);
-          return true;
-        })
-        .map((p) => ({ category: p.category, name: "" }));
-    } else {
-      // After colon → filter pages within the typed category
-      const categoryQuery = triggerText.slice(0, colonIdx).trim().toLowerCase();
-      const pageQuery = triggerText.slice(colonIdx + 1).toLowerCase();
-      next = wikiPages.filter(
-        (p) =>
-          p.category.toLowerCase() === categoryQuery &&
-          p.name.toLowerCase().startsWith(pageQuery),
-      );
-    }
+    const next: Suggestion[] = wikiPages.filter((p) =>
+      p.name.toLowerCase().startsWith(pageQuery),
+    );
 
     if (next.length === 0) {
       closeSuggestions();
@@ -124,7 +106,7 @@ export function WikiLinkMDEditor({
 
   /**
    * Apply the selected suggestion, replacing the open `[[…` fragment with
-   * the completed `[[Category:Page]]` token.
+   * the completed `[[PageName]]` token.
    */
   function applySuggestion(suggestion: Suggestion) {
     const ta = textareaRef.current;
@@ -135,28 +117,19 @@ export function WikiLinkMDEditor({
     const after = ta.value.substring(cursorPos);
     const lastOpen = before.lastIndexOf("[[");
 
-    const replacement =
-      suggestion.name
-        ? `[[${suggestion.category}:${suggestion.name}]]`
-        : `[[${suggestion.category}:`;
+    const replacement = `[[${suggestion.name}]]`;
 
     const newValue = before.slice(0, lastOpen) + replacement + after;
     onChange(newValue);
 
-    // Move cursor to end of replacement (or after colon for category-only)
+    // Move cursor to end of replacement
     const newCursor = lastOpen + replacement.length;
     requestAnimationFrame(() => {
       ta.setSelectionRange(newCursor, newCursor);
       ta.focus();
-      // Trigger input handler so category mode re-opens suggestions after inserting `:`
-      if (!suggestion.name) {
-        handleInput();
-      }
     });
 
-    if (suggestion.name) {
-      closeSuggestions();
-    }
+    closeSuggestions();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -222,7 +195,7 @@ export function WikiLinkMDEditor({
         >
           {suggestions.map((s, i) => (
             <li
-              key={`${s.category}:${s.name}`}
+              key={s.name}
               role="option"
               aria-selected={i === activeIndex}
               className={`flex cursor-pointer select-none items-baseline gap-1.5 px-3 py-2 text-sm ${
@@ -234,13 +207,7 @@ export function WikiLinkMDEditor({
                 applySuggestion(s);
               }}
             >
-              <span className="text-gray-400 shrink-0">{s.category}</span>
-              {s.name && (
-                <>
-                  <span className="text-gray-400">›</span>
-                  <span className="text-gray-900 font-medium">{s.name}</span>
-                </>
-              )}
+              <span className="text-gray-900 font-medium">{s.name}</span>
             </li>
           ))}
         </ul>
