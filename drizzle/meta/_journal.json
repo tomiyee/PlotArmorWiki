@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1778217557059,
-      "tag": "0000_complete_edwin_jarvis",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1747008000000,
-      "tag": "0001_uuid_users_authjs_tables_serial_admins",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1778552083470,
-      "tag": "0002_smart_epoch",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1778645021867,
-      "tag": "0003_acoustic_alex_wilder",
+      "when": 1778648034492,
+      "tag": "0000_peaceful_sphinx",
       "breakpoints": true
     }
   ]
