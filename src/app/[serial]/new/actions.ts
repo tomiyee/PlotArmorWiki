@@ -2,24 +2,9 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, pages, pageTitles, pageRelationships, chapters, volumes } from '@/db/schema';
-import { and, desc, eq, like } from 'drizzle-orm';
+import { serials, pages, pageTitles, pageRelationships } from '@/db/schema';
+import { and, eq, like } from 'drizzle-orm';
 import { titleToSlug } from '@/lib/slug';
-
-/**
- * Resolves the head chapter id (highest idx) for a serial.
- * Returns null when the serial has no chapters yet.
- */
-async function getHeadChapterId(serialId: number): Promise<number | null> {
-  const [row] = await db
-    .select({ id: chapters.id })
-    .from(chapters)
-    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-    .where(eq(volumes.serialId, serialId))
-    .orderBy(desc(chapters.idx))
-    .limit(1);
-  return row?.id ?? null;
-}
 
 /**
  * Generates a slug unique within the serial. If `titleToSlug(name)` already
@@ -109,15 +94,12 @@ export async function createPage(serialSlug: string, formData: FormData) {
       title: trimmedName,
     });
 
-    // 3. Insert a page_relationships row linking to the required parent.
-    // Relationship is stamped at the head chapter (or intro chapter as fallback).
-    const headChapterId = await getHeadChapterId(serial.id);
-    const relationChapterId = headChapterId ?? introChapterId;
-
+    // 3. Insert a page_relationships row linking to the required parent,
+    // stamped at the child's intro chapter.
     await tx.insert(pageRelationships).values({
       parentPageId,
       childPageId: newPage.id,
-      chapterId: relationChapterId,
+      chapterId: introChapterId,
       isActive: true,
     });
   });
