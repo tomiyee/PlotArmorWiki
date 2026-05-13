@@ -166,7 +166,7 @@ Wiki pages form a **directed acyclic graph (DAG)**.
 - Relationships are temporal
 - Cycles are forbidden
 
-The serial index page:
+The serial index page, or the "Home" page, is itself a Wiki Page that::
 
 - Has no parent
 - Serves as the DAG root

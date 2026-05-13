@@ -73,6 +73,8 @@ interface Props {
    * below the content in read mode.
    */
   childPages: { id: number; name: string; slug: string }[];
+  /** The DB id of this page, forwarded to the new-page form as the default parent. */
+  pageId: number;
 }
 
 /**
@@ -166,6 +168,7 @@ export function PageEditor({
   wikiPages,
   introChapterIdx,
   childPages,
+  pageId,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -350,11 +353,11 @@ export function PageEditor({
           </div>
         ))}
 
-        {childPages.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <Text variant="h3" className="mb-3">
-              Related pages
-            </Text>
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <Text variant="h3" className="mb-3">
+            Child pages
+          </Text>
+          {childPages.length > 0 ? (
             <ul className="flex flex-col gap-2">
               {childPages.map((child) => (
                 <li key={child.id}>
@@ -369,8 +372,16 @@ export function PageEditor({
                 </li>
               ))}
             </ul>
-          </div>
-        )}
+          ) : (
+            <Text muted className="text-sm">No child pages yet.</Text>
+          )}
+          <Link
+            href={`/${serialSlug}/new?parentPageId=${pageId}`}
+            className="mt-3 text-sm text-blue-600 hover:underline inline-block"
+          >
+            + New page
+          </Link>
+        </div>
       </div>
     );
   }

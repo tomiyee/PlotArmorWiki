@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db/index";
@@ -14,7 +14,7 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
 } from "@/db/schema";
-import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { PageContainer } from "@/components/ui/page-container";
@@ -107,12 +107,18 @@ export default async function PageView({ params }: Props) {
   // Head chapter is the one with the highest idx (last in the ordered list).
   const headChapterId = chapterList.at(-1)?.id ?? null;
 
-  // Wiki pages visible to the reader at their current chapter cutoff.
+  // Wiki pages visible at the reader's cutoff. Pages with null introChapterId
+  // (the home page) are always included since they predate any chapters.
   const rawWikiPages = await db
     .select({ name: pages.name })
     .from(pages)
-    .innerJoin(chapters, eq(pages.introChapterId, chapters.id))
-    .where(and(eq(pages.serialId, serial.id), lte(chapters.idx, cutoffIdx)))
+    .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(
+      and(
+        eq(pages.serialId, serial.id),
+        or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+      ),
+    )
     .orderBy(asc(pages.name));
   const wikiPages = rawWikiPages.map((p) => ({ name: p.name }));
 
@@ -126,11 +132,19 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [introChapter] = await db
-    .select({ displayName: chapters.displayName, idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, page.introChapterId))
-    .limit(1);
+  // The home page is canonical at /{serial}; visiting /{serial}/home redirects there.
+  if (page.isHomePage) {
+    redirect(`/${serialSlug}`);
+  }
+
+  const introChapter = page.introChapterId
+    ? await db
+        .select({ displayName: chapters.displayName, idx: chapters.idx })
+        .from(chapters)
+        .where(eq(chapters.id, page.introChapterId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null)
+    : null;
 
   if (introChapter && introChapter.idx > cutoffIdx) {
     return (
@@ -362,6 +376,7 @@ export default async function PageView({ params }: Props) {
             serialSlug={serialSlug}
             pageName={page.name}
             pageSlug={decodedPageSlug}
+            pageId={page.id}
             summaryContent=""
             summaryLastUpdatedChapterIdx={null}
             sections={sections}

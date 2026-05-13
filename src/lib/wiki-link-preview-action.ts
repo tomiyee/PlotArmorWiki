@@ -75,12 +75,15 @@ export async function getWikiLinkPreview(
     .limit(1);
   if (!page) return null;
 
-  // Resolve intro chapter name
-  const [introChapterRow] = await db
-    .select({ displayName: chapters.displayName, idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, page.introChapterId))
-    .limit(1);
+  // Resolve intro chapter name (introChapterId is null for the home page)
+  const introChapterRow = page.introChapterId
+    ? await db
+        .select({ displayName: chapters.displayName, idx: chapters.idx })
+        .from(chapters)
+        .where(eq(chapters.id, page.introChapterId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null)
+    : null;
 
   const introChapterName = introChapterRow
     ? `${serial.chapterType} ${introChapterRow.displayName}`

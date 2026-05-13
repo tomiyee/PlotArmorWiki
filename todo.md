@@ -159,7 +159,14 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 20 — Spoiler-aware search
+## - [ ] Step 21 — When the screen is thin, compact the top right nav bar
+
+- When the screen is thin, replace the top right dropdown that controls the currently selected chapter into a hamburger menu that opens a side drawer.
+- The warning to set your chapter should appear over the hamburger menu if relevant.
+
+---
+
+## - [ ] Step 22 — Spoiler-aware search
 
 - Add `to_tsvector` on `pages` (resolved title) and `serials.title` (inline or generated column with index).
 - Create a server-side search endpoint (Server Action or route handler) that:

@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, serialAuthors } from '@/db/schema';
+import { serials, serialAuthors, pages } from '@/db/schema';
 import { titleToSlug } from '@/lib/slug';
 import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
 
@@ -54,6 +54,16 @@ export async function createSerial(formData: FormData) {
       }))
     );
   }
+
+  // Automatically create the serial's home page. introChapterId is null because
+  // no chapters exist yet; the home page is always visible regardless of cutoff.
+  await db.insert(pages).values({
+    serialId: inserted.id,
+    name: 'Home',
+    slug: 'home',
+    introChapterId: null,
+    isHomePage: true,
+  });
 
   redirect(`/${slug}`);
 }

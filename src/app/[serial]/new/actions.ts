@@ -70,15 +70,13 @@ export async function createPage(serialSlug: string, formData: FormData) {
   }
 
   const introChapterId = parseInt(introChapterIdRaw, 10);
-  if (isNaN(introChapterId)) throw new Error('Invalid chapter ID');
+  if (isNaN(introChapterId) || introChapterId <= 0) throw new Error('Intro chapter is required');
 
-  const parentPageIdParsed =
-    parentPageIdRaw && typeof parentPageIdRaw === 'string' && parentPageIdRaw !== ''
-      ? parseInt(parentPageIdRaw, 10)
-      : null;
-  if (parentPageIdParsed !== null && isNaN(parentPageIdParsed)) throw new Error('Invalid parent page ID');
-  // 0 is the "None (root page)" sentinel from the form — treat it as no parent.
-  const parentPageId = parentPageIdParsed !== null && parentPageIdParsed !== 0 ? parentPageIdParsed : null;
+  if (!parentPageIdRaw || typeof parentPageIdRaw !== 'string' || parentPageIdRaw === '') {
+    throw new Error('Parent page is required');
+  }
+  const parentPageId = parseInt(parentPageIdRaw, 10);
+  if (isNaN(parentPageId) || parentPageId <= 0) throw new Error('Invalid parent page ID');
 
   const [serial] = await db
     .select({ id: serials.id })
@@ -111,19 +109,17 @@ export async function createPage(serialSlug: string, formData: FormData) {
       title: trimmedName,
     });
 
-    // 3. If a parent page was chosen, insert a page_relationships row.
-    if (parentPageId !== null) {
-      // Relationship is stamped at the head chapter (or intro chapter as fallback).
-      const headChapterId = await getHeadChapterId(serial.id);
-      const relationChapterId = headChapterId ?? introChapterId;
+    // 3. Insert a page_relationships row linking to the required parent.
+    // Relationship is stamped at the head chapter (or intro chapter as fallback).
+    const headChapterId = await getHeadChapterId(serial.id);
+    const relationChapterId = headChapterId ?? introChapterId;
 
-      await tx.insert(pageRelationships).values({
-        parentPageId,
-        childPageId: newPage.id,
-        chapterId: relationChapterId,
-        isActive: true,
-      });
-    }
+    await tx.insert(pageRelationships).values({
+      parentPageId,
+      childPageId: newPage.id,
+      chapterId: relationChapterId,
+      isActive: true,
+    });
   });
 
   redirect(`/${serialSlug}/${encodeURIComponent(slug)}`);

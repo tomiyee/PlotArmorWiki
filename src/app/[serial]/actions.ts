@@ -347,29 +347,20 @@ export async function addChapter(serialId: number, formData: FormData) {
     })
     .returning({ id: chapters.id });
 
-  // Seed the root "Home" wiki page when the first chapter is added to a serial.
+  // When the first chapter is added, create a pageTitles entry for the home
+  // page so it participates in temporal name tracking from this chapter onward.
   if (isFirstChapter) {
-    const [{ pageCount }] = await db
-      .select({ pageCount: count(pages.id) })
+    const [homePage] = await db
+      .select({ id: pages.id })
       .from(pages)
-      .where(eq(pages.serialId, serialId));
+      .where(and(eq(pages.serialId, serialId), eq(pages.isHomePage, true)));
 
-    if (pageCount === 0) {
-      const [homePage] = await db
-        .insert(pages)
-        .values({
-          serialId,
-          name: 'Home',
-          slug: 'home',
-          introChapterId: newChapter.id,
-        })
-        .returning({ id: pages.id });
-
+    if (homePage) {
       await db.insert(pageTitles).values({
         pageId: homePage.id,
         chapterId: newChapter.id,
         title: 'Home',
-      });
+      }).onConflictDoNothing();
     }
   }
 }

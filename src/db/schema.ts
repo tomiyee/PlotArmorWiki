@@ -71,6 +71,12 @@ export const chapters = pgTable('chapters', {
  * dropped in a later migration once data is migrated.
  *
  * `slug` is unique per serial and is used in URL routing.
+ *
+ * `introChapterId` is nullable for the serial's home page, which is created
+ * before any chapters exist and is always visible regardless of cutoff.
+ *
+ * `isHomePage` marks the single automatically-created root page for a serial.
+ * Every serial has exactly one home page.
  */
 export const pages = pgTable(
   'pages',
@@ -82,9 +88,10 @@ export const pages = pgTable(
     /** Kept temporarily; will be replaced by `page_titles` entries. */
     name: text('name').notNull(),
     slug: text('slug').notNull(),
-    introChapterId: integer('intro_chapter_id')
-      .notNull()
-      .references(() => chapters.id),
+    /** Null for the home page, which predates any chapters and is always visible. */
+    introChapterId: integer('intro_chapter_id').references(() => chapters.id),
+    /** True for the single automatically-created root page per serial. */
+    isHomePage: boolean('is_home_page').notNull().default(false),
   },
   (t) => [uniqueIndex('pages_serial_id_slug_idx').on(t.serialId, t.slug)],
 );

@@ -14,10 +14,13 @@ import { createPage } from './actions';
 
 interface Props {
   params: Promise<{ serial: string }>;
+  searchParams: Promise<{ parentPageId?: string }>;
 }
 
-export default async function NewPagePage({ params }: Props) {
+export default async function NewPagePage({ params, searchParams }: Props) {
   const { serial: serialSlug } = await params;
+  const { parentPageId: parentPageIdParam } = await searchParams;
+  const defaultParentPageId = parentPageIdParam ? parseInt(parentPageIdParam, 10) : undefined;
 
   const [serial] = await db
     .select()
@@ -62,28 +65,24 @@ export default async function NewPagePage({ params }: Props) {
   volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
   chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
 
-  const chapterOptions = volumeList
-    .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
-    .map((v) => ({
-      label: v.displayName,
-      value: -v.id, // placeholder — groups are non-selectable
-      children: (chaptersByVolume[v.id] ?? []).map((c) => ({
-        label: c.displayName,
-        value: c.id,
+  const chapterOptions = [
+    // Sentinel placeholder — value 0 is never a real chapter ID.
+    { label: `Select a ${serial.chapterType.toLowerCase()}…`, value: 0, disabled: true },
+    ...volumeList
+      .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
+      .map((v) => ({
+        label: v.displayName,
+        value: -v.id, // placeholder — groups are non-selectable
+        children: (chaptersByVolume[v.id] ?? []).map((c) => ({
+          label: c.displayName,
+          value: c.id,
+        })),
       })),
-    }));
-
-  // Parent page options: a blank "None (root page)" option followed by all existing pages.
-  const parentPageOptions = [
-    { label: 'None (root page)', value: 0 },
-    ...existingPages.map((p) => ({ label: p.name, value: p.id })),
   ];
 
-  // Default to the latest chapter so the intro chapter selector starts at the end.
-  const headChapterId =
-    chapterList.length > 0
-      ? chapterList.reduce((prev, cur) => (cur.idx > prev.idx ? cur : prev)).id
-      : chapterList[0]?.id;
+  // Parent page options: all existing pages. The home page is always present
+  // since it's created with the serial, so this list is never empty.
+  const parentPageOptions = existingPages.map((p) => ({ label: p.name, value: p.id }));
 
   const createPageAction = createPage.bind(null, serialSlug);
 
@@ -128,7 +127,6 @@ export default async function NewPagePage({ params }: Props) {
                   id="introChapterId"
                   name="introChapterId"
                   options={chapterOptions}
-                  defaultValue={headChapterId}
                 />
               ) : (
                 <Text muted className="text-sm">
@@ -140,18 +138,17 @@ export default async function NewPagePage({ params }: Props) {
               )}
             </Box>
 
-            {/* Parent page (optional) */}
+            {/* Parent page (required) */}
             <Box col className="gap-1">
-              <Label htmlFor="parentPageId">Parent page</Label>
+              <Label htmlFor="parentPageId">
+                Parent page <span className="text-red-500">*</span>
+              </Label>
               <Select
                 id="parentPageId"
                 name="parentPageId"
                 options={parentPageOptions}
-                defaultValue={0}
+                defaultValue={defaultParentPageId}
               />
-              <Text muted className="text-xs">
-                Choose a parent to place this page in the wiki DAG hierarchy.
-              </Text>
             </Box>
 
             <Button
