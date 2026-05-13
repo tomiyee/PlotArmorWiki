@@ -11,6 +11,7 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  pageTitles,
 } from "@/db/schema";
 import { and, asc, desc, eq, isNull, lte, max } from "drizzle-orm";
 
@@ -300,4 +301,61 @@ export async function getPageContentAtChapter(
       content: rowContentMap.get(r.id) ?? "",
     })),
   };
+}
+
+/**
+ * Inserts or replaces a page title revision at the given chapter. If a title
+ * already exists for this (page, chapter) pair it is overwritten in-place.
+ *
+ * @example
+ * await addPageTitle('my-serial', 'luffy', 42, 'Monkey D. Luffy');
+ */
+export async function addPageTitle(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+  title: string,
+): Promise<void> {
+  const { pageId } = await resolvePageIds(serialSlug, pageSlug);
+  await db
+    .insert(pageTitles)
+    .values({ pageId, chapterId, title: title.trim() })
+    .onConflictDoUpdate({
+      target: [pageTitles.pageId, pageTitles.chapterId],
+      set: { title: title.trim() },
+    });
+}
+
+/**
+ * Deletes the page title revision for a specific (page, chapter) pair.
+ * Guards against deleting the last remaining title — a page must always
+ * have at least one title revision.
+ *
+ * @example
+ * await deletePageTitle('my-serial', 'luffy', 42);
+ */
+export async function deletePageTitle(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ error?: string }> {
+  const { pageId } = await resolvePageIds(serialSlug, pageSlug);
+
+  // Count existing titles for this page to prevent deleting the last one.
+  const existing = await db
+    .select({ chapterId: pageTitles.chapterId })
+    .from(pageTitles)
+    .where(eq(pageTitles.pageId, pageId));
+
+  if (existing.length <= 1) {
+    return { error: "Cannot delete the last title revision." };
+  }
+
+  await db
+    .delete(pageTitles)
+    .where(
+      and(eq(pageTitles.pageId, pageId), eq(pageTitles.chapterId, chapterId)),
+    );
+
+  return {};
 }

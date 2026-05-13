@@ -13,6 +13,7 @@ import {
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
   pageRelationships,
+  pageTitles,
 } from "@/db/schema";
 import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
@@ -352,6 +353,50 @@ export default async function PageView({ params }: Props) {
     .filter((r) => r.isActive)
     .map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
 
+  // ── Temporal title resolution ──────────────────────────────────────────────
+  // Resolve the title the reader should see: the page_titles row with the
+  // highest chapters.idx ≤ cutoffIdx (same max-idx read pattern as sections).
+  // Falls back to pages.name when no page_titles rows exist yet.
+  const titleMaxIdxSq = db
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .where(
+      and(eq(pageTitles.pageId, page.id), lte(chapters.idx, cutoffIdx)),
+    )
+    .as("title_max_idx_sq");
+
+  const [allPageTitleRows, [resolvedTitleRow]] = await Promise.all([
+    // All title rows for the edit-mode panel (with chapter labels for display).
+    db
+      .select({
+        chapterId: pageTitles.chapterId,
+        title: pageTitles.title,
+        chapterDisplayName: chapters.displayName,
+        volumeName: volumes.displayName,
+      })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .orderBy(asc(chapters.idx)),
+    // Resolved title at the reader's cutoff.
+    db
+      .select({ title: pageTitles.title })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .innerJoin(titleMaxIdxSq, eq(chapters.idx, titleMaxIdxSq.maxIdx))
+      .where(eq(pageTitles.pageId, page.id))
+      .limit(1),
+  ]);
+
+  const resolvedTitle = resolvedTitleRow?.title ?? page.name;
+
+  const pageTitleEntries = allPageTitleRows.map((r) => ({
+    chapterId: r.chapterId,
+    chapterLabel: `${r.volumeName} — ${r.chapterDisplayName}`,
+    title: r.title,
+  }));
+
   return (
     <main>
       <PageContainer>
@@ -364,7 +409,7 @@ export default async function PageView({ params }: Props) {
           </Text>
 
           <Box col className="gap-2">
-            <Text variant="h1">{page.name}</Text>
+            <Text variant="h1">{resolvedTitle}</Text>
             {introChapter && (
               <Text muted className="text-sm">
                 Introduced in {serial.chapterType} {introChapter.displayName}
@@ -377,6 +422,7 @@ export default async function PageView({ params }: Props) {
             pageName={page.name}
             pageSlug={decodedPageSlug}
             pageId={page.id}
+            pageTitleEntries={pageTitleEntries}
             summaryContent=""
             summaryLastUpdatedChapterIdx={null}
             sections={sections}

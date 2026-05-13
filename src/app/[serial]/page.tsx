@@ -5,7 +5,7 @@ import {
   serials, serialAuthors, volumes, chapters, pages,
   pageSections, pageSectionRevisions,
   pageInfoboxSections, pageInfoboxRevisions, pageInfoboxImageRevisions,
-  pageRelationships,
+  pageRelationships, pageTitles,
 } from '@/db/schema';
 import { and, asc, eq, isNull, lte, max, or } from 'drizzle-orm';
 import {
@@ -272,6 +272,30 @@ export default async function SerialPage({ params }: Props) {
     childPages = childPagesRaw.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
   }
 
+  // ── Home page temporal title entries (for the edit-mode Titles panel) ────────
+  let homePageTitleEntries: { chapterId: number; chapterLabel: string; title: string }[] = [];
+
+  if (homePage) {
+    const allTitleRows = await db
+      .select({
+        chapterId: pageTitles.chapterId,
+        title: pageTitles.title,
+        chapterDisplayName: chapters.displayName,
+        volumeName: volumes.displayName,
+      })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(pageTitles.pageId, homePage.id))
+      .orderBy(asc(chapters.idx));
+
+    homePageTitleEntries = allTitleRows.map((r) => ({
+      chapterId: r.chapterId,
+      chapterLabel: `${r.volumeName} — ${r.chapterDisplayName}`,
+      title: r.title,
+    }));
+  }
+
   return (
     <main>
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
@@ -315,6 +339,7 @@ export default async function SerialPage({ params }: Props) {
                 pageName={homePage.name}
                 pageSlug={homePage.slug}
                 pageId={homePage.id}
+                pageTitleEntries={homePageTitleEntries}
                 summaryContent=""
                 summaryLastUpdatedChapterIdx={null}
                 sections={sections}
