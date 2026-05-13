@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Text } from "@/components/ui/text";
@@ -66,6 +67,14 @@ interface Props {
   wikiPages: { name: string }[];
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
+  /**
+   * Child pages that are actively related to this page at the reader's chapter
+   * cutoff (derived from `page_relationships`). Rendered as a sub-page list
+   * below the content in read mode.
+   */
+  childPages: { id: number; name: string; slug: string }[];
+  /** The DB id of this page, forwarded to the new-page form as the default parent. */
+  pageId: number;
 }
 
 /**
@@ -158,6 +167,8 @@ export function PageEditor({
   readingChapterId,
   wikiPages,
   introChapterIdx,
+  childPages,
+  pageId,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -341,6 +352,36 @@ export function PageEditor({
             )}
           </div>
         ))}
+
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <Text variant="h3" className="mb-3">
+            Child pages
+          </Text>
+          {childPages.length > 0 ? (
+            <ul className="flex flex-col gap-2">
+              {childPages.map((child) => (
+                <li key={child.id}>
+                  <Link
+                    href={`/${serialSlug}/${child.slug}`}
+                    className="rounded-lg border border-gray-200 px-4 py-2 flex items-center hover:bg-gray-50 transition-colors"
+                  >
+                    <Text variant="body" as="span">
+                      {child.name}
+                    </Text>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Text muted className="text-sm">No child pages yet.</Text>
+          )}
+          <Link
+            href={`/${serialSlug}/new?parentPageId=${pageId}`}
+            className="mt-3 text-sm text-blue-600 hover:underline inline-block"
+          >
+            + New page
+          </Link>
+        </div>
       </div>
     );
   }

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/index";
-import { serials, volumes, chapters } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { serials, volumes, chapters, pages, pageRelationships } from "@/db/schema";
+import { and, asc, eq, max } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
@@ -56,10 +56,55 @@ export default async function SerialLayout({ children, params }: Props) {
     ...Object.groupBy(chapterList, (c) => c.volumeId),
   };
 
+  // Navbar "Pages" dropdown: immediate children of the Home page.
+  // Uses the max-idx pattern to get each child's latest relationship state
+  // with no chapter cutoff applied — navigation shows all current children.
+  const [homePage] = await db
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.serialId, serial.id), eq(pages.isHomePage, true)))
+    .limit(1);
+
+  let navPages: { id: number; name: string; slug: string }[] = [];
+  if (homePage) {
+    const relMaxIdxSq = db
+      .select({
+        childPageId: pageRelationships.childPageId,
+        maxIdx: max(chapters.idx).as("max_idx"),
+      })
+      .from(pageRelationships)
+      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+      .where(eq(pageRelationships.parentPageId, homePage.id))
+      .groupBy(pageRelationships.childPageId)
+      .as("rel_max_idx_sq");
+
+    const rawChildren = await db
+      .select({
+        id: pages.id,
+        name: pages.name,
+        slug: pages.slug,
+        isActive: pageRelationships.isActive,
+      })
+      .from(pageRelationships)
+      .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
+      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+      .innerJoin(
+        relMaxIdxSq,
+        and(
+          eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+          eq(chapters.idx, relMaxIdxSq.maxIdx),
+        ),
+      )
+      .where(eq(pageRelationships.parentPageId, homePage.id))
+      .orderBy(asc(pages.name));
+
+    navPages = rawChildren.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+  }
+
   const serialNavData: NavbarSerialData = {
     serialSlug,
     serialTitle: serial.title,
-    categories: [],
+    categories: navPages,
   };
 
   const tocContent = (

@@ -1,23 +1,22 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/db/index';
-import { serials, volumes, chapters } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { serials, volumes, chapters, pages } from '@/db/schema';
+import { asc, eq } from 'drizzle-orm';
 import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { PageContainer } from '@/components/ui/page-container';
-import { createPage } from './actions';
+import { NewPageForm } from './NewPageForm';
 
 interface Props {
   params: Promise<{ serial: string }>;
+  searchParams: Promise<{ parentPageId?: string }>;
 }
 
-export default async function NewPagePage({ params }: Props) {
+export default async function NewPagePage({ params, searchParams }: Props) {
   const { serial: serialSlug } = await params;
+  const { parentPageId: parentPageIdParam } = await searchParams;
+  const defaultParentPageId = parentPageIdParam ? parseInt(parentPageIdParam, 10) : undefined;
 
   const [serial] = await db
     .select()
@@ -29,7 +28,7 @@ export default async function NewPagePage({ params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList] = await Promise.all([
+  const [volumeList, chapterList, existingPages] = await Promise.all([
     db
       .select()
       .from(volumes)
@@ -46,30 +45,13 @@ export default async function NewPagePage({ params }: Props) {
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
+    // All pages in this serial for the parent dropdown (with introChapterId for filtering).
+    db
+      .select({ id: pages.id, name: pages.name, introChapterId: pages.introChapterId })
+      .from(pages)
+      .where(eq(pages.serialId, serial.id))
+      .orderBy(asc(pages.name)),
   ]);
-
-  // Build grouped options: one optgroup per volume
-  const chaptersByVolume: Record<
-    number,
-    { id: number; displayName: string; idx: number }[]
-  > = {};
-  volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
-  chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
-
-  const chapterOptions = volumeList
-    .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
-    .map((v) => ({
-      label: v.displayName,
-      value: -v.id, // placeholder — groups are non-selectable
-      children: (chaptersByVolume[v.id] ?? []).map((c) => ({
-        label: c.displayName,
-        value: c.id,
-      })),
-    }));
-
-  const firstChapterId = chapterList[0]?.id;
-
-  const createPageAction = createPage.bind(null, serialSlug);
 
   return (
     <main>
@@ -86,52 +68,14 @@ export default async function NewPagePage({ params }: Props) {
             New page
           </Text>
 
-          <form action={createPageAction} className="flex flex-col gap-5">
-            {/* Page name */}
-            <Box col className="gap-1">
-              <Label htmlFor="name">
-                Page name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                name="name"
-                required
-                placeholder="e.g. Monkey D. Luffy"
-                autoFocus
-              />
-            </Box>
-
-            {/* Intro chapter */}
-            <Box col className="gap-1">
-              <Label htmlFor="introChapterId">
-                Intro {serial.chapterType.toLowerCase()}{' '}
-                <span className="text-red-500">*</span>
-              </Label>
-              {chapterOptions.length > 0 ? (
-                <Select
-                  id="introChapterId"
-                  name="introChapterId"
-                  options={chapterOptions}
-                  defaultValue={firstChapterId}
-                />
-              ) : (
-                <Text muted className="text-sm">
-                  No {serial.chapterType.toLowerCase()}s yet.{' '}
-                  <Link href={`/${serialSlug}`} className="text-blue-600 hover:underline">
-                    Add a {serial.chapterType.toLowerCase()} first.
-                  </Link>
-                </Text>
-              )}
-            </Box>
-
-            <Button
-              type="submit"
-              className="mt-2"
-              disabled={chapterOptions.length === 0}
-            >
-              Create page
-            </Button>
-          </form>
+          <NewPageForm
+            serialSlug={serialSlug}
+            chapterType={serial.chapterType}
+            volumeList={volumeList}
+            chapterList={chapterList}
+            existingPages={existingPages}
+            defaultParentPageId={defaultParentPageId}
+          />
         </Box>
       </PageContainer>
     </main>

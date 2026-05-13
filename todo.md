@@ -22,18 +22,7 @@
 
 ---
 
-## - [ ] Step 6 — Page creation with parent assignment and slug generation
-
-New pages are created under a chosen parent page (not a category).
-
-- Page creation form at `src/app/[serial]/new/page.tsx`: fields for page name, intro chapter (grouped by volume), and parent page (dropdown of all pages visible at the head chapter).
-- `createPage` Server Action in `src/app/[serial]/new/actions.ts`:
-  1. Insert into `pages` (`serial_id`, `slug`, `intro_chapter_id`).
-  2. Insert initial title into `page_titles` at `intro_chapter_id`.
-  3. Slug generation: `titleToSlug(name)` deduped with a numeric suffix on collision within the serial.
-  4. Insert a `page_relationships` row (`parent_page_id`, `child_page_id = new page`, `chapter_id = head chapter`, `is_active = true`).
-  5. Redirect to `/{serial}/{slug}`.
-- Show child pages in `<PageEditor>` read mode: query `page_relationships` for active children at the user's chapter cutoff; list them below the page content.
+## - [X] Step 6 — Page creation with parent assignment and slug generation
 
 ---
 
@@ -162,7 +151,22 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 20 — Spoiler-aware search
+## - [ ] Step 20 — Put Set Your Chapter to Avoid Spoilers in a Popover
+
+- Currently the warning is in line. Instead, make it a popover that is open by default and dismissed only when the user manually sets their chapter for the first time or manually clicks an "x" button in the popover.
+- The popover should also say it defaulted to the first chapter to avoid spoilers.
+- This should only be visible for the first time across all sreials. Going to a second serial does not alsos show this
+
+---
+
+## - [ ] Step 21 — When the screen is thin, compact the top right nav bar
+
+- When the screen is thin, replace the top right dropdown that controls the currently selected chapter into a hamburger menu that opens a side drawer.
+- The warning to set your chapter should appear over the hamburger menu if relevant.
+
+---
+
+## - [ ] Step 22 — Spoiler-aware search
 
 - Add `to_tsvector` on `pages` (resolved title) and `serials.title` (inline or generated column with index).
 - Create a server-side search endpoint (Server Action or route handler) that:

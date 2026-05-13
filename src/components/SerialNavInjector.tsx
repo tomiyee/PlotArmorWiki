@@ -31,11 +31,17 @@ interface Props {
 export function SerialNavInjector({ data, chapterSelectorSlot, tocSlot }: Props) {
   const { setSerial, clearSerial } = useNavbarSerialContext();
 
+  // Update navbar context whenever props change (e.g. after router.refresh() adds chapters).
+  // RSC serialisation always produces new object references, so this fires on every
+  // RSC re-render — that's intentional and keeps the navbar in sync.
   useLayoutEffect(() => {
     setSerial(data, chapterSelectorSlot, tocSlot);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, chapterSelectorSlot, tocSlot]);
+
+  // Separate cleanup effect so clearSerial only runs on unmount, not on every prop update.
+  useLayoutEffect(() => {
     return clearSerial;
-    // `data` and `chapterSelectorSlot` are new references every render (RSC
-    // serialisation); we only need to set on mount/unmount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

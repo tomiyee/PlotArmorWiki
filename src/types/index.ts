@@ -14,6 +14,7 @@ export interface Volume {
 export interface CategoryNavData {
   id: number;
   name: string;
+  slug: string;
 }
 
 export interface NavbarSerialData {
