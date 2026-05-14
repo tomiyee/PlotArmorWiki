@@ -353,21 +353,62 @@ export default async function PageView({ params }: Props) {
     .groupBy(pageRelationships.childPageId)
     .as("rel_max_idx_sq");
 
-  const childPagesRaw = await db
-    .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+  // ── Parent pages (active at the user's cutoff) ─────────────────────────────
+  // Same max-idx pattern, but from child's perspective: find latest row per
+  // (parent, child) pair where child = page.id, and keep is_active = true.
+  const parentRelMaxIdxSq = db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
     .from(pageRelationships)
-    .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
     .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .innerJoin(
-      relMaxIdxSq,
+    .where(
       and(
-        eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
-        eq(chapters.idx, relMaxIdxSq.maxIdx),
+        eq(pageRelationships.childPageId, page.id),
+        lte(chapters.idx, cutoffIdx),
       ),
     )
-    .where(eq(pageRelationships.parentPageId, page.id));
+    .groupBy(pageRelationships.parentPageId)
+    .as("parent_rel_max_idx_sq");
+
+  const [childPagesRaw, parentPagesRaw, allSerialPagesRaw] = await Promise.all([
+    db
+      .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+      .from(pageRelationships)
+      .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
+      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+      .innerJoin(
+        relMaxIdxSq,
+        and(
+          eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+          eq(chapters.idx, relMaxIdxSq.maxIdx),
+        ),
+      )
+      .where(eq(pageRelationships.parentPageId, page.id)),
+    db
+      .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+      .from(pageRelationships)
+      .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
+      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+      .innerJoin(
+        parentRelMaxIdxSq,
+        and(
+          eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
+          eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
+        ),
+      )
+      .where(eq(pageRelationships.childPageId, page.id)),
+    // All pages in the serial for the "Add parent" dropdown in edit mode.
+    db
+      .select({ id: pages.id, name: pages.name })
+      .from(pages)
+      .where(eq(pages.serialId, serial.id))
+      .orderBy(asc(pages.name)),
+  ]);
 
   const activeChildPages = childPagesRaw.filter((r) => r.isActive);
+  const activeParentPagesRaw = parentPagesRaw.filter((r) => r.isActive);
 
   // Resolve temporal titles for each active child page at the reader's cutoff.
   const childPageIds = activeChildPages.map((r) => r.id);
@@ -404,6 +445,43 @@ export default async function PageView({ params }: Props) {
     name: r.name,
     slug: r.slug,
     title: childTitleMap.get(r.id) ?? r.name,
+  }));
+
+  // Resolve temporal titles for each active parent page at the reader's cutoff.
+  const parentPageIds = activeParentPagesRaw.map((r) => r.id);
+  let parentTitleMap = new Map<number, string>();
+  if (parentPageIds.length > 0) {
+    const parentTitleMaxIdxSq = db
+      .select({
+        pageId: pageTitles.pageId,
+        maxIdx: max(chapters.idx).as("max_idx"),
+      })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .where(and(inArray(pageTitles.pageId, parentPageIds), lte(chapters.idx, cutoffIdx)))
+      .groupBy(pageTitles.pageId)
+      .as("parent_title_max_idx_sq");
+
+    const parentTitleRows = await db
+      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .innerJoin(
+        parentTitleMaxIdxSq,
+        and(
+          eq(pageTitles.pageId, parentTitleMaxIdxSq.pageId),
+          eq(chapters.idx, parentTitleMaxIdxSq.maxIdx),
+        ),
+      );
+
+    parentTitleMap = new Map(parentTitleRows.map((r) => [r.pageId, r.title]));
+  }
+
+  const parentPages = activeParentPagesRaw.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    title: parentTitleMap.get(r.id) ?? r.name,
   }));
 
   // ── Temporal title resolution ──────────────────────────────────────────────
@@ -488,6 +566,8 @@ export default async function PageView({ params }: Props) {
             wikiPages={wikiPages}
             introChapterIdx={introChapter?.idx ?? null}
             childPages={childPages}
+            parentPages={parentPages}
+            allSerialPages={allSerialPagesRaw}
           />
         </Box>
       </PageContainer>

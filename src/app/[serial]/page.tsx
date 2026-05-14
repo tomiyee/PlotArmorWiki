@@ -395,6 +395,8 @@ export default async function SerialPage({ params }: Props) {
                 wikiPages={wikiPages}
                 introChapterIdx={null}
                 childPages={childPages}
+                parentPages={[]}
+                allSerialPages={[]}
               />
             ) : (
               <Text muted>Home page not found.</Text>
