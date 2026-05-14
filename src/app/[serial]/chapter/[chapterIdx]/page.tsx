@@ -13,8 +13,20 @@ import { and, eq } from "drizzle-orm";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { PageContainer } from "@/components/ui/page-container";
+import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { ChapterSynopsisEditor } from "./ChapterSynopsisEditor";
 import { saveChapterSynopsis } from "./actions";
+import {
+  addChapter,
+  addVolume,
+  deleteChapter,
+  deleteVolume,
+  renameChapter,
+  renameVolume,
+  reorderVolumes,
+  reorderAllChapters,
+  updateSerialTypes,
+} from "../../actions";
 
 interface Props {
   params: Promise<{ serial: string; chapterIdx: string }>;
@@ -37,6 +49,20 @@ export default async function ChapterPage({ params }: Props) {
   if (!serial) {
     notFound();
   }
+
+  const [volumeList, chapterList] = await Promise.all([
+    db.select().from(volumes).where(eq(volumes.serialId, serial.id)).orderBy(volumes.idx),
+    db
+      .select({ id: chapters.id, displayName: chapters.displayName, idx: chapters.idx, volumeId: chapters.volumeId })
+      .from(chapters)
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(volumes.serialId, serial.id))
+      .orderBy(chapters.idx),
+  ]);
+
+  const chaptersByVolume: Record<number, { id: number; displayName: string; idx: number; volumeId: number }[]> = {};
+  volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
+  chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
 
   // Resolve the chapter by serial + idx
   const [chapter] = await db
@@ -77,6 +103,16 @@ export default async function ChapterPage({ params }: Props) {
     .from(volumes)
     .where(eq(volumes.id, chapter.volumeId))
     .limit(1);
+
+  const addChapterForSerial = addChapter.bind(null, serial.id);
+  const addVolumeForSerial = addVolume.bind(null, serial.id);
+  const deleteChapterForSerial = deleteChapter.bind(null, serial.id);
+  const deleteVolumeForSerial = deleteVolume.bind(null, serial.id);
+  const renameChapterForSerial = renameChapter.bind(null, serial.id);
+  const renameVolumeForSerial = renameVolume.bind(null, serial.id);
+  const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
+  const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
+  const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
 
   let synopsisContent = "";
   let groupedIntroductions: { categoryName: string; pages: { id: number; name: string; slug: string }[] }[] = [];
@@ -122,80 +158,106 @@ export default async function ChapterPage({ params }: Props) {
 
   return (
     <main>
-      <PageContainer>
-        <Box col className="gap-6">
-          {/* Breadcrumb */}
-          <Text muted className="text-sm">
-            <Link href={`/${serialSlug}`} className="hover:underline">
-              {serial.title}
-            </Link>
-          </Text>
+      <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
+        {/* Left sidebar — sticky, independent scroll, desktop only */}
+        <aside className="hidden md:block w-56 shrink-0">
+          <div className="sticky top-6 overflow-y-auto max-h-[calc(100vh-5rem)] pr-1">
+            <SerialTOCSidebar
+              serialId={serial.id}
+              serialSlug={serialSlug}
+              volumes={volumeList}
+              chaptersByVolume={chaptersByVolume}
+              chapterType={serial.chapterType}
+              volumeType={serial.volumeType}
+              addChapterAction={addChapterForSerial}
+              addVolumeAction={addVolumeForSerial}
+              deleteChapterAction={deleteChapterForSerial}
+              deleteVolumeAction={deleteVolumeForSerial}
+              renameChapterAction={renameChapterForSerial}
+              renameVolumeAction={renameVolumeForSerial}
+              reorderVolumesAction={reorderVolumesForSerial}
+              reorderAllChaptersAction={reorderAllChaptersForSerial}
+              updateSerialTypesAction={updateSerialTypesForSerial}
+            />
+          </div>
+        </aside>
 
-          {/* Chapter heading */}
-          <Box col className="gap-1">
-            {volume && (
-              <Text variant="label" muted className="text-xs uppercase tracking-wider">
-                {serial.volumeType} {volume.displayName}
-              </Text>
-            )}
-            <Text variant="h1">
-              {serial.chapterType} {chapter.displayName}
+        {/* Main content */}
+        <PageContainer className="flex-1 min-w-0 mx-0 px-0 py-0">
+          <Box col className="gap-6">
+            {/* Breadcrumb */}
+            <Text muted className="text-sm">
+              <Link href={`/${serialSlug}`} className="hover:underline">
+                {serial.title}
+              </Link>
             </Text>
-          </Box>
 
-          {spoilered ? (
-            <Box col className="gap-2 rounded-md border border-dashed border-gray-300 px-6 py-8 items-center text-center">
-              <Text variant="h3" muted>Spoilers ahead</Text>
-              <Text muted>
-                You haven&apos;t reached this {serial.chapterType.toLowerCase()} yet. The synopsis
-                and introduced content will be available once you&apos;ve read it.
+            {/* Chapter heading */}
+            <Box col className="gap-1">
+              {volume && (
+                <Text variant="label" muted className="text-xs uppercase tracking-wider">
+                  {serial.volumeType} {volume.displayName}
+                </Text>
+              )}
+              <Text variant="h1">
+                {serial.chapterType} {chapter.displayName}
               </Text>
             </Box>
-          ) : (
-            <>
-              {/* Synopsis */}
-              <Box col className="gap-2">
-                <ChapterSynopsisEditor
-                  serialSlug={serialSlug}
-                  chapterIdx={chapterIdx}
-                  initialContent={synopsisContent}
-                  saveAction={boundSaveAction!}
-                />
-              </Box>
 
-              {/* Introduced content */}
-              <Box col className="gap-4">
-                <Text variant="h2">Introduced in this {serial.chapterType.toLowerCase()}</Text>
-                {groupedIntroductions.length > 0 ? (
-                  <Box col className="gap-4">
-                    {groupedIntroductions.map(({ categoryName, pages: categoryPages }) => (
-                      <Box col key={categoryName} className="gap-1.5">
-                        <Text variant="h4">{categoryName}</Text>
-                        <ul className="flex flex-col gap-1">
-                          {categoryPages.map((page) => (
-                            <li key={page.id}>
-                              <Link
-                                href={`/${serialSlug}/${encodeURIComponent(page.slug)}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {page.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Text muted>
-                    No pages were introduced in this {serial.chapterType.toLowerCase()}.
-                  </Text>
-                )}
+            {spoilered ? (
+              <Box col className="gap-2 rounded-md border border-dashed border-gray-300 px-6 py-8 items-center text-center">
+                <Text variant="h3" muted>Spoilers ahead</Text>
+                <Text muted>
+                  You haven&apos;t reached this {serial.chapterType.toLowerCase()} yet. The synopsis
+                  and introduced content will be available once you&apos;ve read it.
+                </Text>
               </Box>
-            </>
-          )}
-        </Box>
-      </PageContainer>
+            ) : (
+              <>
+                {/* Synopsis */}
+                <Box col className="gap-2">
+                  <ChapterSynopsisEditor
+                    serialSlug={serialSlug}
+                    chapterIdx={chapterIdx}
+                    initialContent={synopsisContent}
+                    saveAction={boundSaveAction!}
+                  />
+                </Box>
+
+                {/* Introduced content */}
+                <Box col className="gap-4">
+                  <Text variant="h2">Introduced in this {serial.chapterType.toLowerCase()}</Text>
+                  {groupedIntroductions.length > 0 ? (
+                    <Box col className="gap-4">
+                      {groupedIntroductions.map(({ categoryName, pages: categoryPages }) => (
+                        <Box col key={categoryName} className="gap-1.5">
+                          <Text variant="h4">{categoryName}</Text>
+                          <ul className="flex flex-col gap-1">
+                            {categoryPages.map((page) => (
+                              <li key={page.id}>
+                                <Link
+                                  href={`/${serialSlug}/${encodeURIComponent(page.slug)}`}
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  {page.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Text muted>
+                      No pages were introduced in this {serial.chapterType.toLowerCase()}.
+                    </Text>
+                  )}
+                </Box>
+              </>
+            )}
+          </Box>
+        </PageContainer>
+      </div>
     </main>
   );
 }
