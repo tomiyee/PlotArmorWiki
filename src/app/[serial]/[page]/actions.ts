@@ -470,3 +470,112 @@ export async function reorderPageSections(formData: FormData): Promise<void> {
     }
   });
 }
+
+// ── Infobox section structure management ──────────────────────────────────────
+// These actions manage the wall-clock-versioned `page_infobox_sections` rows
+// (add, delete, rename, reorder). Infobox content is managed via savePageContent.
+
+/**
+ * Adds a new infobox row to a page. The row is appended after all existing
+ * active infobox rows.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('pageId', '42');
+ * fd.set('label', 'Age');
+ * await addInfoboxSection(fd);
+ */
+export async function addInfoboxSection(formData: FormData): Promise<void> {
+  const pageId = parseInt(formData.get("pageId") as string, 10);
+  const label = (formData.get("label") as string)?.trim();
+  if (!pageId || !label) throw new Error("pageId and label are required");
+
+  const [{ cnt }] = await db
+    .select({ cnt: count() })
+    .from(pageInfoboxSections)
+    .where(and(eq(pageInfoboxSections.pageId, pageId), isNull(pageInfoboxSections.deletedAt)));
+
+  await db.insert(pageInfoboxSections).values({
+    pageId,
+    label,
+    displayOrder: cnt,
+  });
+}
+
+/**
+ * Soft-deletes an infobox row. Rejects if the row has any content revisions to
+ * prevent accidental data loss.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('infoboxSectionId', '7');
+ * await deleteInfoboxSection(fd);
+ */
+export async function deleteInfoboxSection(
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const infoboxSectionId = parseInt(formData.get("infoboxSectionId") as string, 10);
+  if (!infoboxSectionId) return { error: "infoboxSectionId is required" };
+
+  const [{ cnt }] = await db
+    .select({ cnt: count() })
+    .from(pageInfoboxRevisions)
+    .where(eq(pageInfoboxRevisions.infoboxSectionId, infoboxSectionId));
+
+  if (cnt > 0) {
+    return {
+      error:
+        "This infobox row has content revisions and cannot be deleted. Clear all content first.",
+    };
+  }
+
+  await db
+    .update(pageInfoboxSections)
+    .set({ deletedAt: new Date() })
+    .where(eq(pageInfoboxSections.id, infoboxSectionId));
+
+  return {};
+}
+
+/**
+ * Renames an infobox row label.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('infoboxSectionId', '7');
+ * fd.set('label', 'Birthdate');
+ * await renameInfoboxSection(fd);
+ */
+export async function renameInfoboxSection(formData: FormData): Promise<void> {
+  const infoboxSectionId = parseInt(formData.get("infoboxSectionId") as string, 10);
+  const label = (formData.get("label") as string)?.trim();
+  if (!infoboxSectionId || !label) throw new Error("infoboxSectionId and label are required");
+
+  await db
+    .update(pageInfoboxSections)
+    .set({ label })
+    .where(eq(pageInfoboxSections.id, infoboxSectionId));
+}
+
+/**
+ * Reorders infobox rows by assigning new `displayOrder` values matching the
+ * provided ordered array of infobox section IDs.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('orderedIds', JSON.stringify([3, 1, 2]));
+ * await reorderInfoboxSections(fd);
+ */
+export async function reorderInfoboxSections(formData: FormData): Promise<void> {
+  const raw = formData.get("orderedIds") as string;
+  const orderedIds: number[] = JSON.parse(raw);
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await tx
+        .update(pageInfoboxSections)
+        .set({ displayOrder: i })
+        .where(eq(pageInfoboxSections.id, orderedIds[i]));
+    }
+  });
+}
