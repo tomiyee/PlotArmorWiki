@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/box";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { savePageContent, getPageContentAtChapter } from "./actions";
+import { savePageContent, getPageContentAtChapter, getParentPagesAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { PageSectionManager, type PageSection } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
@@ -158,6 +158,8 @@ export function PageEditor({
       Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
     );
 
+  const [currentParentPages, setCurrentParentPages] = useState<ParentPageEntry[]>(parentPages);
+
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
   );
@@ -187,8 +189,9 @@ export function PageEditor({
     setDraftFloaterRowContent(
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
+    setCurrentParentPages(parentPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }, [sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
+  }, [sections, floaterImageUrl, floaterRows, parentPages, readingChapterId, headChapterId]);
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
@@ -226,11 +229,10 @@ export function PageEditor({
   function handleChapterChange(chapterId: number) {
     setSelectedChapterId(chapterId);
     startTransition(async () => {
-      const data = await getPageContentAtChapter(
-        serialSlug,
-        pageSlug,
-        chapterId,
-      );
+      const [data, parents] = await Promise.all([
+        getPageContentAtChapter(serialSlug, pageSlug, chapterId),
+        getParentPagesAtChapter(serialSlug, pageSlug, chapterId),
+      ]);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
@@ -247,6 +249,7 @@ export function PageEditor({
           Object.fromEntries(data.floaterRows.map((r) => [r.id, r.content])),
         );
       }
+      setCurrentParentPages(parents);
     });
   }
 
@@ -259,7 +262,6 @@ export function PageEditor({
         floaterImageUrl={floaterImageUrl}
         floaterRows={floaterRows}
         childPages={childPages}
-        parentPages={parentPages}
         pageId={pageId}
       />
     );
@@ -324,7 +326,7 @@ export function PageEditor({
 
       <PageRelationshipsPanel
         pageId={pageId}
-        parentPages={parentPages}
+        parentPages={currentParentPages}
         allSerialPages={allSerialPages}
         chapterId={selectedChapterId}
       />

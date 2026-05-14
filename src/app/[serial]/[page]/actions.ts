@@ -14,7 +14,7 @@ import {
   pageRelationships,
   pageTitles,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, isNull, lte, max, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, lte, max, ne } from "drizzle-orm";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -643,6 +643,107 @@ async function isReachable(startId: number, targetId: number): Promise<boolean> 
     }
   }
   return false;
+}
+
+/**
+ * Returns the active parent pages for a given page at a specific chapter,
+ * including temporal titles resolved at that chapter's cutoff. Used by the
+ * edit-mode Relationships panel to keep the parent list in sync with the
+ * "Writing as of:" chapter selector.
+ *
+ * @example
+ * const parents = await getParentPagesAtChapter('one-piece', 'luffy', 7);
+ */
+export async function getParentPagesAtChapter(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ id: number; name: string; slug: string; title: string }[]> {
+  const [{ pageId }, [targetChapter]] = await Promise.all([
+    resolvePageIds(serialSlug, pageSlug),
+    db
+      .select({ idx: chapters.idx })
+      .from(chapters)
+      .where(eq(chapters.id, chapterId))
+      .limit(1),
+  ]);
+  if (!targetChapter) throw new Error("Chapter not found");
+
+  const cutoffIdx = targetChapter.idx;
+
+  const parentRelMaxIdxSq = db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .where(
+      and(
+        eq(pageRelationships.childPageId, pageId),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .groupBy(pageRelationships.parentPageId)
+    .as("parent_rel_max_idx_sq");
+
+  const parentPagesRaw = await db
+    .select({
+      id: pages.id,
+      name: pages.name,
+      slug: pages.slug,
+      isActive: pageRelationships.isActive,
+    })
+    .from(pageRelationships)
+    .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      parentRelMaxIdxSq,
+      and(
+        eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
+        eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(eq(pageRelationships.childPageId, pageId));
+
+  const activeParents = parentPagesRaw.filter((r) => r.isActive);
+  if (activeParents.length === 0) return [];
+
+  const parentPageIds = activeParents.map((r) => r.id);
+
+  const titleMaxIdxSq = db
+    .select({
+      pageId: pageTitles.pageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .where(
+      and(inArray(pageTitles.pageId, parentPageIds), lte(chapters.idx, cutoffIdx)),
+    )
+    .groupBy(pageTitles.pageId)
+    .as("title_max_idx_sq");
+
+  const titleRows = await db
+    .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .innerJoin(
+      titleMaxIdxSq,
+      and(
+        eq(pageTitles.pageId, titleMaxIdxSq.pageId),
+        eq(chapters.idx, titleMaxIdxSq.maxIdx),
+      ),
+    );
+
+  const titleMap = new Map(titleRows.map((r) => [r.pageId, r.title]));
+
+  return activeParents.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    title: titleMap.get(r.id) ?? r.name,
+  }));
 }
 
 /**

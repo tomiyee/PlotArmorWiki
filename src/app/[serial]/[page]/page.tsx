@@ -58,10 +58,7 @@ async function getChapterCutoff(
 }
 
 export default async function PageView({ params }: Props) {
-  const {
-    serial: serialSlug,
-    page: pageParam,
-  } = await params;
+  const { serial: serialSlug, page: pageParam } = await params;
 
   const decodedPageSlug = decodeURIComponent(pageParam);
 
@@ -187,13 +184,14 @@ export default async function PageView({ params }: Props) {
 
   const [activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ id: pageSections.id, name: pageSections.name, displayOrder: pageSections.displayOrder })
+      .select({
+        id: pageSections.id,
+        name: pageSections.name,
+        displayOrder: pageSections.displayOrder,
+      })
       .from(pageSections)
       .where(
-        and(
-          eq(pageSections.pageId, page.id),
-          isNull(pageSections.deletedAt),
-        ),
+        and(eq(pageSections.pageId, page.id), isNull(pageSections.deletedAt)),
       )
       .orderBy(asc(pageSections.displayOrder)),
     db
@@ -215,7 +213,10 @@ export default async function PageView({ params }: Props) {
   ]);
 
   const versionBySectionId = new Map(
-    sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
+    sectionVersions.map((v) => [
+      v.sectionId,
+      { content: v.content, chapterIdx: v.chapterIdx },
+    ]),
   );
 
   // pageSectionStructure — wall-clock-versioned rows for the section manager panel.
@@ -294,7 +295,10 @@ export default async function PageView({ params }: Props) {
       db
         .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
         .from(pageInfoboxImageRevisions)
-        .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
+        .innerJoin(
+          chapters,
+          eq(pageInfoboxImageRevisions.chapterId, chapters.id),
+        )
         .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
         .where(eq(pageInfoboxImageRevisions.pageId, page.id))
         .limit(1),
@@ -304,10 +308,7 @@ export default async function PageView({ params }: Props) {
           content: pageInfoboxRevisions.content,
         })
         .from(pageInfoboxRevisions)
-        .innerJoin(
-          chapters,
-          eq(pageInfoboxRevisions.chapterId, chapters.id),
-        )
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
         .innerJoin(
           infoboxRowMaxIdxSq,
           and(
@@ -374,7 +375,12 @@ export default async function PageView({ params }: Props) {
 
   const [childPagesRaw, parentPagesRaw, allSerialPagesRaw] = await Promise.all([
     db
-      .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+      .select({
+        id: pages.id,
+        name: pages.name,
+        slug: pages.slug,
+        isActive: pageRelationships.isActive,
+      })
       .from(pageRelationships)
       .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
       .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
@@ -387,7 +393,12 @@ export default async function PageView({ params }: Props) {
       )
       .where(eq(pageRelationships.parentPageId, page.id)),
     db
-      .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+      .select({
+        id: pages.id,
+        name: pages.name,
+        slug: pages.slug,
+        isActive: pageRelationships.isActive,
+      })
       .from(pageRelationships)
       .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
       .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
@@ -421,7 +432,12 @@ export default async function PageView({ params }: Props) {
       })
       .from(pageTitles)
       .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(and(inArray(pageTitles.pageId, childPageIds), lte(chapters.idx, cutoffIdx)))
+      .where(
+        and(
+          inArray(pageTitles.pageId, childPageIds),
+          lte(chapters.idx, cutoffIdx),
+        ),
+      )
       .groupBy(pageTitles.pageId)
       .as("child_title_max_idx_sq");
 
@@ -458,7 +474,12 @@ export default async function PageView({ params }: Props) {
       })
       .from(pageTitles)
       .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(and(inArray(pageTitles.pageId, parentPageIds), lte(chapters.idx, cutoffIdx)))
+      .where(
+        and(
+          inArray(pageTitles.pageId, parentPageIds),
+          lte(chapters.idx, cutoffIdx),
+        ),
+      )
       .groupBy(pageTitles.pageId)
       .as("parent_title_max_idx_sq");
 
@@ -492,9 +513,7 @@ export default async function PageView({ params }: Props) {
     .select({ maxIdx: max(chapters.idx).as("max_idx") })
     .from(pageTitles)
     .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .where(
-      and(eq(pageTitles.pageId, page.id), lte(chapters.idx, cutoffIdx)),
-    )
+    .where(and(eq(pageTitles.pageId, page.id), lte(chapters.idx, cutoffIdx)))
     .as("title_max_idx_sq");
 
   const [allPageTitleRows, [resolvedTitleRow]] = await Promise.all([
@@ -533,11 +552,27 @@ export default async function PageView({ params }: Props) {
     <main>
       <PageContainer>
         <Box col className="gap-6">
-          {/* Breadcrumb */}
-          <Text muted className="text-sm">
+          {/* Breadcrumb: Serial > Parent1, Parent2 */}
+          <Text muted className="text-sm flex items-center gap-1 flex-wrap">
             <Link href={`/${serialSlug}`} className="hover:underline">
               {serial.title}
             </Link>
+            {parentPages.length > 0 && (
+              <>
+                <span>&gt;</span>
+                {parentPages.map((parent, i) => (
+                  <span key={parent.id} className="flex items-center gap-1">
+                    {i > 0 && <Text>,</Text>}
+                    <Link
+                      href={`/${serialSlug}/${parent.slug}`}
+                      className="hover:underline"
+                    >
+                      {parent.title}
+                    </Link>
+                  </span>
+                ))}
+              </>
+            )}
           </Text>
 
           <Box col className="gap-2">

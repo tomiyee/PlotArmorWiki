@@ -11,7 +11,6 @@ interface Props {
   floaterImageUrl: string | null | undefined;
   floaterRows: FloaterRowData[];
   childPages: { id: number; name: string; slug: string; title: string }[];
-  parentPages: { id: number; name: string; slug: string; title: string }[];
   pageId: number;
 }
 
@@ -27,7 +26,6 @@ interface Props {
  *   floaterImageUrl="https://..."
  *   floaterRows={[{ id: 1, label: "Age", content: "19" }]}
  *   childPages={[]}
- *   parentPages={[{ id: 1, name: "Characters", slug: "characters", title: "Characters" }]}
  *   pageId={42}
  * />
  */
@@ -38,7 +36,6 @@ export function PageReadView({
   floaterImageUrl,
   floaterRows,
   childPages,
-  parentPages,
   pageId,
 }: Props) {
   const hasFloaterContent = hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -71,23 +68,6 @@ export function PageReadView({
             </dl>
           )}
         </aside>
-      )}
-
-      {parentPages.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-1 text-sm text-gray-500">
-          <span>Parent{parentPages.length > 1 ? "s" : ""}:</span>
-          {parentPages.map((parent, i) => (
-            <span key={parent.id} className="flex items-center gap-1">
-              {i > 0 && <span>·</span>}
-              <Link
-                href={`/${serialSlug}/${parent.slug}`}
-                className="text-blue-600 hover:underline"
-              >
-                {parent.title}
-              </Link>
-            </span>
-          ))}
-        </div>
       )}
 
       {sections.map((section, i) => (
