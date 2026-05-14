@@ -32,13 +32,6 @@
 
 ## - [X] Step 8 — Per-page sections
 
-Sections belong to individual pages, not categories. The section structure is wall-clock versioned; content is chapter-versioned.
-
-- In `PageEditor` (edit mode): add a "Sections" management panel — add section (name), delete section (only if no content revisions), reorder sections (drag-and-drop via `@dnd-kit`). Mirrors current category section manager but scoped to the page.
-- `savePageContent` and `getPageContentAtChapter` Server Actions: rewrite to query `page_sections` + `page_section_revisions` instead of `category_sections` + `page_section_versions`.
-- Server Actions: `addPageSection`, `deletePageSection`, `renamePageSection`, `reorderPageSections` in `src/app/[serial]/[page]/actions.ts`.
-- Migrate existing data: for each existing page, create a `page_sections` row for every `category_section` that was assigned to its former category, and copy `page_section_versions` rows into `page_section_revisions`. Convert `page_summaries` rows into the first `page_sections` row (named "Summary") per page.
-
 ---
 
 ## - [ ] Step 9 — Per-page infoboxes

@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/db/index';
 import { serials, pages, pageTitles, pageRelationships, pageSections } from '@/db/schema';
 import { and, eq, like } from 'drizzle-orm';
@@ -112,5 +113,6 @@ export async function createPage(serialSlug: string, formData: FormData) {
     });
   });
 
+  revalidatePath(`/${serialSlug}`, 'layout');
   redirect(`/${serialSlug}/${encodeURIComponent(slug)}`);
 }

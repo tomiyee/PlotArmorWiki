@@ -369,7 +369,6 @@ export function PageEditor({
 
         {sections.map((section, i) => (
           <div key={section.id} className="mb-6 last:mb-0">
-            {/* The first section (Summary by convention) renders without a heading */}
             {i > 0 && (
               <Text variant="h2" className="mb-2">
                 {section.name}
@@ -542,9 +541,9 @@ export function PageEditor({
       {sections.map((section, i) => (
         <Box key={section.id} col className="gap-2">
           <Box className="items-center gap-2">
-            <Text variant="h2">{section.name}</Text>
+            {i > 0 && <Text variant="h2">{section.name}</Text>}
             {i === 0 && (
-              <InfoIcon contents="The first section is shown at the top of the page without a heading in read mode." />
+              <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
             )}
           </Box>
           {/* Two-column layout: current saved value on the left, editor on the right */}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faLock, faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Text } from "@/components/ui/text";
 import { Box } from "@/components/ui/box";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
 import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
 import { Tooltip } from "@/components/ui/tooltip";
+import { InfoIcon } from "@/components/ui/info-icon";
 import {
   addPageSection,
   deletePageSection,
@@ -41,6 +42,7 @@ function ReorderableSection({
   section,
   isFirst,
   isLast,
+  isLocked,
   isPending,
   isRenaming,
   onMoveUp,
@@ -53,6 +55,8 @@ function ReorderableSection({
   section: PageSection;
   isFirst: boolean;
   isLast: boolean;
+  /** When true, the section is pinned in place and cannot be moved, renamed, or deleted. */
+  isLocked: boolean;
   isPending: boolean;
   isRenaming: boolean;
   onMoveUp: () => void;
@@ -62,6 +66,21 @@ function ReorderableSection({
   onDelete: () => void;
   onRename: (fd: FormData) => void;
 }) {
+  if (isLocked) {
+    return (
+      <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
+        <Box className="w-4 mr-1 flex-shrink-0" />
+        <Box className="flex-1 items-center gap-1.5">
+          <Text as="span" variant="label">
+            {section.name}
+          </Text>
+          <InfoIcon contents="This section appears at the top of the page without a heading. Its content will be shown in preview tooltips when this page is mentioned elsewhere." />
+        </Box>
+        <FontAwesomeIcon icon={faLock} className="h-3 w-3 text-gray-400" />
+      </li>
+    );
+  }
+
   return (
     <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
       {isRenaming ? (
@@ -196,8 +215,9 @@ export function PageSectionManager({ pageId, sections }: PageSectionManagerProps
             <ReorderableSection
               key={section.id}
               section={section}
-              isFirst={i === 0}
+              isFirst={i <= 1}
               isLast={i === sections.length - 1}
+              isLocked={i === 0}
               isPending={isPending}
               isRenaming={renamingId === section.id}
               onMoveUp={() => moveSection(section.id, "up")}
