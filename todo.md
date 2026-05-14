@@ -166,7 +166,15 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 22 — Spoiler-aware search
+## - [ ] Step 22 — The Serial Page's Description should be the Home Page's top section
+
+- When creating a new Serial, users enter a Description. Use a Markdown editor for that input field.
+- This description should be used to populate the Serial's Home page's first section, the one without a header.
+- The Serial's index page should show the Serial's Home page's sections.
+
+---
+
+## - [ ] Step 23 — Spoiler-aware search
 
 - Add `to_tsvector` on `pages` (resolved title) and `serials.title` (inline or generated column with index).
 - Create a server-side search endpoint (Server Action or route handler) that:

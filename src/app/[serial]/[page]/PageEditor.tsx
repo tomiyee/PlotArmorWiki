@@ -85,7 +85,7 @@ interface Props {
    * cutoff (derived from `page_relationships`). Rendered as a sub-page list
    * below the content in read mode.
    */
-  childPages: { id: number; name: string; slug: string }[];
+  childPages: { id: number; name: string; slug: string; title: string }[];
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
   pageId: number;
 }
@@ -411,7 +411,7 @@ export function PageEditor({
                     className="rounded-lg border border-gray-200 px-4 py-2 flex items-center hover:bg-gray-50 transition-colors"
                   >
                     <Text variant="body" as="span">
-                      {child.name}
+                      {child.title}
                     </Text>
                   </Link>
                 </li>
@@ -437,6 +437,8 @@ export function PageEditor({
 
   // Build Select options: volumes as optgroups, chapters as options inside each.
   // Chapters before the page's intro chapter are disabled — content can't predate the page.
+  // Chapters beyond the reader's cutoff are also disabled — editors can't write spoilers.
+  const readingCutoffIdx = allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
   const chapterSelectOptions = (() => {
     const volumeMap = new Map<
       string,
@@ -453,7 +455,9 @@ export function PageEditor({
       children: chaps.map((c) => ({
         label: c.label,
         value: c.value,
-        disabled: introChapterIdx !== null && c.idx < introChapterIdx,
+        disabled:
+          (introChapterIdx !== null && c.idx < introChapterIdx) ||
+          (readingCutoffIdx !== null && c.idx > readingCutoffIdx),
       })),
     }));
   })();

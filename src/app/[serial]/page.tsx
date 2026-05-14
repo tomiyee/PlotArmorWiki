@@ -7,7 +7,7 @@ import {
   pageInfoboxSections, pageInfoboxRevisions, pageInfoboxImageRevisions,
   pageRelationships, pageTitles,
 } from '@/db/schema';
-import { and, asc, eq, isNull, lte, max, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lte, max, or } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   reorderVolumes, reorderAllChapters, updateSerialMetadata,
@@ -132,7 +132,7 @@ export default async function SerialPage({ params }: Props) {
   let sections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[] = [];
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
-  let childPages: { id: number; name: string; slug: string }[] = [];
+  let childPages: { id: number; name: string; slug: string; title: string }[] = [];
 
   if (homePage) {
     const sectionMaxIdxSq = db
@@ -269,7 +269,42 @@ export default async function SerialPage({ params }: Props) {
       )
       .where(eq(pageRelationships.parentPageId, homePage.id));
 
-    childPages = childPagesRaw.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+    const activeChildPages = childPagesRaw.filter((r) => r.isActive);
+    const childPageIds = activeChildPages.map((r) => r.id);
+    let childTitleMap = new Map<number, string>();
+    if (childPageIds.length > 0) {
+      const childTitleMaxIdxSq = db
+        .select({
+          pageId: pageTitles.pageId,
+          maxIdx: max(chapters.idx).as('max_idx'),
+        })
+        .from(pageTitles)
+        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+        .where(and(inArray(pageTitles.pageId, childPageIds), lte(chapters.idx, cutoffIdx)))
+        .groupBy(pageTitles.pageId)
+        .as('child_title_max_idx_sq');
+
+      const childTitleRows = await db
+        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+        .from(pageTitles)
+        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+        .innerJoin(
+          childTitleMaxIdxSq,
+          and(
+            eq(pageTitles.pageId, childTitleMaxIdxSq.pageId),
+            eq(chapters.idx, childTitleMaxIdxSq.maxIdx),
+          ),
+        );
+
+      childTitleMap = new Map(childTitleRows.map((r) => [r.pageId, r.title]));
+    }
+
+    childPages = activeChildPages.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      title: childTitleMap.get(r.id) ?? r.name,
+    }));
   }
 
   // ── Home page temporal title entries (for the edit-mode Titles panel) ────────
