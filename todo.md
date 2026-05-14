@@ -34,15 +34,7 @@
 
 ---
 
-## - [ ] Step 9 — Per-page infoboxes
-
-Infoboxes move from the category level (floaters) to the individual page.
-
-- Each page optionally has an infobox: a chapter-versioned image + ordered labeled rows, each with their own chapter-versioned content.
-- In `PageEditor` (edit mode): "Infobox" panel — toggle infobox on/off (presence of any `page_infobox_sections` rows determines this); add/remove/reorder infobox sections; edit image URL and row content, all versioned by the target chapter selector.
-- Read-mode rendering: render infobox at user's chapter cutoff using the same `max(idx) ≤ cutoff` pattern for image and each row.
-- Server Actions: `addInfboxSection`, `deleteInfboxSection`, `reorderInfboxSections`, `saveInfboxContent` in `src/app/[serial]/[page]/actions.ts`.
-- Migrate existing data: copy `page_floater_versions` → `page_infobox_image_revisions`, `page_floater_row_versions` → `page_infobox_revisions`, `category_floater_rows` → `page_infobox_sections` for each page that was in a category with `has_floater = true`.
+## - [X] Step 9 — Per-page infoboxes
 
 ---
 

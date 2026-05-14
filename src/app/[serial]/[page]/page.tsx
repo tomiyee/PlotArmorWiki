@@ -237,7 +237,11 @@ export default async function PageView({ params }: Props) {
 
   // ── Infobox data ───────────────────────────────────────────────────────────
   const activeInfoboxRows = await db
-    .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
+    .select({
+      id: pageInfoboxSections.id,
+      label: pageInfoboxSections.label,
+      displayOrder: pageInfoboxSections.displayOrder,
+    })
     .from(pageInfoboxSections)
     .where(
       and(
@@ -246,6 +250,13 @@ export default async function PageView({ params }: Props) {
       ),
     )
     .orderBy(asc(pageInfoboxSections.displayOrder));
+
+  // Wall-clock-versioned infobox structure for the edit-mode panel.
+  const infoboxSectionStructure = activeInfoboxRows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    displayOrder: r.displayOrder,
+  }));
 
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
@@ -468,6 +479,7 @@ export default async function PageView({ params }: Props) {
             pageTitleEntries={pageTitleEntries}
             pageSectionStructure={pageSectionStructure}
             sections={sections}
+            infoboxSectionStructure={infoboxSectionStructure}
             floaterImageUrl={floaterImageUrl}
             floaterRows={floaterRows}
             allChapters={allChapters}
