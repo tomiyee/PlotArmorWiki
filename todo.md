@@ -26,18 +26,11 @@
 
 ---
 
-## - [ ] Step 7 — Temporal page titles
-
-Page titles change over the story's progression. The static `pages.name` field is replaced with `page_titles`.
-
-- In `PageEditor` (edit mode): add a "Titles" panel listing all `page_titles` rows for this page (title + chapter label). Allow adding a new title revision at any chapter via a small form (chapter selector + text input).
-- Read-mode rendering: resolve the displayed title by finding the `page_titles` row with the highest `chapters.idx ≤ user_cutoff` (same read pattern as section content).
-- Server Actions: `addPageTitle(pageId, chapterId, title)`, `deletePageTitle(pageId, chapterId)`.
-- Once title data is confirmed seeded, drop `pages.name` in a follow-up migration.
+## - [X] Step 7 — Temporal page titles
 
 ---
 
-## - [ ] Step 8 — Per-page sections
+## - [X] Step 8 — Per-page sections
 
 Sections belong to individual pages, not categories. The section structure is wall-clock versioned; content is chapter-versioned.
 
