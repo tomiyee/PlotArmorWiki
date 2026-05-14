@@ -131,6 +131,7 @@ export default async function SerialPage({ params }: Props) {
   // ── Home page content ─────────────────────────────────────────────────────
   let pageSectionStructure: { id: number; name: string; displayOrder: number }[] = [];
   let sections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[] = [];
+  let infoboxSectionStructure: { id: number; label: string; displayOrder: number }[] = [];
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
   let childPages: { id: number; name: string; slug: string; title: string }[] = [];
@@ -190,10 +191,12 @@ export default async function SerialPage({ params }: Props) {
     });
 
     const activeInfoboxRows = await db
-      .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
+      .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label, displayOrder: pageInfoboxSections.displayOrder })
       .from(pageInfoboxSections)
       .where(and(eq(pageInfoboxSections.pageId, homePage.id), isNull(pageInfoboxSections.deletedAt)))
       .orderBy(asc(pageInfoboxSections.displayOrder));
+
+    infoboxSectionStructure = activeInfoboxRows;
 
     if (activeInfoboxRows.length > 0) {
       const floaterMaxIdxSq = db
@@ -383,6 +386,7 @@ export default async function SerialPage({ params }: Props) {
                 pageTitleEntries={homePageTitleEntries}
                 pageSectionStructure={pageSectionStructure}
                 sections={sections}
+                infoboxSectionStructure={infoboxSectionStructure}
                 floaterImageUrl={floaterImageUrl}
                 floaterRows={floaterRows}
                 allChapters={allChapters}

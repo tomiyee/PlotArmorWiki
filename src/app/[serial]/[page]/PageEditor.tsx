@@ -1,50 +1,25 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Text } from "@/components/ui/text";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { savePageContent, getPageContentAtChapter, addPageTitle, deletePageTitle, addInfoboxSection } from "./actions";
+import { savePageContent, getPageContentAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
-import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
-import { InfoIcon } from "@/components/ui/info-icon";
-import { Button } from "@/components/ui/button";
 import { PageSectionManager, type PageSection } from "./PageSectionManager";
-import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
-
-interface SectionData {
-  id: number;
-  name: string;
-  content: string;
-  /** The chapters.idx of the revision currently active at the reader's cutoff, or null if no content yet. */
-  lastUpdatedChapterIdx: number | null;
-}
-
-interface FloaterRowData {
-  id: number;
-  label: string;
-  content: string;
-}
-
-interface ChapterData {
-  id: number;
-  displayName: string;
-  idx: number;
-  volumeName: string;
-}
-
-interface PageTitleEntry {
-  chapterId: number;
-  /** Human-readable label, e.g. "Volume 1 — Chapter 3". */
-  chapterLabel: string;
-  title: string;
-}
+import { type InfoboxSection } from "./PageInfoboxManager";
+import { PageReadView } from "./PageReadView";
+import { PageTitlesPanel } from "./PageTitlesPanel";
+import { SectionContentEditor } from "./SectionContentEditor";
+import { PageInfoboxPanel } from "./PageInfoboxPanel";
+import type {
+  SectionData,
+  FloaterRowData,
+  ChapterData,
+  PageTitleEntry,
+  ChapterGroupOption,
+} from "./types";
 
 interface Props {
   serialSlug: string;
@@ -97,48 +72,6 @@ interface Props {
 }
 
 /**
- * Returns a short human-readable label describing when the currently shown
- * "current value" was last updated relative to the selected target chapter.
- * - `null` when there is no content (nothing to annotate).
- * - `"This Chapter"` when the last update is at exactly the selected chapter.
- * - `"Last Updated N Chapter(s) Ago"` when the last update is before the selected chapter.
- */
-function lastUpdatedLabel(
-  lastUpdatedIdx: number | null,
-  selectedChapterIdx: number | null,
-): string | null {
-  if (lastUpdatedIdx === null) return null;
-  if (selectedChapterIdx === null) return null;
-  const delta = selectedChapterIdx - lastUpdatedIdx;
-  if (delta === 0) return "This Chapter";
-  if (delta === 1) return "Last Updated 1 Chapter Ago";
-  return `Last Updated ${delta} Chapters Ago`;
-}
-
-function LastUpdatedTag({
-  lastUpdatedIdx,
-  selectedChapterIdx,
-}: {
-  lastUpdatedIdx: number | null;
-  selectedChapterIdx: number | null;
-}) {
-  const label = lastUpdatedLabel(lastUpdatedIdx, selectedChapterIdx);
-  if (!label) return null;
-  const isCurrent = lastUpdatedIdx === selectedChapterIdx;
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-        isCurrent
-          ? "bg-blue-100 text-blue-700"
-          : "bg-gray-100 text-gray-500"
-      }`}
-    >
-      {label}
-    </span>
-  );
-}
-
-/**
  * Renders the page body in read mode and switches to an inline edit mode where
  * each section gets an MDEditor alongside its current rendered value, and
  * infobox fields get plain text inputs.
@@ -151,21 +84,6 @@ function LastUpdatedTag({
  * with where they are in the story. Changing the selection reloads draft content
  * via `getPageContentAtChapter` so the editor always sees what readers at that
  * chapter currently see.
- *
- * The "Titles" panel in edit mode lists all `page_titles` revisions and lets
- * editors add new title revisions at any chapter or delete existing ones.
- *
- * The "Sections" panel in edit mode lets editors add, rename, reorder, and
- * delete sections via `PageSectionManager`. Section structure is wall-clock
- * versioned (add/remove/reorder any time); section content is chapter-versioned.
- *
- * The "Infobox" panel in edit mode lets editors toggle the infobox on/off
- * (by adding/removing `page_infobox_sections` rows), manage row structure via
- * `PageInfoboxManager`, and edit the image URL and per-row content.
- *
- * Each section is shown in a two-column layout: the left column shows the
- * current saved value (read-only reference) and the right column contains the
- * MDEditor for the draft being written.
  *
  * @example
  * <PageEditor
@@ -209,11 +127,6 @@ export function PageEditor({
   const [isPending, startTransition] = useTransition();
   const { isEditing, registerHandlers } = useEditMode();
 
-  // ── Titles panel state ────────────────────────────────────────────────────
-  // -1 is used as the sentinel "no chapter selected" value for the Select placeholder.
-  const [newTitleChapterId, setNewTitleChapterId] = useState<number>(-1);
-  const [newTitleText, setNewTitleText] = useState<string>("");
-
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
   >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
@@ -224,10 +137,10 @@ export function PageEditor({
   const [currentSectionContent, setCurrentSectionContent] = useState<
     Record<number, string>
   >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
-  // The chapters.idx of the revision currently shown for each section in the "Current value" panel.
-  const [currentSectionLastUpdatedIdx, setCurrentSectionLastUpdatedIdx] = useState<
-    Record<number, number | null>
-  >(() => Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])));
+  const [currentSectionLastUpdatedIdx, setCurrentSectionLastUpdatedIdx] =
+    useState<Record<number, number | null>>(() =>
+      Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
+    );
 
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
@@ -236,14 +149,12 @@ export function PageEditor({
     Record<number, string>
   >(() => Object.fromEntries(floaterRows.map((r) => [r.id, r.content])));
 
-  // The chapter the editor is currently targeting.
   // Defaults to the reader's current chapter so writing stays in sync with what
   // the reader just read. Falls back to headChapterId when no reading chapter is set.
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
     readingChapterId ?? headChapterId,
   );
 
-  // The infobox is considered "active" when at least one infobox section row exists.
   const hasInfobox = infoboxSectionStructure.length > 0;
 
   const handleDiscard = useCallback(() => {
@@ -310,7 +221,9 @@ export function PageEditor({
       setCurrentSectionContent(newContent);
       setDraftSectionContent(newContent);
       setCurrentSectionLastUpdatedIdx(
-        Object.fromEntries(data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
+        Object.fromEntries(
+          data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx]),
+        ),
       );
       if (hasInfobox) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
@@ -321,122 +234,29 @@ export function PageEditor({
     });
   }
 
-  function handleAddTitle() {
-    if (newTitleChapterId === -1 || !newTitleText.trim()) return;
-    startTransition(async () => {
-      await addPageTitle(serialSlug, pageSlug, newTitleChapterId, newTitleText.trim());
-      setNewTitleText("");
-      setNewTitleChapterId(-1);
-      router.refresh();
-    });
-  }
-
-  function handleDeleteTitle(chapterId: number) {
-    startTransition(async () => {
-      const result = await deletePageTitle(serialSlug, pageSlug, chapterId);
-      if (result.error) {
-        alert(result.error);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  // ── Read mode ────────────────────────────────────────────────────────────────
-  // Use props directly so content updates when router.refresh() delivers new
-  // server-rendered props (e.g. after the user changes their chapter cutoff).
-  // Draft state is only needed while editing.
-  const hasFloaterContent =
-    hasInfobox && (floaterImageUrl || floaterRows.length > 0);
-
   if (!isEditing) {
     return (
-      <div className="overflow-hidden">
-        {hasFloaterContent && (
-          <aside className="float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
-            {floaterImageUrl && (
-              <Image
-                src={floaterImageUrl}
-                alt="Floater image"
-                width={288}
-                height={288}
-                unoptimized
-                className="w-full rounded object-cover"
-              />
-            )}
-
-            {floaterRows.length > 0 && (
-              <dl className="flex flex-col gap-2 text-sm">
-                {floaterRows.map((row) => (
-                  <div key={row.id}>
-                    <dt className="font-medium text-gray-600">{row.label}</dt>
-                    <dd className="text-gray-800 whitespace-pre-wrap">
-                      {row.content || <span className="text-gray-400">—</span>}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </aside>
-        )}
-
-        {sections.map((section, i) => (
-          <div key={section.id} className="mb-6 last:mb-0">
-            {i > 0 && (
-              <Text variant="h2" className="mb-2">
-                {section.name}
-              </Text>
-            )}
-            {section.content ? (
-              <MarkdownRenderer serialSlug={serialSlug}>{section.content}</MarkdownRenderer>
-            ) : (
-              <Text muted>No content for this chapter yet.</Text>
-            )}
-          </div>
-        ))}
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <Text variant="h3" className="mb-3">
-            Child pages
-          </Text>
-          {childPages.length > 0 ? (
-            <ul className="flex flex-col gap-2">
-              {childPages.map((child) => (
-                <li key={child.id}>
-                  <Link
-                    href={`/${serialSlug}/${child.slug}`}
-                    className="rounded-lg border border-gray-200 px-4 py-2 flex items-center hover:bg-gray-50 transition-colors"
-                  >
-                    <Text variant="body" as="span">
-                      {child.title}
-                    </Text>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Text muted className="text-sm">No child pages yet.</Text>
-          )}
-          <Link
-            href={`/${serialSlug}/new?parentPageId=${pageId}`}
-            className="mt-3 text-sm text-blue-600 hover:underline inline-block"
-          >
-            + New page
-          </Link>
-        </div>
-      </div>
+      <PageReadView
+        serialSlug={serialSlug}
+        sections={sections}
+        hasInfobox={hasInfobox}
+        floaterImageUrl={floaterImageUrl}
+        floaterRows={floaterRows}
+        childPages={childPages}
+        pageId={pageId}
+      />
     );
   }
 
   // ── Edit mode ────────────────────────────────────────────────────────────────
-  // The chapters.idx for the currently selected target chapter (for label computation).
-  const selectedChapterIdx = allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
+  const selectedChapterIdx =
+    allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
-  // Build Select options: volumes as optgroups, chapters as options inside each.
   // Chapters before the page's intro chapter are disabled — content can't predate the page.
   // Chapters beyond the reader's cutoff are also disabled — editors can't write spoilers.
-  const readingCutoffIdx = allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
-  const chapterSelectOptions = (() => {
+  const readingCutoffIdx =
+    allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
+  const chapterSelectOptions: ChapterGroupOption[] = (() => {
     const volumeMap = new Map<
       string,
       { label: string; value: number; idx: number }[]
@@ -448,7 +268,7 @@ export function PageEditor({
     }
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
       label: volumeName,
-      value: -1 as number, // group node — value unused
+      value: -1 as number,
       children: chaps.map((c) => ({
         label: c.label,
         value: c.value,
@@ -477,197 +297,43 @@ export function PageEditor({
         </Box>
       )}
 
-      {/* Titles panel — list all page_titles rows + add-new form */}
-      <Box col className="gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <Box className="items-center gap-2">
-          <Text variant="h3">Titles</Text>
-          <InfoIcon contents="A page's display name can change over the story. Each revision is shown to readers whose chapter cutoff is at or after the listed chapter." />
-        </Box>
+      <PageTitlesPanel
+        serialSlug={serialSlug}
+        pageSlug={pageSlug}
+        pageTitleEntries={pageTitleEntries}
+        chapterSelectOptions={chapterSelectOptions}
+        isPending={isPending}
+      />
 
-        {pageTitleEntries.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {pageTitleEntries.map((entry) => (
-              <li key={entry.chapterId} className="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                <div className="flex flex-col min-w-0">
-                  <Text variant="label" className="text-xs text-gray-400 uppercase tracking-wide">{entry.chapterLabel}</Text>
-                  <Text variant="body" as="span" className="font-medium truncate">{entry.title}</Text>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteTitle(entry.chapterId)}
-                  disabled={isPending || pageTitleEntries.length <= 1}
-                  className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                >
-                  Delete
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <Text muted className="text-sm">No title revisions yet. Add one below.</Text>
-        )}
-
-        {/* Add new title revision form */}
-        {allChapters.length > 0 && (
-          <Box className="items-end gap-2 flex-wrap">
-            <Box col className="gap-1 flex-1 min-w-40">
-              <Label htmlFor="new-title-chapter" className="text-xs">Chapter</Label>
-              <Select<number>
-                id="new-title-chapter"
-                options={[
-                  { label: "Select a chapter…", value: -1, disabled: true },
-                  ...chapterSelectOptions,
-                ]}
-                value={newTitleChapterId}
-                onChange={(id) => { if (id !== -1) setNewTitleChapterId(id); }}
-                disabled={isPending}
-                className="w-full"
-              />
-            </Box>
-            <Box col className="gap-1 flex-[2] min-w-48">
-              <Label htmlFor="new-title-text" className="text-xs">Title</Label>
-              <Input
-                id="new-title-text"
-                value={newTitleText}
-                onChange={(e) => setNewTitleText(e.target.value)}
-                placeholder="Enter title…"
-                disabled={isPending}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddTitle(); } }}
-              />
-            </Box>
-            <Button
-              onClick={handleAddTitle}
-              disabled={isPending || newTitleChapterId === -1 || !newTitleText.trim()}
-              size="sm"
-            >
-              Add title
-            </Button>
-          </Box>
-        )}
-      </Box>
-
-      {/* Sections structure manager */}
       <PageSectionManager pageId={pageId} sections={pageSectionStructure} />
 
-      {/* Section content editors — one per active section */}
       {sections.map((section, i) => (
-        <Box key={section.id} col className="gap-2">
-          <Box className="items-center gap-2">
-            {i > 0 && <Text variant="h2">{section.name}</Text>}
-            {i === 0 && (
-              <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
-            )}
-          </Box>
-          {/* Two-column layout: current saved value on the left, editor on the right */}
-          <div className="grid grid-cols-2 gap-4 items-start">
-            {/* Left: current saved value at the selected chapter */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
-              <div className="mb-2 flex items-center gap-2">
-                <Text
-                  variant="label"
-                  className="block text-xs text-gray-400 uppercase tracking-wide"
-                >
-                  Current value
-                </Text>
-                <LastUpdatedTag lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null} selectedChapterIdx={selectedChapterIdx} />
-              </div>
-              {currentSectionContent[section.id] ? (
-                <MarkdownRenderer serialSlug={serialSlug}>
-                  {currentSectionContent[section.id]}
-                </MarkdownRenderer>
-              ) : (
-                <Text muted className="text-sm">
-                  No content at this chapter.
-                </Text>
-              )}
-            </div>
-            {/* Right: markdown editor for the new draft */}
-            <WikiLinkMDEditor
-              value={draftSectionContent[section.id] ?? ""}
-              onChange={(val) =>
-                setDraftSectionContent((prev) => ({
-                  ...prev,
-                  [section.id]: val ?? "",
-                }))
-              }
-              height={300}
-              preview="edit"
-              wikiPages={wikiPages}
-              serialSlug={serialSlug}
-            />
-          </div>
-        </Box>
+        <SectionContentEditor
+          key={section.id}
+          section={section}
+          isFirst={i === 0}
+          currentContent={currentSectionContent[section.id] ?? ""}
+          draftContent={draftSectionContent[section.id] ?? ""}
+          lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null}
+          selectedChapterIdx={selectedChapterIdx}
+          onChange={(val) =>
+            setDraftSectionContent((prev) => ({ ...prev, [section.id]: val }))
+          }
+          serialSlug={serialSlug}
+          wikiPages={wikiPages}
+        />
       ))}
 
-      {/* Infobox panel — structure management + image URL + row content editors */}
-      <Box
-        col
-        className="gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
-      >
-        <Box className="items-center gap-2">
-          <Text variant="h3">Infobox</Text>
-          <InfoIcon contents="The infobox floats on the right side of the page showing an image and key facts about this subject. It's chapter-versioned: each row's content is tied to the 'Writing as of:' chapter you select above." />
-        </Box>
-
-        {infoboxSectionStructure.length === 0 ? (
-          <Box col className="gap-2">
-            <Text muted className="text-sm">
-              This page has no infobox. Add a row below to enable the infobox.
-            </Text>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="self-start"
-              disabled={isPending}
-              onClick={() => {
-                startTransition(async () => {
-                  const fd = new FormData();
-                  fd.set("pageId", String(pageId));
-                  fd.set("label", "Overview");
-                  await addInfoboxSection(fd);
-                  router.refresh();
-                });
-              }}
-            >
-              Enable infobox
-            </Button>
-          </Box>
-        ) : (
-          <>
-            <PageInfoboxManager pageId={pageId} sections={infoboxSectionStructure} />
-
-            <Box col className="gap-1.5">
-              <Label htmlFor="floater-image-url">Image URL</Label>
-              <Input
-                id="floater-image-url"
-                value={draftFloaterImageUrl}
-                onChange={(e) => setDraftFloaterImageUrl(e.target.value)}
-                placeholder="https://…"
-                disabled={isPending}
-              />
-            </Box>
-
-            {floaterRows.map((row) => (
-              <Box key={row.id} col className="gap-1.5">
-                <Label htmlFor={`floater-row-${row.id}`}>{row.label}</Label>
-                <Input
-                  id={`floater-row-${row.id}`}
-                  value={draftFloaterRowContent[row.id] ?? ""}
-                  onChange={(e) =>
-                    setDraftFloaterRowContent((prev) => ({
-                      ...prev,
-                      [row.id]: e.target.value,
-                    }))
-                  }
-                  disabled={isPending}
-                />
-              </Box>
-            ))}
-          </>
-        )}
-      </Box>
+      <PageInfoboxPanel
+        pageId={pageId}
+        infoboxSectionStructure={infoboxSectionStructure}
+        floaterRows={floaterRows}
+        draftFloaterImageUrl={draftFloaterImageUrl}
+        setDraftFloaterImageUrl={setDraftFloaterImageUrl}
+        draftFloaterRowContent={draftFloaterRowContent}
+        setDraftFloaterRowContent={setDraftFloaterRowContent}
+        isPending={isPending}
+      />
     </Box>
   );
 }
