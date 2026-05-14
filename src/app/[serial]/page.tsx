@@ -129,6 +129,7 @@ export default async function SerialPage({ params }: Props) {
   const wikiPages = rawWikiPages.map((p) => ({ name: p.name }));
 
   // ── Home page content ─────────────────────────────────────────────────────
+  let pageSectionStructure: { id: number; name: string; displayOrder: number }[] = [];
   let sections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[] = [];
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
@@ -153,7 +154,7 @@ export default async function SerialPage({ params }: Props) {
 
     const [activeSections, sectionVersions] = await Promise.all([
       db
-        .select({ id: pageSections.id, name: pageSections.name })
+        .select({ id: pageSections.id, name: pageSections.name, displayOrder: pageSections.displayOrder })
         .from(pageSections)
         .where(and(eq(pageSections.pageId, homePage.id), isNull(pageSections.deletedAt)))
         .orderBy(asc(pageSections.displayOrder)),
@@ -178,6 +179,11 @@ export default async function SerialPage({ params }: Props) {
     const versionBySectionId = new Map(
       sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
     );
+    pageSectionStructure = activeSections.map((s) => ({
+      id: s.id,
+      name: s.name,
+      displayOrder: s.displayOrder,
+    }));
     sections = activeSections.map((s) => {
       const v = versionBySectionId.get(s.id);
       return { id: s.id, name: s.name, content: v?.content ?? '', lastUpdatedChapterIdx: v?.chapterIdx ?? null };
@@ -375,8 +381,7 @@ export default async function SerialPage({ params }: Props) {
                 pageSlug={homePage.slug}
                 pageId={homePage.id}
                 pageTitleEntries={homePageTitleEntries}
-                summaryContent=""
-                summaryLastUpdatedChapterIdx={null}
+                pageSectionStructure={pageSectionStructure}
                 sections={sections}
                 floaterImageUrl={floaterImageUrl}
                 floaterRows={floaterRows}

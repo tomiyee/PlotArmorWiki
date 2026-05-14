@@ -15,6 +15,7 @@ import { useEditMode } from "@/contexts/EditModeContext";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 import { InfoIcon } from "@/components/ui/info-icon";
 import { Button } from "@/components/ui/button";
+import { PageSectionManager, type PageSection } from "./PageSectionManager";
 
 interface SectionData {
   id: number;
@@ -48,18 +49,19 @@ interface Props {
   serialSlug: string;
   pageName: string;
   pageSlug: string;
+  /** The DB id of this page, forwarded to the new-page form as the default parent. */
+  pageId: number;
   /**
    * All page_titles rows for this page, ordered by chapter idx ascending.
    * Used to render the Titles panel in edit mode.
    */
   pageTitleEntries: PageTitleEntry[];
   /**
-   * Chapter-versioned summary content shown at the top of the page with no
-   * section header in read mode. Always present; empty string means no content yet.
+   * Wall-clock-versioned section structure for this page, used to power the
+   * Sections management panel in edit mode. Separate from `sections` (which
+   * carries chapter-versioned content).
    */
-  summaryContent: string;
-  /** The chapters.idx of the active summary revision at the reader's cutoff, or null if no content yet. */
-  summaryLastUpdatedChapterIdx: number | null;
+  pageSectionStructure: PageSection[];
   sections: SectionData[];
   /** null when the page has no infobox */
   floaterImageUrl: string | null | undefined;
@@ -86,8 +88,6 @@ interface Props {
    * below the content in read mode.
    */
   childPages: { id: number; name: string; slug: string; title: string }[];
-  /** The DB id of this page, forwarded to the new-page form as the default parent. */
-  pageId: number;
 }
 
 /**
@@ -148,8 +148,10 @@ function LastUpdatedTag({
  *
  * The "Titles" panel in edit mode lists all `page_titles` revisions and lets
  * editors add new title revisions at any chapter or delete existing ones.
- * The title shown in read mode is resolved by the parent Server Component using
- * the max-idx pattern and displayed as `<Text variant="h1">` above this component.
+ *
+ * The "Sections" panel in edit mode lets editors add, rename, reorder, and
+ * delete sections via `PageSectionManager`. Section structure is wall-clock
+ * versioned (add/remove/reorder any time); section content is chapter-versioned.
  *
  * Each section is shown in a two-column layout: the left column shows the
  * current saved value (read-only reference) and the right column contains the
@@ -160,24 +162,27 @@ function LastUpdatedTag({
  *   serialSlug="one-piece"
  *   pageName="Luffy"
  *   pageSlug="luffy"
- *   summaryContent="Monkey D. Luffy is the captain of the Straw Hat Pirates."
- *   summaryLastUpdatedChapterIdx={1}
- *   sections={[{ id: 1, name: 'Overview', content: '...', lastUpdatedChapterIdx: 1 }]}
+ *   pageId={42}
+ *   pageTitleEntries={[]}
+ *   pageSectionStructure={[{ id: 1, name: 'Summary', displayOrder: 0 }]}
+ *   sections={[{ id: 1, name: 'Summary', content: '...', lastUpdatedChapterIdx: 1 }]}
  *   floaterImageUrl="https://..."
  *   floaterRows={[{ id: 2, label: 'Age', content: '19' }]}
  *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
  *   headChapterId={5}
  *   readingChapterId={3}
  *   wikiPages={[{ name: 'Luffy' }]}
+ *   introChapterIdx={1}
+ *   childPages={[]}
  * />
  */
 export function PageEditor({
   serialSlug,
   pageName: _pageName,
   pageSlug,
+  pageId,
   pageTitleEntries,
-  summaryContent,
-  summaryLastUpdatedChapterIdx,
+  pageSectionStructure,
   sections,
   floaterImageUrl,
   floaterRows,
@@ -187,7 +192,6 @@ export function PageEditor({
   wikiPages,
   introChapterIdx,
   childPages,
-  pageId,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -197,14 +201,6 @@ export function PageEditor({
   // -1 is used as the sentinel "no chapter selected" value for the Select placeholder.
   const [newTitleChapterId, setNewTitleChapterId] = useState<number>(-1);
   const [newTitleText, setNewTitleText] = useState<string>("");
-
-  const [draftSummaryContent, setDraftSummaryContent] = useState<string>(summaryContent);
-  // Reference view for summary in edit mode — same as draft initially; updates on chapter change.
-  const [currentSummaryContent, setCurrentSummaryContent] = useState<string>(summaryContent);
-  // The chapters.idx of the revision currently shown in the summary "Current value" panel.
-  const [currentSummaryLastUpdatedIdx, setCurrentSummaryLastUpdatedIdx] = useState<number | null>(
-    summaryLastUpdatedChapterIdx,
-  );
 
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
@@ -238,9 +234,6 @@ export function PageEditor({
   const hasFloater = floaterImageUrl !== undefined;
 
   const handleDiscard = useCallback(() => {
-    setDraftSummaryContent(summaryContent);
-    setCurrentSummaryContent(summaryContent);
-    setCurrentSummaryLastUpdatedIdx(summaryLastUpdatedChapterIdx);
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
@@ -255,14 +248,14 @@ export function PageEditor({
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }, [summaryContent, summaryLastUpdatedChapterIdx, sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
+  }, [sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
       await savePageContent(
         serialSlug,
         pageSlug,
-        draftSummaryContent,
+        "",
         draftSectionContent,
         hasFloater ? draftFloaterImageUrl.trim() || null : null,
         hasFloater ? draftFloaterRowContent : {},
@@ -273,7 +266,6 @@ export function PageEditor({
   }, [
     serialSlug,
     pageSlug,
-    draftSummaryContent,
     draftSectionContent,
     hasFloater,
     draftFloaterImageUrl,
@@ -299,9 +291,6 @@ export function PageEditor({
         pageSlug,
         chapterId,
       );
-      setCurrentSummaryContent(data.summaryContent);
-      setDraftSummaryContent(data.summaryContent);
-      setCurrentSummaryLastUpdatedIdx(data.summaryLastUpdatedChapterIdx);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
@@ -378,18 +367,13 @@ export function PageEditor({
           </aside>
         )}
 
-        {/* Summary — shown at the top with no header */}
-        {summaryContent && (
-          <div className="mb-6">
-            <MarkdownRenderer serialSlug={serialSlug}>{summaryContent}</MarkdownRenderer>
-          </div>
-        )}
-
-        {sections.map((section) => (
+        {sections.map((section, i) => (
           <div key={section.id} className="mb-6 last:mb-0">
-            <Text variant="h2" className="mb-2">
-              {section.name}
-            </Text>
+            {i > 0 && (
+              <Text variant="h2" className="mb-2">
+                {section.name}
+              </Text>
+            )}
             {section.content ? (
               <MarkdownRenderer serialSlug={serialSlug}>{section.content}</MarkdownRenderer>
             ) : (
@@ -550,47 +534,18 @@ export function PageEditor({
         )}
       </Box>
 
-      {/* Summary — always first; labeled in edit mode but has no header in read mode */}
-      <Box col className="gap-2">
-        <Box className="items-center gap-2">
-          <Text variant="h2">Summary</Text>
-          <InfoIcon contents="Shown at the top of the page with no heading." />
-        </Box>
-        <div className="grid grid-cols-2 gap-4 items-start">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
-            <div className="mb-2 flex items-center gap-2">
-              <Text
-                variant="label"
-                className="block text-xs text-gray-400 uppercase tracking-wide"
-              >
-                Current value
-              </Text>
-              <LastUpdatedTag lastUpdatedIdx={currentSummaryLastUpdatedIdx} selectedChapterIdx={selectedChapterIdx} />
-            </div>
-            {currentSummaryContent ? (
-              <MarkdownRenderer serialSlug={serialSlug}>
-                {currentSummaryContent}
-              </MarkdownRenderer>
-            ) : (
-              <Text muted className="text-sm">
-                No content at this chapter.
-              </Text>
-            )}
-          </div>
-          <WikiLinkMDEditor
-            value={draftSummaryContent}
-            onChange={(val) => setDraftSummaryContent(val ?? "")}
-            height={300}
-            preview="edit"
-            wikiPages={wikiPages}
-            serialSlug={serialSlug}
-          />
-        </div>
-      </Box>
+      {/* Sections structure manager */}
+      <PageSectionManager pageId={pageId} sections={pageSectionStructure} />
 
-      {sections.map((section) => (
+      {/* Section content editors — one per active section */}
+      {sections.map((section, i) => (
         <Box key={section.id} col className="gap-2">
-          <Text variant="h2">{section.name}</Text>
+          <Box className="items-center gap-2">
+            {i > 0 && <Text variant="h2">{section.name}</Text>}
+            {i === 0 && (
+              <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
+            )}
+          </Box>
           {/* Two-column layout: current saved value on the left, editor on the right */}
           <div className="grid grid-cols-2 gap-4 items-start">
             {/* Left: current saved value at the selected chapter */}

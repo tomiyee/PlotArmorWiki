@@ -187,7 +187,7 @@ export default async function PageView({ params }: Props) {
 
   const [activeSections, sectionVersions] = await Promise.all([
     db
-      .select({ id: pageSections.id, name: pageSections.name })
+      .select({ id: pageSections.id, name: pageSections.name, displayOrder: pageSections.displayOrder })
       .from(pageSections)
       .where(
         and(
@@ -217,6 +217,13 @@ export default async function PageView({ params }: Props) {
   const versionBySectionId = new Map(
     sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
   );
+
+  // pageSectionStructure — wall-clock-versioned rows for the section manager panel.
+  const pageSectionStructure = activeSections.map((s) => ({
+    id: s.id,
+    name: s.name,
+    displayOrder: s.displayOrder,
+  }));
 
   const sections = activeSections.map((s) => {
     const v = versionBySectionId.get(s.id);
@@ -459,8 +466,7 @@ export default async function PageView({ params }: Props) {
             pageSlug={decodedPageSlug}
             pageId={page.id}
             pageTitleEntries={pageTitleEntries}
-            summaryContent=""
-            summaryLastUpdatedChapterIdx={null}
+            pageSectionStructure={pageSectionStructure}
             sections={sections}
             floaterImageUrl={floaterImageUrl}
             floaterRows={floaterRows}

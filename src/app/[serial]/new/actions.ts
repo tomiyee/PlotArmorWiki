@@ -1,8 +1,9 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/db/index';
-import { serials, pages, pageTitles, pageRelationships } from '@/db/schema';
+import { serials, pages, pageTitles, pageRelationships, pageSections } from '@/db/schema';
 import { and, eq, like } from 'drizzle-orm';
 import { titleToSlug } from '@/lib/slug';
 
@@ -102,7 +103,16 @@ export async function createPage(serialSlug: string, formData: FormData) {
       chapterId: introChapterId,
       isActive: true,
     });
+
+    // 4. Seed an initial "Summary" section so the page has at least one
+    // editable section immediately after creation.
+    await tx.insert(pageSections).values({
+      pageId: newPage.id,
+      name: 'Summary',
+      displayOrder: 0,
+    });
   });
 
+  revalidatePath(`/${serialSlug}`, 'layout');
   redirect(`/${serialSlug}/${encodeURIComponent(slug)}`);
 }
