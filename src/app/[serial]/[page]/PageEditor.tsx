@@ -10,10 +10,11 @@ import { Box } from "@/components/ui/box";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { savePageContent, getPageContentAtChapter } from "./actions";
+import { savePageContent, getPageContentAtChapter, addPageTitle, deletePageTitle } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 import { InfoIcon } from "@/components/ui/info-icon";
+import { Button } from "@/components/ui/button";
 
 interface SectionData {
   id: number;
@@ -36,10 +37,22 @@ interface ChapterData {
   volumeName: string;
 }
 
+interface PageTitleEntry {
+  chapterId: number;
+  /** Human-readable label, e.g. "Volume 1 — Chapter 3". */
+  chapterLabel: string;
+  title: string;
+}
+
 interface Props {
   serialSlug: string;
   pageName: string;
   pageSlug: string;
+  /**
+   * All page_titles rows for this page, ordered by chapter idx ascending.
+   * Used to render the Titles panel in edit mode.
+   */
+  pageTitleEntries: PageTitleEntry[];
   /**
    * Chapter-versioned summary content shown at the top of the page with no
    * section header in read mode. Always present; empty string means no content yet.
@@ -72,7 +85,7 @@ interface Props {
    * cutoff (derived from `page_relationships`). Rendered as a sub-page list
    * below the content in read mode.
    */
-  childPages: { id: number; name: string; slug: string }[];
+  childPages: { id: number; name: string; slug: string; title: string }[];
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
   pageId: number;
 }
@@ -133,6 +146,11 @@ function LastUpdatedTag({
  * via `getPageContentAtChapter` so the editor always sees what readers at that
  * chapter currently see.
  *
+ * The "Titles" panel in edit mode lists all `page_titles` revisions and lets
+ * editors add new title revisions at any chapter or delete existing ones.
+ * The title shown in read mode is resolved by the parent Server Component using
+ * the max-idx pattern and displayed as `<Text variant="h1">` above this component.
+ *
  * Each section is shown in a two-column layout: the left column shows the
  * current saved value (read-only reference) and the right column contains the
  * MDEditor for the draft being written.
@@ -157,6 +175,7 @@ export function PageEditor({
   serialSlug,
   pageName: _pageName,
   pageSlug,
+  pageTitleEntries,
   summaryContent,
   summaryLastUpdatedChapterIdx,
   sections,
@@ -173,6 +192,11 @@ export function PageEditor({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isEditing, registerHandlers } = useEditMode();
+
+  // ── Titles panel state ────────────────────────────────────────────────────
+  // -1 is used as the sentinel "no chapter selected" value for the Select placeholder.
+  const [newTitleChapterId, setNewTitleChapterId] = useState<number>(-1);
+  const [newTitleText, setNewTitleText] = useState<string>("");
 
   const [draftSummaryContent, setDraftSummaryContent] = useState<string>(summaryContent);
   // Reference view for summary in edit mode — same as draft initially; updates on chapter change.
@@ -295,6 +319,27 @@ export function PageEditor({
     });
   }
 
+  function handleAddTitle() {
+    if (newTitleChapterId === -1 || !newTitleText.trim()) return;
+    startTransition(async () => {
+      await addPageTitle(serialSlug, pageSlug, newTitleChapterId, newTitleText.trim());
+      setNewTitleText("");
+      setNewTitleChapterId(-1);
+      router.refresh();
+    });
+  }
+
+  function handleDeleteTitle(chapterId: number) {
+    startTransition(async () => {
+      const result = await deletePageTitle(serialSlug, pageSlug, chapterId);
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   // ── Read mode ────────────────────────────────────────────────────────────────
   // Use props directly so content updates when router.refresh() delivers new
   // server-rendered props (e.g. after the user changes their chapter cutoff).
@@ -366,7 +411,7 @@ export function PageEditor({
                     className="rounded-lg border border-gray-200 px-4 py-2 flex items-center hover:bg-gray-50 transition-colors"
                   >
                     <Text variant="body" as="span">
-                      {child.name}
+                      {child.title}
                     </Text>
                   </Link>
                 </li>
@@ -392,6 +437,8 @@ export function PageEditor({
 
   // Build Select options: volumes as optgroups, chapters as options inside each.
   // Chapters before the page's intro chapter are disabled — content can't predate the page.
+  // Chapters beyond the reader's cutoff are also disabled — editors can't write spoilers.
+  const readingCutoffIdx = allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
   const chapterSelectOptions = (() => {
     const volumeMap = new Map<
       string,
@@ -408,7 +455,9 @@ export function PageEditor({
       children: chaps.map((c) => ({
         label: c.label,
         value: c.value,
-        disabled: introChapterIdx !== null && c.idx < introChapterIdx,
+        disabled:
+          (introChapterIdx !== null && c.idx < introChapterIdx) ||
+          (readingCutoffIdx !== null && c.idx > readingCutoffIdx),
       })),
     }));
   })();
@@ -430,6 +479,76 @@ export function PageEditor({
           />
         </Box>
       )}
+
+      {/* Titles panel — list all page_titles rows + add-new form */}
+      <Box col className="gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <Box className="items-center gap-2">
+          <Text variant="h3">Titles</Text>
+          <InfoIcon contents="A page's display name can change over the story. Each revision is shown to readers whose chapter cutoff is at or after the listed chapter." />
+        </Box>
+
+        {pageTitleEntries.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {pageTitleEntries.map((entry) => (
+              <li key={entry.chapterId} className="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
+                <div className="flex flex-col min-w-0">
+                  <Text variant="label" className="text-xs text-gray-400 uppercase tracking-wide">{entry.chapterLabel}</Text>
+                  <Text variant="body" as="span" className="font-medium truncate">{entry.title}</Text>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteTitle(entry.chapterId)}
+                  disabled={isPending || pageTitleEntries.length <= 1}
+                  className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                >
+                  Delete
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Text muted className="text-sm">No title revisions yet. Add one below.</Text>
+        )}
+
+        {/* Add new title revision form */}
+        {allChapters.length > 0 && (
+          <Box className="items-end gap-2 flex-wrap">
+            <Box col className="gap-1 flex-1 min-w-40">
+              <Label htmlFor="new-title-chapter" className="text-xs">Chapter</Label>
+              <Select<number>
+                id="new-title-chapter"
+                options={[
+                  { label: "Select a chapter…", value: -1, disabled: true },
+                  ...chapterSelectOptions,
+                ]}
+                value={newTitleChapterId}
+                onChange={(id) => { if (id !== -1) setNewTitleChapterId(id); }}
+                disabled={isPending}
+                className="w-full"
+              />
+            </Box>
+            <Box col className="gap-1 flex-[2] min-w-48">
+              <Label htmlFor="new-title-text" className="text-xs">Title</Label>
+              <Input
+                id="new-title-text"
+                value={newTitleText}
+                onChange={(e) => setNewTitleText(e.target.value)}
+                placeholder="Enter title…"
+                disabled={isPending}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddTitle(); } }}
+              />
+            </Box>
+            <Button
+              onClick={handleAddTitle}
+              disabled={isPending || newTitleChapterId === -1 || !newTitleText.trim()}
+              size="sm"
+            >
+              Add title
+            </Button>
+          </Box>
+        )}
+      </Box>
 
       {/* Summary — always first; labeled in edit mode but has no header in read mode */}
       <Box col className="gap-2">
