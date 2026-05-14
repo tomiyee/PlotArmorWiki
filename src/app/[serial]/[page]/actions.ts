@@ -13,7 +13,7 @@ import {
   pageInfoboxImageRevisions,
   pageTitles,
 } from "@/db/schema";
-import { and, asc, desc, eq, isNull, lte, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, lte, max } from "drizzle-orm";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -358,4 +358,115 @@ export async function deletePageTitle(
     );
 
   return {};
+}
+
+// ── Page section structure management ────────────────────────────────────────
+// These actions manage the wall-clock-versioned `page_sections` rows (add,
+// delete, rename, reorder). Content is managed separately via savePageContent.
+
+/**
+ * Adds a new section to a page. The section is appended after all existing
+ * active sections.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('pageId', '42');
+ * fd.set('name', 'Biography');
+ * await addPageSection(fd);
+ */
+export async function addPageSection(formData: FormData): Promise<void> {
+  const pageId = parseInt(formData.get("pageId") as string, 10);
+  const name = (formData.get("name") as string)?.trim();
+  if (!pageId || !name) throw new Error("pageId and name are required");
+
+  // Find the next displayOrder by counting active sections.
+  const [{ cnt }] = await db
+    .select({ cnt: count() })
+    .from(pageSections)
+    .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)));
+
+  await db.insert(pageSections).values({
+    pageId,
+    name,
+    displayOrder: cnt,
+  });
+}
+
+/**
+ * Soft-deletes a page section. Rejects if the section has any content
+ * revisions to prevent accidental data loss.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('sectionId', '7');
+ * await deletePageSection(fd);
+ */
+export async function deletePageSection(
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const sectionId = parseInt(formData.get("sectionId") as string, 10);
+  if (!sectionId) return { error: "sectionId is required" };
+
+  // Guard: reject if any content revisions exist for this section.
+  const [{ cnt }] = await db
+    .select({ cnt: count() })
+    .from(pageSectionRevisions)
+    .where(eq(pageSectionRevisions.sectionId, sectionId));
+
+  if (cnt > 0) {
+    return {
+      error:
+        "This section has content revisions and cannot be deleted. Clear all content first.",
+    };
+  }
+
+  await db
+    .update(pageSections)
+    .set({ deletedAt: new Date() })
+    .where(eq(pageSections.id, sectionId));
+
+  return {};
+}
+
+/**
+ * Renames a page section.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('sectionId', '7');
+ * fd.set('name', 'Early Life');
+ * await renamePageSection(fd);
+ */
+export async function renamePageSection(formData: FormData): Promise<void> {
+  const sectionId = parseInt(formData.get("sectionId") as string, 10);
+  const name = (formData.get("name") as string)?.trim();
+  if (!sectionId || !name) throw new Error("sectionId and name are required");
+
+  await db
+    .update(pageSections)
+    .set({ name })
+    .where(eq(pageSections.id, sectionId));
+}
+
+/**
+ * Reorders sections by assigning new `displayOrder` values matching the
+ * provided ordered array of section IDs.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('orderedIds', JSON.stringify([3, 1, 2]));
+ * await reorderPageSections(fd);
+ */
+export async function reorderPageSections(formData: FormData): Promise<void> {
+  const raw = formData.get("orderedIds") as string;
+  const orderedIds: number[] = JSON.parse(raw);
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await tx
+        .update(pageSections)
+        .set({ displayOrder: i })
+        .where(eq(pageSections.id, orderedIds[i]));
+    }
+  });
 }
