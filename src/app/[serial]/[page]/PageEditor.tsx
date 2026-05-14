@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/box";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { savePageContent, getPageContentAtChapter } from "./actions";
+import { savePageContent, getPageContentAtChapter, getParentPagesAtChapter } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { PageSectionManager, type PageSection } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
@@ -13,6 +13,7 @@ import { PageReadView } from "./PageReadView";
 import { PageTitlesPanel } from "./PageTitlesPanel";
 import { SectionContentEditor } from "./SectionContentEditor";
 import { PageInfoboxPanel } from "./PageInfoboxPanel";
+import { PageRelationshipsPanel, type ParentPageEntry } from "./PageRelationshipsPanel";
 import type {
   SectionData,
   FloaterRowData,
@@ -69,6 +70,17 @@ interface Props {
    * below the content in read mode.
    */
   childPages: { id: number; name: string; slug: string; title: string }[];
+  /**
+   * Parent pages that are actively related to this page at the reader's chapter
+   * cutoff (derived from `page_relationships`). Shown as a breadcrumb in read
+   * mode and as a list in the Relationships edit panel.
+   */
+  parentPages: ParentPageEntry[];
+  /**
+   * All pages in the serial (excluding the current page) used to populate the
+   * "Add parent" dropdown in the Relationships edit panel.
+   */
+  allSerialPages: { id: number; name: string }[];
 }
 
 /**
@@ -103,6 +115,8 @@ interface Props {
  *   wikiPages={[{ name: 'Luffy' }]}
  *   introChapterIdx={1}
  *   childPages={[]}
+ *   parentPages={[]}
+ *   allSerialPages={[]}
  * />
  */
 export function PageEditor({
@@ -122,6 +136,8 @@ export function PageEditor({
   wikiPages,
   introChapterIdx,
   childPages,
+  parentPages,
+  allSerialPages,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -141,6 +157,8 @@ export function PageEditor({
     useState<Record<number, number | null>>(() =>
       Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
     );
+
+  const [currentParentPages, setCurrentParentPages] = useState<ParentPageEntry[]>(parentPages);
 
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
@@ -171,8 +189,9 @@ export function PageEditor({
     setDraftFloaterRowContent(
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
+    setCurrentParentPages(parentPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }, [sections, floaterImageUrl, floaterRows, readingChapterId, headChapterId]);
+  }, [sections, floaterImageUrl, floaterRows, parentPages, readingChapterId, headChapterId]);
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
@@ -210,11 +229,10 @@ export function PageEditor({
   function handleChapterChange(chapterId: number) {
     setSelectedChapterId(chapterId);
     startTransition(async () => {
-      const data = await getPageContentAtChapter(
-        serialSlug,
-        pageSlug,
-        chapterId,
-      );
+      const [data, parents] = await Promise.all([
+        getPageContentAtChapter(serialSlug, pageSlug, chapterId),
+        getParentPagesAtChapter(serialSlug, pageSlug, chapterId),
+      ]);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
@@ -231,6 +249,7 @@ export function PageEditor({
           Object.fromEntries(data.floaterRows.map((r) => [r.id, r.content])),
         );
       }
+      setCurrentParentPages(parents);
     });
   }
 
@@ -303,6 +322,13 @@ export function PageEditor({
         pageTitleEntries={pageTitleEntries}
         chapterSelectOptions={chapterSelectOptions}
         isPending={isPending}
+      />
+
+      <PageRelationshipsPanel
+        pageId={pageId}
+        parentPages={currentParentPages}
+        allSerialPages={allSerialPages}
+        chapterId={selectedChapterId}
       />
 
       <PageSectionManager pageId={pageId} sections={pageSectionStructure} />

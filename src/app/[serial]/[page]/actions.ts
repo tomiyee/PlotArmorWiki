@@ -11,9 +11,10 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  pageRelationships,
   pageTitles,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, isNull, lte, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, lte, max, ne } from "drizzle-orm";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -578,4 +579,281 @@ export async function reorderInfoboxSections(formData: FormData): Promise<void> 
         .where(eq(pageInfoboxSections.id, orderedIds[i]));
     }
   });
+}
+
+// ── Page relationship management ──────────────────────────────────────────────
+// Relationships are temporal: each add/remove inserts a new row instead of
+// mutating existing rows (same SCD Type 2 pattern as section content).
+
+/**
+ * Performs a DFS from `startId` following currently-active parent edges in
+ * `page_relationships` (using all rows in the DB — not chapter-filtered — so
+ * the cycle check is conservative). Returns true if `targetId` is reachable.
+ *
+ * This is called before inserting an `is_active = true` edge to ensure the
+ * resulting graph remains a DAG.
+ */
+async function isReachable(startId: number, targetId: number): Promise<boolean> {
+  // Build the full parent map for the serial in a single query.
+  // We only care about the *most recent* row per (parent, child) pair and
+  // whether that row is active. To keep the query simple we fetch all rows
+  // and compute the latest-per-pair in JS.
+  const allRows = await db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      childPageId: pageRelationships.childPageId,
+      chapterId: pageRelationships.chapterId,
+      isActive: pageRelationships.isActive,
+    })
+    .from(pageRelationships);
+
+  // Latest row per (parent, child) keyed by `${parent}:${child}`.
+  const latestByEdge = new Map<string, { chapterId: number; isActive: boolean }>();
+  for (const row of allRows) {
+    const key = `${row.parentPageId}:${row.childPageId}`;
+    const existing = latestByEdge.get(key);
+    if (!existing || row.chapterId > existing.chapterId) {
+      latestByEdge.set(key, { chapterId: row.chapterId, isActive: row.isActive });
+    }
+  }
+
+  // Build adjacency: childId → set of parentIds that are currently active.
+  const parentOf = new Map<number, Set<number>>();
+  for (const [key, val] of latestByEdge.entries()) {
+    if (!val.isActive) continue;
+    const [parentStr, childStr] = key.split(":");
+    const parent = parseInt(parentStr, 10);
+    const child = parseInt(childStr, 10);
+    const parents = parentOf.get(child) ?? new Set();
+    parents.add(parent);
+    parentOf.set(child, parents);
+  }
+
+  // DFS upward from startId to see if targetId is an ancestor.
+  const visited = new Set<number>();
+  const stack = [startId];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current === targetId) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    const parents = parentOf.get(current);
+    if (parents) {
+      for (const p of parents) stack.push(p);
+    }
+  }
+  return false;
+}
+
+/**
+ * Returns the active parent pages for a given page at a specific chapter,
+ * including temporal titles resolved at that chapter's cutoff. Used by the
+ * edit-mode Relationships panel to keep the parent list in sync with the
+ * "Writing as of:" chapter selector.
+ *
+ * @example
+ * const parents = await getParentPagesAtChapter('one-piece', 'luffy', 7);
+ */
+export async function getParentPagesAtChapter(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ id: number; name: string; slug: string; title: string }[]> {
+  const [{ pageId }, [targetChapter]] = await Promise.all([
+    resolvePageIds(serialSlug, pageSlug),
+    db
+      .select({ idx: chapters.idx })
+      .from(chapters)
+      .where(eq(chapters.id, chapterId))
+      .limit(1),
+  ]);
+  if (!targetChapter) throw new Error("Chapter not found");
+
+  const cutoffIdx = targetChapter.idx;
+
+  const parentRelMaxIdxSq = db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .where(
+      and(
+        eq(pageRelationships.childPageId, pageId),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .groupBy(pageRelationships.parentPageId)
+    .as("parent_rel_max_idx_sq");
+
+  const parentPagesRaw = await db
+    .select({
+      id: pages.id,
+      name: pages.name,
+      slug: pages.slug,
+      isActive: pageRelationships.isActive,
+    })
+    .from(pageRelationships)
+    .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      parentRelMaxIdxSq,
+      and(
+        eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
+        eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(eq(pageRelationships.childPageId, pageId));
+
+  const activeParents = parentPagesRaw.filter((r) => r.isActive);
+  if (activeParents.length === 0) return [];
+
+  const parentPageIds = activeParents.map((r) => r.id);
+
+  const titleMaxIdxSq = db
+    .select({
+      pageId: pageTitles.pageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .where(
+      and(inArray(pageTitles.pageId, parentPageIds), lte(chapters.idx, cutoffIdx)),
+    )
+    .groupBy(pageTitles.pageId)
+    .as("title_max_idx_sq");
+
+  const titleRows = await db
+    .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .innerJoin(
+      titleMaxIdxSq,
+      and(
+        eq(pageTitles.pageId, titleMaxIdxSq.pageId),
+        eq(chapters.idx, titleMaxIdxSq.maxIdx),
+      ),
+    );
+
+  const titleMap = new Map(titleRows.map((r) => [r.pageId, r.title]));
+
+  return activeParents.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    title: titleMap.get(r.id) ?? r.name,
+  }));
+}
+
+/**
+ * Inserts an `is_active = true` row for (childPageId, parentPageId) at the
+ * given chapter. Rejects if the edge would create a cycle in the page DAG.
+ *
+ * @example
+ * await addPageRelationship(childPageId, parentPageId, chapterId);
+ */
+export async function addPageRelationship(
+  childPageId: number,
+  parentPageId: number,
+  chapterId: number,
+): Promise<{ error?: string }> {
+  if (childPageId === parentPageId) {
+    return { error: "A page cannot be its own parent." };
+  }
+
+  // Cycle check: if parentPageId can already reach childPageId through active
+  // edges, adding childPageId → parentPageId would create a cycle.
+  const wouldCycle = await isReachable(parentPageId, childPageId);
+  if (wouldCycle) {
+    return { error: "Adding this parent would create a cycle in the page graph." };
+  }
+
+  await db
+    .insert(pageRelationships)
+    .values({ parentPageId, childPageId, chapterId, isActive: true })
+    .onConflictDoUpdate({
+      target: [
+        pageRelationships.parentPageId,
+        pageRelationships.childPageId,
+        pageRelationships.chapterId,
+      ],
+      set: { isActive: true },
+    });
+
+  return {};
+}
+
+/**
+ * Inserts an `is_active = false` tombstone for (childPageId, parentPageId) at
+ * the given chapter. Guards against leaving a non-home-page with zero parents
+ * at any chapter snapshot by checking whether the page has other active parents.
+ *
+ * The "other active parent" check is intentionally conservative: it uses the
+ * latest-per-pair rows across all chapters, not a chapter-filtered view, so
+ * we never accidentally leave a page orphaned.
+ *
+ * @example
+ * await removePageRelationship(childPageId, parentPageId, chapterId);
+ */
+export async function removePageRelationship(
+  childPageId: number,
+  parentPageId: number,
+  chapterId: number,
+): Promise<{ error?: string }> {
+  // Count OTHER active parents for this child (conservative — unfiltered).
+  const allRows = await db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      chapterId: pageRelationships.chapterId,
+      isActive: pageRelationships.isActive,
+    })
+    .from(pageRelationships)
+    .where(
+      and(
+        eq(pageRelationships.childPageId, childPageId),
+        ne(pageRelationships.parentPageId, parentPageId),
+      ),
+    );
+
+  // Compute latest row per other parent.
+  const latestByParent = new Map<number, { chapterId: number; isActive: boolean }>();
+  for (const row of allRows) {
+    const existing = latestByParent.get(row.parentPageId);
+    if (!existing || row.chapterId > existing.chapterId) {
+      latestByParent.set(row.parentPageId, { chapterId: row.chapterId, isActive: row.isActive });
+    }
+  }
+
+  const activeOtherParents = [...latestByParent.values()].filter((v) => v.isActive);
+
+  if (activeOtherParents.length === 0) {
+    // Check if the page is a home page (home pages are root nodes — no parent needed).
+    const [pageRow] = await db
+      .select({ isHomePage: pages.isHomePage })
+      .from(pages)
+      .where(eq(pages.id, childPageId))
+      .limit(1);
+
+    if (!pageRow?.isHomePage) {
+      return {
+        error:
+          "Cannot remove this parent: the page must have at least one parent. Add another parent first.",
+      };
+    }
+  }
+
+  await db
+    .insert(pageRelationships)
+    .values({ parentPageId, childPageId, chapterId, isActive: false })
+    .onConflictDoUpdate({
+      target: [
+        pageRelationships.parentPageId,
+        pageRelationships.childPageId,
+        pageRelationships.chapterId,
+      ],
+      set: { isActive: false },
+    });
+
+  return {};
 }
