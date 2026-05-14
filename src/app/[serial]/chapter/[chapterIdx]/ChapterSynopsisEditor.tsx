@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
-import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
-import { Tooltip } from "@/components/ui/tooltip";
+import { useEditMode } from "@/contexts/EditModeContext";
+import { MDEditor } from "@/components/MDEditor";
 
 interface Props {
   serialSlug: string;
@@ -17,9 +16,13 @@ interface Props {
 }
 
 /**
- * Inline markdown editor for a chapter's synopsis. Toggles between a rendered
- * read-only view and a textarea edit form. Shows a placeholder message when no
- * synopsis has been written yet.
+ * Inline markdown editor for a chapter's synopsis. In read mode renders the
+ * synopsis as styled markdown (or a placeholder when empty). In edit mode
+ * (driven by the global `EditModeContext` / bottom-right FAB) shows an
+ * MDEditor so the author can write formatted content.
+ *
+ * Save and discard are handled by the global FAB via registered handlers,
+ * keeping this component consistent with the rest of the edit-mode pattern.
  *
  * @example
  * <ChapterSynopsisEditor
@@ -35,66 +38,59 @@ export function ChapterSynopsisEditor({
   initialContent,
   saveAction,
 }: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [isEditing, setIsEditing] = useState(false);
+  const { isEditing, registerHandlers } = useEditMode();
+
   const [committed, setCommitted] = useState(initialContent);
   const [draft, setDraft] = useState(initialContent);
 
-  function handleSave() {
+  const handleSave = useCallback(() => {
     startTransition(async () => {
       await saveAction(serialSlug, chapterIdx, draft);
       setCommitted(draft);
-      setIsEditing(false);
+      router.refresh();
     });
-  }
+  }, [saveAction, serialSlug, chapterIdx, draft, router]);
 
-  function handleCancel() {
+  const handleDiscard = useCallback(() => {
     setDraft(committed);
-    setIsEditing(false);
-  }
+  }, [committed]);
+
+  useEffect(() => {
+    return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
+  }, [registerHandlers, handleSave, handleDiscard]);
 
   if (isEditing) {
     return (
       <Box col className="gap-3">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          disabled={isPending}
-          rows={8}
-          placeholder="Write a synopsis for this chapter…"
-          className="w-full resize-y rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-        />
-        <Box className="gap-2">
-          <Button onClick={handleSave} disabled={isPending}>
-            Save
-          </Button>
-          <Button variant="outline" onClick={handleCancel} disabled={isPending}>
-            Cancel
-          </Button>
-        </Box>
+        <div data-color-mode="light">
+          <MDEditor
+            value={draft}
+            onChange={(val) => setDraft(val ?? "")}
+            height={300}
+            preview="edit"
+            components={{
+              preview: (source) => (
+                <MarkdownRenderer serialSlug={serialSlug} className="p-4">
+                  {source}
+                </MarkdownRenderer>
+              ),
+            }}
+          />
+        </div>
+        {isPending && <Text muted className="text-sm">Saving…</Text>}
       </Box>
     );
   }
 
   return (
-    <Box className="items-start gap-2">
-      <Box col flex={1} className="gap-2">
-        {committed ? (
-          <MarkdownRenderer>{committed}</MarkdownRenderer>
-        ) : (
-          <Text muted>No synopsis written yet.</Text>
-        )}
-      </Box>
-      <Tooltip content="Edit synopsis" side="left">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsEditing(true)}
-          aria-label="Edit synopsis"
-        >
-          <FontAwesomeIcon icon={faPen} />
-        </Button>
-      </Tooltip>
+    <Box col className="gap-2">
+      {committed ? (
+        <MarkdownRenderer serialSlug={serialSlug}>{committed}</MarkdownRenderer>
+      ) : (
+        <Text muted>No synopsis written yet.</Text>
+      )}
     </Box>
   );
 }
