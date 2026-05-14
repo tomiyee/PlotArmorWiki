@@ -2,55 +2,7 @@
 
 ---
 
-## - [X] Step 1 — Neon DB + Vercel project setup
-
----
-
-## - [X] Step 2 — Schema: extend users + add auth tables + serial_admins
-
----
-
-## - [X] Step 3 — Schema: replace categories with DAG + per-page structure
-
----
-
-## - [X] Step 4 — Routing: collapse `/{serial}/{category}/{page}` → `/{serial}/{page-slug}`
-
----
-
-## - [X] Step 5 — Serial page: replace category list with wiki page DAG navigation
-
----
-
-## - [X] Step 6 — Page creation with parent assignment and slug generation
-
----
-
-## - [X] Step 7 — Temporal page titles
-
----
-
-## - [X] Step 8 — Per-page sections
-
----
-
-## - [X] Step 9 — Per-page infoboxes
-
----
-
-## - [ ] Step 10 — DAG page relationships UI
-
-Pages can have multiple parents. Relationships are temporal.
-
-- In `PageEditor` (read mode): show a breadcrumb of parent pages resolved at the user's chapter cutoff (query: latest `page_relationships` row per parent where `chapter_idx ≤ cutoff AND is_active = true`).
-- In `PageEditor` (edit mode): "Relationships" panel — list current active parents; "Add parent" dropdown (all pages in serial); "Remove" button per parent.
-- Server Actions: `addPageRelationship(childPageId, parentPageId, chapterId)`, `removePageRelationship(childPageId, parentPageId, chapterId)` — both insert a new row (is_active true/false respectively) rather than mutating existing rows.
-- Cycle detection: before inserting an `is_active = true` relationship, verify the resulting graph remains acyclic (DFS/BFS from the proposed child; reject if it reaches the proposed parent).
-- Guard: prevent removing a relationship if it would leave a non-root page with zero parents at any chapter snapshot.
-
----
-
-## - [ ] Step 11 — Templates
+## - [ ] Step 1 — Templates
 
 Admins can define reusable page templates per serial to pre-populate sections and infobox structure.
 
@@ -60,7 +12,7 @@ Admins can define reusable page templates per serial to pre-populate sections an
 
 ---
 
-## - [ ] Step 12 — Auth.js with Google provider
+## - [ ] Step 2 — Auth.js with Google provider
 
 - Install: `pnpm add next-auth@beta @auth/drizzle-adapter`.
 - Create `src/auth.ts`: use `@auth/drizzle-adapter`, configure Google provider (`AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`), use database sessions so `session.user.id` is available server-side. After sign-in, redirect to `/onboarding` if `users.username` is null.
@@ -72,7 +24,7 @@ Admins can define reusable page templates per serial to pre-populate sections an
 
 ---
 
-## - [ ] Step 13 — Username onboarding
+## - [ ] Step 3 — Username onboarding
 
 New Google sign-ins have `users.username = null`. Gate access until a username is chosen.
 
@@ -81,7 +33,7 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 14 — Serial admin permissions: auto-grant on create + Server Action gates
+## - [ ] Step 4 — Serial admin permissions: auto-grant on create + Server Action gates
 
 - In `createSerial` Server Action: require session; after inserting the serial, insert a `serial_admins` row for the creator.
 - Add `requireSerialAdmin(serialId)` helper in `src/lib/auth-guard.ts`: reads session, queries `serial_admins`, throws if not found.
@@ -89,7 +41,7 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 15 — Edit UI gates (hide edit controls for non-admins)
+## - [ ] Step 5 — Edit UI gates (hide edit controls for non-admins)
 
 - In `src/app/[serial]/[page]/page.tsx`: call `auth()`, check `serial_admins`, pass `isAdmin: boolean` to `<PageEditor>`.
 - In `<PageEditor>`: hide the edit FAB and all edit-mode controls when `isAdmin` is false.
@@ -97,14 +49,14 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 16 — Admin management UI
+## - [ ] Step 6 — Admin management UI
 
 - On `/{serial}`, add an "Admins" section visible only to existing admins: list current admins (join `serial_admins → users`, show `username`); "Add admin" input (look up by username, insert into `serial_admins`); "Remove" button per admin (prevent removing yourself if sole admin).
 - Server Actions: `addSerialAdmin(serialId, username)`, `removeSerialAdmin(serialId, userId)` — both gated behind `requireSerialAdmin`.
 
 ---
 
-## - [ ] Step 17 — Deploy to Vercel + production smoke test
+## - [ ] Step 7 — Deploy to Vercel + production smoke test
 
 - Push to GitHub; Vercel auto-deploys.
 - Verify all Vercel env vars are set (`DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_URL`).
@@ -113,14 +65,14 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 18 — Progress sync for logged-in users
+## - [ ] Step 8 — Progress sync for logged-in users
 
 - In `<ChapterSelector>`: when authenticated, call a Server Action that upserts `user_progress (user_id, serial_id, chapter_id)` in addition to writing the cookie/localStorage.
 - On serial page load, read progress in priority order: (1) `user_progress` table row if session exists, (2) cookie fallback.
 
 ---
 
-## - [ ] Step 19 — Dark mode
+## - [ ] Step 9 — Dark mode
 
 - In `tailwind.config.ts`, set `darkMode: 'class'`.
 - Create `src/components/ThemeToggle.tsx` — sun/moon icon button toggling a `dark` class on `<html>`, persisted in `localStorage` under `plotarmor:theme`.
@@ -129,7 +81,7 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 20 — Put Set Your Chapter to Avoid Spoilers in a Popover
+## - [ ] Step 10 — Put Set Your Chapter to Avoid Spoilers in a Popover
 
 - Currently the warning is in line. Instead, make it a popover that is open by default and dismissed only when the user manually sets their chapter for the first time or manually clicks an "x" button in the popover.
 - The popover should also say it defaulted to the first chapter to avoid spoilers.
@@ -137,14 +89,14 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 21 — When the screen is thin, compact the top right nav bar
+## - [ ] Step 11 — When the screen is thin, compact the top right nav bar
 
 - When the screen is thin, replace the top right dropdown that controls the currently selected chapter into a hamburger menu that opens a side drawer.
 - The warning to set your chapter should appear over the hamburger menu if relevant.
 
 ---
 
-## - [ ] Step 22 — The Serial Page's Description should be the Home Page's top section
+## - [ ] Step 12 — The Serial Page's Description should be the Home Page's top section
 
 - When creating a new Serial, users enter a Description. Use a Markdown editor for that input field.
 - This description should be used to populate the Serial's Home page's first section, the one without a header.
@@ -152,7 +104,7 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 23 — Spoiler-aware search
+## - [ ] Step 13 — Spoiler-aware search
 
 - Add `to_tsvector` on `pages` (resolved title) and `serials.title` (inline or generated column with index).
 - Create a server-side search endpoint (Server Action or route handler) that:
