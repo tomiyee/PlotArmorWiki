@@ -10,12 +10,13 @@ import { Box } from "@/components/ui/box";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { savePageContent, getPageContentAtChapter, addPageTitle, deletePageTitle } from "./actions";
+import { savePageContent, getPageContentAtChapter, addPageTitle, deletePageTitle, addInfoboxSection } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 import { InfoIcon } from "@/components/ui/info-icon";
 import { Button } from "@/components/ui/button";
 import { PageSectionManager, type PageSection } from "./PageSectionManager";
+import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
 
 interface SectionData {
   id: number;
@@ -63,6 +64,11 @@ interface Props {
    */
   pageSectionStructure: PageSection[];
   sections: SectionData[];
+  /**
+   * Wall-clock-versioned infobox row structure for this page, used to power
+   * the Infobox management panel in edit mode.
+   */
+  infoboxSectionStructure: InfoboxSection[];
   /** null when the page has no infobox */
   floaterImageUrl: string | null | undefined;
   floaterRows: FloaterRowData[];
@@ -135,7 +141,7 @@ function LastUpdatedTag({
 /**
  * Renders the page body in read mode and switches to an inline edit mode where
  * each section gets an MDEditor alongside its current rendered value, and
- * floater fields get plain text inputs.
+ * infobox fields get plain text inputs.
  * Edit mode is driven by the global `EditModeContext`; the `<EditModeFAB>`
  * triggers save and discard.
  * On save, calls the `savePageContent` Server Action which writes via SCD Type 2.
@@ -153,6 +159,10 @@ function LastUpdatedTag({
  * delete sections via `PageSectionManager`. Section structure is wall-clock
  * versioned (add/remove/reorder any time); section content is chapter-versioned.
  *
+ * The "Infobox" panel in edit mode lets editors toggle the infobox on/off
+ * (by adding/removing `page_infobox_sections` rows), manage row structure via
+ * `PageInfoboxManager`, and edit the image URL and per-row content.
+ *
  * Each section is shown in a two-column layout: the left column shows the
  * current saved value (read-only reference) and the right column contains the
  * MDEditor for the draft being written.
@@ -166,6 +176,7 @@ function LastUpdatedTag({
  *   pageTitleEntries={[]}
  *   pageSectionStructure={[{ id: 1, name: 'Summary', displayOrder: 0 }]}
  *   sections={[{ id: 1, name: 'Summary', content: '...', lastUpdatedChapterIdx: 1 }]}
+ *   infoboxSectionStructure={[{ id: 1, label: 'Age', displayOrder: 0 }]}
  *   floaterImageUrl="https://..."
  *   floaterRows={[{ id: 2, label: 'Age', content: '19' }]}
  *   allChapters={[{ id: 5, displayName: '1', idx: 1, volumeName: 'Volume 1' }]}
@@ -184,6 +195,7 @@ export function PageEditor({
   pageTitleEntries,
   pageSectionStructure,
   sections,
+  infoboxSectionStructure,
   floaterImageUrl,
   floaterRows,
   allChapters,
@@ -231,7 +243,8 @@ export function PageEditor({
     readingChapterId ?? headChapterId,
   );
 
-  const hasFloater = floaterImageUrl !== undefined;
+  // The infobox is considered "active" when at least one infobox section row exists.
+  const hasInfobox = infoboxSectionStructure.length > 0;
 
   const handleDiscard = useCallback(() => {
     setDraftSectionContent(
@@ -257,8 +270,8 @@ export function PageEditor({
         pageSlug,
         "",
         draftSectionContent,
-        hasFloater ? draftFloaterImageUrl.trim() || null : null,
-        hasFloater ? draftFloaterRowContent : {},
+        hasInfobox ? draftFloaterImageUrl.trim() || null : null,
+        hasInfobox ? draftFloaterRowContent : {},
         selectedChapterId ?? undefined,
       );
       router.refresh();
@@ -267,7 +280,7 @@ export function PageEditor({
     serialSlug,
     pageSlug,
     draftSectionContent,
-    hasFloater,
+    hasInfobox,
     draftFloaterImageUrl,
     draftFloaterRowContent,
     selectedChapterId,
@@ -299,7 +312,7 @@ export function PageEditor({
       setCurrentSectionLastUpdatedIdx(
         Object.fromEntries(data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
       );
-      if (hasFloater) {
+      if (hasInfobox) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
           Object.fromEntries(data.floaterRows.map((r) => [r.id, r.content])),
@@ -334,7 +347,7 @@ export function PageEditor({
   // server-rendered props (e.g. after the user changes their chapter cutoff).
   // Draft state is only needed while editing.
   const hasFloaterContent =
-    hasFloater && (floaterImageUrl || floaterRows.length > 0);
+    hasInfobox && (floaterImageUrl || floaterRows.length > 0);
 
   if (!isEditing) {
     return (
@@ -587,42 +600,74 @@ export function PageEditor({
         </Box>
       ))}
 
-      {hasFloater && (
-        <Box
-          col
-          className="gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
-        >
-          <Text variant="h3">Floater fields</Text>
+      {/* Infobox panel — structure management + image URL + row content editors */}
+      <Box
+        col
+        className="gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+      >
+        <Box className="items-center gap-2">
+          <Text variant="h3">Infobox</Text>
+          <InfoIcon contents="The infobox floats on the right side of the page showing an image and key facts about this subject. It's chapter-versioned: each row's content is tied to the 'Writing as of:' chapter you select above." />
+        </Box>
 
-          <Box col className="gap-1.5">
-            <Label htmlFor="floater-image-url">Image URL</Label>
-            <Input
-              id="floater-image-url"
-              value={draftFloaterImageUrl}
-              onChange={(e) => setDraftFloaterImageUrl(e.target.value)}
-              placeholder="https://…"
+        {infoboxSectionStructure.length === 0 ? (
+          <Box col className="gap-2">
+            <Text muted className="text-sm">
+              This page has no infobox. Add a row below to enable the infobox.
+            </Text>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
               disabled={isPending}
-            />
+              onClick={() => {
+                startTransition(async () => {
+                  const fd = new FormData();
+                  fd.set("pageId", String(pageId));
+                  fd.set("label", "Overview");
+                  await addInfoboxSection(fd);
+                  router.refresh();
+                });
+              }}
+            >
+              Enable infobox
+            </Button>
           </Box>
+        ) : (
+          <>
+            <PageInfoboxManager pageId={pageId} sections={infoboxSectionStructure} />
 
-          {floaterRows.map((row) => (
-            <Box key={row.id} col className="gap-1.5">
-              <Label htmlFor={`floater-row-${row.id}`}>{row.label}</Label>
+            <Box col className="gap-1.5">
+              <Label htmlFor="floater-image-url">Image URL</Label>
               <Input
-                id={`floater-row-${row.id}`}
-                value={draftFloaterRowContent[row.id] ?? ""}
-                onChange={(e) =>
-                  setDraftFloaterRowContent((prev) => ({
-                    ...prev,
-                    [row.id]: e.target.value,
-                  }))
-                }
+                id="floater-image-url"
+                value={draftFloaterImageUrl}
+                onChange={(e) => setDraftFloaterImageUrl(e.target.value)}
+                placeholder="https://…"
                 disabled={isPending}
               />
             </Box>
-          ))}
-        </Box>
-      )}
+
+            {floaterRows.map((row) => (
+              <Box key={row.id} col className="gap-1.5">
+                <Label htmlFor={`floater-row-${row.id}`}>{row.label}</Label>
+                <Input
+                  id={`floater-row-${row.id}`}
+                  value={draftFloaterRowContent[row.id] ?? ""}
+                  onChange={(e) =>
+                    setDraftFloaterRowContent((prev) => ({
+                      ...prev,
+                      [row.id]: e.target.value,
+                    }))
+                  }
+                  disabled={isPending}
+                />
+              </Box>
+            ))}
+          </>
+        )}
+      </Box>
     </Box>
   );
 }
