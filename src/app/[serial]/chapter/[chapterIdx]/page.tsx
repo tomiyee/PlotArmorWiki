@@ -155,7 +155,6 @@ export default async function ChapterPage({ params }: Props) {
             <>
               {/* Synopsis */}
               <Box col className="gap-2">
-                <Text variant="h2">Synopsis</Text>
                 <ChapterSynopsisEditor
                   serialSlug={serialSlug}
                   chapterIdx={chapterIdx}
