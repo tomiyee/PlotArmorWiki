@@ -6,11 +6,15 @@ import {
   pageSections, pageSectionRevisions,
   pageInfoboxSections, pageInfoboxRevisions, pageInfoboxImageRevisions,
   pageRelationships, pageTitles,
+  templates, templateSections, templateInfoboxSections,
 } from '@/db/schema';
 import { and, asc, eq, inArray, isNull, lte, max, or } from 'drizzle-orm';
 import {
   addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
   reorderVolumes, reorderAllChapters, updateSerialMetadata,
+  createTemplate, deleteTemplate, renameTemplate, toggleTemplateInfobox,
+  addTemplateSection, deleteTemplateSection,
+  addTemplateInfoboxSection, deleteTemplateInfoboxSection,
 } from './actions';
 import { Box } from '@/components/ui/box';
 import { PageContainer } from '@/components/ui/page-container';
@@ -18,6 +22,7 @@ import { Text } from '@/components/ui/text';
 import { SerialMetadataEditor } from '@/components/SerialMetadataEditor';
 import { SerialTOCSidebar } from '@/components/SerialTOCSidebar';
 import { PageEditor } from './[page]/PageEditor';
+import { TemplateManager } from '@/components/TemplateManager';
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -56,7 +61,7 @@ export default async function SerialPage({ params }: Props) {
     notFound();
   }
 
-  const [chapterCutoff, authors, volumeList, chapterList, homePage] = await Promise.all([
+  const [chapterCutoff, authors, volumeList, chapterList, homePage, serialTemplates] = await Promise.all([
     getChapterCutoff(serial.id),
     db
       .select()
@@ -85,6 +90,35 @@ export default async function SerialPage({ params }: Props) {
       .where(and(eq(pages.serialId, serial.id), eq(pages.isHomePage, true)))
       .limit(1)
       .then((rows) => rows[0] ?? null),
+    // Fetch all templates with their sections and infobox sections.
+    db
+      .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
+      .from(templates)
+      .where(eq(templates.serialId, serial.id))
+      .orderBy(asc(templates.name))
+      .then(async (rows) => {
+        if (rows.length === 0) return [];
+        const templateIds = rows.map((r) => r.id);
+        const [sectionRows, infoboxRows] = await Promise.all([
+          db
+            .select()
+            .from(templateSections)
+            .where(inArray(templateSections.templateId, templateIds))
+            .orderBy(asc(templateSections.displayOrder)),
+          db
+            .select()
+            .from(templateInfoboxSections)
+            .where(inArray(templateInfoboxSections.templateId, templateIds))
+            .orderBy(asc(templateInfoboxSections.displayOrder)),
+        ]);
+        return rows.map((t) => ({
+          id: t.id,
+          name: t.name,
+          hasInfobox: t.hasInfobox,
+          sections: sectionRows.filter((s) => s.templateId === t.id),
+          infoboxSections: infoboxRows.filter((s) => s.templateId === t.id),
+        }));
+      }),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -103,6 +137,16 @@ export default async function SerialPage({ params }: Props) {
   const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
   const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
+
+  // Template actions bound to this serial.
+  const createTemplateForSerial = createTemplate.bind(null, serial.id);
+  const deleteTemplateForSerial = deleteTemplate.bind(null, serial.id);
+  const renameTemplateForSerial = renameTemplate.bind(null, serial.id);
+  const toggleTemplateInfoboxForSerial = toggleTemplateInfobox.bind(null, serial.id);
+  const addTemplateSectionForSerial = addTemplateSection.bind(null, serial.id);
+  const deleteTemplateSectionForSerial = deleteTemplateSection.bind(null, serial.id);
+  const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(null, serial.id);
+  const deleteTemplateInfoboxSectionForSerial = deleteTemplateInfoboxSection.bind(null, serial.id);
 
   const headChapterId = chapterList.at(-1)?.id ?? null;
   const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
@@ -401,6 +445,18 @@ export default async function SerialPage({ params }: Props) {
             ) : (
               <Text muted>Home page not found.</Text>
             )}
+
+            <TemplateManager
+              templates={serialTemplates}
+              createTemplateAction={createTemplateForSerial}
+              deleteTemplateAction={deleteTemplateForSerial}
+              renameTemplateAction={renameTemplateForSerial}
+              toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
+              addTemplateSectionAction={addTemplateSectionForSerial}
+              deleteTemplateSectionAction={deleteTemplateSectionForSerial}
+              addTemplateInfoboxSectionAction={addTemplateInfoboxSectionForSerial}
+              deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionForSerial}
+            />
           </Box>
         </PageContainer>
       </div>

@@ -28,6 +28,26 @@ interface PageOption {
   introChapterId: number | null;
 }
 
+interface TemplateSection {
+  id: number;
+  name: string;
+  displayOrder: number;
+}
+
+interface TemplateInfoboxSection {
+  id: number;
+  label: string;
+  displayOrder: number;
+}
+
+interface Template {
+  id: number;
+  name: string;
+  hasInfobox: boolean;
+  sections: TemplateSection[];
+  infoboxSections: TemplateInfoboxSection[];
+}
+
 interface Props {
   serialSlug: string;
   chapterType: string;
@@ -35,15 +55,19 @@ interface Props {
   chapterList: Chapter[];
   existingPages: PageOption[];
   defaultParentPageId?: number;
+  templates: Template[];
 }
 
 /**
  * Page creation form. Tracks the selected intro chapter and narrows the parent
  * page dropdown to pages that are visible at (i.e. introduced at or before) that
  * chapter, so a child page cannot reference a parent that doesn't exist yet.
+ * When templates are defined for the serial, a "Use template" dropdown lets the
+ * user pre-populate sections and infobox rows; a preview shows the resulting
+ * structure before submitting.
  *
  * @example
- * <NewPageForm serialSlug="one-piece" chapterType="Chapter" ... />
+ * <NewPageForm serialSlug="one-piece" chapterType="Chapter" templates={[]} ... />
  */
 export function NewPageForm({
   serialSlug,
@@ -52,6 +76,7 @@ export function NewPageForm({
   chapterList,
   existingPages,
   defaultParentPageId,
+  templates,
 }: Props) {
   const chapterTypeLabel = chapterType.toLowerCase();
 
@@ -66,6 +91,7 @@ export function NewPageForm({
 
   const firstChapterId = chapterList[0]?.id ?? 0;
   const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<number>(firstChapterId);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
 
   const chapterOptions = [
     { label: `Select a ${chapterTypeLabel}…`, value: 0, disabled: true },
@@ -98,6 +124,20 @@ export function NewPageForm({
     visiblePages.some((p) => p.id === defaultParentPageId)
       ? defaultParentPageId
       : undefined;
+
+  // Template options — 0 means "no template".
+  const templateOptions = [
+    { label: 'None (default sections)', value: 0 },
+    ...templates.map((t) => ({ label: t.name, value: t.id })),
+  ];
+
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
+  const sortedTemplateSections = selectedTemplate
+    ? [...selectedTemplate.sections].sort((a, b) => a.displayOrder - b.displayOrder)
+    : [];
+  const sortedTemplateInfoboxSections = selectedTemplate
+    ? [...selectedTemplate.infoboxSections].sort((a, b) => a.displayOrder - b.displayOrder)
+    : [];
 
   const createPageAction = createPage.bind(null, serialSlug);
   const hasChapters = chapterList.length > 0;
@@ -153,6 +193,60 @@ export function NewPageForm({
           defaultValue={visibleParentDefault}
         />
       </Box>
+
+      {/* Template selection (only shown when templates exist) */}
+      {templates.length > 0 && (
+        <Box col className="gap-1">
+          <Label htmlFor="templateId">Use template</Label>
+          {/* Hidden input so the form always submits a templateId value */}
+          <input type="hidden" name="templateId" value={selectedTemplateId > 0 ? selectedTemplateId : ''} />
+          <Select
+            id="templateId"
+            options={templateOptions}
+            value={selectedTemplateId}
+            onChange={(val) => setSelectedTemplateId(val as number)}
+          />
+
+          {/* Preview of what the template will create */}
+          {selectedTemplate && (
+            <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 flex flex-col gap-3 text-sm">
+              <Text variant="label">Template preview</Text>
+
+              {sortedTemplateSections.length > 0 ? (
+                <div>
+                  <Text muted className="text-xs mb-1">Sections</Text>
+                  <Box col className="gap-0.5">
+                    {sortedTemplateSections.map((s) => (
+                      <Text key={s.id} className="text-sm pl-2 border-l-2 border-gray-300">
+                        {s.name}
+                      </Text>
+                    ))}
+                  </Box>
+                </div>
+              ) : (
+                <Text muted className="text-xs">No sections defined — will use default Summary section.</Text>
+              )}
+
+              {selectedTemplate.hasInfobox && (
+                <div>
+                  <Text muted className="text-xs mb-1">Infobox rows</Text>
+                  {sortedTemplateInfoboxSections.length > 0 ? (
+                    <Box col className="gap-0.5">
+                      {sortedTemplateInfoboxSections.map((s) => (
+                        <Text key={s.id} className="text-sm pl-2 border-l-2 border-gray-300">
+                          {s.label}
+                        </Text>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Text muted className="text-xs">No infobox rows defined.</Text>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </Box>
+      )}
 
       <Button type="submit" className="mt-2" disabled={!hasChapters}>
         Create page
