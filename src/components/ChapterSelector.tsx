@@ -95,7 +95,7 @@ export function ChapterSelector(props: Props) {
   const effectiveChapterId = selectedChapterId ?? firstChapterId;
   const selectedChapter = allChapters.find((c) => c.id === effectiveChapterId);
   const selectedLabel = selectedChapter
-    ? `${chapterType} ${selectedChapter.displayName}`
+    ? selectedChapter.displayName
     : "Select chapter";
 
   function handleSelectChapter(chapterId: number) {
@@ -172,14 +172,14 @@ export function ChapterSelector(props: Props) {
                   >
                     <Box className="items-center justify-between gap-1 w-full">
                       <Text as="span" variant="label" className="truncate">
-                        {chapterType} {chapter.displayName}
+                        {chapter.displayName}
                       </Text>
                       <Link
                         href={`/${serialSlug}/chapter/${chapter.idx}`}
                         onClick={(e) => e.stopPropagation()}
                         className="shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label={`View ${chapterType} ${chapter.displayName} page`}
-                        title={`View ${chapterType} ${chapter.displayName} page`}
+                        aria-label={`View ${chapter.displayName} page`}
+                        title={`View ${chapter.displayName} page`}
                       >
                         <ExternalLinkIcon className="size-3" />
                       </Link>

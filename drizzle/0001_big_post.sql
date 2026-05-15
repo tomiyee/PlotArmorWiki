@@ -1,0 +1,1 @@
+ALTER TABLE "serials" DROP COLUMN "description";

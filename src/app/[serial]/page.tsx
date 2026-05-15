@@ -545,7 +545,6 @@ export default async function SerialPage({ params }: Props) {
           <Box col className="gap-6">
             <SerialMetadataEditor
               title={serial.title}
-              description={serial.description}
               splashArtUrl={serial.splashArtUrl}
               authors={authors.map((a) => a.name)}
               updateMetadataAction={updateMetadataForSerial}

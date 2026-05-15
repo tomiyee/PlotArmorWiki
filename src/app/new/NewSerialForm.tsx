@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { PageContainer } from '@/components/ui/page-container';
 import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from '@/lib/serial-types';
+import { WikiLinkMDEditor } from '@/components/WikiLinkMDEditor';
 
 type Props = {
   /** Pre-filled title value, e.g. from a search-to-create redirect. When non-empty the input is focused automatically. */
@@ -27,6 +28,7 @@ type Props = {
  */
 export default function NewSerialForm({ defaultTitle }: Props) {
   const [authors, setAuthors] = useState<string[]>(['']);
+  const [description, setDescription] = useState('');
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -70,15 +72,17 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           {/* Description */}
           <Box col className="gap-1">
             <Label htmlFor="description">
-              Description
+              Description <span className="text-gray-400">(optional, Markdown)</span>
             </Label>
-            <textarea
-              id="description"
-              name="description"
-              rows={4}
-              placeholder="A brief spoiler-free synopsis…"
-              className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black resize-none"
+            <WikiLinkMDEditor
+              value={description}
+              onChange={(v) => setDescription(v ?? '')}
+              height={200}
+              wikiPages={[]}
+              serialSlug=""
             />
+            {/* Bridge the controlled editor value into FormData for the server action */}
+            <input type="hidden" name="description" value={description} />
           </Box>
 
           {/* Authors */}

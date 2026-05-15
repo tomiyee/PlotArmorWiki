@@ -51,18 +51,34 @@ export default async function ChapterPage({ params }: Props) {
   }
 
   const [volumeList, chapterList] = await Promise.all([
-    db.select().from(volumes).where(eq(volumes.serialId, serial.id)).orderBy(volumes.idx),
     db
-      .select({ id: chapters.id, displayName: chapters.displayName, idx: chapters.idx, volumeId: chapters.volumeId })
+      .select()
+      .from(volumes)
+      .where(eq(volumes.serialId, serial.id))
+      .orderBy(volumes.idx),
+    db
+      .select({
+        id: chapters.id,
+        displayName: chapters.displayName,
+        idx: chapters.idx,
+        volumeId: chapters.volumeId,
+      })
       .from(chapters)
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(chapters.idx),
   ]);
 
-  const chaptersByVolume: Record<number, { id: number; displayName: string; idx: number; volumeId: number }[]> = {};
-  volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
-  chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
+  const chaptersByVolume: Record<
+    number,
+    { id: number; displayName: string; idx: number; volumeId: number }[]
+  > = {};
+  volumeList.forEach((v) => {
+    chaptersByVolume[v.id] = [];
+  });
+  chapterList.forEach((c) => {
+    chaptersByVolume[c.volumeId]?.push(c);
+  });
 
   // Resolve the chapter by serial + idx
   const [chapter] = await db
@@ -115,7 +131,10 @@ export default async function ChapterPage({ params }: Props) {
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
 
   let synopsisContent = "";
-  let groupedIntroductions: { categoryName: string; pages: { id: number; name: string; slug: string }[] }[] = [];
+  let groupedIntroductions: {
+    categoryName: string;
+    pages: { id: number; name: string; slug: string }[];
+  }[] = [];
   let boundSaveAction: typeof saveChapterSynopsis | null = null;
 
   if (!spoilered) {
@@ -148,7 +167,11 @@ export default async function ChapterPage({ params }: Props) {
       groupedIntroductions = [
         {
           categoryName: "",
-          pages: introducedPages.map((r) => ({ id: r.pageId, name: r.pageName, slug: r.pageSlug })),
+          pages: introducedPages.map((r) => ({
+            id: r.pageId,
+            name: r.pageName,
+            slug: r.pageSlug,
+          })),
         },
       ];
     }
@@ -195,21 +218,29 @@ export default async function ChapterPage({ params }: Props) {
             {/* Chapter heading */}
             <Box col className="gap-1">
               {volume && (
-                <Text variant="label" muted className="text-xs uppercase tracking-wider">
-                  {serial.volumeType} {volume.displayName}
+                <Text
+                  variant="label"
+                  muted
+                  className="text-xs uppercase tracking-wider"
+                >
+                  {volume.displayName}
                 </Text>
               )}
-              <Text variant="h1">
-                {serial.chapterType} {chapter.displayName}
-              </Text>
+              <Text variant="h1">{chapter.displayName}</Text>
             </Box>
 
             {spoilered ? (
-              <Box col className="gap-2 rounded-md border border-dashed border-gray-300 px-6 py-8 items-center text-center">
-                <Text variant="h3" muted>Spoilers ahead</Text>
+              <Box
+                col
+                className="gap-2 rounded-md border border-dashed border-gray-300 px-6 py-8 items-center text-center"
+              >
+                <Text variant="h3" muted>
+                  Spoilers ahead
+                </Text>
                 <Text muted>
-                  You haven&apos;t reached this {serial.chapterType.toLowerCase()} yet. The synopsis
-                  and introduced content will be available once you&apos;ve read it.
+                  You haven&apos;t reached this{" "}
+                  {serial.chapterType.toLowerCase()} yet. The synopsis and
+                  introduced content will be available once you&apos;ve read it.
                 </Text>
               </Box>
             ) : (
@@ -226,30 +257,35 @@ export default async function ChapterPage({ params }: Props) {
 
                 {/* Introduced content */}
                 <Box col className="gap-4">
-                  <Text variant="h2">Introduced in this {serial.chapterType.toLowerCase()}</Text>
+                  <Text variant="h2">
+                    Introduced in this {serial.chapterType.toLowerCase()}
+                  </Text>
                   {groupedIntroductions.length > 0 ? (
                     <Box col className="gap-4">
-                      {groupedIntroductions.map(({ categoryName, pages: categoryPages }) => (
-                        <Box col key={categoryName} className="gap-1.5">
-                          <Text variant="h4">{categoryName}</Text>
-                          <ul className="flex flex-col gap-1">
-                            {categoryPages.map((page) => (
-                              <li key={page.id}>
-                                <Link
-                                  href={`/${serialSlug}/${encodeURIComponent(page.slug)}`}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  {page.name}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        </Box>
-                      ))}
+                      {groupedIntroductions.map(
+                        ({ categoryName, pages: categoryPages }) => (
+                          <Box col key={categoryName} className="gap-1.5">
+                            <Text variant="h4">{categoryName}</Text>
+                            <ul className="flex flex-col gap-1">
+                              {categoryPages.map((page) => (
+                                <li key={page.id}>
+                                  <Link
+                                    href={`/${serialSlug}/${encodeURIComponent(page.slug)}`}
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    {page.name}
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          </Box>
+                        ),
+                      )}
                     </Box>
                   ) : (
                     <Text muted>
-                      No pages were introduced in this {serial.chapterType.toLowerCase()}.
+                      No pages were introduced in this{" "}
+                      {serial.chapterType.toLowerCase()}.
                     </Text>
                   )}
                 </Box>

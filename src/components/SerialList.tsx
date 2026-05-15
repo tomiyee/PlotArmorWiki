@@ -10,7 +10,6 @@ type Serial = {
   id: number;
   title: string;
   slug: string;
-  description: string | null;
   splashArtUrl: string | null;
 };
 
@@ -53,11 +52,6 @@ export default function SerialList({ serials }: Props) {
                 className="block rounded-lg border px-4 py-3 hover:bg-gray-50 transition-colors"
               >
                 <Text as="span" variant="label" className="font-medium">{serial.title}</Text>
-                {serial.description && (
-                  <Text muted className="mt-0.5 line-clamp-2">
-                    {serial.description}
-                  </Text>
-                )}
               </Link>
             </li>
           ))}
