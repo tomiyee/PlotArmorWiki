@@ -20,23 +20,24 @@ Progress is stored in `localStorage` for anonymous users and synced to their acc
 |------|------------|
 | **Serial** | The story a wiki covers (a book series, TV show, etc.) |
 | **Chapter** | A single installment — episode, book chapter, volume, etc. |
-| **Page Category** | A page type within a serial (e.g. Characters, Locations) |
-| **Page** | A single wiki entry belonging to a category |
+| **Page** | A single wiki entry within a serial |
 
 ### Pages
 
-Every page belongs to a category. Page categories define two layout components:
+Each serial has a home page (the root of the wiki DAG) and any number of child pages. Every page records the chapter it was first introduced in, which determines its visibility to a given user.
 
-- **Body** — an ordered list of named sections, each storing Markdown text.
-- **Floater** *(optional)* — a sidebar panel with a header, image, and labeled rows.
+Pages contain two optional layout components:
 
-Every page also records the chapter it was first introduced in, which determines its visibility to a given user.
+- **Sections** — an ordered list of named sections, each storing Markdown text.
+- **Infobox** *(optional)* — a sidebar panel with an image and labeled rows.
 
 ### URL structure
 
 ```
-/{serial}/{category}           # category index page
-/{serial}/{category}/{page-name}
+/                    # home
+/{serial}            # serial home (metadata + home wiki page)
+/{serial}/new        # new wiki page form
+/{serial}/{slug}     # wiki page
 ```
 
 ## Data model
@@ -53,22 +54,31 @@ Category structure (sections, floater rows) is versioned by wall-clock time. Pag
 ### Tables
 
 ```
-serials          id, title, slug, description, splash_art_url, chapter_type, volume_type
-serial_authors   serial_id, name, display_order
-volumes          id, serial_id, display_name, idx
-chapters         id, volume_id, display_name, idx
+serials                       id, title, slug, splash_art_url, chapter_type, volume_type
+serial_authors                serial_id, name, display_order
+volumes                       id, serial_id, display_name, idx
+chapters                      id, volume_id, display_name, idx
+chapter_synopses              chapter_id, content, updated_at
 
-page_categories          id, serial_id, name, body, has_floater
-category_sections        id, category_id, name, display_order, created_at, deleted_at
-category_floater_rows    id, category_id, label, display_order, created_at, deleted_at
+pages                         id, serial_id, name, slug, intro_chapter_id, is_home_page
+page_titles                   page_id, chapter_id, title
+page_sections                 id, page_id, name, display_order, created_at, deleted_at
+page_section_revisions        page_id, section_id, chapter_id, content
+page_infobox_sections         id, page_id, label, display_order, created_at, deleted_at
+page_infobox_revisions        page_id, infobox_section_id, chapter_id, content
+page_infobox_image_revisions  page_id, chapter_id, image_url
+page_relationships            parent_page_id, child_page_id, chapter_id, is_active
 
-pages                    id, category_id, name, intro_chapter_id
-page_section_versions    page_id, section_id, chapter_id, content
-page_floater_versions    page_id, chapter_id, image_url
-page_floater_row_versions  page_id, floater_row_id, chapter_id, content
+templates                     id, serial_id, name, has_infobox
+template_sections             id, template_id, name, display_order
+template_infobox_sections     id, template_id, label, display_order
 
-users            id, email, display_name, created_at
-user_progress    user_id, serial_id, chapter_id, updated_at
+users                   id, name, username, email, email_verified, image, created_at
+accounts                user_id, type, provider, provider_account_id, ...
+sessions                session_token, user_id, expires
+verification_tokens     identifier, token, expires
+user_progress           user_id, serial_id, chapter_id, updated_at
+serial_admins           user_id, serial_id, granted_at
 ```
 
 For the full design spec, see [spec.md](spec.md).
@@ -83,7 +93,7 @@ For the full design spec, see [spec.md](spec.md).
 | Auth | Auth.js (NextAuth v5) |
 | Search | PostgreSQL full-text search |
 | Styling | Tailwind CSS v4 |
-| UI components | Shadcn UI |
+| UI components | Base UI + custom design system (`src/components/ui/`) |
 | Hosting | Vercel |
 
 Rationale for each decision is in [spec.md § Tech Stack](spec.md#tech-stack).
@@ -91,7 +101,7 @@ Rationale for each decision is in [spec.md § Tech Stack](spec.md#tech-stack).
 ## Getting started
 
 ```bash
-pnpm install
+npm install
 ```
 
 Create `.env.local` with your database connection string.
@@ -123,15 +133,15 @@ npx drizzle-kit migrate
 Start the dev server:
 
 ```bash
-pnpm dev         # http://localhost:3000
-pnpm build       # production build
-pnpm lint        # ESLint
+npm run dev      # http://localhost:3000
+npm run build    # production build
+npm run lint     # ESLint
 ```
 
 To regenerate migrations after schema changes:
 
 ```bash
-pnpm drizzle-kit generate
+npx drizzle-kit generate
 ```
 
 ## Saving and loading the database state
