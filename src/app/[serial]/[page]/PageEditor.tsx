@@ -1,11 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/box";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { savePageContent, getPageContentAtChapter, getParentPagesAtChapter } from "./actions";
+import {
+  savePageContent,
+  getPageContentAtChapter,
+  getParentPagesAtChapter,
+} from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { PageSectionManager, type PageSection } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
@@ -13,7 +23,10 @@ import { PageReadView } from "./PageReadView";
 import { PageTitlesPanel } from "./PageTitlesPanel";
 import { SectionContentEditor } from "./SectionContentEditor";
 import { PageInfoboxPanel } from "./PageInfoboxPanel";
-import { PageRelationshipsPanel, type ParentPageEntry } from "./PageRelationshipsPanel";
+import {
+  PageRelationshipsPanel,
+  type ParentPageEntry,
+} from "./PageRelationshipsPanel";
 import type {
   SectionData,
   FloaterRowData,
@@ -24,7 +37,6 @@ import type {
 
 interface Props {
   serialSlug: string;
-  pageName: string;
   pageSlug: string;
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
   pageId: number;
@@ -81,6 +93,18 @@ interface Props {
    * "Add parent" dropdown in the Relationships edit panel.
    */
   allSerialPages: { id: number; name: string }[];
+  /**
+   * When true, hides the Titles and Relationships panels in edit mode. The home
+   * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
+   * parents), so both panels are irrelevant there.
+   */
+  isHomePage?: boolean;
+  /**
+   * Optional slot rendered at the top of the edit-mode panel, before the
+   * "Writing as of:" selector. Used by the serial home page to inject the
+   * TemplateManager above the content editors.
+   */
+  editModeHeader?: ReactNode;
 }
 
 /**
@@ -100,7 +124,6 @@ interface Props {
  * @example
  * <PageEditor
  *   serialSlug="one-piece"
- *   pageName="Luffy"
  *   pageSlug="luffy"
  *   pageId={42}
  *   pageTitleEntries={[]}
@@ -121,7 +144,6 @@ interface Props {
  */
 export function PageEditor({
   serialSlug,
-  pageName: _pageName,
   pageSlug,
   pageId,
   pageTitleEntries,
@@ -138,6 +160,8 @@ export function PageEditor({
   childPages,
   parentPages,
   allSerialPages,
+  isHomePage = false,
+  editModeHeader,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -158,7 +182,8 @@ export function PageEditor({
       Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
     );
 
-  const [currentParentPages, setCurrentParentPages] = useState<ParentPageEntry[]>(parentPages);
+  const [currentParentPages, setCurrentParentPages] =
+    useState<ParentPageEntry[]>(parentPages);
 
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
@@ -191,7 +216,14 @@ export function PageEditor({
     );
     setCurrentParentPages(parentPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
-  }, [sections, floaterImageUrl, floaterRows, parentPages, readingChapterId, headChapterId]);
+  }, [
+    sections,
+    floaterImageUrl,
+    floaterRows,
+    parentPages,
+    readingChapterId,
+    headChapterId,
+  ]);
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
@@ -300,6 +332,8 @@ export function PageEditor({
 
   return (
     <Box col className="gap-6">
+      {editModeHeader}
+
       {allChapters.length > 0 && (
         <Box className="items-center gap-3">
           <Label htmlFor="target-chapter" className="shrink-0 text-sm">
@@ -316,20 +350,24 @@ export function PageEditor({
         </Box>
       )}
 
-      <PageTitlesPanel
-        serialSlug={serialSlug}
-        pageSlug={pageSlug}
-        pageTitleEntries={pageTitleEntries}
-        chapterSelectOptions={chapterSelectOptions}
-        isPending={isPending}
-      />
+      {!isHomePage && (
+        <PageTitlesPanel
+          serialSlug={serialSlug}
+          pageSlug={pageSlug}
+          pageTitleEntries={pageTitleEntries}
+          chapterSelectOptions={chapterSelectOptions}
+          isPending={isPending}
+        />
+      )}
 
-      <PageRelationshipsPanel
-        pageId={pageId}
-        parentPages={currentParentPages}
-        allSerialPages={allSerialPages}
-        chapterId={selectedChapterId}
-      />
+      {!isHomePage && (
+        <PageRelationshipsPanel
+          pageId={pageId}
+          parentPages={currentParentPages}
+          allSerialPages={allSerialPages}
+          chapterId={selectedChapterId}
+        />
+      )}
 
       <PageSectionManager pageId={pageId} sections={pageSectionStructure} />
 

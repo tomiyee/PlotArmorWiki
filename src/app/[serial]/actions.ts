@@ -2,7 +2,10 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '@/db/index';
-import { serials, serialAuthors, volumes, chapters, pages, pageTitles } from '@/db/schema';
+import {
+  serials, serialAuthors, volumes, chapters, pages, pageTitles,
+  templates, templateSections, templateInfoboxSections,
+} from '@/db/schema';
 import { and, asc, count, eq, gte, gt, inArray, lte, max, sql } from 'drizzle-orm';
 import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 import { titleToSlug } from '@/lib/slug';
@@ -363,5 +366,240 @@ export async function addChapter(serialId: number, formData: FormData) {
       }).onConflictDoNothing();
     }
   }
+}
+
+// ── Template management ───────────────────────────────────────────────────────
+
+/**
+ * Creates a new page template for the serial with the given name.
+ *
+ * @example
+ * await createTemplate(42, new FormData()); // formData has "name" field
+ */
+export async function createTemplate(serialId: number, formData: FormData) {
+  const name = formData.get('name');
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    throw new Error('Template name is required');
+  }
+
+  await db.insert(templates).values({
+    serialId,
+    name: name.trim(),
+    hasInfobox: false,
+  });
+}
+
+/**
+ * Deletes a template along with its section and infobox section definitions.
+ *
+ * @example
+ * await deleteTemplate(42, new FormData()); // formData has "templateId" field
+ */
+export async function deleteTemplate(serialId: number, formData: FormData) {
+  const templateIdRaw = formData.get('templateId');
+  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+  const templateId = parseInt(templateIdRaw, 10);
+  if (isNaN(templateId)) throw new Error('Invalid template ID');
+
+  // Verify the template belongs to this serial before deleting.
+  const [target] = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error('Template not found');
+
+  await db.transaction(async (tx) => {
+    await tx.delete(templateInfoboxSections).where(eq(templateInfoboxSections.templateId, templateId));
+    await tx.delete(templateSections).where(eq(templateSections.templateId, templateId));
+    await tx.delete(templates).where(eq(templates.id, templateId));
+  });
+}
+
+/**
+ * Renames an existing template.
+ *
+ * @example
+ * await renameTemplate(42, new FormData()); // formData has "templateId" and "name" fields
+ */
+export async function renameTemplate(serialId: number, formData: FormData) {
+  const templateIdRaw = formData.get('templateId');
+  const name = formData.get('name');
+  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+  if (!name || typeof name !== 'string' || name.trim() === '') throw new Error('Template name is required');
+
+  const templateId = parseInt(templateIdRaw, 10);
+  if (isNaN(templateId)) throw new Error('Invalid template ID');
+
+  await db
+    .update(templates)
+    .set({ name: name.trim() })
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+}
+
+/**
+ * Toggles the `hasInfobox` flag on a template.
+ *
+ * @example
+ * await toggleTemplateInfobox(42, new FormData()); // formData has "templateId" and "hasInfobox" fields
+ */
+export async function toggleTemplateInfobox(serialId: number, formData: FormData) {
+  const templateIdRaw = formData.get('templateId');
+  const hasInfoboxRaw = formData.get('hasInfobox');
+  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+
+  const templateId = parseInt(templateIdRaw, 10);
+  if (isNaN(templateId)) throw new Error('Invalid template ID');
+
+  const hasInfobox = hasInfoboxRaw === 'true';
+
+  await db
+    .update(templates)
+    .set({ hasInfobox })
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+}
+
+/**
+ * Appends a new section name to a template.
+ *
+ * @example
+ * await addTemplateSection(42, new FormData()); // formData has "templateId" and "name" fields
+ */
+export async function addTemplateSection(serialId: number, formData: FormData) {
+  const templateIdRaw = formData.get('templateId');
+  const name = formData.get('name');
+  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+  if (!name || typeof name !== 'string' || name.trim() === '') throw new Error('Section name is required');
+
+  const templateId = parseInt(templateIdRaw, 10);
+  if (isNaN(templateId)) throw new Error('Invalid template ID');
+
+  // Verify ownership.
+  const [target] = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error('Template not found');
+
+  const [{ maxOrder }] = await db
+    .select({ maxOrder: max(templateSections.displayOrder) })
+    .from(templateSections)
+    .where(eq(templateSections.templateId, templateId));
+
+  await db.insert(templateSections).values({
+    templateId,
+    name: name.trim(),
+    displayOrder: (maxOrder ?? -1) + 1,
+  });
+}
+
+/**
+ * Removes a section from a template.
+ *
+ * @example
+ * await deleteTemplateSection(42, new FormData()); // formData has "sectionId" field
+ */
+export async function deleteTemplateSection(serialId: number, formData: FormData) {
+  const sectionIdRaw = formData.get('sectionId');
+  if (!sectionIdRaw || typeof sectionIdRaw !== 'string') throw new Error('Section ID is required');
+  const sectionId = parseInt(sectionIdRaw, 10);
+  if (isNaN(sectionId)) throw new Error('Invalid section ID');
+
+  // Verify the section's template belongs to this serial.
+  const [target] = await db
+    .select({ id: templateSections.id })
+    .from(templateSections)
+    .innerJoin(templates, eq(templateSections.templateId, templates.id))
+    .where(and(eq(templateSections.id, sectionId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error('Section not found');
+
+  await db.delete(templateSections).where(eq(templateSections.id, sectionId));
+}
+
+/**
+ * Reorders sections within a template. `orderedSectionIds` must include every
+ * section for the template — no partial reorders.
+ *
+ * @example
+ * await reorderTemplateSections(42, [3, 1, 2]);
+ */
+export async function reorderTemplateSections(
+  serialId: number,
+  templateId: number,
+  orderedSectionIds: number[],
+) {
+  if (orderedSectionIds.length === 0) return;
+
+  // Verify ownership.
+  const [target] = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error('Template not found');
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedSectionIds.length; i++) {
+      await tx
+        .update(templateSections)
+        .set({ displayOrder: i })
+        .where(and(eq(templateSections.id, orderedSectionIds[i]), eq(templateSections.templateId, templateId)));
+    }
+  });
+}
+
+/**
+ * Appends a new infobox section label to a template.
+ *
+ * @example
+ * await addTemplateInfoboxSection(42, new FormData()); // formData has "templateId" and "label" fields
+ */
+export async function addTemplateInfoboxSection(serialId: number, formData: FormData) {
+  const templateIdRaw = formData.get('templateId');
+  const label = formData.get('label');
+  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+  if (!label || typeof label !== 'string' || label.trim() === '') throw new Error('Label is required');
+
+  const templateId = parseInt(templateIdRaw, 10);
+  if (isNaN(templateId)) throw new Error('Invalid template ID');
+
+  // Verify ownership.
+  const [target] = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error('Template not found');
+
+  const [{ maxOrder }] = await db
+    .select({ maxOrder: max(templateInfoboxSections.displayOrder) })
+    .from(templateInfoboxSections)
+    .where(eq(templateInfoboxSections.templateId, templateId));
+
+  await db.insert(templateInfoboxSections).values({
+    templateId,
+    label: label.trim(),
+    displayOrder: (maxOrder ?? -1) + 1,
+  });
+}
+
+/**
+ * Removes an infobox section from a template.
+ *
+ * @example
+ * await deleteTemplateInfoboxSection(42, new FormData()); // formData has "infoboxSectionId" field
+ */
+export async function deleteTemplateInfoboxSection(serialId: number, formData: FormData) {
+  const infoboxSectionIdRaw = formData.get('infoboxSectionId');
+  if (!infoboxSectionIdRaw || typeof infoboxSectionIdRaw !== 'string') throw new Error('Infobox section ID is required');
+  const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
+  if (isNaN(infoboxSectionId)) throw new Error('Invalid infobox section ID');
+
+  // Verify the infobox section's template belongs to this serial.
+  const [target] = await db
+    .select({ id: templateInfoboxSections.id })
+    .from(templateInfoboxSections)
+    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
+    .where(and(eq(templateInfoboxSections.id, infoboxSectionId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error('Infobox section not found');
+
+  await db.delete(templateInfoboxSections).where(eq(templateInfoboxSections.id, infoboxSectionId));
 }
 

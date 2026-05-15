@@ -3,8 +3,11 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/index';
-import { serials, pages, pageTitles, pageRelationships, pageSections } from '@/db/schema';
-import { and, eq, like } from 'drizzle-orm';
+import {
+  serials, pages, pageTitles, pageRelationships, pageSections, pageInfoboxSections,
+  templates, templateSections, templateInfoboxSections,
+} from '@/db/schema';
+import { and, asc, eq, like } from 'drizzle-orm';
 import { titleToSlug } from '@/lib/slug';
 
 /**
@@ -47,6 +50,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
   const name = formData.get('name');
   const introChapterIdRaw = formData.get('introChapterId');
   const parentPageIdRaw = formData.get('parentPageId');
+  const templateIdRaw = formData.get('templateId');
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     throw new Error('Page name is required');
@@ -64,12 +68,54 @@ export async function createPage(serialSlug: string, formData: FormData) {
   const parentPageId = parseInt(parentPageIdRaw, 10);
   if (isNaN(parentPageId) || parentPageId <= 0) throw new Error('Invalid parent page ID');
 
+  // Optional template — empty string or missing means no template.
+  const templateId =
+    templateIdRaw && typeof templateIdRaw === 'string' && templateIdRaw !== ''
+      ? parseInt(templateIdRaw, 10)
+      : null;
+
   const [serial] = await db
     .select({ id: serials.id })
     .from(serials)
     .where(eq(serials.slug, serialSlug))
     .limit(1);
   if (!serial) throw new Error('Serial not found');
+
+  // Pre-fetch the template definition outside the transaction (read-only).
+  let templateDef: {
+    hasInfobox: boolean;
+    sections: { name: string; displayOrder: number }[];
+    infoboxSections: { label: string; displayOrder: number }[];
+  } | null = null;
+
+  if (templateId !== null && !isNaN(templateId)) {
+    const [tmpl] = await db
+      .select({ id: templates.id, hasInfobox: templates.hasInfobox })
+      .from(templates)
+      .where(and(eq(templates.id, templateId), eq(templates.serialId, serial.id)));
+
+    if (tmpl) {
+      const [tmplSections, tmplInfoboxSections] = await Promise.all([
+        db
+          .select({ name: templateSections.name, displayOrder: templateSections.displayOrder })
+          .from(templateSections)
+          .where(eq(templateSections.templateId, tmpl.id))
+          .orderBy(asc(templateSections.displayOrder)),
+        tmpl.hasInfobox
+          ? db
+              .select({ label: templateInfoboxSections.label, displayOrder: templateInfoboxSections.displayOrder })
+              .from(templateInfoboxSections)
+              .where(eq(templateInfoboxSections.templateId, tmpl.id))
+              .orderBy(asc(templateInfoboxSections.displayOrder))
+          : Promise.resolve([]),
+      ]);
+      templateDef = {
+        hasInfobox: tmpl.hasInfobox,
+        sections: tmplSections,
+        infoboxSections: tmplInfoboxSections,
+      };
+    }
+  }
 
   const trimmedName = name.trim();
   const slug = await generateUniqueSlug(serial.id, trimmedName);
@@ -104,13 +150,33 @@ export async function createPage(serialSlug: string, formData: FormData) {
       isActive: true,
     });
 
-    // 4. Seed an initial "Summary" section so the page has at least one
-    // editable section immediately after creation.
-    await tx.insert(pageSections).values({
-      pageId: newPage.id,
-      name: 'Summary',
-      displayOrder: 0,
-    });
+    // 4. Seed sections from the template (or fall back to a default "Summary" section).
+    if (templateDef && templateDef.sections.length > 0) {
+      await tx.insert(pageSections).values(
+        templateDef.sections.map((s) => ({
+          pageId: newPage.id,
+          name: s.name,
+          displayOrder: s.displayOrder,
+        })),
+      );
+    } else {
+      await tx.insert(pageSections).values({
+        pageId: newPage.id,
+        name: 'Summary',
+        displayOrder: 0,
+      });
+    }
+
+    // 5. Seed infobox rows from the template when hasInfobox is true.
+    if (templateDef?.hasInfobox && templateDef.infoboxSections.length > 0) {
+      await tx.insert(pageInfoboxSections).values(
+        templateDef.infoboxSections.map((s) => ({
+          pageId: newPage.id,
+          label: s.label,
+          displayOrder: s.displayOrder,
+        })),
+      );
+    }
   });
 
   revalidatePath(`/${serialSlug}`, 'layout');

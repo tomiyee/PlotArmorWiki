@@ -3,11 +3,11 @@
 ## Commands
 
 ```bash
-pnpm dev                     # start Next.js dev server
-pnpm build                   # production build
-pnpm lint                    # run ESLint
-pnpm drizzle-kit generate    # generate migration after schema changes
-pnpm drizzle-kit migrate     # apply pending migrations
+npm run dev                          # start Next.js dev server
+rtk npm run build                    # production build
+rtk npm run lint                     # run ESLint
+rtk npx drizzle-kit generate         # generate migration after schema changes
+rtk npx drizzle-kit migrate          # apply pending migrations
 ```
 
 ### Schema change workflow

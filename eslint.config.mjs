@@ -20,6 +20,7 @@ const eslintConfig = defineConfig([
         "error",
         { varsIgnorePattern: "^_", argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
       ],
+      "max-len": ["warn", { code: 100, ignoreUrls: true, ignoreStrings: true, ignoreTemplateLiterals: true, ignoreComments: true }],
     },
   },
 ]);

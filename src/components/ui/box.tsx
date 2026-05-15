@@ -1,9 +1,15 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+export type BoxProps = {
+  /** If true, the children are stacked vertically (`flex-col`) */
+  col?: boolean;
+  /** The inline flex style */
+  flex?: number | string;
+} & React.ComponentProps<"div">;
 
 /**
- * A `flex` container div. Pass `col` to stack children vertically (`flex-col`).
- * Pass `flex` to set the CSS `flex` property as an inline style (e.g. `flex={1}`).
+ * A `flex` container div.
  * All other div props and className are forwarded and merged.
  *
  * @example
@@ -21,20 +27,13 @@ import { cn } from "@/lib/utils"
  *   <Input name="search" />
  * </Box>
  */
-function Box({
-  col,
-  flex,
-  className,
-  style,
-  ...props
-}: { col?: boolean; flex?: number | string } & React.ComponentProps<"div">) {
+export function Box(props: BoxProps) {
+  const { col, flex, className, style, ...rest } = props;
   return (
     <div
       className={cn("flex", col && "flex-col", className)}
       style={flex !== undefined ? { flex, ...style } : style}
-      {...props}
+      {...rest}
     />
-  )
+  );
 }
-
-export { Box }
