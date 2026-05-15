@@ -1,28 +1,51 @@
-import { notFound } from 'next/navigation';
-import { cookies } from 'next/headers';
-import { db } from '@/db/index';
+import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
+import { db } from "@/db/index";
 import {
-  serials, serialAuthors, volumes, chapters, pages,
-  pageSections, pageSectionRevisions,
-  pageInfoboxSections, pageInfoboxRevisions, pageInfoboxImageRevisions,
-  pageRelationships, pageTitles,
-  templates, templateSections, templateInfoboxSections,
-} from '@/db/schema';
-import { and, asc, eq, inArray, isNull, lte, max, or } from 'drizzle-orm';
+  serials,
+  serialAuthors,
+  volumes,
+  chapters,
+  pages,
+  pageSections,
+  pageSectionRevisions,
+  pageInfoboxSections,
+  pageInfoboxRevisions,
+  pageInfoboxImageRevisions,
+  pageRelationships,
+  pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
+} from "@/db/schema";
+import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import {
-  addChapter, addVolume, deleteChapter, deleteVolume, renameChapter, renameVolume, updateSerialTypes,
-  reorderVolumes, reorderAllChapters, updateSerialMetadata,
-  createTemplate, deleteTemplate, renameTemplate, toggleTemplateInfobox,
-  addTemplateSection, deleteTemplateSection,
-  addTemplateInfoboxSection, deleteTemplateInfoboxSection,
-} from './actions';
-import { Box } from '@/components/ui/box';
-import { PageContainer } from '@/components/ui/page-container';
-import { Text } from '@/components/ui/text';
-import { SerialMetadataEditor } from '@/components/SerialMetadataEditor';
-import { SerialTOCSidebar } from '@/components/SerialTOCSidebar';
-import { PageEditor } from './[page]/PageEditor';
-import { TemplateManager } from '@/components/TemplateManager';
+  addChapter,
+  addVolume,
+  deleteChapter,
+  deleteVolume,
+  renameChapter,
+  renameVolume,
+  updateSerialTypes,
+  reorderVolumes,
+  reorderAllChapters,
+  updateSerialMetadata,
+  createTemplate,
+  deleteTemplate,
+  renameTemplate,
+  toggleTemplateInfobox,
+  addTemplateSection,
+  deleteTemplateSection,
+  addTemplateInfoboxSection,
+  deleteTemplateInfoboxSection,
+} from "./actions";
+import { Box } from "@/components/ui/box";
+import { PageContainer } from "@/components/ui/page-container";
+import { Text } from "@/components/ui/text";
+import { SerialMetadataEditor } from "@/components/SerialMetadataEditor";
+import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
+import { PageEditor } from "./[page]/PageEditor";
+import { TemplateManager } from "@/components/TemplateManager";
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -61,7 +84,14 @@ export default async function SerialPage({ params }: Props) {
     notFound();
   }
 
-  const [chapterCutoff, authors, volumeList, chapterList, homePage, serialTemplates] = await Promise.all([
+  const [
+    chapterCutoff,
+    authors,
+    volumeList,
+    chapterList,
+    homePage,
+    serialTemplates,
+  ] = await Promise.all([
     getChapterCutoff(serial.id),
     db
       .select()
@@ -92,7 +122,11 @@ export default async function SerialPage({ params }: Props) {
       .then((rows) => rows[0] ?? null),
     // Fetch all templates with their sections and infobox sections.
     db
-      .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
+      .select({
+        id: templates.id,
+        name: templates.name,
+        hasInfobox: templates.hasInfobox,
+      })
       .from(templates)
       .where(eq(templates.serialId, serial.id))
       .orderBy(asc(templates.name))
@@ -123,9 +157,16 @@ export default async function SerialPage({ params }: Props) {
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
 
-  const chaptersByVolume: Record<number, { id: number; displayName: string; idx: number; volumeId: number }[]> = {};
-  volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
-  chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
+  const chaptersByVolume: Record<
+    number,
+    { id: number; displayName: string; idx: number; volumeId: number }[]
+  > = {};
+  volumeList.forEach((v) => {
+    chaptersByVolume[v.id] = [];
+  });
+  chapterList.forEach((c) => {
+    chaptersByVolume[c.volumeId]?.push(c);
+  });
 
   const updateMetadataForSerial = updateSerialMetadata.bind(null, serial.id);
   const addVolumeForSerial = addVolume.bind(null, serial.id);
@@ -142,11 +183,21 @@ export default async function SerialPage({ params }: Props) {
   const createTemplateForSerial = createTemplate.bind(null, serial.id);
   const deleteTemplateForSerial = deleteTemplate.bind(null, serial.id);
   const renameTemplateForSerial = renameTemplate.bind(null, serial.id);
-  const toggleTemplateInfoboxForSerial = toggleTemplateInfobox.bind(null, serial.id);
+  const toggleTemplateInfoboxForSerial = toggleTemplateInfobox.bind(
+    null,
+    serial.id,
+  );
   const addTemplateSectionForSerial = addTemplateSection.bind(null, serial.id);
-  const deleteTemplateSectionForSerial = deleteTemplateSection.bind(null, serial.id);
-  const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(null, serial.id);
-  const deleteTemplateInfoboxSectionForSerial = deleteTemplateInfoboxSection.bind(null, serial.id);
+  const deleteTemplateSectionForSerial = deleteTemplateSection.bind(
+    null,
+    serial.id,
+  );
+  const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(
+    null,
+    serial.id,
+  );
+  const deleteTemplateInfoboxSectionForSerial =
+    deleteTemplateInfoboxSection.bind(null, serial.id);
 
   const headChapterId = chapterList.at(-1)?.id ?? null;
   const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
@@ -154,7 +205,7 @@ export default async function SerialPage({ params }: Props) {
     id: c.id,
     displayName: c.displayName,
     idx: c.idx,
-    volumeName: volumeNameById.get(c.volumeId) ?? '',
+    volumeName: volumeNameById.get(c.volumeId) ?? "",
   }));
 
   // Wiki pages visible at the reader's cutoff. Pages with null introChapterId
@@ -173,18 +224,32 @@ export default async function SerialPage({ params }: Props) {
   const wikiPages = rawWikiPages.map((p) => ({ name: p.name }));
 
   // ── Home page content ─────────────────────────────────────────────────────
-  let pageSectionStructure: { id: number; name: string; displayOrder: number }[] = [];
-  let sections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[] = [];
-  let infoboxSectionStructure: { id: number; label: string; displayOrder: number }[] = [];
+  let pageSectionStructure: {
+    id: number;
+    name: string;
+    displayOrder: number;
+  }[] = [];
+  let sections: {
+    id: number;
+    name: string;
+    content: string;
+    lastUpdatedChapterIdx: number | null;
+  }[] = [];
+  let infoboxSectionStructure: {
+    id: number;
+    label: string;
+    displayOrder: number;
+  }[] = [];
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
-  let childPages: { id: number; name: string; slug: string; title: string }[] = [];
+  let childPages: { id: number; name: string; slug: string; title: string }[] =
+    [];
 
   if (homePage) {
     const sectionMaxIdxSq = db
       .select({
         sectionId: pageSectionRevisions.sectionId,
-        maxIdx: max(chapters.idx).as('max_idx'),
+        maxIdx: max(chapters.idx).as("max_idx"),
       })
       .from(pageSectionRevisions)
       .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
@@ -195,13 +260,22 @@ export default async function SerialPage({ params }: Props) {
         ),
       )
       .groupBy(pageSectionRevisions.sectionId)
-      .as('section_max_idx_sq');
+      .as("section_max_idx_sq");
 
     const [activeSections, sectionVersions] = await Promise.all([
       db
-        .select({ id: pageSections.id, name: pageSections.name, displayOrder: pageSections.displayOrder })
+        .select({
+          id: pageSections.id,
+          name: pageSections.name,
+          displayOrder: pageSections.displayOrder,
+        })
         .from(pageSections)
-        .where(and(eq(pageSections.pageId, homePage.id), isNull(pageSections.deletedAt)))
+        .where(
+          and(
+            eq(pageSections.pageId, homePage.id),
+            isNull(pageSections.deletedAt),
+          ),
+        )
         .orderBy(asc(pageSections.displayOrder)),
       db
         .select({
@@ -222,7 +296,10 @@ export default async function SerialPage({ params }: Props) {
     ]);
 
     const versionBySectionId = new Map(
-      sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
+      sectionVersions.map((v) => [
+        v.sectionId,
+        { content: v.content, chapterIdx: v.chapterIdx },
+      ]),
     );
     pageSectionStructure = activeSections.map((s) => ({
       id: s.id,
@@ -231,41 +308,71 @@ export default async function SerialPage({ params }: Props) {
     }));
     sections = activeSections.map((s) => {
       const v = versionBySectionId.get(s.id);
-      return { id: s.id, name: s.name, content: v?.content ?? '', lastUpdatedChapterIdx: v?.chapterIdx ?? null };
+      return {
+        id: s.id,
+        name: s.name,
+        content: v?.content ?? "",
+        lastUpdatedChapterIdx: v?.chapterIdx ?? null,
+      };
     });
 
     const activeInfoboxRows = await db
-      .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label, displayOrder: pageInfoboxSections.displayOrder })
+      .select({
+        id: pageInfoboxSections.id,
+        label: pageInfoboxSections.label,
+        displayOrder: pageInfoboxSections.displayOrder,
+      })
       .from(pageInfoboxSections)
-      .where(and(eq(pageInfoboxSections.pageId, homePage.id), isNull(pageInfoboxSections.deletedAt)))
+      .where(
+        and(
+          eq(pageInfoboxSections.pageId, homePage.id),
+          isNull(pageInfoboxSections.deletedAt),
+        ),
+      )
       .orderBy(asc(pageInfoboxSections.displayOrder));
 
     infoboxSectionStructure = activeInfoboxRows;
 
     if (activeInfoboxRows.length > 0) {
       const floaterMaxIdxSq = db
-        .select({ maxIdx: max(chapters.idx).as('max_idx') })
+        .select({ maxIdx: max(chapters.idx).as("max_idx") })
         .from(pageInfoboxImageRevisions)
-        .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
-        .where(and(eq(pageInfoboxImageRevisions.pageId, homePage.id), lte(chapters.idx, cutoffIdx)))
-        .as('floater_max_idx_sq');
+        .innerJoin(
+          chapters,
+          eq(pageInfoboxImageRevisions.chapterId, chapters.id),
+        )
+        .where(
+          and(
+            eq(pageInfoboxImageRevisions.pageId, homePage.id),
+            lte(chapters.idx, cutoffIdx),
+          ),
+        )
+        .as("floater_max_idx_sq");
 
       const infoboxRowMaxIdxSq = db
         .select({
           infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-          maxIdx: max(chapters.idx).as('max_idx'),
+          maxIdx: max(chapters.idx).as("max_idx"),
         })
         .from(pageInfoboxRevisions)
         .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-        .where(and(eq(pageInfoboxRevisions.pageId, homePage.id), lte(chapters.idx, cutoffIdx)))
+        .where(
+          and(
+            eq(pageInfoboxRevisions.pageId, homePage.id),
+            lte(chapters.idx, cutoffIdx),
+          ),
+        )
         .groupBy(pageInfoboxRevisions.infoboxSectionId)
-        .as('infobox_row_max_idx_sq');
+        .as("infobox_row_max_idx_sq");
 
       const [[floaterVersion], infoboxRowVersions] = await Promise.all([
         db
           .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
           .from(pageInfoboxImageRevisions)
-          .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
+          .innerJoin(
+            chapters,
+            eq(pageInfoboxImageRevisions.chapterId, chapters.id),
+          )
           .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
           .where(eq(pageInfoboxImageRevisions.pageId, homePage.id))
           .limit(1),
@@ -279,23 +386,32 @@ export default async function SerialPage({ params }: Props) {
           .innerJoin(
             infoboxRowMaxIdxSq,
             and(
-              eq(pageInfoboxRevisions.infoboxSectionId, infoboxRowMaxIdxSq.infoboxSectionId),
+              eq(
+                pageInfoboxRevisions.infoboxSectionId,
+                infoboxRowMaxIdxSq.infoboxSectionId,
+              ),
               eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
             ),
           )
           .where(eq(pageInfoboxRevisions.pageId, homePage.id)),
       ]);
 
-      const rowContentMap = new Map(infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]));
+      const rowContentMap = new Map(
+        infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]),
+      );
       floaterImageUrl = floaterVersion?.imageUrl ?? null;
-      floaterRows = activeInfoboxRows.map((r) => ({ id: r.id, label: r.label, content: rowContentMap.get(r.id) ?? '' }));
+      floaterRows = activeInfoboxRows.map((r) => ({
+        id: r.id,
+        label: r.label,
+        content: rowContentMap.get(r.id) ?? "",
+      }));
     }
 
     // Child pages active at the user's cutoff (same max-idx pattern).
     const relMaxIdxSq = db
       .select({
         childPageId: pageRelationships.childPageId,
-        maxIdx: max(chapters.idx).as('max_idx'),
+        maxIdx: max(chapters.idx).as("max_idx"),
       })
       .from(pageRelationships)
       .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
@@ -306,10 +422,15 @@ export default async function SerialPage({ params }: Props) {
         ),
       )
       .groupBy(pageRelationships.childPageId)
-      .as('rel_max_idx_sq');
+      .as("rel_max_idx_sq");
 
     const childPagesRaw = await db
-      .select({ id: pages.id, name: pages.name, slug: pages.slug, isActive: pageRelationships.isActive })
+      .select({
+        id: pages.id,
+        name: pages.name,
+        slug: pages.slug,
+        isActive: pageRelationships.isActive,
+      })
       .from(pageRelationships)
       .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
       .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
@@ -329,13 +450,18 @@ export default async function SerialPage({ params }: Props) {
       const childTitleMaxIdxSq = db
         .select({
           pageId: pageTitles.pageId,
-          maxIdx: max(chapters.idx).as('max_idx'),
+          maxIdx: max(chapters.idx).as("max_idx"),
         })
         .from(pageTitles)
         .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .where(and(inArray(pageTitles.pageId, childPageIds), lte(chapters.idx, cutoffIdx)))
+        .where(
+          and(
+            inArray(pageTitles.pageId, childPageIds),
+            lte(chapters.idx, cutoffIdx),
+          ),
+        )
         .groupBy(pageTitles.pageId)
-        .as('child_title_max_idx_sq');
+        .as("child_title_max_idx_sq");
 
       const childTitleRows = await db
         .select({ pageId: pageTitles.pageId, title: pageTitles.title })
@@ -361,7 +487,11 @@ export default async function SerialPage({ params }: Props) {
   }
 
   // ── Home page temporal title entries (for the edit-mode Titles panel) ────────
-  let homePageTitleEntries: { chapterId: number; chapterLabel: string; title: string }[] = [];
+  let homePageTitleEntries: {
+    chapterId: number;
+    chapterLabel: string;
+    title: string;
+  }[] = [];
 
   if (homePage) {
     const allTitleRows = await db
@@ -424,7 +554,6 @@ export default async function SerialPage({ params }: Props) {
             {homePage ? (
               <PageEditor
                 serialSlug={serialSlug}
-                pageName={homePage.name}
                 pageSlug={homePage.slug}
                 pageId={homePage.id}
                 pageTitleEntries={homePageTitleEntries}
@@ -441,22 +570,28 @@ export default async function SerialPage({ params }: Props) {
                 childPages={childPages}
                 parentPages={[]}
                 allSerialPages={[]}
+                isHomePage
+                editModeHeader={
+                  <TemplateManager
+                    templates={serialTemplates}
+                    createTemplateAction={createTemplateForSerial}
+                    deleteTemplateAction={deleteTemplateForSerial}
+                    renameTemplateAction={renameTemplateForSerial}
+                    toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
+                    addTemplateSectionAction={addTemplateSectionForSerial}
+                    deleteTemplateSectionAction={deleteTemplateSectionForSerial}
+                    addTemplateInfoboxSectionAction={
+                      addTemplateInfoboxSectionForSerial
+                    }
+                    deleteTemplateInfoboxSectionAction={
+                      deleteTemplateInfoboxSectionForSerial
+                    }
+                  />
+                }
               />
             ) : (
               <Text muted>Home page not found.</Text>
             )}
-
-            <TemplateManager
-              templates={serialTemplates}
-              createTemplateAction={createTemplateForSerial}
-              deleteTemplateAction={deleteTemplateForSerial}
-              renameTemplateAction={renameTemplateForSerial}
-              toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
-              addTemplateSectionAction={addTemplateSectionForSerial}
-              deleteTemplateSectionAction={deleteTemplateSectionForSerial}
-              addTemplateInfoboxSectionAction={addTemplateInfoboxSectionForSerial}
-              deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionForSerial}
-            />
           </Box>
         </PageContainer>
       </div>

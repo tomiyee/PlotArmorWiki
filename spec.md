@@ -166,7 +166,7 @@ Wiki pages form a **directed acyclic graph (DAG)**.
 - Relationships are temporal
 - Cycles are forbidden
 
-The serial index page, or the "Home" page, is itself a Wiki Page that::
+The serial index page, or the "Home" page, is itself a Wiki Page that:
 
 - Has no parent
 - Serves as the DAG root
@@ -174,6 +174,15 @@ The serial index page, or the "Home" page, is itself a Wiki Page that::
 All other pages:
 
 - Must have at least one parent
+
+### Home page edit restrictions
+
+The home page has two permanent constraints that restrict its edit UI:
+
+- **No title renaming** — The home page slug is fixed and canonical (`/{serial}`). Its name cannot be changed, so the Titles panel is hidden in edit mode.
+- **No parent relationships** — The home page is the DAG root and can never have a parent. The Relationships panel is hidden in edit mode.
+
+In edit mode on the serial index page, Page Templates are shown above the "Writing as of:" selector so administrators can manage templates before editing content.
 
 ---
 

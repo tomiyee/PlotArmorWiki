@@ -562,7 +562,7 @@ export default async function PageView({ params }: Props) {
                 <span>&gt;</span>
                 {parentPages.map((parent, i) => (
                   <span key={parent.id} className="flex items-center gap-1">
-                    {i > 0 && <Text>,</Text>}
+                    {i > 0 && <Text as="span">,</Text>}
                     <Link
                       href={`/${serialSlug}/${parent.slug}`}
                       className="hover:underline"
