@@ -124,7 +124,6 @@ interface Props {
  * @example
  * <PageEditor
  *   serialSlug="one-piece"
- *   pageName="Luffy"
  *   pageSlug="luffy"
  *   pageId={42}
  *   pageTitleEntries={[]}

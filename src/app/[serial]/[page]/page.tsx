@@ -586,7 +586,6 @@ export default async function PageView({ params }: Props) {
 
           <PageEditor
             serialSlug={serialSlug}
-            pageName={page.name}
             pageSlug={decodedPageSlug}
             pageId={page.id}
             pageTitleEntries={pageTitleEntries}
