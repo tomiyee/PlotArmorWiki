@@ -75,22 +75,7 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 10 — Put Set Your Chapter to Avoid Spoilers in a Popover
-
-- Currently the warning is in line. Instead, make it a popover that is open by default and dismissed only when the user manually sets their chapter for the first time or manually clicks an "x" button in the popover.
-- The popover should also say it defaulted to the first chapter to avoid spoilers.
-- This should only be visible for the first time across all sreials. Going to a second serial does not alsos show this
-
----
-
-## - [ ] Step 11 — When the screen is thin, compact the top right nav bar
-
-- When the screen is thin, replace the top right dropdown that controls the currently selected chapter into a hamburger menu that opens a side drawer.
-- The warning to set your chapter should appear over the hamburger menu if relevant.
-
----
-
-## - [ ] Step 12 — Spoiler-aware search
+## - [ ] Step 10 — Spoiler-aware search
 
 - Add `to_tsvector` on `pages` (resolved title) and `serials.title` (inline or generated column with index).
 - Create a server-side search endpoint (Server Action or route handler) that:
