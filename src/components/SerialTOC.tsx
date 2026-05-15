@@ -42,7 +42,7 @@ export function SerialTOC({
   volumes,
   chaptersByVolume,
   chapterType,
-  volumeType,
+  volumeType: _volumeType,
 }: Props) {
   const [volCollapsed, setVolCollapsed] = usePersistedStore<
     Record<number, boolean>
