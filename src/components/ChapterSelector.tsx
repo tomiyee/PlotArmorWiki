@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
 import { Menu, MenuItem } from "@/components/ui/menu";
-import { Drawer } from "@base-ui/react/drawer";
+import { Drawer } from "@/components/ui/drawer";
 import {
   ChevronDownIcon,
   ExternalLinkIcon,
@@ -64,7 +64,8 @@ function volCollapsedKey(serialId: number) {
  * />
  */
 export function ChapterSelector(props: Props) {
-  const { serialId, serialSlug, chapterType, volumes, chaptersByVolume } = props;
+  const { serialId, serialSlug, chapterType, volumes, chaptersByVolume } =
+    props;
 
   const allChapters = volumes
     .flatMap((v) => chaptersByVolume[v.id] ?? [])
@@ -176,35 +177,12 @@ export function ChapterSelector(props: Props) {
   return (
     <>
       {/* ── Desktop (sm and up): inline label + dropdown with popover callout ── */}
-      <Box col className="hidden sm:flex gap-1.5 justify-center">
-        {/* Popover callout anchored below the chapter button */}
-        {!popoverDismissed && (
-          <div suppressHydrationWarning>
-            <Box className="mb-1 items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-md max-w-64">
-              <Text variant="label" className="flex-1 leading-snug text-amber-800">
-                We defaulted to the first {chapterType.toLowerCase()} to avoid
-                spoilers. Set your {chapterType.toLowerCase()} here.
-              </Text>
-              <Tooltip content="Dismiss">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={dismissPopover}
-                  aria-label="Dismiss spoiler reminder"
-                  className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
-                >
-                  <XIcon />
-                </Button>
-              </Tooltip>
-            </Box>
-          </div>
-        )}
+      <Box className="hidden sm:flex items-center gap-2">
+        <Text variant="label" as="label" className="whitespace-nowrap text-sm">
+          Reading up to:
+        </Text>
 
-        <Box className="items-center gap-2">
-          <Text variant="label" as="label" className="whitespace-nowrap text-sm">
-            Reading up to:
-          </Text>
-
+        <div className="relative">
           <Menu
             isOpen={dropdownOpen}
             onClose={() => setDropdownOpen(false)}
@@ -235,77 +213,82 @@ export function ChapterSelector(props: Props) {
               />
             </Button>
           </Menu>
-        </Box>
+
+          {/* Floating callout — absolute so it doesn't affect navbar height */}
+          {!popoverDismissed && (
+            <div
+              suppressHydrationWarning
+              className="absolute top-full right-0 mt-2 z-50"
+            >
+              <Box className="items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-md w-64">
+                <Text
+                  variant="label"
+                  className="flex-1 leading-snug text-amber-800"
+                >
+                  We defaulted to the first {chapterType.toLowerCase()} to avoid
+                  spoilers. Set your {chapterType.toLowerCase()} here.
+                </Text>
+                <Tooltip content="Dismiss">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={dismissPopover}
+                    aria-label="Dismiss spoiler reminder"
+                    className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
+                  >
+                    <XIcon />
+                  </Button>
+                </Tooltip>
+              </Box>
+            </div>
+          )}
+        </div>
       </Box>
 
       {/* ── Mobile (below sm): icon button + bottom drawer ── */}
       <div className="relative sm:hidden" suppressHydrationWarning>
-        <Drawer.Root
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          swipeDirection="down"
-        >
-          <Tooltip content={`Set your ${chapterType}`} side="bottom">
-            <Drawer.Trigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Set ${chapterType} progress`}
-                />
-              }
-            >
-              <BookOpenIcon />
-            </Drawer.Trigger>
-          </Tooltip>
+        <Tooltip content={`Set your ${chapterType}`} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Set ${chapterType} progress`}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <BookOpenIcon />
+          </Button>
+        </Tooltip>
 
-          {/* Badge dot: shown when the spoiler popover hasn't been dismissed yet */}
+        {/* Badge dot: shown when the spoiler popover hasn't been dismissed yet */}
+        {!popoverDismissed && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-background"
+          />
+        )}
+
+        <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="down">
+          <Box className="items-center justify-between px-4 py-3 border-b">
+            <Text variant="h4">Reading up to</Text>
+          </Box>
+
+          {/* Spoiler callout inside the drawer — dismisses on chapter select */}
           {!popoverDismissed && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-background"
-            />
+            <div className="mx-4 mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2">
+              <Text
+                variant="label"
+                className="text-sm text-amber-800 leading-snug"
+              >
+                We defaulted to the first {chapterType.toLowerCase()} to avoid
+                spoilers. Set your {chapterType.toLowerCase()} here.
+              </Text>
+            </div>
           )}
 
-          <Drawer.Portal>
-            <Drawer.Backdrop className="fixed inset-0 z-40 bg-black/20 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-200" />
-            <Drawer.Popup className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[85dvh] flex-col rounded-t-xl bg-background shadow-xl outline-none data-open:animate-in data-open:slide-in-from-bottom data-closed:animate-out data-closed:slide-out-to-bottom duration-300">
-              {/* Drag handle */}
-              <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-muted" />
-
-              {/* Header */}
-              <Box className="items-center justify-between px-4 py-3 border-b">
-                <Text variant="h4">Reading up to</Text>
-                <Tooltip content="Close">
-                  <Drawer.Close
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Close chapter selector"
-                      />
-                    }
-                  >
-                    <XIcon />
-                  </Drawer.Close>
-                </Tooltip>
-              </Box>
-
-              {/* Spoiler callout inside the drawer — dismisses on chapter select */}
-              {!popoverDismissed && (
-                <div className="mx-4 mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2">
-                  <Text variant="label" className="text-sm text-amber-800 leading-snug">
-                    We defaulted to the first {chapterType.toLowerCase()} to
-                    avoid spoilers. Set your {chapterType.toLowerCase()} here.
-                  </Text>
-                </div>
-              )}
-
-              {/* Chapter list */}
-              <div className="flex-1 overflow-y-auto py-2">{chapterListContents}</div>
-            </Drawer.Popup>
-          </Drawer.Portal>
-        </Drawer.Root>
+          {/* Chapter list */}
+          <div className="flex-1 overflow-y-auto py-2">
+            {chapterListContents}
+          </div>
+        </Drawer>
       </div>
     </>
   );
