@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { Menu, MenuItem } from "@/components/ui/Menu";
-import { Drawer } from "@/components/ui/drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import {
   ChevronDownIcon,
   ExternalLinkIcon,
