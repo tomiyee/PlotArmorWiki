@@ -2,13 +2,7 @@
 
 ---
 
-## - [ ] Step 1 — Templates
-
-Admins can define reusable page templates per serial to pre-populate sections and infobox structure.
-
-- Template management UI on `/{serial}` — visible only to admins in edit mode: create/delete/rename templates, add/remove section names, toggle `has_infobox`, add/remove infobox section labels.
-- Server Actions: `createTemplate`, `deleteTemplate`, `renameTemplate`, `addTemplateSection`, `deleteTemplateSection`, `reorderTemplateSections`, `addTemplateInfboxSection`, `deleteTemplateInfboxSection` in `src/app/[serial]/actions.ts`.
-- Page creation form (Step 6): add optional "Use template" dropdown. On selection, preview the template's sections and infobox sections. On submit, `createPage` seeds `page_sections` and `page_infobox_sections` from the selected template before redirecting.
+## - [X] Step 1 — Templates
 
 ---
 
@@ -81,30 +75,7 @@ New Google sign-ins have `users.username = null`. Gate access until a username i
 
 ---
 
-## - [ ] Step 10 — Put Set Your Chapter to Avoid Spoilers in a Popover
-
-- Currently the warning is in line. Instead, make it a popover that is open by default and dismissed only when the user manually sets their chapter for the first time or manually clicks an "x" button in the popover.
-- The popover should also say it defaulted to the first chapter to avoid spoilers.
-- This should only be visible for the first time across all sreials. Going to a second serial does not alsos show this
-
----
-
-## - [ ] Step 11 — When the screen is thin, compact the top right nav bar
-
-- When the screen is thin, replace the top right dropdown that controls the currently selected chapter into a hamburger menu that opens a side drawer.
-- The warning to set your chapter should appear over the hamburger menu if relevant.
-
----
-
-## - [ ] Step 12 — The Serial Page's Description should be the Home Page's top section
-
-- When creating a new Serial, users enter a Description. Use a Markdown editor for that input field.
-- This description should be used to populate the Serial's Home page's first section, the one without a header.
-- The Serial's index page should show the Serial's Home page's sections.
-
----
-
-## - [ ] Step 13 — Spoiler-aware search
+## - [ ] Step 10 — Spoiler-aware search
 
 - Add `to_tsvector` on `pages` (resolved title) and `serials.title` (inline or generated column with index).
 - Create a server-side search endpoint (Server Action or route handler) that:
