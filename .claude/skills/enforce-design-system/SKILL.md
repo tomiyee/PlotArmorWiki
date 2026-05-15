@@ -9,17 +9,17 @@ Scan all TSX/TS source files outside of `src/components/ui/` for native HTML ele
 
 ## Design-system mapping
 
-These are the only allowed substitutions. Do not replace elements that are used *inside* the ui/ components themselves or that have no design-system equivalent.
+These are the only allowed substitutions. Do not replace elements that are used _inside_ the ui/ components themselves or that have no design-system equivalent.
 
-| Native element | Replacement | Import path |
-|---|---|---|
-| `<button` | `<Button` | `@/components/ui/button` |
-| `<input` | `<Input` | `@/components/ui/input` |
-| `<select` | `<Select` | `@/components/ui/select` |
-| `<h1`, `<h2`, `<h3`, `<h4` | `<Text variant="h1"` … `<Text variant="h4"` | `@/components/ui/text` |
-| `<p` (presentational text, not inside markdown renderers) | `<Text` (defaults to `body` variant) | `@/components/ui/text` |
-| `<span` (text-only spans, not icon wrappers or structural containers) | `<Text variant="label"` or `<Text as="span"` | `@/components/ui/text` |
-| `<label` (standalone labels outside a library primitive) | `<Text as="label" variant="label"` | `@/components/ui/text` |
+| Native element                                                        | Replacement                                  | Import path              |
+| --------------------------------------------------------------------- | -------------------------------------------- | ------------------------ |
+| `<button`                                                             | `<Button`                                    | `@/components/ui/button` |
+| `<input`                                                              | `<Input`                                     | `@/components/ui/input`  |
+| `<select`                                                             | `<Select`                                    | `@/components/ui/select` |
+| `<h1`, `<h2`, `<h3`, `<h4`                                            | `<Text variant="h1"` … `<Text variant="h4"`  | `@/components/ui/Text`   |
+| `<p` (presentational text, not inside markdown renderers)             | `<Text` (defaults to `body` variant)         | `@/components/ui/Text`   |
+| `<span` (text-only spans, not icon wrappers or structural containers) | `<Text variant="label"` or `<Text as="span"` | `@/components/ui/Text`   |
+| `<label` (standalone labels outside a library primitive)              | `<Text as="label" variant="label"`           | `@/components/ui/Text`   |
 
 ### When NOT to replace
 

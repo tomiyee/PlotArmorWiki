@@ -39,9 +39,9 @@ import {
   addTemplateInfoboxSection,
   deleteTemplateInfoboxSection,
 } from "./actions";
-import { Box } from "@/components/ui/box";
-import { PageContainer } from "@/components/ui/page-container";
-import { Text } from "@/components/ui/text";
+import { Box } from "@/components/ui/Box";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { Text } from "@/components/ui/Text";
 import { SerialMetadataEditor } from "@/components/SerialMetadataEditor";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { PageEditor } from "./[page]/PageEditor";

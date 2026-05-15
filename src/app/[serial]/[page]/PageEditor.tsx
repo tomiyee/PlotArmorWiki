@@ -8,9 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Box } from "@/components/ui/box";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Box } from "@/components/ui/Box";
+import { Label } from "@/components/ui/Label";
+import { Select } from "@/components/ui/Select";
 import {
   savePageContent,
   getPageContentAtChapter,

@@ -2,9 +2,10 @@
 
 import type { ReactNode } from "react";
 import { Info } from "lucide-react";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface InfoIconProps {
+  /** Tooltip content shown on hover/focus. */
   contents: ReactNode;
 }
 
@@ -16,7 +17,8 @@ interface InfoIconProps {
  * @example
  * <InfoIcon contents="Shown at the top of the page with no heading." />
  */
-export function InfoIcon({ contents }: InfoIconProps) {
+export function InfoIcon(props: InfoIconProps) {
+  const { contents } = props;
   return (
     <Tooltip content={contents} side="right">
       <button

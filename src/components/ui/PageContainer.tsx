@@ -1,5 +1,7 @@
-import * as React from "react";
 import { cn } from "@/lib/utils";
+import { ComponentProps } from "react";
+
+type PageContainerProps = ComponentProps<"div">;
 
 /**
  * Standard page-level content container. Constrains width to `max-w-5xl`,
@@ -17,15 +19,12 @@ import { cn } from "@/lib/utils";
  * // Narrower layout (creation forms)
  * <PageContainer className="max-w-lg">…</PageContainer>
  */
-function PageContainer({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"div">) {
+function PageContainer(props: PageContainerProps) {
+  const { className, children, ...rest } = props;
   return (
     <div
       className={cn("max-w-5xl mx-auto w-full px-4 py-6", className)}
-      {...props}
+      {...rest}
     >
       {children}
     </div>

@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { createPage } from './actions';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { useState } from "react";
+import Link from "next/link";
+import { createPage } from "./actions";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 interface Chapter {
   id: number;
@@ -82,15 +82,22 @@ export function NewPageForm({
 
   // Build chapter id → idx lookup for filtering.
   const chapterIdxById: Record<number, number> = {};
-  chapterList.forEach((c) => { chapterIdxById[c.id] = c.idx; });
+  chapterList.forEach((c) => {
+    chapterIdxById[c.id] = c.idx;
+  });
 
   // Build grouped chapter options.
   const chaptersByVolume: Record<number, Chapter[]> = {};
-  volumeList.forEach((v) => { chaptersByVolume[v.id] = []; });
-  chapterList.forEach((c) => { chaptersByVolume[c.volumeId]?.push(c); });
+  volumeList.forEach((v) => {
+    chaptersByVolume[v.id] = [];
+  });
+  chapterList.forEach((c) => {
+    chaptersByVolume[c.volumeId]?.push(c);
+  });
 
   const firstChapterId = chapterList[0]?.id ?? 0;
-  const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<number>(firstChapterId);
+  const [selectedIntroChapterId, setSelectedIntroChapterId] =
+    useState<number>(firstChapterId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
 
   const chapterOptions = [
@@ -114,9 +121,14 @@ export function NewPageForm({
       ? (chapterIdxById[selectedIntroChapterId] ?? Infinity)
       : Infinity;
   const visiblePages = existingPages.filter(
-    (p) => p.introChapterId === null || (chapterIdxById[p.introChapterId] ?? 0) <= selectedIdx,
+    (p) =>
+      p.introChapterId === null ||
+      (chapterIdxById[p.introChapterId] ?? 0) <= selectedIdx,
   );
-  const parentPageOptions = visiblePages.map((p) => ({ label: p.name, value: p.id }));
+  const parentPageOptions = visiblePages.map((p) => ({
+    label: p.name,
+    value: p.id,
+  }));
 
   // Only pre-select the defaultParentPageId if it is still visible.
   const visibleParentDefault =
@@ -127,16 +139,21 @@ export function NewPageForm({
 
   // Template options — 0 means "no template".
   const templateOptions = [
-    { label: 'None (default sections)', value: 0 },
+    { label: "None (default sections)", value: 0 },
     ...templates.map((t) => ({ label: t.name, value: t.id })),
   ];
 
-  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
+  const selectedTemplate =
+    templates.find((t) => t.id === selectedTemplateId) ?? null;
   const sortedTemplateSections = selectedTemplate
-    ? [...selectedTemplate.sections].sort((a, b) => a.displayOrder - b.displayOrder)
+    ? [...selectedTemplate.sections].sort(
+        (a, b) => a.displayOrder - b.displayOrder,
+      )
     : [];
   const sortedTemplateInfoboxSections = selectedTemplate
-    ? [...selectedTemplate.infoboxSections].sort((a, b) => a.displayOrder - b.displayOrder)
+    ? [...selectedTemplate.infoboxSections].sort(
+        (a, b) => a.displayOrder - b.displayOrder,
+      )
     : [];
 
   const createPageAction = createPage.bind(null, serialSlug);
@@ -173,8 +190,11 @@ export function NewPageForm({
           />
         ) : (
           <Text muted className="text-sm">
-            No {chapterTypeLabel}s yet.{' '}
-            <Link href={`/${serialSlug}`} className="text-blue-600 hover:underline">
+            No {chapterTypeLabel}s yet.{" "}
+            <Link
+              href={`/${serialSlug}`}
+              className="text-blue-600 hover:underline"
+            >
               Add a {chapterTypeLabel} first.
             </Link>
           </Text>
@@ -199,7 +219,11 @@ export function NewPageForm({
         <Box col className="gap-1">
           <Label htmlFor="templateId">Use template</Label>
           {/* Hidden input so the form always submits a templateId value */}
-          <input type="hidden" name="templateId" value={selectedTemplateId > 0 ? selectedTemplateId : ''} />
+          <input
+            type="hidden"
+            name="templateId"
+            value={selectedTemplateId > 0 ? selectedTemplateId : ""}
+          />
           <Select
             id="templateId"
             options={templateOptions}
@@ -214,32 +238,46 @@ export function NewPageForm({
 
               {sortedTemplateSections.length > 0 ? (
                 <div>
-                  <Text muted className="text-xs mb-1">Sections</Text>
+                  <Text muted className="text-xs mb-1">
+                    Sections
+                  </Text>
                   <Box col className="gap-0.5">
                     {sortedTemplateSections.map((s) => (
-                      <Text key={s.id} className="text-sm pl-2 border-l-2 border-gray-300">
+                      <Text
+                        key={s.id}
+                        className="text-sm pl-2 border-l-2 border-gray-300"
+                      >
                         {s.name}
                       </Text>
                     ))}
                   </Box>
                 </div>
               ) : (
-                <Text muted className="text-xs">No sections defined — will use default Summary section.</Text>
+                <Text muted className="text-xs">
+                  No sections defined — will use default Summary section.
+                </Text>
               )}
 
               {selectedTemplate.hasInfobox && (
                 <div>
-                  <Text muted className="text-xs mb-1">Infobox rows</Text>
+                  <Text muted className="text-xs mb-1">
+                    Infobox rows
+                  </Text>
                   {sortedTemplateInfoboxSections.length > 0 ? (
                     <Box col className="gap-0.5">
                       {sortedTemplateInfoboxSections.map((s) => (
-                        <Text key={s.id} className="text-sm pl-2 border-l-2 border-gray-300">
+                        <Text
+                          key={s.id}
+                          className="text-sm pl-2 border-l-2 border-gray-300"
+                        >
                           {s.label}
                         </Text>
                       ))}
                     </Box>
                   ) : (
-                    <Text muted className="text-xs">No infobox rows defined.</Text>
+                    <Text muted className="text-xs">
+                      No infobox rows defined.
+                    </Text>
                   )}
                 </div>
               )}

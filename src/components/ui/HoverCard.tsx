@@ -29,12 +29,8 @@ interface HoverCardProps {
  *   <p>Preview content for Foo</p>
  * </HoverCard>
  */
-export function HoverCard({
-  trigger,
-  children,
-  side = "bottom",
-  className,
-}: HoverCardProps) {
+export function HoverCard(props: HoverCardProps) {
+  const { trigger, children, side = "bottom", className } = props;
   return (
     <PreviewCardPrimitive.Root>
       <PreviewCardPrimitive.Trigger
@@ -45,7 +41,11 @@ export function HoverCard({
         {trigger}
       </PreviewCardPrimitive.Trigger>
       <PreviewCardPrimitive.Portal>
-        <PreviewCardPrimitive.Positioner side={side} sideOffset={8} align="start">
+        <PreviewCardPrimitive.Positioner
+          side={side}
+          sideOffset={8}
+          align="start"
+        >
           <PreviewCardPrimitive.Popup
             className={cn(
               "z-50 w-72 rounded-lg border border-gray-200 bg-white p-4 shadow-lg",

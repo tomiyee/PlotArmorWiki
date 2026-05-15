@@ -2,11 +2,12 @@ import ReactMarkdown, { Components } from "react-markdown";
 import type { PluggableList } from "unified";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import { Text } from "@/components/ui/text";
+import { Text } from "@/components/ui/Text";
 import { remarkWikiLinks } from "@/lib/remark-wiki-links";
 import { WikiLinkPreview } from "@/components/WikiLinkPreview";
 
-interface Props {
+interface MarkdownRendererProps {
+  /** Raw markdown string to render. */
   children: string;
   /** Extra classes to merge onto the wrapper. */
   className?: string;
@@ -208,7 +209,8 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
  * <MarkdownRenderer sm className="mt-2">{schema.body}</MarkdownRenderer>
  * <MarkdownRenderer serialSlug="one-piece">{section.content}</MarkdownRenderer>
  */
-export function MarkdownRenderer({ children, className, sm = false, serialSlug }: Props) {
+export function MarkdownRenderer(props: MarkdownRendererProps) {
+  const { children, className, sm = false, serialSlug } = props;
   const remarkPlugins: PluggableList = [remarkGfm];
   if (serialSlug) remarkPlugins.push(remarkWikiLinks(serialSlug));
 
@@ -219,10 +221,7 @@ export function MarkdownRenderer({ children, className, sm = false, serialSlug }
 
   return (
     <div className={cn("max-w-none", className)}>
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        components={components}
-      >
+      <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
         {children}
       </ReactMarkdown>
     </div>

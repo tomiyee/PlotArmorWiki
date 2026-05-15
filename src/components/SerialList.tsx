@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Input } from '@/components/ui/input';
-import { Text } from '@/components/ui/text';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Input } from "@/components/ui/Input";
+import { Text } from "@/components/ui/Text";
 
 type Serial = {
   id: number;
@@ -18,18 +18,18 @@ type Props = {
 };
 
 export default function SerialList({ serials }: Props) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const router = useRouter();
 
   const filtered = query.trim()
     ? serials.filter((s) =>
-        s.title.toLowerCase().includes(query.trim().toLowerCase())
+        s.title.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : serials;
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && query.trim() && filtered.length === 0) {
-      router.push('/new?title=' + encodeURIComponent(query.trim()));
+    if (e.key === "Enter" && query.trim() && filtered.length === 0) {
+      router.push("/new?title=" + encodeURIComponent(query.trim()));
     }
   }
 
@@ -51,7 +51,9 @@ export default function SerialList({ serials }: Props) {
                 href={`/${serial.slug}`}
                 className="block rounded-lg border px-4 py-3 hover:bg-gray-50 transition-colors"
               >
-                <Text as="span" variant="label" className="font-medium">{serial.title}</Text>
+                <Text as="span" variant="label" className="font-medium">
+                  {serial.title}
+                </Text>
               </Link>
             </li>
           ))}
@@ -59,10 +61,10 @@ export default function SerialList({ serials }: Props) {
       ) : (
         <Text muted className="mt-2">
           {query.trim() ? (
-            'No serials match your search.'
+            "No serials match your search."
           ) : (
             <>
-              No wikis yet —{' '}
+              No wikis yet —{" "}
               <Link href="/new" className="text-blue-600 hover:underline">
                 create one
               </Link>

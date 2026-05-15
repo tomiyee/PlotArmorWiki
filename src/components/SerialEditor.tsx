@@ -32,11 +32,11 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import {
   Dialog,
   DialogHeader,
@@ -45,7 +45,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog";
+} from "@/components/ui/Dialog";
 import { useServerAction } from "@/hooks/useServerAction";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import {
@@ -54,7 +54,7 @@ import {
   ChapterType,
   VolumeType,
 } from "@/lib/serial-types";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface Chapter {
   id: number;
@@ -183,7 +183,9 @@ function VolumeDragPreview({
               key={chapter.id}
               className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
             >
-              <Text as="span" variant="label" className="truncate">{chapter.displayName}</Text>
+              <Text as="span" variant="label" className="truncate">
+                {chapter.displayName}
+              </Text>
               <Text as="span" muted>
                 #{chapter.idx}
               </Text>
@@ -199,7 +201,9 @@ function VolumeDragPreview({
 function ChapterDragPreview({ chapter }: { chapter: Chapter }) {
   return (
     <li className="flex items-center justify-between rounded-md px-3 py-2 text-sm bg-white border border-gray-200 shadow-lg list-none">
-      <Text as="span" variant="label" className="truncate">{chapter.displayName}</Text>
+      <Text as="span" variant="label" className="truncate">
+        {chapter.displayName}
+      </Text>
       <Text as="span" muted>
         #{chapter.idx}
       </Text>
@@ -417,12 +421,22 @@ function SortableVolumeItem({
                   <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
                 </span>
               ) : (
-                <Tooltip content={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}>
+                <Tooltip
+                  content={
+                    isCollapsed
+                      ? `Expand ${volume.displayName}`
+                      : `Collapse ${volume.displayName}`
+                  }
+                >
                   <Button
                     variant="ghost"
                     size="icon-xs"
                     onClick={onToggleCollapse}
-                    aria-label={isCollapsed ? `Expand ${volume.displayName}` : `Collapse ${volume.displayName}`}
+                    aria-label={
+                      isCollapsed
+                        ? `Expand ${volume.displayName}`
+                        : `Collapse ${volume.displayName}`
+                    }
                     className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
                   >
                     <FontAwesomeIcon
@@ -446,7 +460,9 @@ function SortableVolumeItem({
               </Text>
             </Box>
             {editing && (
-              <Tooltip content={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}>
+              <Tooltip
+                content={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}
+              >
                 <Button
                   type="button"
                   variant="destructive"
@@ -464,35 +480,36 @@ function SortableVolumeItem({
 
       {/* Chapter list — SortableContext only; DndContext lives in the parent SerialEditor */}
       {/* Hidden when collapsed in read mode; always shown in edit mode. */}
-      {(editing || !isCollapsed) && (vChapters.length > 0 ? (
-        <SortableContext
-          items={vChapters.map((c) => c.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
-            {vChapters.map((chapter) => (
-              <SortableChapterItem
-                key={chapter.id}
-                chapter={chapter}
-                editing={editing}
-                isRenaming={renamingChapterId === chapter.id}
-                isPending={isPending}
-                isVolumeDragging={isVolumeDragging}
-                onStartRename={() => onStartRenameChapter(chapter.id)}
-                onSaveRename={onSaveRenameChapter}
-                onCancelRename={onCancelRenameChapter}
-                onDelete={() =>
-                  onDeleteChapter(chapter.id, chapter.displayName)
-                }
-              />
-            ))}
-          </ol>
-        </SortableContext>
-      ) : (
-        <Text muted className="pl-3">
-          No {chapterType.toLowerCase()}s yet.
-        </Text>
-      ))}
+      {(editing || !isCollapsed) &&
+        (vChapters.length > 0 ? (
+          <SortableContext
+            items={vChapters.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+              {vChapters.map((chapter) => (
+                <SortableChapterItem
+                  key={chapter.id}
+                  chapter={chapter}
+                  editing={editing}
+                  isRenaming={renamingChapterId === chapter.id}
+                  isPending={isPending}
+                  isVolumeDragging={isVolumeDragging}
+                  onStartRename={() => onStartRenameChapter(chapter.id)}
+                  onSaveRename={onSaveRenameChapter}
+                  onCancelRename={onCancelRenameChapter}
+                  onDelete={() =>
+                    onDeleteChapter(chapter.id, chapter.displayName)
+                  }
+                />
+              ))}
+            </ol>
+          </SortableContext>
+        ) : (
+          <Text muted className="pl-3">
+            No {chapterType.toLowerCase()}s yet.
+          </Text>
+        ))}
 
       {/* Add chapter — toggle between button and inline form */}
       {editing &&
@@ -576,10 +593,9 @@ export function SerialEditor({
   // the user explicitly opens to manage volumes and chapters.
   const editing = true;
 
-  const [volCollapsed, setVolCollapsed] = usePersistedStore<Record<number, boolean>>(
-    `plotarmor:toc-collapsed:${serialId}`,
-    {},
-  );
+  const [volCollapsed, setVolCollapsed] = usePersistedStore<
+    Record<number, boolean>
+  >(`plotarmor:toc-collapsed:${serialId}`, {});
 
   function toggleVolume(volumeId: number) {
     setVolCollapsed((prev) => ({ ...prev, [volumeId]: !prev[volumeId] }));

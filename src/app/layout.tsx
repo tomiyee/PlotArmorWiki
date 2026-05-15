@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModeFAB } from "@/components/EditModeFAB";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/Tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

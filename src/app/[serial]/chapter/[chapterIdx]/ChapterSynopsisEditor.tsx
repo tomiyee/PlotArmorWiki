@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
-import { Box } from "@/components/ui/box";
-import { Text } from "@/components/ui/text";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import { Box } from "@/components/ui/Box";
+import { Text } from "@/components/ui/Text";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { MDEditor } from "@/components/MDEditor";
 
@@ -12,7 +12,11 @@ interface Props {
   serialSlug: string;
   chapterIdx: number;
   initialContent: string;
-  saveAction: (serialSlug: string, chapterIdx: number, content: string) => Promise<void>;
+  saveAction: (
+    serialSlug: string,
+    chapterIdx: number,
+    content: string,
+  ) => Promise<void>;
 }
 
 /**
@@ -79,7 +83,11 @@ export function ChapterSynopsisEditor({
             }}
           />
         </div>
-        {isPending && <Text muted className="text-sm">Saving…</Text>}
+        {isPending && (
+          <Text muted className="text-sm">
+            Saving…
+          </Text>
+        )}
       </Box>
     );
   }

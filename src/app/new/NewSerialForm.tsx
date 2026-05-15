@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { createSerial } from './actions';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { PageContainer } from '@/components/ui/page-container';
-import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from '@/lib/serial-types';
-import { WikiLinkMDEditor } from '@/components/WikiLinkMDEditor';
+import { useEffect, useRef, useState } from "react";
+import { createSerial } from "./actions";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Label } from "@/components/ui/Label";
+import { Button } from "@/components/ui/Button";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from "@/lib/serial-types";
+import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 
 type Props = {
   /** Pre-filled title value, e.g. from a search-to-create redirect. When non-empty the input is focused automatically. */
@@ -27,8 +27,8 @@ type Props = {
  * <NewSerialForm defaultTitle="One Piece" />
  */
 export default function NewSerialForm({ defaultTitle }: Props) {
-  const [authors, setAuthors] = useState<string[]>(['']);
-  const [description, setDescription] = useState('');
+  const [authors, setAuthors] = useState<string[]>([""]);
+  const [description, setDescription] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function NewSerialForm({ defaultTitle }: Props) {
   }, [defaultTitle]);
 
   function addAuthor() {
-    setAuthors((prev) => [...prev, '']);
+    setAuthors((prev) => [...prev, ""]);
   }
 
   function removeAuthor(index: number) {
@@ -52,7 +52,9 @@ export default function NewSerialForm({ defaultTitle }: Props) {
   return (
     <main className="flex-1 min-h-0 overflow-y-scroll">
       <PageContainer className="max-w-lg">
-        <Text variant="h1" className="text-2xl mb-8">Create a new wiki</Text>
+        <Text variant="h1" className="text-2xl mb-8">
+          Create a new wiki
+        </Text>
         <form action={createSerial} className="flex flex-col gap-5">
           {/* Title */}
           <Box col className="gap-1">
@@ -72,11 +74,12 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           {/* Description */}
           <Box col className="gap-1">
             <Label htmlFor="description">
-              Description <span className="text-gray-400">(optional, Markdown)</span>
+              Description{" "}
+              <span className="text-gray-400">(optional, Markdown)</span>
             </Label>
             <WikiLinkMDEditor
               value={description}
-              onChange={(v) => setDescription(v ?? '')}
+              onChange={(v) => setDescription(v ?? "")}
               height={200}
               wikiPages={[]}
               serialSlug=""

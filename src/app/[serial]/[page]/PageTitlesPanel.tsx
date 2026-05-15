@@ -2,13 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { InfoIcon } from "@/components/ui/info-icon";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { InfoIcon } from "@/components/ui/InfoIcon";
 import { addPageTitle, deletePageTitle } from "./actions";
 import type { PageTitleEntry, ChapterGroupOption } from "./types";
 
@@ -51,7 +51,12 @@ export function PageTitlesPanel({
   function handleAddTitle() {
     if (newTitleChapterId === -1 || !newTitleText.trim()) return;
     startTransition(async () => {
-      await addPageTitle(serialSlug, pageSlug, newTitleChapterId, newTitleText.trim());
+      await addPageTitle(
+        serialSlug,
+        pageSlug,
+        newTitleChapterId,
+        newTitleText.trim(),
+      );
       setNewTitleText("");
       setNewTitleChapterId(-1);
       router.refresh();
@@ -152,7 +157,9 @@ export function PageTitlesPanel({
           </Box>
           <Button
             onClick={handleAddTitle}
-            disabled={disabled || newTitleChapterId === -1 || !newTitleText.trim()}
+            disabled={
+              disabled || newTitleChapterId === -1 || !newTitleText.trim()
+            }
             size="sm"
           >
             Add title

@@ -2,9 +2,9 @@
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { useEditMode } from "@/contexts/EditModeContext";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * Fixed bottom-right floating action button that drives the global edit mode.
@@ -46,19 +46,11 @@ export function EditModeFAB() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex gap-2">
-      <Button
-        variant="outline"
-        onClick={discard}
-        className="shadow-lg"
-      >
+      <Button variant="outline" onClick={discard} className="shadow-lg">
         <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
         Discard
       </Button>
-      <Button
-        variant="default"
-        onClick={save}
-        className="shadow-lg"
-      >
+      <Button variant="default" onClick={save} className="shadow-lg">
         <FontAwesomeIcon icon={faCheck} className="h-4 w-4" />
         Save
       </Button>

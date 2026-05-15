@@ -2,12 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPencil, faChevronDown, faChevronRight } from "@fortawesome/free-solid-svg-icons";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import {
+  faTrash,
+  faPencil,
+  faChevronDown,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Label } from "@/components/ui/Label";
 import { useServerAction } from "@/hooks/useServerAction";
 import { TemplateSectionList } from "./TemplateSectionList";
 import { TemplateInfoboxSectionList } from "./TemplateInfoboxSectionList";
@@ -144,24 +149,43 @@ export function TemplateItem({
               onBlur={handleRename}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleRename();
-                if (e.key === "Escape") { setRenameDraft(template.name); setRenaming(false); }
+                if (e.key === "Escape") {
+                  setRenameDraft(template.name);
+                  setRenaming(false);
+                }
               }}
               autoFocus
               className="h-7 text-sm"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <Text variant="h4" as="span" className="truncate">{template.name}</Text>
+            <Text variant="h4" as="span" className="truncate">
+              {template.name}
+            </Text>
           )}
         </button>
         <Box className="items-center gap-1 shrink-0">
-          <Button type="button" variant="ghost" size="icon-sm" title="Rename template"
-            onClick={() => { setRenaming((p) => !p); setRenameDraft(template.name); }}
-            disabled={isPending}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            title="Rename template"
+            onClick={() => {
+              setRenaming((p) => !p);
+              setRenameDraft(template.name);
+            }}
+            disabled={isPending}
+          >
             <FontAwesomeIcon icon={faPencil} className="h-3 w-3" />
           </Button>
-          <Button type="button" variant="ghost" size="icon-sm" title="Delete template"
-            onClick={handleDelete} disabled={isPending}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            title="Delete template"
+            onClick={handleDelete}
+            disabled={isPending}
+          >
             <FontAwesomeIcon icon={faTrash} className="h-3 w-3 text-red-500" />
           </Button>
         </Box>
@@ -178,7 +202,9 @@ export function TemplateItem({
               disabled={isPending}
               className="h-4 w-4 rounded border-gray-300"
             />
-            <Label htmlFor={`has-infobox-${template.id}`}>Has infobox sidebar</Label>
+            <Label htmlFor={`has-infobox-${template.id}`}>
+              Has infobox sidebar
+            </Label>
           </Box>
           <TemplateSectionList
             sections={sortedSections}

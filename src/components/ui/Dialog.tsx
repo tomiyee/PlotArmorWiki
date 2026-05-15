@@ -1,11 +1,22 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import * as React from "react";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { XIcon } from "lucide-react";
+
+type DialogProps = {
+  /** Whether the dialog is visible. */
+  isOpen: boolean;
+  /** Called when the dialog requests closure (Escape key, X button, or backdrop click). */
+  onClose: () => void;
+  /** Whether to render the X close button in the top-right corner. Defaults to `true`. */
+  showCloseButton?: boolean;
+  /** Content rendered inside the dialog popup. */
+  children: React.ReactNode;
+} & Omit<DialogPrimitive.Root.Props, "open" | "onOpenChange">;
 
 /**
  * Controlled modal dialog. Renders a backdrop, centered popup, and an optional
@@ -29,24 +40,16 @@ import { XIcon } from "lucide-react"
  *   )
  * }
  */
-function Dialog({
-  isOpen,
-  onClose,
-  showCloseButton = true,
-  children,
-  ...props
-}: {
-  isOpen: boolean
-  onClose: () => void
-  showCloseButton?: boolean
-  children: React.ReactNode
-} & Omit<DialogPrimitive.Root.Props, "open" | "onOpenChange">) {
+function Dialog(props: DialogProps) {
+  const { isOpen, onClose, showCloseButton = true, children, ...rest } = props;
   return (
     <DialogPrimitive.Root
       data-slot="dialog"
       open={isOpen}
-      onOpenChange={(open) => { if (!open) onClose() }}
-      {...props}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      {...rest}
     >
       <DialogPrimitive.Portal data-slot="dialog-portal">
         <DialogPrimitive.Backdrop
@@ -76,7 +79,7 @@ function Dialog({
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
-  )
+  );
 }
 
 /**
@@ -89,7 +92,7 @@ function Dialog({
  * </DialogFooter>
  */
 function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
 /**
@@ -107,11 +110,11 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="dialog-header"
       className={cn(
         "flex shrink-0 items-center gap-2 border-b px-4 py-3",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 /**
@@ -131,7 +134,7 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
       className={cn("flex-1 overflow-y-auto px-4 py-4", className)}
       {...props}
     />
-  )
+  );
 }
 
 /**
@@ -150,11 +153,11 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="dialog-footer"
       className={cn(
         "flex shrink-0 flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 px-4 py-3 sm:flex-row sm:justify-end",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 /**
@@ -173,7 +176,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
       className={cn("flex-1 text-base leading-none font-semibold", className)}
       {...props}
     />
-  )
+  );
 }
 
 /**
@@ -194,11 +197,11 @@ function DialogDescription({
       data-slot="dialog-description"
       className={cn(
         "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -209,4 +212,4 @@ export {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-}
+};

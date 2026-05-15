@@ -3,17 +3,26 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import { useServerAction } from "@/hooks/useServerAction";
 import { useEditMode } from "@/contexts/EditModeContext";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/Card";
 import { TemplateItem } from "./TemplateItem";
 import type { TemplateManagerProps } from "./types";
 
-export type { Template, TemplateSection, TemplateInfoboxSection } from "./types";
+export type {
+  Template,
+  TemplateSection,
+  TemplateInfoboxSection,
+} from "./types";
 
 /**
  * Manages the set of reusable page templates for a serial. Only renders the
@@ -80,14 +89,19 @@ export function TemplateManager({
                   toggleTemplateInfoboxAction={toggleTemplateInfoboxAction}
                   addTemplateSectionAction={addTemplateSectionAction}
                   deleteTemplateSectionAction={deleteTemplateSectionAction}
-                  addTemplateInfoboxSectionAction={addTemplateInfoboxSectionAction}
-                  deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionAction}
+                  addTemplateInfoboxSectionAction={
+                    addTemplateInfoboxSectionAction
+                  }
+                  deleteTemplateInfoboxSectionAction={
+                    deleteTemplateInfoboxSectionAction
+                  }
                 />
               ))}
             </Box>
           ) : (
             <Text muted>
-              No templates yet. Create one to pre-populate sections when making new pages.
+              No templates yet. Create one to pre-populate sections when making
+              new pages.
             </Text>
           )}
         </CardContent>
@@ -99,24 +113,44 @@ export function TemplateManager({
                 value={newTemplateName}
                 onChange={(e) => setNewTemplateName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); handleCreate(); }
-                  if (e.key === "Escape") { setCreating(false); setNewTemplateName(""); }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreate();
+                  }
+                  if (e.key === "Escape") {
+                    setCreating(false);
+                    setNewTemplateName("");
+                  }
                 }}
                 autoFocus
                 className="flex-1"
                 disabled={isPending}
               />
-              <Button type="button" onClick={handleCreate} disabled={isPending || !newTemplateName.trim()}>
+              <Button
+                type="button"
+                onClick={handleCreate}
+                disabled={isPending || !newTemplateName.trim()}
+              >
                 Create
               </Button>
-              <Button type="button" variant="ghost"
-                onClick={() => { setCreating(false); setNewTemplateName(""); }}
-                disabled={isPending}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setCreating(false);
+                  setNewTemplateName("");
+                }}
+                disabled={isPending}
+              >
                 Cancel
               </Button>
             </Box>
           ) : (
-            <Button type="button" variant="outline" onClick={() => setCreating(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreating(true)}
+            >
               <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
               New template
             </Button>

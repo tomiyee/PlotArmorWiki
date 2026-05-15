@@ -22,10 +22,15 @@ const variantElement: Record<TextVariant, React.ElementType> = {
 };
 
 type TextProps<C extends React.ElementType> = {
+  /** Typography style variant. Defaults to `"body"`. */
   variant?: TextVariant;
+  /** Override the rendered HTML element. Defaults to the element for the chosen variant. */
   as?: C;
+  /** Apply `text-gray-500` — useful for secondary or helper text. */
   muted?: boolean;
+  /** Extra classes merged onto the rendered element. */
   className?: string;
+  /** Text or elements to render inside. */
   children?: React.ReactNode;
 } & Omit<React.ComponentPropsWithoutRef<C>, "className" | "children">;
 
@@ -43,14 +48,10 @@ type TextProps<C extends React.ElementType> = {
  * // For labels, prefer the Label component:
  * // <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
  */
-function Text<C extends React.ElementType = React.ElementType>({
-  variant = "body",
-  as,
-  muted,
-  className,
-  children,
-  ...props
-}: TextProps<C>) {
+function Text<C extends React.ElementType = React.ElementType>(
+  props: TextProps<C>,
+) {
+  const { variant = "body", as, muted, className, children, ...rest } = props;
   const Component = as ?? variantElement[variant];
   return (
     <Component
@@ -59,7 +60,7 @@ function Text<C extends React.ElementType = React.ElementType>({
         muted && "text-gray-500",
         className,
       )}
-      {...props}
+      {...rest}
     >
       {children}
     </Component>

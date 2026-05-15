@@ -1,24 +1,29 @@
 "use client";
 
-import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
 
 // ---------------------------------------------------------------------------
 // Menu
 // ---------------------------------------------------------------------------
 
 interface MenuProps {
+  /** Whether the dropdown panel is visible. */
   isOpen: boolean;
+  /** Called when a click-outside event is detected. */
   onClose: () => void;
   /** Panel contents rendered below the trigger when open. */
   contents: React.ReactNode;
   /** Trigger element(s). The consumer owns the open/close interaction. */
   children: React.ReactNode;
+  /** Horizontal alignment of the panel relative to the trigger. Defaults to `"left"`. */
   align?: "left" | "right";
+  /** Extra classes merged onto the dropdown panel. */
   panelClassName?: string;
   /** ARIA role for the panel div (default: `"listbox"`). */
   role?: string;
+  /** Accessible label for the panel element. */
   "aria-label"?: string;
 }
 
@@ -36,19 +41,20 @@ interface MenuProps {
  *   <Button onClick={() => setOpen(v => !v)}>Open</Button>
  * </Menu>
  */
-function Menu({
-  isOpen,
-  onClose,
-  contents,
-  children,
-  align = "left",
-  panelClassName,
-  role = "listbox",
-  "aria-label": ariaLabel,
-}: MenuProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
+function Menu(props: MenuProps) {
+  const {
+    isOpen,
+    onClose,
+    contents,
+    children,
+    align = "left",
+    panelClassName,
+    role = "listbox",
+    "aria-label": ariaLabel,
+  } = props;
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen) return;
     function handleOutsideClick(e: MouseEvent) {
       if (
@@ -87,18 +93,24 @@ function Menu({
 // ---------------------------------------------------------------------------
 
 interface MenuItemBaseProps extends React.ComponentProps<"button"> {
+  /** Discriminant — omit or set `false` for a regular item. */
   group?: false;
+  /** Highlights the item as the currently active selection. */
   selected?: boolean;
 }
 
 interface MenuItemGroupProps {
+  /** Discriminant — must be `true` to render as a collapsible group header row. */
   group: true;
   /** Header text rendered on the collapsible group row. */
   label: React.ReactNode;
   /** Whether the group body is expanded. */
   isOpen?: boolean;
+  /** Called when the group header row is clicked (use to toggle `isOpen`). */
   onClick?: () => void;
+  /** Items shown beneath the header when `isOpen` is true. */
   children?: React.ReactNode;
+  /** Extra classes merged onto the group header button. */
   className?: string;
 }
 
@@ -144,7 +156,7 @@ function MenuItem(props: MenuItemProps) {
     );
   }
 
-  const { selected, className, group: _group, ...rest } = props as MenuItemBaseProps;
+  const { selected, className, ...rest } = props;
   return (
     <button
       type="button"

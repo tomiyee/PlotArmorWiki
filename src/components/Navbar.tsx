@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { PagesDropdown } from "@/components/navbar/PagesDropdown";
-import { Text } from "@/components/ui/text";
+import { Text } from "@/components/ui/Text";
 
 /**
  * Global top navbar. When on a serial route, the serial layout injects typed

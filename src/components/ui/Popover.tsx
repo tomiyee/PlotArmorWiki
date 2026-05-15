@@ -11,10 +11,15 @@ export const PopoverPositioner = PopoverPrimitive.Positioner;
 export const PopoverClose = PopoverPrimitive.Close;
 
 interface PopoverContentProps {
+  /** Content rendered inside the popover popup. */
   children: ReactNode;
+  /** Extra classes merged onto the popup container. */
   className?: string;
+  /** Which side of the trigger to render the popup on. Defaults to `"bottom"`. */
   side?: "top" | "right" | "bottom" | "left";
+  /** Alignment of the popup relative to the trigger. Defaults to `"start"`. */
   align?: "start" | "center" | "end";
+  /** Gap in pixels between the trigger and popup. Defaults to `8`. */
   sideOffset?: number;
 }
 
@@ -28,13 +33,14 @@ interface PopoverContentProps {
  *   <PopoverContent side="bottom">Content here</PopoverContent>
  * </PopoverRoot>
  */
-export function PopoverContent({
-  children,
-  className,
-  side = "bottom",
-  align = "start",
-  sideOffset = 8,
-}: PopoverContentProps) {
+export function PopoverContent(props: PopoverContentProps) {
+  const {
+    children,
+    className,
+    side = "bottom",
+    align = "start",
+    sideOffset = 8,
+  } = props;
   return (
     <PopoverPortal>
       <PopoverPositioner side={side} align={align} sideOffset={sideOffset}>

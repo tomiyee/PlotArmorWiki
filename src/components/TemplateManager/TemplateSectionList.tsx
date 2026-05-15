@@ -2,10 +2,10 @@
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import type { TemplateSection } from "./types";
 
 interface TemplateSectionListProps {

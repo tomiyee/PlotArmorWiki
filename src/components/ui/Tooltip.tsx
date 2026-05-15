@@ -19,10 +19,11 @@ export const TooltipProvider = TooltipPrimitive.Provider;
 interface TooltipProps {
   /** The label shown inside the tooltip bubble. */
   content: ReactNode;
-  /** Which side of the trigger to render the tooltip on. Defaults to "top". */
+  /** Which side of the trigger to render the tooltip on. Defaults to `"top"`. */
   side?: "top" | "right" | "bottom" | "left";
   /** The trigger element — must be a single focusable element. */
   children: ReactNode;
+  /** Extra classes merged onto the tooltip popup. */
   className?: string;
 }
 
@@ -42,7 +43,8 @@ interface TooltipProps {
  *   </Button>
  * </Tooltip>
  */
-export function Tooltip({ content, side = "top", children, className }: TooltipProps) {
+export function Tooltip(props: TooltipProps) {
+  const { content, side = "top", children, className } = props;
   return (
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger render={<span className="inline-flex" />}>

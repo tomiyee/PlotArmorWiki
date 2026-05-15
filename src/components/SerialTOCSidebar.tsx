@@ -3,17 +3,17 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen } from "@fortawesome/free-solid-svg-icons";
-import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
+import { Button } from "@/components/ui/Button";
+import { Text } from "@/components/ui/Text";
 import {
   Dialog,
   DialogHeader,
   DialogTitle,
   DialogBody,
-} from "@/components/ui/dialog";
+} from "@/components/ui/Dialog";
 import { SerialTOC } from "@/components/SerialTOC";
 import { SerialEditor } from "@/components/SerialEditor";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { ChapterData, Volume } from "@/types";
 import { ChapterType, VolumeType } from "@/lib/serial-types";
 
@@ -74,7 +74,10 @@ export function SerialTOCSidebar({
         >
           Contents
         </Text>
-        <Tooltip content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`} side="right">
+        <Tooltip
+          content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
+          side="right"
+        >
           <Button
             variant="ghost"
             size="icon-xs"

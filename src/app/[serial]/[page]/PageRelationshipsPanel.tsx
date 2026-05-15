@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash } from "@fortawesome/free-solid-svg-icons";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useServerAction } from "@/hooks/useServerAction";
 import { addPageRelationship, removePageRelationship } from "./actions";
 
@@ -65,7 +65,11 @@ export function PageRelationshipsPanel({
   async function handleAddParent() {
     if (!selectedParentId || !chapterId) return;
     setAddError(null);
-    const result = await addPageRelationship(pageId, selectedParentId, chapterId);
+    const result = await addPageRelationship(
+      pageId,
+      selectedParentId,
+      chapterId,
+    );
     if (result?.error) {
       setAddError(result.error);
     } else {
@@ -77,7 +81,11 @@ export function PageRelationshipsPanel({
   async function handleRemoveParent(parentPageId: number) {
     if (!chapterId) return;
     setRemoveError(null);
-    const result = await removePageRelationship(pageId, parentPageId, chapterId);
+    const result = await removePageRelationship(
+      pageId,
+      parentPageId,
+      chapterId,
+    );
     if (result?.error) {
       setRemoveError(result.error);
     } else {

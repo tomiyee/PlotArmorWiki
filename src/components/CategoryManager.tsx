@@ -4,11 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Label } from "@/components/ui/Label";
 import { useServerAction } from "@/hooks/useServerAction";
 import { useEditMode } from "@/contexts/EditModeContext";
 
@@ -43,11 +43,8 @@ interface CategoryManagerProps {
  *   addCategoryAction={addCategoryAction}
  * />
  */
-export function CategoryManager({
-  categories,
-  serialSlug,
-  addCategoryAction,
-}: CategoryManagerProps) {
+export function CategoryManager(props: CategoryManagerProps) {
+  const { categories, serialSlug, addCategoryAction } = props;
   const { run, isPending } = useServerAction();
   const { isEditing } = useEditMode();
   const [addingCategory, setAddingCategory] = useState(false);
@@ -117,7 +114,9 @@ export function CategoryManager({
                   required
                   placeholder="e.g. Characters, Locations…"
                   autoFocus
-                  onKeyDown={(e) => e.key === "Escape" && setAddingCategory(false)}
+                  onKeyDown={(e) =>
+                    e.key === "Escape" && setAddingCategory(false)
+                  }
                 />
               </Box>
               <Box className="items-center gap-2">

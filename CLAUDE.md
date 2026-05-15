@@ -33,17 +33,17 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 
 ### Tech stack
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router, SSR) |
-| Database | PostgreSQL (serverless) |
-| ORM | Drizzle ORM |
-| Auth | Auth.js (NextAuth v5) — not yet implemented |
-| Search | PostgreSQL full-text search (tsvector) — not yet implemented |
-| Markdown | `@uiw/react-md-editor` (edit) + `react-markdown` (render) |
-| Styling | Tailwind CSS v4 |
-| UI components | Shadcn UI (Button, Input, Select, Dialog) + custom Text |
-| Hosting | Vercel |
+| Layer         | Choice                                                       |
+| ------------- | ------------------------------------------------------------ |
+| Framework     | Next.js 16 (App Router, SSR)                                 |
+| Database      | PostgreSQL (serverless)                                      |
+| ORM           | Drizzle ORM                                                  |
+| Auth          | Auth.js (NextAuth v5) — not yet implemented                  |
+| Search        | PostgreSQL full-text search (tsvector) — not yet implemented |
+| Markdown      | `@uiw/react-md-editor` (edit) + `react-markdown` (render)    |
+| Styling       | Tailwind CSS v4                                              |
+| UI components | Shadcn UI (Button, Input, Select, Dialog) + custom Text      |
+| Hosting       | Vercel                                                       |
 
 ### Core data pattern: single-timestamp versioning
 
@@ -75,45 +75,45 @@ First-time visitors default to chapter 1 with a callout to update.
 
 ### Key files
 
-| File | Purpose / non-obvious notes |
-|---|---|
-| `spec.md` | Canonical product + data model spec. Consult before changing data model or spoiler logic. |
-| `src/db/schema.ts` | Drizzle table definitions; source of truth. |
-| `src/db/index.ts` | Drizzle client (postgres.js); exports `db`. |
-| `src/app/layout.tsx` | Root layout. `overflow-y-auto` wrapper prevents scrollbar shift when dialogs open. |
-| `src/app/[serial]/layout.tsx` | Fetches serial/volumes/chapters/home-page children; injects `<ChapterSelector>` + `<SerialTOCDrawer>` via `<SerialNavInjector>`. |
-| `src/app/[serial]/page.tsx` | Serial home; two-column layout with `<SerialTOCSidebar>`. |
-| `src/app/[serial]/actions.ts` | Volume/chapter CRUD + reorder. Reorder reassigns `chapters.idx`; no version repair needed (revisions keyed by `chapter_id`). |
-| `src/app/[serial]/new/actions.ts` | `createPage`: unique slug, inserts page + title + parent relationship, redirects. |
-| `src/app/[serial]/[page]/page.tsx` | Wiki page view. Reads cutoff from cookie, fetches chapter-filtered content, delegates to `<PageEditor>`. |
-| `src/app/[serial]/[page]/PageEditor.tsx` | Client Component owning page body. Edit mode: `<WikiLinkMDEditor>` per section, "Writing as of:" chapter selector, calls `getPageContentAtChapter` on chapter change. |
-| `src/app/[serial]/[page]/actions.ts` | `savePageContent` (upserts at target chapter) + `getPageContentAtChapter` (pre-fills edit drafts). |
-| `src/components/SerialEditor.tsx` | Volume/chapter edit UI with drag-and-drop reorder (`@dnd-kit`). Uses serial's type names (e.g. "Episode"/"Season"). |
-| `src/components/SerialMetadataEditor.tsx` | Inline serial title/description/authors/art edit. Redirects on slug change. |
-| `src/components/ChapterSelector.tsx` | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. Grouped volume dropdown with collapsible headers (collapse state persisted). |
-| `src/components/WikiLinkMDEditor.tsx` | `<MDEditor>` + `[[Category:Page]]` autocomplete. Uses `MarkdownRenderer` as preview so edit preview matches final render. |
-| `src/components/SerialNavInjector.tsx` | Client Component (renders null); injects serial data into navbar via `useLayoutEffect`. |
-| `src/components/ui/markdown-renderer.tsx` | Single source of truth for markdown styling. No `@tailwindcss/typography` — explicit Tailwind classes. Accepts `serialSlug` for wiki links, `sm` for compact mode. |
-| `src/components/ui/text.tsx` | `<Text variant>` typography. Variants: `h1`–`h4`, `body`, `muted`, `faint`, `label`. `as` overrides element. |
-| `src/components/ui/select.tsx` | Generic `<Select<T>>` over native `<select>`. Client Component. |
-| `src/components/ui/dialog.tsx` | Controlled dialog (`isOpen`/`onClose`). |
-| `src/hooks/useServerAction.ts` | Wraps server action in `useTransition` + `router.refresh()`. Use in all Client Components calling Server Actions. |
-| `src/hooks/usePersistedStore.ts` | `useState`-compatible, backed by `localStorage`. SSR-safe via `useSyncExternalStore`, cross-tab via `storage` event. |
-| `src/lib/serial-types.ts` | `ChapterType`/`VolumeType` types, arrays, parsers, Select options. Single source of truth — don't duplicate. |
-| `src/lib/wiki-links.ts` | `WIKI_LINK_RE`, `parseWikiLink()`, `slugifyWikiName()`. Shared by remark plugin + editor autocomplete. |
-| `src/lib/remark-wiki-links.ts` | Remark plugin: `[[Category:Page]]` → markdown links. Skips code blocks. |
-| `src/lib/slug.ts` | `titleToSlug`; computed at creation and stored in `serials.slug`. |
+| File                                      | Purpose / non-obvious notes                                                                                                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec.md`                                 | Canonical product + data model spec. Consult before changing data model or spoiler logic.                                                                             |
+| `src/db/schema.ts`                        | Drizzle table definitions; source of truth.                                                                                                                           |
+| `src/db/index.ts`                         | Drizzle client (postgres.js); exports `db`.                                                                                                                           |
+| `src/app/layout.tsx`                      | Root layout. `overflow-y-auto` wrapper prevents scrollbar shift when dialogs open.                                                                                    |
+| `src/app/[serial]/layout.tsx`             | Fetches serial/volumes/chapters/home-page children; injects `<ChapterSelector>` + `<SerialTOCDrawer>` via `<SerialNavInjector>`.                                      |
+| `src/app/[serial]/page.tsx`               | Serial home; two-column layout with `<SerialTOCSidebar>`.                                                                                                             |
+| `src/app/[serial]/actions.ts`             | Volume/chapter CRUD + reorder. Reorder reassigns `chapters.idx`; no version repair needed (revisions keyed by `chapter_id`).                                          |
+| `src/app/[serial]/new/actions.ts`         | `createPage`: unique slug, inserts page + title + parent relationship, redirects.                                                                                     |
+| `src/app/[serial]/[page]/page.tsx`        | Wiki page view. Reads cutoff from cookie, fetches chapter-filtered content, delegates to `<PageEditor>`.                                                              |
+| `src/app/[serial]/[page]/PageEditor.tsx`  | Client Component owning page body. Edit mode: `<WikiLinkMDEditor>` per section, "Writing as of:" chapter selector, calls `getPageContentAtChapter` on chapter change. |
+| `src/app/[serial]/[page]/actions.ts`      | `savePageContent` (upserts at target chapter) + `getPageContentAtChapter` (pre-fills edit drafts).                                                                    |
+| `src/components/SerialEditor.tsx`         | Volume/chapter edit UI with drag-and-drop reorder (`@dnd-kit`). Uses serial's type names (e.g. "Episode"/"Season").                                                   |
+| `src/components/SerialMetadataEditor.tsx` | Inline serial title/description/authors/art edit. Redirects on slug change.                                                                                           |
+| `src/components/ChapterSelector.tsx`      | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. Grouped volume dropdown with collapsible headers (collapse state persisted).               |
+| `src/components/WikiLinkMDEditor.tsx`     | `<MDEditor>` + `[[Category:Page]]` autocomplete. Uses `MarkdownRenderer` as preview so edit preview matches final render.                                             |
+| `src/components/SerialNavInjector.tsx`    | Client Component (renders null); injects serial data into navbar via `useLayoutEffect`.                                                                               |
+| `src/components/ui/markdown-renderer.tsx` | Single source of truth for markdown styling. No `@tailwindcss/typography` — explicit Tailwind classes. Accepts `serialSlug` for wiki links, `sm` for compact mode.    |
+| `src/components/ui/Text.tsx`              | `<Text variant>` typography. Variants: `h1`–`h4`, `body`, `muted`, `faint`, `label`. `as` overrides element.                                                          |
+| `src/components/ui/select.tsx`            | Generic `<Select<T>>` over native `<select>`. Client Component.                                                                                                       |
+| `src/components/ui/dialog.tsx`            | Controlled dialog (`isOpen`/`onClose`).                                                                                                                               |
+| `src/hooks/useServerAction.ts`            | Wraps server action in `useTransition` + `router.refresh()`. Use in all Client Components calling Server Actions.                                                     |
+| `src/hooks/usePersistedStore.ts`          | `useState`-compatible, backed by `localStorage`. SSR-safe via `useSyncExternalStore`, cross-tab via `storage` event.                                                  |
+| `src/lib/serial-types.ts`                 | `ChapterType`/`VolumeType` types, arrays, parsers, Select options. Single source of truth — don't duplicate.                                                          |
+| `src/lib/wiki-links.ts`                   | `WIKI_LINK_RE`, `parseWikiLink()`, `slugifyWikiName()`. Shared by remark plugin + editor autocomplete.                                                                |
+| `src/lib/remark-wiki-links.ts`            | Remark plugin: `[[Category:Page]]` → markdown links. Skips code blocks.                                                                                               |
+| `src/lib/slug.ts`                         | `titleToSlug`; computed at creation and stored in `serials.slug`.                                                                                                     |
 
 ### UI component conventions
 
 Always use design-system components instead of bare HTML:
 
-| Instead of | Use |
-|---|---|
-| `<input>` | `<Input>` from `@/components/ui/input` |
-| `<select>` | `<Select>` from `@/components/ui/select` |
-| `<button>` | `<Button>` from `@/components/ui/button` |
-| `<h1>`–`<h4>`, `<p>`, `<label>`, `<span>` | `<Text variant="…">` from `@/components/ui/text` |
+| Instead of                                | Use                                              |
+| ----------------------------------------- | ------------------------------------------------ |
+| `<input>`                                 | `<Input>` from `@/components/ui/input`           |
+| `<select>`                                | `<Select>` from `@/components/ui/select`         |
+| `<button>`                                | `<Button>` from `@/components/ui/button`         |
+| `<h1>`–`<h4>`, `<p>`, `<label>`, `<span>` | `<Text variant="…">` from `@/components/ui/Text` |
 
 ### JSDoc conventions
 
@@ -129,3 +129,17 @@ All exported components, hooks, and helpers must have a JSDoc block with at leas
  * const [val, setVal] = usePersistedStore("key", defaultValue);
  */
 ```
+
+### New component conventions
+
+Every new component must:
+
+1. **Declare an explicit named props type** — `type FooProps = { ... }` or `interface FooProps { ... }`. Never inline the type in the function signature.
+2. **Add a one-line JSDoc comment to each explicitly-declared prop** — document only props that are unique to this component (not ones inherited via `& ComponentProps<"div">`).
+3. **Use the `props` destructuring pattern** in the function body:
+   ```ts
+   export function Foo(props: FooProps) {
+     const { bar, baz = "default", ...rest } = props;
+   ```
+
+See `src/components/ui/Box.tsx` for the canonical reference.

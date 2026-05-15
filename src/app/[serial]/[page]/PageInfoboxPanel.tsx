@@ -3,12 +3,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { InfoIcon } from "@/components/ui/info-icon";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Button } from "@/components/ui/Button";
+import { InfoIcon } from "@/components/ui/InfoIcon";
 import { addInfoboxSection } from "./actions";
 import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
 import type { FloaterRowData } from "./types";
@@ -90,7 +90,10 @@ export function PageInfoboxPanel({
         </Box>
       ) : (
         <>
-          <PageInfoboxManager pageId={pageId} sections={infoboxSectionStructure} />
+          <PageInfoboxManager
+            pageId={pageId}
+            sections={infoboxSectionStructure}
+          />
 
           <Box col className="gap-1.5">
             <Label htmlFor="floater-image-url">Image URL</Label>

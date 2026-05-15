@@ -6,8 +6,8 @@ import {
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from "@/components/ui/accordion";
-import { Text } from "@/components/ui/text";
+} from "@/components/ui/Accordion";
+import { Text } from "@/components/ui/Text";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { ChapterData, Volume } from "@/types";
 

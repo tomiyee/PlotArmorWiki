@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { Text } from '@/components/ui/text';
-import { Box } from '@/components/ui/box';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { useServerAction } from '@/hooks/useServerAction';
-import { useEditMode } from '@/contexts/EditModeContext';
-import { Tooltip } from '@/components/ui/tooltip';
+import { useEffect, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Label } from "@/components/ui/Label";
+import { useServerAction } from "@/hooks/useServerAction";
+import { useEditMode } from "@/contexts/EditModeContext";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface SerialMetadataEditorProps {
   title: string;
@@ -42,14 +42,16 @@ export function SerialMetadataEditor({
   const { run, isPending } = useServerAction();
   const { isEditing, registerHandlers } = useEditMode();
   const [authorFields, setAuthorFields] = useState<string[]>(
-    authors.length > 0 ? authors : ['']
+    authors.length > 0 ? authors : [""],
   );
   // Draft values for controlled form fields in edit mode.
   const [draftTitle, setDraftTitle] = useState(title);
-  const [draftSplashArtUrl, setDraftSplashArtUrl] = useState(splashArtUrl ?? '');
+  const [draftSplashArtUrl, setDraftSplashArtUrl] = useState(
+    splashArtUrl ?? "",
+  );
 
   function addAuthor() {
-    setAuthorFields((prev) => [...prev, '']);
+    setAuthorFields((prev) => [...prev, ""]);
   }
 
   function removeAuthor(index: number) {
@@ -62,16 +64,16 @@ export function SerialMetadataEditor({
 
   function handleDiscard() {
     setDraftTitle(title);
-    setDraftSplashArtUrl(splashArtUrl ?? '');
-    setAuthorFields(authors.length > 0 ? authors : ['']);
+    setDraftSplashArtUrl(splashArtUrl ?? "");
+    setAuthorFields(authors.length > 0 ? authors : [""]);
   }
 
   function handleSave() {
     const fd = new FormData();
-    fd.set('title', draftTitle.trim());
-    fd.set('splashArtUrl', draftSplashArtUrl);
+    fd.set("title", draftTitle.trim());
+    fd.set("splashArtUrl", draftSplashArtUrl);
     for (const author of authorFields) {
-      fd.append('authors', author);
+      fd.append("authors", author);
     }
     run(updateMetadataAction, fd);
   }
@@ -85,9 +87,7 @@ export function SerialMetadataEditor({
     return (
       <Box col className="gap-2">
         <Text variant="h1">{title}</Text>
-        {authors.length > 0 && (
-          <Text muted>{authors.join(', ')}</Text>
-        )}
+        {authors.length > 0 && <Text muted>{authors.join(", ")}</Text>}
         {splashArtUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -173,9 +173,7 @@ export function SerialMetadataEditor({
           />
         </Box>
 
-        {isPending && (
-          <Text muted>Saving…</Text>
-        )}
+        {isPending && <Text muted>Saving…</Text>}
       </Box>
     </Box>
   );

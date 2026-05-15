@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { MDEditor } from "@/components/MDEditor";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 
 interface WikiPage {
   name: string;
@@ -53,7 +53,6 @@ export function WikiLinkMDEditor({
   wikiPages,
   serialSlug,
 }: Props) {
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -88,7 +87,9 @@ export function WikiLinkMDEditor({
 
     // Strip a legacy `Category:` prefix if present — filter by the page part.
     const colonIdx = triggerText.indexOf(":");
-    const pageQuery = (colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText).toLowerCase();
+    const pageQuery = (
+      colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText
+    ).toLowerCase();
 
     const next: Suggestion[] = wikiPages.filter((p) =>
       p.name.toLowerCase().startsWith(pageQuery),
@@ -144,7 +145,9 @@ export function WikiLinkMDEditor({
       case "ArrowUp":
         if (isComposing) return;
         e.preventDefault();
-        setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+        setActiveIndex(
+          (i) => (i - 1 + suggestions.length) % suggestions.length,
+        );
         break;
       case "Enter":
         if (isComposing) return;

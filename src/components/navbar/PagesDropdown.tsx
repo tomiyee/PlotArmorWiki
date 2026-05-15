@@ -4,9 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Menu } from "@/components/ui/menu";
-import { Text } from "@/components/ui/text";
+import { Button } from "@/components/ui/Button";
+import { Menu } from "@/components/ui/Menu";
+import { Text } from "@/components/ui/Text";
 import { CategoryNavData } from "@/types";
 
 interface Props {
@@ -33,7 +33,11 @@ export function PagesDropdown({ serialSlug, categories }: Props) {
       aria-label="Page categories"
       contents={
         categories.length === 0 ? (
-          <Text as="span" variant="label" className="block px-3 py-2 text-sm text-muted-foreground">
+          <Text
+            as="span"
+            variant="label"
+            className="block px-3 py-2 text-sm text-muted-foreground"
+          >
             No pages yet
           </Text>
         ) : (
@@ -62,7 +66,10 @@ export function PagesDropdown({ serialSlug, categories }: Props) {
         Pages
         <ChevronDownIcon
           aria-hidden
-          className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")}
+          className={cn(
+            "size-4 text-muted-foreground transition-transform",
+            open && "rotate-180",
+          )}
         />
       </Button>
     </Menu>

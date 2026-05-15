@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 
 interface RenameFormProps {
   hiddenName: string;
@@ -48,11 +48,15 @@ export function RenameForm({
         defaultValue={defaultValue}
         required
         autoFocus
-        className={inputClassName ?? 'flex-1'}
-        onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+        className={inputClassName ?? "flex-1"}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
       />
-      <Button type="submit" size="sm">Save</Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+      <Button type="submit" size="sm">
+        Save
+      </Button>
+      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
     </form>
   );
 }

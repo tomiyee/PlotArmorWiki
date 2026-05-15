@@ -1,8 +1,8 @@
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
-import { InfoIcon } from "@/components/ui/info-icon";
+import { InfoIcon } from "@/components/ui/InfoIcon";
 import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { SectionData } from "./types";
 

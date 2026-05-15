@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock, faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import {
+  faLock,
+  faPen,
+  faPlus,
+  faTrash,
+} from "@fortawesome/free-solid-svg-icons";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import {
   Dialog,
   DialogHeader,
@@ -15,11 +20,11 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog";
+} from "@/components/ui/Dialog";
 import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
-import { Tooltip } from "@/components/ui/tooltip";
-import { InfoIcon } from "@/components/ui/info-icon";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { InfoIcon } from "@/components/ui/InfoIcon";
 import {
   addPageSection,
   deletePageSection,
@@ -173,7 +178,10 @@ function ReorderableSection({
  *   sections={[{ id: 1, name: 'Summary', displayOrder: 0 }]}
  * />
  */
-export function PageSectionManager({ pageId, sections }: PageSectionManagerProps) {
+export function PageSectionManager({
+  pageId,
+  sections,
+}: PageSectionManagerProps) {
   const { run, isPending } = useServerAction();
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -297,7 +305,9 @@ export function PageSectionManager({ pageId, sections }: PageSectionManagerProps
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>Delete section &quot;{deleteTarget?.name}&quot;?</DialogTitle>
+          <DialogTitle>
+            Delete section &quot;{deleteTarget?.name}&quot;?
+          </DialogTitle>
         </DialogHeader>
         <DialogBody>
           {deleteError ? (
@@ -307,7 +317,8 @@ export function PageSectionManager({ pageId, sections }: PageSectionManagerProps
           ) : (
             <DialogDescription>
               This section will be removed from this page. This action cannot be
-              undone. Sections with existing content revisions cannot be deleted.
+              undone. Sections with existing content revisions cannot be
+              deleted.
             </DialogDescription>
           )}
         </DialogBody>

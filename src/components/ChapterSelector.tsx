@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
-import { Button } from "@/components/ui/button";
-import { Box } from "@/components/ui/box";
-import { Text } from "@/components/ui/text";
-import { Menu, MenuItem } from "@/components/ui/menu";
+import { Button } from "@/components/ui/Button";
+import { Box } from "@/components/ui/Box";
+import { Text } from "@/components/ui/Text";
+import { Menu, MenuItem } from "@/components/ui/Menu";
 import { Drawer } from "@/components/ui/drawer";
 import {
   ChevronDownIcon,
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChapterData, Volume } from "@/types";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface Props {
   serialId: number;

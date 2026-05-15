@@ -16,9 +16,9 @@ import {
   pageTitles,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { PageContainer } from "@/components/ui/page-container";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { PageEditor } from "./PageEditor";
 
 interface Props {

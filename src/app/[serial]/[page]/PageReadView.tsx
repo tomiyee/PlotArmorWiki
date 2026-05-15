@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Text } from "@/components/ui/text";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { Text } from "@/components/ui/Text";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import type { SectionData, FloaterRowData } from "./types";
 
 interface Props {
@@ -38,7 +38,8 @@ export function PageReadView({
   childPages,
   pageId,
 }: Props) {
-  const hasFloaterContent = hasInfobox && (floaterImageUrl || floaterRows.length > 0);
+  const hasFloaterContent =
+    hasInfobox && (floaterImageUrl || floaterRows.length > 0);
 
   return (
     <div className="overflow-hidden">

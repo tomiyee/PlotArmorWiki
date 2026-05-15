@@ -2,14 +2,14 @@
 
 import { useState, type ReactNode } from "react";
 import { TableOfContents as TableOfContentsIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import {
   Dialog,
   DialogHeader,
   DialogTitle,
   DialogBody,
-} from "@/components/ui/dialog";
-import { Tooltip } from "@/components/ui/tooltip";
+} from "@/components/ui/Dialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface Props {
   /** Pre-rendered <SerialTOC> to display inside the drawer. */

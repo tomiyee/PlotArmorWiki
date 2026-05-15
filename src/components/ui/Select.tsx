@@ -6,21 +6,27 @@ import { ChevronDownIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface Option<T> {
-  label: string
-  value: T
-  disabled?: boolean
-  children?: Option<T>[]
+  /** Display text shown in the dropdown. */
+  label: string;
+  /** The value emitted to `onChange` when this option is selected. */
+  value: T;
+  /** When true, prevents the option from being selected. */
+  disabled?: boolean;
+  /** Nested options — renders this option as an `<optgroup>` header. */
+  children?: Option<T>[];
 }
 
 type SelectProps<T> = {
-  options: Option<T>[]
+  /** List of options (or option groups) to render. */
+  options: Option<T>[];
   /** Called with the matched Option value when the user picks an entry. */
-  onChange?: (value: T) => void
+  onChange?: (value: T) => void;
   /** The currently-selected value (controlled). */
-  value?: T
+  value?: T;
   /** The default-selected value (uncontrolled). */
-  defaultValue?: T
-  className?: string
+  defaultValue?: T;
+  /** Extra classes merged onto the `<select>` element. */
+  className?: string;
 } & Omit<React.ComponentProps<"select">, "onChange" | "value" | "defaultValue" | "children">
 
 /**
@@ -52,14 +58,8 @@ type SelectProps<T> = {
  *   ]}
  * />
  */
-function Select<T>({
-  options,
-  onChange,
-  value,
-  defaultValue,
-  className,
-  ...props
-}: SelectProps<T>) {
+function Select<T>(props: SelectProps<T>) {
+  const { options, onChange, value, defaultValue, className, ...rest } = props;
   /** Flatten options so we can resolve the original T from the string key. */
   function allLeafOptions(opts: Option<T>[]): Option<T>[] {
     return opts.flatMap((o) => (o.children ? allLeafOptions(o.children) : [o]))
@@ -102,7 +102,7 @@ function Select<T>({
           "flex h-9 w-full appearance-none rounded-lg border border-input bg-background px-3 py-1 pr-8 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
           className
         )}
-        {...props}
+        {...rest}
       >
         {options.map((opt, i) => renderOption(opt, i))}
       </select>

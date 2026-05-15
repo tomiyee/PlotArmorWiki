@@ -1,11 +1,11 @@
-import Link from 'next/link';
-import { db } from '@/db/index';
-import { serials } from '@/db/schema';
-import SerialList from '@/components/SerialList';
-import { Text } from '@/components/ui/text';
-import { PageContainer } from '@/components/ui/page-container';
+import Link from "next/link";
+import { db } from "@/db/index";
+import { serials } from "@/db/schema";
+import SerialList from "@/components/SerialList";
+import { Text } from "@/components/ui/Text";
+import { PageContainer } from "@/components/ui/PageContainer";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const allSerials = await db.select().from(serials);

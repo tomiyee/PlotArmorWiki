@@ -10,9 +10,9 @@ import {
   pages,
 } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { Text } from "@/components/ui/text";
-import { Box } from "@/components/ui/box";
-import { PageContainer } from "@/components/ui/page-container";
+import { Text } from "@/components/ui/Text";
+import { Box } from "@/components/ui/Box";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { ChapterSynopsisEditor } from "./ChapterSynopsisEditor";
 import { saveChapterSynopsis } from "./actions";

@@ -1,9 +1,9 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { HoverCard } from "@/components/ui/hovercard";
-import { Text } from "@/components/ui/text";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { HoverCard } from "@/components/ui/HoverCard";
+import { Text } from "@/components/ui/Text";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { getWikiLinkPreview } from "@/lib/wiki-link-preview-action";
 import type { WikiLinkPreviewData } from "@/lib/wiki-link-preview-action";
 
@@ -45,7 +45,9 @@ export function WikiLinkPreview({
   serialSlug,
   pageName,
 }: Props) {
-  const [preview, setPreview] = useState<WikiLinkPreviewData | "loading" | "missing">("loading");
+  const [preview, setPreview] = useState<
+    WikiLinkPreviewData | "loading" | "missing"
+  >("loading");
 
   async function handleMouseEnter() {
     // Only fetch once
@@ -66,7 +68,11 @@ export function WikiLinkPreview({
 
   return (
     <HoverCard trigger={anchor}>
-      <PreviewContent preview={preview} pageName={pageName} serialSlug={serialSlug} />
+      <PreviewContent
+        preview={preview}
+        pageName={pageName}
+        serialSlug={serialSlug}
+      />
     </HoverCard>
   );
 }
@@ -77,7 +83,11 @@ interface PreviewContentProps {
   serialSlug: string;
 }
 
-function PreviewContent({ preview, pageName, serialSlug }: PreviewContentProps) {
+function PreviewContent({
+  preview,
+  pageName,
+  serialSlug,
+}: PreviewContentProps) {
   if (preview === "loading") {
     return (
       <Text muted className="text-sm">
@@ -143,9 +153,7 @@ function PreviewContent({ preview, pageName, serialSlug }: PreviewContentProps) 
                 <dt className="text-gray-500 font-medium whitespace-nowrap">
                   {row.label}
                 </dt>
-                <dd className="text-gray-800 truncate">
-                  {row.content}
-                </dd>
+                <dd className="text-gray-800 truncate">{row.content}</dd>
               </Fragment>
             ))}
         </dl>
@@ -154,7 +162,11 @@ function PreviewContent({ preview, pageName, serialSlug }: PreviewContentProps) 
       {/* First section text */}
       {truncatedContent && (
         <div className="border-t border-gray-100 pt-2">
-          <MarkdownRenderer sm serialSlug={serialSlug} className="[&_p]:mb-1 [&_p:last-child]:mb-0">
+          <MarkdownRenderer
+            sm
+            serialSlug={serialSlug}
+            className="[&_p]:mb-1 [&_p:last-child]:mb-0"
+          >
             {truncatedContent}
           </MarkdownRenderer>
         </div>
