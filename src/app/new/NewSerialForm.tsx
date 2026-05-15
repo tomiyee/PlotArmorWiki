@@ -67,20 +67,6 @@ export default function NewSerialForm({ defaultTitle }: Props) {
             />
           </Box>
 
-          {/* Description */}
-          <Box col className="gap-1">
-            <Label htmlFor="description">
-              Description
-            </Label>
-            <textarea
-              id="description"
-              name="description"
-              rows={4}
-              placeholder="A brief spoiler-free synopsis…"
-              className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black resize-none"
-            />
-          </Box>
-
           {/* Authors */}
           <Box col className="gap-2">
             <Text variant="label">Authors</Text>

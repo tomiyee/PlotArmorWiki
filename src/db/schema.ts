@@ -28,7 +28,6 @@ export const serials = pgTable('serials', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   slug: text('slug').notNull().unique(),
-  description: text('description'),
   splashArtUrl: text('splash_art_url'),
   chapterType: chapterTypeEnum('chapter_type').notNull().default('Chapter'),
   volumeType: volumeTypeEnum('volume_type').notNull().default('Volume'),

@@ -258,7 +258,6 @@ export async function updateSerialMetadata(serialId: number, formData: FormData)
     throw new Error('Title is required');
   }
 
-  const description = formData.get('description');
   const splashArtUrl = formData.get('splashArtUrl');
 
   const authorValues = formData.getAll('authors') as string[];
@@ -269,10 +268,6 @@ export async function updateSerialMetadata(serialId: number, formData: FormData)
   await db.update(serials).set({
     title: title.trim(),
     slug: newSlug,
-    description:
-      description && typeof description === 'string' && description.trim()
-        ? description.trim()
-        : null,
     splashArtUrl:
       splashArtUrl && typeof splashArtUrl === 'string' && splashArtUrl.trim()
         ? splashArtUrl.trim()

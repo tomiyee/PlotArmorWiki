@@ -14,22 +14,20 @@ import { Tooltip } from '@/components/ui/tooltip';
 
 interface SerialMetadataEditorProps {
   title: string;
-  description: string | null;
   splashArtUrl: string | null;
   authors: string[];
   updateMetadataAction: (formData: FormData) => Promise<void>;
 }
 
 /**
- * Displays the serial's title, authors, description, and splash art in read
- * mode. Switches to an inline edit form when the global edit mode is active.
+ * Displays the serial's title, authors, and splash art in read mode.
+ * Switches to an inline edit form when the global edit mode is active.
  * Registers save/discard handlers with `EditModeContext` so the `<EditModeFAB>`
  * can trigger them.
  *
  * @example
  * <SerialMetadataEditor
  *   title={serial.title}
- *   description={serial.description}
  *   splashArtUrl={serial.splashArtUrl}
  *   authors={authors.map((a) => a.name)}
  *   updateMetadataAction={updateMetadataForSerial}
@@ -37,7 +35,6 @@ interface SerialMetadataEditorProps {
  */
 export function SerialMetadataEditor({
   title,
-  description,
   splashArtUrl,
   authors,
   updateMetadataAction,
@@ -49,7 +46,6 @@ export function SerialMetadataEditor({
   );
   // Draft values for controlled form fields in edit mode.
   const [draftTitle, setDraftTitle] = useState(title);
-  const [draftDescription, setDraftDescription] = useState(description ?? '');
   const [draftSplashArtUrl, setDraftSplashArtUrl] = useState(splashArtUrl ?? '');
 
   function addAuthor() {
@@ -66,7 +62,6 @@ export function SerialMetadataEditor({
 
   function handleDiscard() {
     setDraftTitle(title);
-    setDraftDescription(description ?? '');
     setDraftSplashArtUrl(splashArtUrl ?? '');
     setAuthorFields(authors.length > 0 ? authors : ['']);
   }
@@ -74,7 +69,6 @@ export function SerialMetadataEditor({
   function handleSave() {
     const fd = new FormData();
     fd.set('title', draftTitle.trim());
-    fd.set('description', draftDescription);
     fd.set('splashArtUrl', draftSplashArtUrl);
     for (const author of authorFields) {
       fd.append('authors', author);
@@ -85,7 +79,7 @@ export function SerialMetadataEditor({
   useEffect(() => {
     return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftTitle, draftDescription, draftSplashArtUrl, authorFields]);
+  }, [draftTitle, draftSplashArtUrl, authorFields]);
 
   if (!isEditing) {
     return (
@@ -93,9 +87,6 @@ export function SerialMetadataEditor({
         <Text variant="h1">{title}</Text>
         {authors.length > 0 && (
           <Text muted>{authors.join(', ')}</Text>
-        )}
-        {description && (
-          <Text className="mt-1">{description}</Text>
         )}
         {splashArtUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -126,20 +117,6 @@ export function SerialMetadataEditor({
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
             placeholder="e.g. One Piece"
-          />
-        </Box>
-
-        {/* Description */}
-        <Box col className="gap-1">
-          <Label htmlFor="meta-description">Description</Label>
-          <textarea
-            id="meta-description"
-            name="description"
-            rows={4}
-            value={draftDescription}
-            onChange={(e) => setDraftDescription(e.target.value)}
-            placeholder="A brief spoiler-free synopsis…"
-            className="rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-black resize-none"
           />
         </Box>
 
