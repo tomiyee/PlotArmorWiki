@@ -1,18 +1,20 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { db } from '@/db/index';
-import { serials, serialAuthors, pages, pageSections } from '@/db/schema';
+import {
+  serials, serialAuthors, pages, pageSections, pageSectionRevisions,
+  volumes, chapters,
+} from '@/db/schema';
 import { titleToSlug } from '@/lib/slug';
 import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
 
 /**
- * Creates a new serial and its home page. The home page is seeded with a
- * "Description" section so the user's description text has a natural home on
- * the wiki — they can paste it into that section once chapters are available.
- *
- * Section *content* (page_section_revisions) cannot be written here because
- * revisions require a chapter_id, and a brand-new serial has no chapters yet.
+ * Creates a new serial and its home page, seeding a "Description" section.
+ * If the user provides description text, a first volume + chapter are
+ * auto-created (e.g. "Volume 1" / "Chapter 1") so the content revision can be
+ * stored immediately — section revisions require a chapter_id.
  *
  * @example
  * <form action={createSerial}>…</form>
@@ -26,6 +28,12 @@ export async function createSerial(formData: FormData) {
   const splashArtUrl = formData.get('splashArtUrl');
   const chapterType = parseChapterType(formData.get('chapterType'));
   const volumeType = parseVolumeType(formData.get('volumeType'));
+
+  const descriptionRaw = formData.get('description');
+  const description =
+    descriptionRaw && typeof descriptionRaw === 'string'
+      ? descriptionRaw.trim()
+      : '';
 
   // authors is a multi-value field — filter out blank entries
   const authorValues = formData.getAll('authors') as string[];
@@ -74,14 +82,42 @@ export async function createSerial(formData: FormData) {
     })
     .returning({ id: pages.id });
 
-  // Seed the home page with a "Description" section. Content revisions cannot
-  // be written here (they require a chapter_id), so the section starts empty
-  // and the editor can fill it in once the first chapter is added.
-  await db.insert(pageSections).values({
-    pageId: homePage.id,
-    name: 'Description',
-    displayOrder: 0,
-  });
+  // Seed the home page with a "Description" section.
+  const [descriptionSection] = await db
+    .insert(pageSections)
+    .values({ pageId: homePage.id, name: 'Description', displayOrder: 0 })
+    .returning({ id: pageSections.id });
+
+  // If description text was provided, auto-create the first volume + chapter
+  // so the content revision can be stored immediately.
+  if (description) {
+    const [vol1] = await db
+      .insert(volumes)
+      .values({ serialId: inserted.id, displayName: `${volumeType} 1`, idx: 1 })
+      .returning({ id: volumes.id });
+
+    const [ch1] = await db
+      .insert(chapters)
+      .values({ volumeId: vol1.id, displayName: `${chapterType} 1`, idx: 1 })
+      .returning({ id: chapters.id });
+
+    await db.insert(pageSectionRevisions).values({
+      pageId: homePage.id,
+      sectionId: descriptionSection.id,
+      chapterId: ch1.id,
+      content: description,
+    });
+
+    // Pre-set the progress cookie so the SSR render after redirect uses cutoffIdx=1
+    // and shows the description immediately — without this, no cookie exists on first
+    // visit and cutoffIdx defaults to 0, which is below ch1.idx=1.
+    const cookieStore = await cookies();
+    cookieStore.set(`plotarmor_chapter_${inserted.id}`, String(ch1.id), {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
 
   redirect(`/${slug}`);
 }
