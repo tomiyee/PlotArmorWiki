@@ -8,14 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { Menu, MenuItem } from "@/components/ui/Menu";
-import { Drawer } from "@/components/ui/Drawer";
-import {
-  ChevronDownIcon,
-  ExternalLinkIcon,
-  XIcon,
-  BookOpenIcon,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileShield } from "@fortawesome/free-solid-svg-icons";
+import { ExternalLinkIcon, XIcon } from "lucide-react";
 import { ChapterData, Volume } from "@/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 
@@ -88,7 +83,6 @@ export function ChapterSelector(props: Props) {
   const [volCollapsed, setVolCollapsed] = useCollapsedVolumes(serialId);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const router = useRouter();
 
@@ -116,7 +110,6 @@ export function ChapterSelector(props: Props) {
     setPopoverDismissed(true);
     writeCookie(chapterId);
     setDropdownOpen(false);
-    setDrawerOpen(false);
     router.refresh();
   }
 
@@ -175,122 +168,59 @@ export function ChapterSelector(props: Props) {
   });
 
   return (
-    <>
-      {/* ── Desktop (sm and up): inline label + dropdown with popover callout ── */}
-      <Box className="hidden sm:flex items-center gap-2">
-        <Text variant="label" as="label" className="whitespace-nowrap text-sm">
-          Reading up to:
-        </Text>
-
-        <div className="relative">
-          <Menu
-            isOpen={dropdownOpen}
-            onClose={() => setDropdownOpen(false)}
-            align="right"
-            role="listbox"
-            aria-label="Chapter list"
-            panelClassName="w-60 max-h-80"
-            contents={chapterListContents}
-          >
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setDropdownOpen((o) => !o)}
-              aria-haspopup="listbox"
-              aria-expanded={dropdownOpen}
-              aria-label="Select chapter progress"
-              className="w-52 justify-between px-3 border-input shadow-xs hover:bg-background aria-expanded:bg-background"
-            >
-              <Text as="span" variant="label" className="truncate">
-                {selectedLabel}
-              </Text>
-              <ChevronDownIcon
-                aria-hidden
-                className={cn(
-                  "size-4 shrink-0 text-muted-foreground transition-transform",
-                  dropdownOpen && "rotate-180",
-                )}
-              />
-            </Button>
-          </Menu>
-
-          {/* Floating callout — absolute so it doesn't affect navbar height */}
-          {!popoverDismissed && (
-            <div
-              suppressHydrationWarning
-              className="absolute top-full right-0 mt-2 z-50"
-            >
-              <Box className="items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-md w-64">
-                <Text
-                  variant="label"
-                  className="flex-1 leading-snug text-amber-800"
-                >
-                  We defaulted to the first {chapterType.toLowerCase()} to avoid
-                  spoilers. Set your {chapterType.toLowerCase()} here.
-                </Text>
-                <Tooltip content="Dismiss">
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={dismissPopover}
-                    aria-label="Dismiss spoiler reminder"
-                    className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
-                  >
-                    <XIcon />
-                  </Button>
-                </Tooltip>
-              </Box>
-            </div>
-          )}
-        </div>
-      </Box>
-
-      {/* ── Mobile (below sm): icon button + bottom drawer ── */}
-      <div className="relative sm:hidden" suppressHydrationWarning>
+    <Box className="sm:flex items-center gap-2">
+      <Menu
+        isOpen={dropdownOpen}
+        onClose={() => setDropdownOpen(false)}
+        align="right"
+        role="listbox"
+        aria-label="Chapter list"
+        panelClassName="w-60 max-h-80"
+        contents={chapterListContents}
+      >
         <Tooltip content={`Set your ${chapterType}`} side="bottom">
           <Button
             variant="ghost"
-            size="icon"
             aria-label={`Set ${chapterType} progress`}
-            onClick={() => setDrawerOpen(true)}
+            onClick={() => setDropdownOpen((o) => !o)}
           >
-            <BookOpenIcon />
+            <FontAwesomeIcon icon={faFileShield} />
+            <Text as="span" variant="label" className="truncate sm:visible">
+              {selectedLabel}
+            </Text>
           </Button>
         </Tooltip>
+      </Menu>
 
-        {/* Badge dot: shown when the spoiler popover hasn't been dismissed yet */}
-        {!popoverDismissed && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-background"
-          />
-        )}
-
-        <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="down">
-          <Box className="items-center justify-between px-4 py-3 border-b">
-            <Text variant="h4">Reading up to</Text>
-          </Box>
-
-          {/* Spoiler callout inside the drawer — dismisses on chapter select */}
-          {!popoverDismissed && (
-            <div className="mx-4 mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2">
-              <Text
-                variant="label"
-                className="text-sm text-amber-800 leading-snug"
+      {/* Floating callout — absolute so it doesn't affect navbar height */}
+      {!popoverDismissed && (
+        <div
+          suppressHydrationWarning
+          className="absolute top-full right-0 mt-2 z-50"
+        >
+          <Box className="items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-md w-64">
+            <Text
+              variant="label"
+              className="flex-1 leading-snug text-amber-800"
+            >
+              We defaulted to the first {chapterType.toLowerCase()} to avoid
+              spoilers. Set your {chapterType.toLowerCase()} here.
+            </Text>
+            <Tooltip content="Dismiss">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={dismissPopover}
+                aria-label="Dismiss spoiler reminder"
+                className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
               >
-                We defaulted to the first {chapterType.toLowerCase()} to avoid
-                spoilers. Set your {chapterType.toLowerCase()} here.
-              </Text>
-            </div>
-          )}
-
-          {/* Chapter list */}
-          <div className="flex-1 overflow-y-auto py-2">
-            {chapterListContents}
-          </div>
-        </Drawer>
-      </div>
-    </>
+                <XIcon />
+              </Button>
+            </Tooltip>
+          </Box>
+        </div>
+      )}
+    </Box>
   );
 }
 

@@ -14,7 +14,7 @@ rtk npx drizzle-kit migrate          # apply pending migrations
 
 Whenever `src/db/schema.ts` changes: generate migration → apply → commit schema + migration + `drizzle/meta/` together.
 
-Local dev: set `DATABASE_URL` in `.env.local`, then `.\scripts\start-db.ps1` to create/start the Postgres container.
+Local dev: set `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `AUTH_URL` in `.env.local`, then `.\scripts\start-db.ps1` to create/start the Postgres container.
 
 No test runner configured.
 
@@ -38,7 +38,7 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 | Framework     | Next.js 16 (App Router, SSR)                                 |
 | Database      | PostgreSQL (serverless)                                      |
 | ORM           | Drizzle ORM                                                  |
-| Auth          | Auth.js (NextAuth v5) — not yet implemented                  |
+| Auth          | Auth.js (NextAuth v5) — Google OAuth, Drizzle adapter        |
 | Search        | PostgreSQL full-text search (tsvector) — not yet implemented |
 | Markdown      | `@uiw/react-md-editor` (edit) + `react-markdown` (render)    |
 | Styling       | Tailwind CSS v4                                              |
@@ -103,6 +103,13 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/lib/wiki-links.ts`                   | `WIKI_LINK_RE`, `parseWikiLink()`, `slugifyWikiName()`. Shared by remark plugin + editor autocomplete.                                                                |
 | `src/lib/remark-wiki-links.ts`            | Remark plugin: `[[Category:Page]]` → markdown links. Skips code blocks.                                                                                               |
 | `src/lib/slug.ts`                         | `titleToSlug`; computed at creation and stored in `serials.slug`.                                                                                                     |
+| `src/auth.ts`                             | Auth.js v5 config: Google provider, Drizzle adapter (database sessions), session callback exposing `user.id` + `user.username`.                                       |
+| `src/proxy.ts`                            | Next.js middleware (exported as default). Redirects authenticated users with `username === null` to `/onboarding`; skips `/api/auth/**` to avoid loops.               |
+| `src/app/onboarding/page.tsx`             | Username-pick page shown after first sign-in. Redirects to `/` once username is saved.                                                                                |
+| `src/app/onboarding/actions.ts`           | `setUsername` Server Action: validates uniqueness, writes to `users.username`, invalidates the session cache.                                                         |
+| `src/components/navbar/AuthControls.tsx`  | Server Component: renders `<UserMenu>` when authenticated, or a sign-in button when not.                                                                              |
+| `src/components/navbar/UserMenu.tsx`      | Client Component: avatar dropdown with username display and `<SignOutButton>`.                                                                                        |
+| `src/components/navbar/SignOutButton.tsx` | Thin Client Component wrapping `signOut()` as a form action (required by Auth.js for CSRF safety).                                                                    |
 
 ### UI component conventions
 

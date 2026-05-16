@@ -104,16 +104,24 @@ Rationale for each decision is in [spec.md § Tech Stack](spec.md#tech-stack).
 npm install
 ```
 
-Create `.env.local` with your database connection string.
+Create `.env.local` with your database connection string and Auth.js secrets.
 
 **Production/staging:**
 ```
 DATABASE_URL=postgres://<user>:<password>@<host>/<db>?sslmode=require
+AUTH_SECRET=<random-secret>
+AUTH_GOOGLE_ID=<google-oauth-client-id>
+AUTH_GOOGLE_SECRET=<google-oauth-client-secret>
+AUTH_URL=https://<your-domain>
 ```
 
 **Local Docker (development):**
 ```
 DATABASE_URL=postgres://postgres:secret@localhost:5432/plotarmor
+AUTH_SECRET=<random-secret>
+AUTH_GOOGLE_ID=<google-oauth-client-id>
+AUTH_GOOGLE_SECRET=<google-oauth-client-secret>
+AUTH_URL=http://localhost:3000
 ```
 
 Then start the database. For local Docker, run the helper script (PowerShell):

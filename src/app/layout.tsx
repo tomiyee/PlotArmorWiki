@@ -5,6 +5,7 @@ import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModeFAB } from "@/components/EditModeFAB";
 import { TooltipProvider } from "@/components/ui/Tooltip";
+import { AuthControls } from "@/components/navbar/AuthControls";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,7 @@ export default function RootLayout(props: RootLayoutProps) {
         <TooltipProvider>
           <EditModeProvider>
             <NavbarSerialProvider>
-              <Navbar />
+              <Navbar authSlot={<AuthControls />} />
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 {children}
               </div>
