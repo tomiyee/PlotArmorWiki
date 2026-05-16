@@ -1,12 +1,11 @@
 import { auth } from "@/auth";
-import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { SignOutButton } from "@/components/navbar/SignOutButton";
+import { UserMenu } from "@/components/navbar/UserMenu";
 
 /**
  * Server Component that reads the Auth.js session and renders either a
- * "Sign in" button (unauthenticated) or a user avatar + "Sign out" button
+ * "Sign in" button (unauthenticated) or a user avatar dropdown
  * (authenticated). Rendered in the root layout so it is never stale.
  *
  * @example
@@ -25,23 +24,5 @@ export async function AuthControls() {
   }
 
   const { name, image } = session.user;
-
-  return (
-    <div className="flex items-center gap-2">
-      {image ? (
-        <Image
-          src={image}
-          alt={name ?? "User avatar"}
-          width={28}
-          height={28}
-          className="rounded-full"
-        />
-      ) : (
-        <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
-          {name?.[0]?.toUpperCase() ?? "?"}
-        </span>
-      )}
-      <SignOutButton />
-    </div>
-  );
+  return <UserMenu name={name} image={image} />;
 }

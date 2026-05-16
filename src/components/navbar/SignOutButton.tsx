@@ -1,7 +1,9 @@
 "use client";
 
-import { signOut } from "next-auth/react";
-import { Button } from "@/components/ui/Button";
+import { MenuItem } from "../ui/Menu";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowRightFromBracket } from "@fortawesome/free-solid-svg-icons";
+import { Box } from "../ui/Box";
 
 /**
  * Client-side sign-out button. Uses next-auth/react's `signOut` (not the
@@ -12,8 +14,11 @@ import { Button } from "@/components/ui/Button";
  */
 export function SignOutButton() {
   return (
-    <Button variant="outline" size="sm" onClick={() => signOut()}>
-      Sign out
-    </Button>
+    <MenuItem>
+      <Box className="items-center gap-2">
+        <FontAwesomeIcon icon={faArrowRightFromBracket} />
+        Sign out
+      </Box>
+    </MenuItem>
   );
 }

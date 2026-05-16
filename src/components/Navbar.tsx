@@ -1,16 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { MenuIcon, XIcon } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShieldHalved } from "@fortawesome/free-solid-svg-icons";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { PagesDropdown } from "@/components/navbar/PagesDropdown";
-import { Button } from "@/components/ui/Button";
-import { Text } from "@/components/ui/Text";
-import { cn } from "@/lib/utils";
+import { Box } from "./ui/Box";
 
 type NavbarProps = {
   /** Server-rendered auth controls (sign-in button or avatar + sign-out). Passed as a slot from the server layout so `auth()` can be called there. */
@@ -38,22 +34,9 @@ type NavbarProps = {
 export default function Navbar(props: NavbarProps) {
   const { authSlot } = props;
   const { serialData, chapterSelectorSlot, tocSlot } = useNavbarSerialContext();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const rightRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onOutsideClick(e: MouseEvent) {
-      if (rightRef.current && !rightRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onOutsideClick);
-    return () => document.removeEventListener("mousedown", onOutsideClick);
-  }, [menuOpen]);
 
   return (
-    <nav className="sticky top-0 z-10 border-b bg-white px-4 py-2 flex items-center justify-between gap-4 min-h-[54px]">
+    <nav className="sticky top-0 z-10 border-b bg-white px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
       {/* Left — logo + serial breadcrumb + Pages dropdown */}
       <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
         <Link
@@ -65,9 +48,6 @@ export default function Navbar(props: NavbarProps) {
         </Link>
         {serialData && (
           <>
-            <Text muted aria-hidden>
-              /
-            </Text>
             <Link
               href={`/${serialData.serialSlug}`}
               className="truncate text-sm font-medium text-gray-700 hover:text-gray-900 max-w-40 shrink-0"
@@ -81,37 +61,11 @@ export default function Navbar(props: NavbarProps) {
           </>
         )}
       </div>
-
-      {/* Right — hamburger toggle (mobile) + items */}
-      <div ref={rightRef} className="flex items-center gap-3 shrink-0">
-        {/* Hamburger: only visible on mobile */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="sm:hidden"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={menuOpen}
-        >
-          {menuOpen ? (
-            <XIcon className="size-5" />
-          ) : (
-            <MenuIcon className="size-5" />
-          )}
-        </Button>
-
-        {/* Items: inline row on sm+; absolute dropdown panel on mobile when open */}
-        <div
-          suppressHydrationWarning
-          className={cn(
-            "sm:flex sm:flex-row sm:items-center sm:gap-3 sm:static sm:bg-transparent sm:border-0 sm:shadow-none sm:rounded-none sm:p-0",
-          )}
-        >
-          {tocSlot}
-          {chapterSelectorSlot}
-          {authSlot}
-        </div>
-      </div>
+      <Box className="gap-2 items-center">
+        {tocSlot}
+        {chapterSelectorSlot}
+        {authSlot}
+      </Box>
     </nav>
   );
 }
