@@ -17,6 +17,8 @@ import {
   templates,
   templateSections,
   templateInfoboxSections,
+  serialAdmins,
+  users,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import {
@@ -38,6 +40,8 @@ import {
   deleteTemplateSection,
   addTemplateInfoboxSection,
   deleteTemplateInfoboxSection,
+  addSerialAdmin,
+  removeSerialAdmin,
 } from "./actions";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -46,8 +50,10 @@ import { SerialMetadataEditor } from "@/components/SerialMetadataEditor";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { PageEditor } from "./[page]/PageEditor";
 import { TemplateManager } from "@/components/TemplateManager";
+import { AdminManager } from "@/components/AdminManager";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin } from "@/lib/auth-guard";
+import { auth } from "@/auth";
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -94,6 +100,8 @@ export default async function SerialPage({ params }: Props) {
     homePage,
     serialTemplates,
     isAdmin,
+    serialAdminList,
+    session,
   ] = await Promise.all([
     getChapterCutoff(serial.id),
     db
@@ -157,6 +165,14 @@ export default async function SerialPage({ params }: Props) {
         }));
       }),
     isSerialAdmin(serial.id),
+    // Fetch all admins for this serial joined with their usernames.
+    db
+      .select({ userId: serialAdmins.userId, username: users.username })
+      .from(serialAdmins)
+      .innerJoin(users, eq(serialAdmins.userId, users.id))
+      .where(eq(serialAdmins.serialId, serial.id))
+      .orderBy(asc(serialAdmins.grantedAt)),
+    auth(),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -182,6 +198,10 @@ export default async function SerialPage({ params }: Props) {
   const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
   const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
+
+  // Admin actions bound to this serial.
+  const addAdminForSerial = addSerialAdmin.bind(null, serial.id);
+  const removeAdminForSerial = removeSerialAdmin.bind(null, serial.id);
 
   // Template actions bound to this serial.
   const createTemplateForSerial = createTemplate.bind(null, serial.id);
@@ -579,21 +599,30 @@ export default async function SerialPage({ params }: Props) {
                 isHomePage
                 isAdmin={isAdmin}
                 editModeHeader={
-                  <TemplateManager
-                    templates={serialTemplates}
-                    createTemplateAction={createTemplateForSerial}
-                    deleteTemplateAction={deleteTemplateForSerial}
-                    renameTemplateAction={renameTemplateForSerial}
-                    toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
-                    addTemplateSectionAction={addTemplateSectionForSerial}
-                    deleteTemplateSectionAction={deleteTemplateSectionForSerial}
-                    addTemplateInfoboxSectionAction={
-                      addTemplateInfoboxSectionForSerial
-                    }
-                    deleteTemplateInfoboxSectionAction={
-                      deleteTemplateInfoboxSectionForSerial
-                    }
-                  />
+                  <>
+                    <AdminManager
+                      serialId={serial.id}
+                      currentUserId={session?.user?.id ?? ""}
+                      admins={serialAdminList}
+                      addAdminAction={addAdminForSerial}
+                      removeAdminAction={removeAdminForSerial}
+                    />
+                    <TemplateManager
+                      templates={serialTemplates}
+                      createTemplateAction={createTemplateForSerial}
+                      deleteTemplateAction={deleteTemplateForSerial}
+                      renameTemplateAction={renameTemplateForSerial}
+                      toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
+                      addTemplateSectionAction={addTemplateSectionForSerial}
+                      deleteTemplateSectionAction={deleteTemplateSectionForSerial}
+                      addTemplateInfoboxSectionAction={
+                        addTemplateInfoboxSectionForSerial
+                      }
+                      deleteTemplateInfoboxSectionAction={
+                        deleteTemplateInfoboxSectionForSerial
+                      }
+                    />
+                  </>
                 }
               />
             ) : (
