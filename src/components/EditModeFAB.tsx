@@ -13,6 +13,9 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * In edit mode: a "Save" button (calls registered onSave handlers) and a
  * "Discard" button (calls registered onDiscard handlers). Both exit edit mode.
  *
+ * Renders nothing when the context reports `isAdmin === false` — non-admin
+ * visitors should never see the edit FAB regardless of the page they are on.
+ *
  * Rendered once in the root layout so it appears on every page.
  *
  * @example
@@ -24,7 +27,11 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * </EditModeProvider>
  */
 export function EditModeFAB() {
-  const { isEditing, toggle, save, discard } = useEditMode();
+  const { isEditing, isAdmin, toggle, save, discard } = useEditMode();
+
+  if (!isAdmin) {
+    return null;
+  }
 
   if (!isEditing) {
     return (

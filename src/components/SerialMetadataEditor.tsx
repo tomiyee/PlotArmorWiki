@@ -17,6 +17,8 @@ interface SerialMetadataEditorProps {
   splashArtUrl: string | null;
   authors: string[];
   updateMetadataAction: (formData: FormData) => Promise<void>;
+  /** When false, always renders in read mode regardless of the global edit toggle. */
+  isAdmin?: boolean;
 }
 
 /**
@@ -33,12 +35,14 @@ interface SerialMetadataEditorProps {
  *   updateMetadataAction={updateMetadataForSerial}
  * />
  */
-export function SerialMetadataEditor({
-  title,
-  splashArtUrl,
-  authors,
-  updateMetadataAction,
-}: SerialMetadataEditorProps) {
+export function SerialMetadataEditor(props: SerialMetadataEditorProps) {
+  const {
+    title,
+    splashArtUrl,
+    authors,
+    updateMetadataAction,
+    isAdmin = false,
+  } = props;
   const { run, isPending } = useServerAction();
   const { isEditing, registerHandlers } = useEditMode();
   const [authorFields, setAuthorFields] = useState<string[]>(
@@ -83,7 +87,7 @@ export function SerialMetadataEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftTitle, draftSplashArtUrl, authorFields]);
 
-  if (!isEditing) {
+  if (!isAdmin || !isEditing) {
     return (
       <Box col className="gap-2">
         <Text variant="h1">{title}</Text>

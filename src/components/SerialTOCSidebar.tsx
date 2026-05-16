@@ -36,6 +36,8 @@ interface Props {
     chaptersByVolumeId: Record<number, number[]>,
   ) => Promise<void>;
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
+  /** When false, hides the edit (pen) icon so non-admins cannot open SerialEditor. */
+  isAdmin?: boolean;
 }
 
 /**
@@ -46,23 +48,25 @@ interface Props {
  * @example
  * <SerialTOCSidebar serialId={1} serialSlug="my-serial" volumes={...} ... />
  */
-export function SerialTOCSidebar({
-  serialId,
-  serialSlug,
-  volumes,
-  chaptersByVolume,
-  chapterType,
-  volumeType,
-  addChapterAction,
-  addVolumeAction,
-  deleteChapterAction,
-  deleteVolumeAction,
-  renameChapterAction,
-  renameVolumeAction,
-  reorderVolumesAction,
-  reorderAllChaptersAction,
-  updateSerialTypesAction,
-}: Props) {
+export function SerialTOCSidebar(props: Props) {
+  const {
+    serialId,
+    serialSlug,
+    volumes,
+    chaptersByVolume,
+    chapterType,
+    volumeType,
+    addChapterAction,
+    addVolumeAction,
+    deleteChapterAction,
+    deleteVolumeAction,
+    renameChapterAction,
+    renameVolumeAction,
+    reorderVolumesAction,
+    reorderAllChaptersAction,
+    updateSerialTypesAction,
+    isAdmin = false,
+  } = props;
   const [editOpen, setEditOpen] = useState(false);
 
   return (
@@ -74,20 +78,22 @@ export function SerialTOCSidebar({
         >
           Contents
         </Text>
-        <Tooltip
-          content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
-          side="right"
-        >
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => setEditOpen(true)}
-            aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
-            className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
+        {isAdmin && (
+          <Tooltip
+            content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
+            side="right"
           >
-            <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
-          </Button>
-        </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setEditOpen(true)}
+              aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
+              className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
+            >
+              <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
+            </Button>
+          </Tooltip>
+        )}
       </div>
 
       <SerialTOC

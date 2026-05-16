@@ -5,10 +5,11 @@ import { cookies } from 'next/headers';
 import { db } from '@/db/index';
 import {
   serials, serialAuthors, pages, pageSections, pageSectionRevisions,
-  volumes, chapters,
+  volumes, chapters, serialAdmins,
 } from '@/db/schema';
 import { titleToSlug } from '@/lib/slug';
 import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
+import { auth } from '@/auth';
 
 /**
  * Creates a new serial and its home page, seeding a "Description" section.
@@ -20,6 +21,9 @@ import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
  * <form action={createSerial}>…</form>
  */
 export async function createSerial(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error('Unauthorized: sign in to create a serial.');
+
   const title = formData.get('title');
   if (!title || typeof title !== 'string' || title.trim() === '') {
     throw new Error('Title is required');
@@ -58,6 +62,12 @@ export async function createSerial(formData: FormData) {
       volumeType,
     })
     .returning({ id: serials.id });
+
+  // Grant the creator admin rights over the new serial.
+  await db.insert(serialAdmins).values({
+    userId: session.user.id,
+    serialId: inserted.id,
+  });
 
   if (filteredAuthors.length > 0) {
     await db.insert(serialAuthors).values(

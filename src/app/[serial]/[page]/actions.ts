@@ -15,6 +15,7 @@ import {
   pageTitles,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, inArray, isNull, lte, max, ne } from "drizzle-orm";
+import { requireSerialAdminBySlug, requireSerialAdminByPageId } from "@/lib/auth-guard";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -86,6 +87,7 @@ export async function savePageContent(
   floaterRowContent: Record<number, string>,
   targetChapterId?: number,
 ): Promise<void> {
+  await requireSerialAdminBySlug(serialSlug);
   const { serialId, pageId } = await resolvePageIds(serialSlug, pageSlug);
   const headChapterId = targetChapterId ?? (await getHeadChapterId(serialId));
 
@@ -317,6 +319,7 @@ export async function addPageTitle(
   chapterId: number,
   title: string,
 ): Promise<void> {
+  await requireSerialAdminBySlug(serialSlug);
   const { pageId } = await resolvePageIds(serialSlug, pageSlug);
   await db
     .insert(pageTitles)
@@ -340,6 +343,7 @@ export async function deletePageTitle(
   pageSlug: string,
   chapterId: number,
 ): Promise<{ error?: string }> {
+  await requireSerialAdminBySlug(serialSlug);
   const { pageId } = await resolvePageIds(serialSlug, pageSlug);
 
   // Count existing titles for this page to prevent deleting the last one.
@@ -379,6 +383,7 @@ export async function addPageSection(formData: FormData): Promise<void> {
   const pageId = parseInt(formData.get("pageId") as string, 10);
   const name = (formData.get("name") as string)?.trim();
   if (!pageId || !name) throw new Error("pageId and name are required");
+  await requireSerialAdminByPageId(pageId);
 
   // Find the next displayOrder by counting active sections.
   const [{ cnt }] = await db
@@ -407,6 +412,13 @@ export async function deletePageSection(
 ): Promise<{ error?: string }> {
   const sectionId = parseInt(formData.get("sectionId") as string, 10);
   if (!sectionId) return { error: "sectionId is required" };
+
+  const [sectionRow] = await db
+    .select({ pageId: pageSections.pageId })
+    .from(pageSections)
+    .where(eq(pageSections.id, sectionId))
+    .limit(1);
+  if (sectionRow) await requireSerialAdminByPageId(sectionRow.pageId);
 
   // Guard: reject if any content revisions exist for this section.
   const [{ cnt }] = await db
@@ -443,6 +455,13 @@ export async function renamePageSection(formData: FormData): Promise<void> {
   const name = (formData.get("name") as string)?.trim();
   if (!sectionId || !name) throw new Error("sectionId and name are required");
 
+  const [sectionRow] = await db
+    .select({ pageId: pageSections.pageId })
+    .from(pageSections)
+    .where(eq(pageSections.id, sectionId))
+    .limit(1);
+  if (sectionRow) await requireSerialAdminByPageId(sectionRow.pageId);
+
   await db
     .update(pageSections)
     .set({ name })
@@ -461,6 +480,15 @@ export async function renamePageSection(formData: FormData): Promise<void> {
 export async function reorderPageSections(formData: FormData): Promise<void> {
   const raw = formData.get("orderedIds") as string;
   const orderedIds: number[] = JSON.parse(raw);
+
+  if (orderedIds.length > 0) {
+    const [sectionRow] = await db
+      .select({ pageId: pageSections.pageId })
+      .from(pageSections)
+      .where(eq(pageSections.id, orderedIds[0]))
+      .limit(1);
+    if (sectionRow) await requireSerialAdminByPageId(sectionRow.pageId);
+  }
 
   await db.transaction(async (tx) => {
     for (let i = 0; i < orderedIds.length; i++) {
@@ -490,6 +518,7 @@ export async function addInfoboxSection(formData: FormData): Promise<void> {
   const pageId = parseInt(formData.get("pageId") as string, 10);
   const label = (formData.get("label") as string)?.trim();
   if (!pageId || !label) throw new Error("pageId and label are required");
+  await requireSerialAdminByPageId(pageId);
 
   const [{ cnt }] = await db
     .select({ cnt: count() })
@@ -517,6 +546,13 @@ export async function deleteInfoboxSection(
 ): Promise<{ error?: string }> {
   const infoboxSectionId = parseInt(formData.get("infoboxSectionId") as string, 10);
   if (!infoboxSectionId) return { error: "infoboxSectionId is required" };
+
+  const [infoboxRow] = await db
+    .select({ pageId: pageInfoboxSections.pageId })
+    .from(pageInfoboxSections)
+    .where(eq(pageInfoboxSections.id, infoboxSectionId))
+    .limit(1);
+  if (infoboxRow) await requireSerialAdminByPageId(infoboxRow.pageId);
 
   const [{ cnt }] = await db
     .select({ cnt: count() })
@@ -552,6 +588,13 @@ export async function renameInfoboxSection(formData: FormData): Promise<void> {
   const label = (formData.get("label") as string)?.trim();
   if (!infoboxSectionId || !label) throw new Error("infoboxSectionId and label are required");
 
+  const [infoboxRow] = await db
+    .select({ pageId: pageInfoboxSections.pageId })
+    .from(pageInfoboxSections)
+    .where(eq(pageInfoboxSections.id, infoboxSectionId))
+    .limit(1);
+  if (infoboxRow) await requireSerialAdminByPageId(infoboxRow.pageId);
+
   await db
     .update(pageInfoboxSections)
     .set({ label })
@@ -570,6 +613,15 @@ export async function renameInfoboxSection(formData: FormData): Promise<void> {
 export async function reorderInfoboxSections(formData: FormData): Promise<void> {
   const raw = formData.get("orderedIds") as string;
   const orderedIds: number[] = JSON.parse(raw);
+
+  if (orderedIds.length > 0) {
+    const [infoboxRow] = await db
+      .select({ pageId: pageInfoboxSections.pageId })
+      .from(pageInfoboxSections)
+      .where(eq(pageInfoboxSections.id, orderedIds[0]))
+      .limit(1);
+    if (infoboxRow) await requireSerialAdminByPageId(infoboxRow.pageId);
+  }
 
   await db.transaction(async (tx) => {
     for (let i = 0; i < orderedIds.length; i++) {
@@ -758,6 +810,8 @@ export async function addPageRelationship(
   parentPageId: number,
   chapterId: number,
 ): Promise<{ error?: string }> {
+  await requireSerialAdminByPageId(childPageId);
+
   if (childPageId === parentPageId) {
     return { error: "A page cannot be its own parent." };
   }
@@ -801,6 +855,8 @@ export async function removePageRelationship(
   parentPageId: number,
   chapterId: number,
 ): Promise<{ error?: string }> {
+  await requireSerialAdminByPageId(childPageId);
+
   // Count OTHER active parents for this child (conservative — unfiltered).
   const allRows = await db
     .select({

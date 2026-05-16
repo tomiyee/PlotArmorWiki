@@ -9,8 +9,10 @@ import {
 import { and, asc, count, eq, gte, gt, inArray, lte, max, sql } from 'drizzle-orm';
 import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 import { titleToSlug } from '@/lib/slug';
+import { requireSerialAdmin } from '@/lib/auth-guard';
 
 export async function deleteChapter(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const chapterIdRaw = formData.get('chapterId');
   if (!chapterIdRaw || typeof chapterIdRaw !== 'string') throw new Error('Chapter ID is required');
 
@@ -36,6 +38,7 @@ export async function deleteChapter(serialId: number, formData: FormData) {
 }
 
 export async function deleteVolume(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const volumeIdRaw = formData.get('volumeId');
   if (!volumeIdRaw || typeof volumeIdRaw !== 'string') throw new Error('Volume ID is required');
 
@@ -70,6 +73,7 @@ export async function deleteVolume(serialId: number, formData: FormData) {
 }
 
 export async function addVolume(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const displayName = formData.get('displayName');
   if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') {
     throw new Error('Volume display name is required');
@@ -87,7 +91,8 @@ export async function addVolume(serialId: number, formData: FormData) {
   });
 }
 
-export async function renameVolume(_serialId: number, formData: FormData) {
+export async function renameVolume(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const volumeIdRaw = formData.get('volumeId');
   const displayName = formData.get('displayName');
 
@@ -100,7 +105,8 @@ export async function renameVolume(_serialId: number, formData: FormData) {
   await db.update(volumes).set({ displayName: displayName.trim() }).where(eq(volumes.id, volumeId));
 }
 
-export async function renameChapter(_serialId: number, formData: FormData) {
+export async function renameChapter(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const chapterIdRaw = formData.get('chapterId');
   const displayName = formData.get('displayName');
 
@@ -114,6 +120,7 @@ export async function renameChapter(_serialId: number, formData: FormData) {
 }
 
 export async function updateSerialTypes(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const chapterType = parseChapterType(formData.get('chapterType'));
   const volumeType = parseVolumeType(formData.get('volumeType'));
   await db.update(serials).set({ chapterType, volumeType }).where(eq(serials.id, serialId));
@@ -127,6 +134,7 @@ export async function updateSerialTypes(serialId: number, formData: FormData) {
  * await reorderVolumes(serialId, [3, 1, 2]);
  */
 export async function reorderVolumes(serialId: number, orderedVolumeIds: number[]) {
+  await requireSerialAdmin(serialId);
   if (orderedVolumeIds.length === 0) return;
 
   await db.transaction(async (tx) => {
@@ -170,6 +178,7 @@ export async function reorderChapters(
   volumeId: number,
   orderedChapterIds: number[],
 ) {
+  await requireSerialAdmin(serialId);
   if (orderedChapterIds.length === 0) return;
 
   await db.transaction(async (tx) => {
@@ -231,6 +240,7 @@ export async function reorderAllChapters(
   volumeOrder: number[],
   chaptersByVolumeId: Record<number, number[]>,
 ) {
+  await requireSerialAdmin(serialId);
   if (volumeOrder.length === 0) return;
 
   const serialVolumes = await db
@@ -253,6 +263,7 @@ export async function reorderAllChapters(
 }
 
 export async function updateSerialMetadata(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const title = formData.get('title');
   if (!title || typeof title !== 'string' || title.trim() === '') {
     throw new Error('Title is required');
@@ -290,6 +301,7 @@ export async function updateSerialMetadata(serialId: number, formData: FormData)
 }
 
 export async function addChapter(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const displayName = formData.get('displayName');
   const volumeIdRaw = formData.get('volumeId');
 
@@ -372,6 +384,7 @@ export async function addChapter(serialId: number, formData: FormData) {
  * await createTemplate(42, new FormData()); // formData has "name" field
  */
 export async function createTemplate(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const name = formData.get('name');
   if (!name || typeof name !== 'string' || name.trim() === '') {
     throw new Error('Template name is required');
@@ -391,6 +404,7 @@ export async function createTemplate(serialId: number, formData: FormData) {
  * await deleteTemplate(42, new FormData()); // formData has "templateId" field
  */
 export async function deleteTemplate(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const templateIdRaw = formData.get('templateId');
   if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
   const templateId = parseInt(templateIdRaw, 10);
@@ -417,6 +431,7 @@ export async function deleteTemplate(serialId: number, formData: FormData) {
  * await renameTemplate(42, new FormData()); // formData has "templateId" and "name" fields
  */
 export async function renameTemplate(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const templateIdRaw = formData.get('templateId');
   const name = formData.get('name');
   if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
@@ -438,6 +453,7 @@ export async function renameTemplate(serialId: number, formData: FormData) {
  * await toggleTemplateInfobox(42, new FormData()); // formData has "templateId" and "hasInfobox" fields
  */
 export async function toggleTemplateInfobox(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const templateIdRaw = formData.get('templateId');
   const hasInfoboxRaw = formData.get('hasInfobox');
   if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
@@ -460,6 +476,7 @@ export async function toggleTemplateInfobox(serialId: number, formData: FormData
  * await addTemplateSection(42, new FormData()); // formData has "templateId" and "name" fields
  */
 export async function addTemplateSection(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const templateIdRaw = formData.get('templateId');
   const name = formData.get('name');
   if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
@@ -494,6 +511,7 @@ export async function addTemplateSection(serialId: number, formData: FormData) {
  * await deleteTemplateSection(42, new FormData()); // formData has "sectionId" field
  */
 export async function deleteTemplateSection(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const sectionIdRaw = formData.get('sectionId');
   if (!sectionIdRaw || typeof sectionIdRaw !== 'string') throw new Error('Section ID is required');
   const sectionId = parseInt(sectionIdRaw, 10);
@@ -522,6 +540,7 @@ export async function reorderTemplateSections(
   templateId: number,
   orderedSectionIds: number[],
 ) {
+  await requireSerialAdmin(serialId);
   if (orderedSectionIds.length === 0) return;
 
   // Verify ownership.
@@ -548,6 +567,7 @@ export async function reorderTemplateSections(
  * await addTemplateInfoboxSection(42, new FormData()); // formData has "templateId" and "label" fields
  */
 export async function addTemplateInfoboxSection(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const templateIdRaw = formData.get('templateId');
   const label = formData.get('label');
   if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
@@ -582,6 +602,7 @@ export async function addTemplateInfoboxSection(serialId: number, formData: Form
  * await deleteTemplateInfoboxSection(42, new FormData()); // formData has "infoboxSectionId" field
  */
 export async function deleteTemplateInfoboxSection(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
   const infoboxSectionIdRaw = formData.get('infoboxSectionId');
   if (!infoboxSectionIdRaw || typeof infoboxSectionIdRaw !== 'string') throw new Error('Infobox section ID is required');
   const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
