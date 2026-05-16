@@ -18,11 +18,7 @@
 
 ---
 
-## - [ ] Step 5 — Edit UI gates (hide edit controls for non-admins)
-
-- In `src/app/[serial]/[page]/page.tsx`: call `auth()`, check `serial_admins`, pass `isAdmin: boolean` to `<PageEditor>`.
-- In `<PageEditor>`: hide the edit FAB and all edit-mode controls when `isAdmin` is false.
-- Apply the same pattern to `<SerialEditor>` and template management on `/{serial}` — each reads `isAdmin` from its parent Server Component.
+## - [X] Step 5 — Edit UI gates (hide edit controls for non-admins)
 
 ---
 
