@@ -8,22 +8,9 @@
 
 ## - [X] Step 2 — Auth.js with Google provider
 
-- Install: `pnpm add next-auth@beta @auth/drizzle-adapter`.
-- Create `src/auth.ts`: use `@auth/drizzle-adapter`, configure Google provider (`AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`), use database sessions so `session.user.id` is available server-side. After sign-in, redirect to `/onboarding` if `users.username` is null.
-- Add `src/app/api/auth/[...nextauth]/route.ts` (re-export handlers).
-- Add env vars to `.env.local` and Vercel: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_URL`.
-- Set authorized redirect URIs in Google Cloud Console for local and deployed URLs.
-- Update `<Navbar>` to use `auth()` (Server Component): show "Sign in" / avatar + "Sign out" based on session.
-- Verify sign-in and sign-out work end-to-end.
-
 ---
 
 ## - [X] Step 3 — Username onboarding
-
-New Google sign-ins have `users.username = null`. Gate access until a username is chosen.
-
-- Create `/onboarding` page: text input for username (alphanumeric + underscores, 3–20 chars). Server Action `setUsername`: validates uniqueness, writes `users.username`, redirects to `/`.
-- In root layout or middleware: redirect session users with null username to `/onboarding`. Skip `/api/auth/**` and `/onboarding` to avoid redirect loops.
 
 ---
 
