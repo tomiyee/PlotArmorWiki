@@ -4,6 +4,31 @@ import { serialAdmins, serials, pages } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 /**
+ * Returns `true` when the currently authenticated user is an admin of the given
+ * serial. Never throws — safe to call from Server Component render functions
+ * where a hard error would break the page for all visitors.
+ *
+ * Use `requireSerialAdmin` (which throws) in Server Actions where an
+ * unauthenticated call must be rejected.
+ *
+ * @example
+ * const isAdmin = await isSerialAdmin(serial.id);
+ * return <PageEditor isAdmin={isAdmin} ... />;
+ */
+export async function isSerialAdmin(serialId: number): Promise<boolean> {
+  const session = await auth();
+  if (!session?.user?.id) return false;
+
+  const [row] = await db
+    .select({ userId: serialAdmins.userId })
+    .from(serialAdmins)
+    .where(and(eq(serialAdmins.userId, session.user.id), eq(serialAdmins.serialId, serialId)))
+    .limit(1);
+
+  return !!row;
+}
+
+/**
  * Asserts that the currently authenticated user is an admin of the given serial.
  * Throws an error (caught by Next.js and surfaced as a 500) if the session is
  * missing or the user is not in `serial_admins` for this serial.

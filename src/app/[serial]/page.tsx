@@ -46,6 +46,8 @@ import { SerialMetadataEditor } from "@/components/SerialMetadataEditor";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { PageEditor } from "./[page]/PageEditor";
 import { TemplateManager } from "@/components/TemplateManager";
+import { EditModeAdminSetter } from "@/contexts/EditModeContext";
+import { isSerialAdmin } from "@/lib/auth-guard";
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -91,6 +93,7 @@ export default async function SerialPage({ params }: Props) {
     chapterList,
     homePage,
     serialTemplates,
+    isAdmin,
   ] = await Promise.all([
     getChapterCutoff(serial.id),
     db
@@ -153,6 +156,7 @@ export default async function SerialPage({ params }: Props) {
           infoboxSections: infoboxRows.filter((s) => s.templateId === t.id),
         }));
       }),
+    isSerialAdmin(serial.id),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -516,6 +520,7 @@ export default async function SerialPage({ params }: Props) {
 
   return (
     <main>
+      <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
         {/* Left sidebar — sticky, independent scroll, desktop only */}
         <aside className="hidden md:block w-56 shrink-0">
@@ -536,6 +541,7 @@ export default async function SerialPage({ params }: Props) {
               reorderVolumesAction={reorderVolumesForSerial}
               reorderAllChaptersAction={reorderAllChaptersForSerial}
               updateSerialTypesAction={updateSerialTypesForSerial}
+              isAdmin={isAdmin}
             />
           </div>
         </aside>
@@ -548,6 +554,7 @@ export default async function SerialPage({ params }: Props) {
               splashArtUrl={serial.splashArtUrl}
               authors={authors.map((a) => a.name)}
               updateMetadataAction={updateMetadataForSerial}
+              isAdmin={isAdmin}
             />
 
             {homePage ? (
@@ -570,6 +577,7 @@ export default async function SerialPage({ params }: Props) {
                 parentPages={[]}
                 allSerialPages={[]}
                 isHomePage
+                isAdmin={isAdmin}
                 editModeHeader={
                   <TemplateManager
                     templates={serialTemplates}

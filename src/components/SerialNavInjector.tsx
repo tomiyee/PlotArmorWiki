@@ -4,7 +4,7 @@ import { useLayoutEffect, type ReactNode } from "react";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { NavbarSerialData } from "@/types";
 
-interface Props {
+interface SerialNavInjectorProps {
   data: NavbarSerialData;
   chapterSelectorSlot: ReactNode;
   tocSlot: ReactNode;
@@ -28,7 +28,8 @@ interface Props {
  *   tocSlot={<SerialTOCDrawer ... />}
  * />
  */
-export function SerialNavInjector({ data, chapterSelectorSlot, tocSlot }: Props) {
+export function SerialNavInjector(props: SerialNavInjectorProps) {
+  const { data, chapterSelectorSlot, tocSlot } = props;
   const { setSerial, clearSerial } = useNavbarSerialContext();
 
   // Update navbar context whenever props change (e.g. after router.refresh() adds chapters).

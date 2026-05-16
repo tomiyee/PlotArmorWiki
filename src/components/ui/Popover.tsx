@@ -47,8 +47,8 @@ export function PopoverContent(props: PopoverContentProps) {
         <PopoverPrimitive.Popup
           className={cn(
             "z-50 w-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-md",
-            "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 transition-[opacity,transform] duration-150",
-            "data-[starting-style]:scale-95 data-[ending-style]:scale-95",
+            "data-starting-style:opacity-0 data-ending-style:opacity-0 transition-[opacity,transform] duration-150",
+            "data-starting-style:scale-95 data-ending-style:scale-95",
             className,
           )}
         >

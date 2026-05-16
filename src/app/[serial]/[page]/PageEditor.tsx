@@ -105,6 +105,13 @@ interface Props {
    * TemplateManager above the content editors.
    */
   editModeHeader?: ReactNode;
+  /**
+   * Whether the current user is an admin of this serial. When `false`, the
+   * component always renders in read mode — edit controls and the edit FAB
+   * are invisible to non-admins. The parent Server Component is responsible
+   * for resolving this value via `isSerialAdmin`.
+   */
+  isAdmin?: boolean;
 }
 
 /**
@@ -142,27 +149,29 @@ interface Props {
  *   allSerialPages={[]}
  * />
  */
-export function PageEditor({
-  serialSlug,
-  pageSlug,
-  pageId,
-  pageTitleEntries,
-  pageSectionStructure,
-  sections,
-  infoboxSectionStructure,
-  floaterImageUrl,
-  floaterRows,
-  allChapters,
-  headChapterId,
-  readingChapterId,
-  wikiPages,
-  introChapterIdx,
-  childPages,
-  parentPages,
-  allSerialPages,
-  isHomePage = false,
-  editModeHeader,
-}: Props) {
+export function PageEditor(props: Props) {
+  const {
+    serialSlug,
+    pageSlug,
+    pageId,
+    pageTitleEntries,
+    pageSectionStructure,
+    sections,
+    infoboxSectionStructure,
+    floaterImageUrl,
+    floaterRows,
+    allChapters,
+    headChapterId,
+    readingChapterId,
+    wikiPages,
+    introChapterIdx,
+    childPages,
+    parentPages,
+    allSerialPages,
+    isHomePage = false,
+    editModeHeader,
+    isAdmin = false,
+  } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isEditing, registerHandlers } = useEditMode();
@@ -285,7 +294,7 @@ export function PageEditor({
     });
   }
 
-  if (!isEditing) {
+  if (!isAdmin || !isEditing) {
     return (
       <PageReadView
         serialSlug={serialSlug}

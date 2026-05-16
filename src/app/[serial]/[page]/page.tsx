@@ -20,6 +20,8 @@ import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageEditor } from "./PageEditor";
+import { EditModeAdminSetter } from "@/contexts/EditModeContext";
+import { isSerialAdmin } from "@/lib/auth-guard";
 
 interface Props {
   params: Promise<{ serial: string; page: string }>;
@@ -72,7 +74,7 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [chapterCutoff, volumeList, chapterList] = await Promise.all([
+  const [chapterCutoff, volumeList, chapterList, adminStatus] = await Promise.all([
     getChapterCutoff(serial.id),
     db
       .select({ id: volumes.id, displayName: volumes.displayName })
@@ -90,7 +92,9 @@ export default async function PageView({ params }: Props) {
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
       .where(eq(volumes.serialId, serial.id))
       .orderBy(asc(chapters.idx)),
+    isSerialAdmin(serial.id),
   ]);
+  const isAdmin = adminStatus;
   const { cutoffIdx, readingChapterId } = chapterCutoff;
 
   // Build a structured chapter list for the chapter selector in edit mode.
@@ -550,6 +554,7 @@ export default async function PageView({ params }: Props) {
 
   return (
     <main>
+      <EditModeAdminSetter isAdmin={isAdmin} />
       <PageContainer>
         <Box col className="gap-6">
           {/* Breadcrumb: Serial > Parent1, Parent2 */}
@@ -602,6 +607,7 @@ export default async function PageView({ params }: Props) {
             childPages={childPages}
             parentPages={parentPages}
             allSerialPages={allSerialPagesRaw}
+            isAdmin={isAdmin}
           />
         </Box>
       </PageContainer>
