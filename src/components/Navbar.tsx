@@ -105,9 +105,6 @@ export default function Navbar(props: NavbarProps) {
           suppressHydrationWarning
           className={cn(
             "sm:flex sm:flex-row sm:items-center sm:gap-3 sm:static sm:bg-transparent sm:border-0 sm:shadow-none sm:rounded-none sm:p-0",
-            menuOpen
-              ? "flex flex-col items-stretch absolute top-full right-0 bg-white border border-border shadow-md rounded-lg p-3 gap-3 z-50 min-w-48"
-              : "hidden",
           )}
         >
           {tocSlot}

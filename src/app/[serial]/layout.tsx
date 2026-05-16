@@ -1,6 +1,12 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/index";
-import { serials, volumes, chapters, pages, pageRelationships } from "@/db/schema";
+import {
+  serials,
+  volumes,
+  chapters,
+  pages,
+  pageRelationships,
+} from "@/db/schema";
 import { and, asc, eq, max } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
@@ -98,7 +104,9 @@ export default async function SerialLayout({ children, params }: Props) {
       .where(eq(pageRelationships.parentPageId, homePage.id))
       .orderBy(asc(pages.name));
 
-    navPages = rawChildren.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+    navPages = rawChildren
+      .filter((r) => r.isActive)
+      .map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
   }
 
   const serialNavData: NavbarSerialData = {

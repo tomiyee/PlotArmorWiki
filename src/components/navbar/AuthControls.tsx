@@ -19,9 +19,7 @@ export async function AuthControls() {
   if (!session?.user) {
     return (
       <Link href="/api/auth/signin">
-        <Button variant="outline" size="sm">
-          Sign in
-        </Button>
+        <Button size="sm">Sign in</Button>
       </Link>
     );
   }
