@@ -6,7 +6,7 @@
 
 ---
 
-## - [ ] Step 2 — Auth.js with Google provider
+## - [X] Step 2 — Auth.js with Google provider
 
 - Install: `pnpm add next-auth@beta @auth/drizzle-adapter`.
 - Create `src/auth.ts`: use `@auth/drizzle-adapter`, configure Google provider (`AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`), use database sessions so `session.user.id` is available server-side. After sign-in, redirect to `/onboarding` if `users.username` is null.
@@ -18,7 +18,7 @@
 
 ---
 
-## - [ ] Step 3 — Username onboarding
+## - [X] Step 3 — Username onboarding
 
 New Google sign-ins have `users.username = null`. Gate access until a username is chosen.
 

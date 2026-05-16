@@ -1,9 +1,18 @@
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/index";
 import { users, accounts, sessions, verificationTokens } from "@/db/schema";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      username: string | null;
+    } & DefaultSession["user"];
+  }
+}
 
 /**
  * Auth.js v5 configuration with Google OAuth and Drizzle database sessions.
@@ -33,9 +42,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "database" },
   callbacks: {
     async session({ session, user }) {
-      // Expose the database user id on the session object for server-side use.
+      // Expose the database user id and username on the session for server-side use.
       if (session.user) {
         session.user.id = user.id;
+        session.user.username = (user as typeof user & { username: string | null }).username ?? null;
       }
       return session;
     },
