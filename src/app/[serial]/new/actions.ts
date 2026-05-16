@@ -9,6 +9,7 @@ import {
 } from '@/db/schema';
 import { and, asc, eq, like } from 'drizzle-orm';
 import { titleToSlug } from '@/lib/slug';
+import { requireSerialAdminBySlug } from '@/lib/auth-guard';
 
 /**
  * Generates a slug unique within the serial. If `titleToSlug(name)` already
@@ -47,6 +48,7 @@ async function generateUniqueSlug(serialId: number, name: string): Promise<strin
  * <form action={createPageForSerial}>…</form>
  */
 export async function createPage(serialSlug: string, formData: FormData) {
+  await requireSerialAdminBySlug(serialSlug);
   const name = formData.get('name');
   const introChapterIdRaw = formData.get('introChapterId');
   const parentPageIdRaw = formData.get('parentPageId');

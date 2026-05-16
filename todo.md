@@ -14,11 +14,7 @@
 
 ---
 
-## - [ ] Step 4 — Serial admin permissions: auto-grant on create + Server Action gates
-
-- In `createSerial` Server Action: require session; after inserting the serial, insert a `serial_admins` row for the creator.
-- Add `requireSerialAdmin(serialId)` helper in `src/lib/auth-guard.ts`: reads session, queries `serial_admins`, throws if not found.
-- Gate every mutating Server Action in `[serial]/actions.ts` and `[serial]/[page]/actions.ts` behind `requireSerialAdmin`.
+## - [X] Step 4 — Serial admin permissions: auto-grant on create + Server Action gates
 
 ---
 
