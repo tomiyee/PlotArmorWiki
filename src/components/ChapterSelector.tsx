@@ -9,11 +9,12 @@ import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { Drawer } from "@/components/ui/Drawer";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileShield } from "@fortawesome/free-solid-svg-icons";
 import {
   ChevronDownIcon,
   ExternalLinkIcon,
   XIcon,
-  BookOpenIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChapterData, Volume } from "@/types";
@@ -254,7 +255,7 @@ export function ChapterSelector(props: Props) {
             aria-label={`Set ${chapterType} progress`}
             onClick={() => setDrawerOpen(true)}
           >
-            <BookOpenIcon />
+            <FontAwesomeIcon icon={faFileShield} />
           </Button>
         </Tooltip>
 

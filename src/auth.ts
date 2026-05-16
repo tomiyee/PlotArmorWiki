@@ -1,7 +1,6 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
 import { db } from "@/db/index";
 import { users, accounts, sessions, verificationTokens } from "@/db/schema";
 
@@ -45,22 +44,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Expose the database user id and username on the session for server-side use.
       if (session.user) {
         session.user.id = user.id;
-        session.user.username = (user as typeof user & { username: string | null }).username ?? null;
+        session.user.username =
+          (user as typeof user & { username: string | null }).username ?? null;
       }
       return session;
     },
-    async signIn({ user }) {
-      // If the user has no username set, redirect them to onboarding.
-      // This is checked after the adapter creates/fetches the user row.
-      const [dbUser] = await db
-        .select({ username: users.username })
-        .from(users)
-        .where(eq(users.id, user.id!))
-        .limit(1);
-      if (dbUser && dbUser.username === null) {
-        // Return the redirect URL; Auth.js will follow it.
-        return "/onboarding";
-      }
+    async signIn() {
+      // Always allow sign-in. Username gating is handled in middleware so
+      // the database session is created before the onboarding redirect.
       return true;
     },
   },

@@ -19,7 +19,7 @@ export type UsernameActionState = { error: string } | null;
  */
 export async function setUsername(
   _: UsernameActionState,
-  formData: FormData
+  formData: FormData,
 ): Promise<UsernameActionState> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -29,7 +29,8 @@ export async function setUsername(
   const raw = formData.get("username");
   if (typeof raw !== "string" || !USERNAME_RE.test(raw)) {
     return {
-      error: "Username must be 3–20 characters: letters, numbers, and underscores only.",
+      error:
+        "Username must be 3–20 characters: letters, numbers, and underscores only.",
     };
   }
   const username = raw;
@@ -44,10 +45,7 @@ export async function setUsername(
     return { error: "That username is already taken." };
   }
 
-  await db
-    .update(users)
-    .set({ username })
-    .where(eq(users.id, session.user.id));
+  await db.update(users).set({ username }).where(eq(users.id, session.user.id));
 
   redirect("/");
 }
