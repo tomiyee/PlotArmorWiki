@@ -5,10 +5,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Combobox } from "@/components/ui/Combobox";
 import { useServerAction } from "@/hooks/useServerAction";
 import { useEditMode } from "@/contexts/EditModeContext";
+import { useToast } from "@/components/ui/Toast";
 import {
   Card,
   CardContent,
@@ -34,6 +35,8 @@ type AdminManagerProps = {
   addAdminAction: (formData: FormData) => Promise<void>;
   /** Server Action: remove a user from `serial_admins` by userId. */
   removeAdminAction: (formData: FormData) => Promise<void>;
+  /** Server Action: search for users by query, excluding current admins. */
+  searchUsersAction: (query: string) => Promise<{ userId: string; username: string }[]>;
 };
 
 /**
@@ -51,35 +54,51 @@ type AdminManagerProps = {
  *   admins={admins}
  *   addAdminAction={addAdminForSerial}
  *   removeAdminAction={removeAdminForSerial}
+ *   searchUsersAction={searchUsersForSerial}
  * />
  */
 export function AdminManager(props: AdminManagerProps) {
-  const { serialId: _serialId, currentUserId, admins, addAdminAction, removeAdminAction } = props;
+  const {
+    serialId: _serialId,
+    currentUserId,
+    admins,
+    addAdminAction,
+    removeAdminAction,
+    searchUsersAction,
+  } = props;
   void _serialId;
 
   const { isEditing } = useEditMode();
   const { run, isPending } = useServerAction();
+  const { toast } = useToast();
   const [adding, setAdding] = useState(false);
-  const [newUsername, setNewUsername] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
 
   if (!isEditing) return null;
 
   const isSoleAdmin = admins.length <= 1;
 
+  async function getOptions(query: string) {
+    const users = await searchUsersAction(query);
+    return users.map((u) => ({ label: u.username, value: u.username }));
+  }
+
   function handleAdd() {
-    if (!newUsername.trim()) return;
-    setError(null);
+    if (!selectedUsername) return;
     const fd = new FormData();
-    fd.set("username", newUsername.trim());
-    run(addAdminAction, fd, () => {
-      setNewUsername("");
-      setAdding(false);
-    });
+    fd.set("username", selectedUsername);
+    run(
+      addAdminAction,
+      fd,
+      () => {
+        setSelectedUsername(null);
+        setAdding(false);
+      },
+      (err) => toast({ title: err.message, variant: "error" }),
+    );
   }
 
   function handleRemove(userId: string) {
-    setError(null);
     const fd = new FormData();
     fd.set("userId", userId);
     run(removeAdminAction, fd);
@@ -92,11 +111,6 @@ export function AdminManager(props: AdminManagerProps) {
           <Text variant="h2">Admins</Text>
         </CardHeader>
         <CardContent>
-          {error && (
-            <Text variant="body" className="text-destructive mb-2">
-              {error}
-            </Text>
-          )}
           {admins.length > 0 ? (
             <Box col className="gap-1">
               {admins.map((admin) => {
@@ -137,29 +151,18 @@ export function AdminManager(props: AdminManagerProps) {
         <CardFooter>
           {adding ? (
             <Box className="gap-2 items-center">
-              <Input
-                placeholder="Username…"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAdd();
-                  }
-                  if (e.key === "Escape") {
-                    setAdding(false);
-                    setNewUsername("");
-                    setError(null);
-                  }
-                }}
-                autoFocus
-                className="flex-1"
+              <Combobox
+                placeholder="Search users…"
+                value={selectedUsername}
+                onChange={setSelectedUsername}
+                getOptions={getOptions}
                 disabled={isPending}
+                className="flex-1"
               />
               <Button
                 type="button"
                 onClick={handleAdd}
-                disabled={isPending || !newUsername.trim()}
+                disabled={isPending || !selectedUsername}
               >
                 Add
               </Button>
@@ -168,8 +171,7 @@ export function AdminManager(props: AdminManagerProps) {
                 variant="ghost"
                 onClick={() => {
                   setAdding(false);
-                  setNewUsername("");
-                  setError(null);
+                  setSelectedUsername(null);
                 }}
                 disabled={isPending}
               >

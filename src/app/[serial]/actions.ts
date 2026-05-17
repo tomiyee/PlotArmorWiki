@@ -7,7 +7,7 @@ import {
   templates, templateSections, templateInfoboxSections,
   serialAdmins, users,
 } from '@/db/schema';
-import { and, asc, count, eq, gte, gt, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, gt, ilike, inArray, isNotNull, lte, max, not, sql } from 'drizzle-orm';
 import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 import { titleToSlug } from '@/lib/slug';
 import { requireSerialAdmin } from '@/lib/auth-guard';
@@ -685,3 +685,38 @@ export async function removeSerialAdmin(serialId: number, formData: FormData) {
     .where(and(eq(serialAdmins.userId, targetUserId), eq(serialAdmins.serialId, serialId)));
 }
 
+/**
+ * Returns up to 10 users whose username contains `query` and who are not
+ * already admins of the given serial. Requires the caller to be an admin.
+ *
+ * @example
+ * const users = await searchUsersForSerial(42, "ali");
+ */
+export async function searchUsersForSerial(
+  serialId: number,
+  query: string,
+): Promise<{ userId: string; username: string }[]> {
+  await requireSerialAdmin(serialId);
+
+  const q = query.trim();
+
+  const currentAdmins = await db
+    .select({ userId: serialAdmins.userId })
+    .from(serialAdmins)
+    .where(eq(serialAdmins.serialId, serialId));
+  const excludeIds = currentAdmins.map((a) => a.userId);
+
+  const results = await db
+    .select({ userId: users.id, username: users.username })
+    .from(users)
+    .where(
+      and(
+        isNotNull(users.username),
+        q ? ilike(users.username, `%${q}%`) : undefined,
+        excludeIds.length > 0 ? not(inArray(users.id, excludeIds)) : undefined,
+      ),
+    )
+    .limit(10);
+
+  return results.map((r) => ({ userId: r.userId, username: r.username! }));
+}

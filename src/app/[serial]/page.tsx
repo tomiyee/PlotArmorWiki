@@ -42,6 +42,7 @@ import {
   deleteTemplateInfoboxSection,
   addSerialAdmin,
   removeSerialAdmin,
+  searchUsersForSerial,
 } from "./actions";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -202,6 +203,7 @@ export default async function SerialPage({ params }: Props) {
   // Admin actions bound to this serial.
   const addAdminForSerial = addSerialAdmin.bind(null, serial.id);
   const removeAdminForSerial = removeSerialAdmin.bind(null, serial.id);
+  const searchUsersForThisSerial = searchUsersForSerial.bind(null, serial.id);
 
   // Template actions bound to this serial.
   const createTemplateForSerial = createTemplate.bind(null, serial.id);
@@ -606,6 +608,7 @@ export default async function SerialPage({ params }: Props) {
                       admins={serialAdminList}
                       addAdminAction={addAdminForSerial}
                       removeAdminAction={removeAdminForSerial}
+                      searchUsersAction={searchUsersForThisSerial}
                     />
                     <TemplateManager
                       templates={serialTemplates}
