@@ -82,6 +82,7 @@ function Combobox<T>(props: ComboboxProps<T>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelRef = useRef<{ cancelled: boolean } | null>(null);
   const listboxId = useId();
 
   // Sync: reset the visible input when the controlled value is cleared externally.
@@ -92,8 +93,14 @@ function Combobox<T>(props: ComboboxProps<T>) {
     if (value == null && inputValue !== "") setInputValue("");
   }
 
-  // Click-outside closes the dropdown. Must check both the input and the
-  // portaled popup since they are separate DOM subtrees.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (cancelRef.current) cancelRef.current.cancelled = true;
+    };
+  }, []);
+
+  // Must check both the input and the portaled popup since they are separate DOM subtrees.
   useEffect(() => {
     if (!isOpen) return;
     function handleClick(e: MouseEvent) {
@@ -113,13 +120,16 @@ function Combobox<T>(props: ComboboxProps<T>) {
         setDisplayedOptions(filterStatic(options, query));
       } else if (getOptions) {
         if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (cancelRef.current) cancelRef.current.cancelled = true;
+        const token = { cancelled: false };
+        cancelRef.current = token;
         debounceRef.current = setTimeout(async () => {
           setIsLoading(true);
           try {
             const results = await getOptions(query);
-            setDisplayedOptions(results);
+            if (!token.cancelled) setDisplayedOptions(results);
           } finally {
-            setIsLoading(false);
+            if (!token.cancelled) setIsLoading(false);
           }
         }, DEBOUNCE_MS);
       }
@@ -136,8 +146,10 @@ function Combobox<T>(props: ComboboxProps<T>) {
   }
 
   function handleFocus() {
-    fetchOptions(inputValue);
-    setIsOpen(true);
+    if (!isOpen) {
+      fetchOptions(inputValue);
+      setIsOpen(true);
+    }
   }
 
   function handleSelect(option: Option<T>) {
@@ -221,7 +233,6 @@ function Combobox<T>(props: ComboboxProps<T>) {
         aria-autocomplete="list"
         className="w-full"
       />
-      {/* anchor mode: positions under the input without a separate trigger element */}
       <Popover
         anchor={inputRef}
         open={isOpen}
@@ -232,7 +243,6 @@ function Combobox<T>(props: ComboboxProps<T>) {
         initialFocus={false}
         side="bottom"
         align="start"
-        sideOffset={4}
         popupStyle={{ width: "var(--anchor-width)" }}
         className="max-h-60 overflow-y-auto bg-background py-1 text-foreground"
         content={dropdownContent}

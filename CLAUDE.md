@@ -10,6 +10,19 @@ rtk npx drizzle-kit generate         # generate migration after schema changes
 rtk npx drizzle-kit migrate          # apply pending migrations
 ```
 
+### RTK command prefixes (token savings)
+
+Always prefix these shell commands with `rtk` to compress output:
+
+```bash
+rtk git <args>        # instead of: git <args>
+rtk grep <args>       # instead of: grep <args>
+rtk find <args>       # instead of: find <args>
+rtk ls <args>         # instead of: ls <args>
+rtk gh <args>         # instead of: gh <args>
+rtk read <file>       # instead of: cat <file>
+```
+
 ### Schema change workflow
 
 Whenever `src/db/schema.ts` changes: generate migration → apply → commit schema + migration + `drizzle/meta/` together.

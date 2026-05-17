@@ -7,9 +7,13 @@ import { cn } from "@/lib/utils";
 type TriggerPopoverProps = {
   /** The trigger element that opens the popover on click. Required when not using `anchor`. */
   children: ReactNode;
+  /** Not applicable in trigger mode; use anchor mode to attach to an existing element. */
   anchor?: never;
+  /** Not applicable in trigger mode; open state is managed internally. */
   open?: never;
+  /** Not applicable in trigger mode. */
   onOpenChange?: never;
+  /** Not applicable in trigger mode. */
   modal?: never;
   /** Forwarded to the popup element as `id` (e.g. for `aria-controls`). */
   popupId?: never;
@@ -24,6 +28,7 @@ type TriggerPopoverProps = {
 };
 
 type AnchorPopoverProps = {
+  /** Not applicable in anchor mode; provide `anchor` and `open` instead. */
   children?: never;
   /** Ref to an existing DOM element used as the positioning anchor. Enables controlled mode. */
   anchor: RefObject<Element | null>;
@@ -33,9 +38,13 @@ type AnchorPopoverProps = {
   onOpenChange?: (open: boolean) => void;
   /** Whether the popover is modal (traps focus). Defaults to `true`. */
   modal?: boolean;
+  /** Forwarded to the popup element as `id` (e.g. for `aria-controls`). */
   popupId?: string;
+  /** Forwarded to the popup element as `role`. */
   popupRole?: string;
+  /** Ref attached to the popup element (e.g. for click-outside detection). */
   popupRef?: RefObject<HTMLDivElement | null>;
+  /** Inline styles merged onto the popup element. */
   popupStyle?: CSSProperties;
   /** Pass `false` to prevent the popup from stealing focus on open. */
   initialFocus?: boolean;
@@ -48,13 +57,12 @@ type BasePopoverProps = {
   side?: "top" | "right" | "bottom" | "left";
   /** Alignment of the popup relative to the trigger/anchor. Defaults to `"start"`. */
   align?: "start" | "center" | "end";
-  /** Pixel gap between anchor and popup. Defaults to `8`. */
-  sideOffset?: number;
   /** Additional classes merged onto the popup container. */
   className?: string;
 };
 
-export type PopoverProps = BasePopoverProps & (TriggerPopoverProps | AnchorPopoverProps);
+export type PopoverProps = BasePopoverProps &
+  (TriggerPopoverProps | AnchorPopoverProps);
 
 /**
  * Composable popover with two usage modes:
@@ -87,15 +95,9 @@ export type PopoverProps = BasePopoverProps & (TriggerPopoverProps | AnchorPopov
  * />
  */
 export function Popover(props: PopoverProps) {
-  const {
-    content,
-    side = "bottom",
-    align = "start",
-    sideOffset = 8,
-    className,
-  } = props;
+  const { content, side = "bottom", align = "start", className } = props;
 
-  const isAnchorMode = "anchor" in props && props.anchor !== undefined;
+  const isAnchorMode = "anchor" in props;
 
   const rootProps = isAnchorMode
     ? { open: props.open, onOpenChange: props.onOpenChange, modal: props.modal }
@@ -125,9 +127,10 @@ export function Popover(props: PopoverProps) {
           anchor={positionerAnchor}
           side={side}
           align={align}
-          sideOffset={sideOffset}
+          className="z-50"
         >
           <PopoverPrimitive.Popup
+            finalFocus={false}
             {...popupExtraProps}
             className={cn(
               "z-50 rounded-lg border border-border bg-popover text-popover-foreground shadow-md",

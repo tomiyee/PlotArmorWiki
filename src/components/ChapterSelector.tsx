@@ -172,8 +172,8 @@ export function ChapterSelector(props: Props) {
   const spoilerCallout = (
     <Box className="items-start gap-2 px-3 py-2 text-sm">
       <Text variant="label" className="flex-1 leading-snug text-amber-800">
-        We defaulted to the first {chapterType.toLowerCase()} to avoid
-        spoilers. Set your {chapterType.toLowerCase()} here.
+        We defaulted to the first {chapterType.toLowerCase()} to avoid spoilers.
+        Set your {chapterType.toLowerCase()} here.
       </Text>
       <Tooltip content="Dismiss">
         <Button
@@ -225,11 +225,12 @@ export function ChapterSelector(props: Props) {
         <Popover
           anchor={triggerRef}
           open={!popoverDismissed}
-          onOpenChange={(open) => { if (!open) setPopoverDismissed(true); }}
+          onOpenChange={(open) => {
+            if (!open) setPopoverDismissed(true);
+          }}
           modal={false}
           side="bottom"
           align="end"
-          sideOffset={8}
           className="w-64 border-amber-300 bg-amber-50 text-amber-800"
           content={spoilerCallout}
         />
