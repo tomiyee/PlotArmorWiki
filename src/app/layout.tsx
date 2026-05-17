@@ -5,6 +5,7 @@ import { NavbarSerialProvider } from "@/contexts/NavbarSerialContext";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModeFAB } from "@/components/EditModeFAB";
 import { TooltipProvider } from "@/components/ui/Tooltip";
+import { ToastProvider } from "@/components/ui/Toast";
 import { AuthControls } from "@/components/navbar/AuthControls";
 
 const geistSans = Geist({
@@ -33,17 +34,19 @@ export default function RootLayout(props: RootLayoutProps) {
         className="h-full overflow-hidden flex flex-col"
         suppressHydrationWarning
       >
-        <TooltipProvider>
-          <EditModeProvider>
-            <NavbarSerialProvider>
-              <Navbar authSlot={<AuthControls />} />
-              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                {children}
-              </div>
-              <EditModeFAB />
-            </NavbarSerialProvider>
-          </EditModeProvider>
-        </TooltipProvider>
+        <ToastProvider>
+          <TooltipProvider>
+            <EditModeProvider>
+              <NavbarSerialProvider>
+                <Navbar authSlot={<AuthControls />} />
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                  {children}
+                </div>
+                <EditModeFAB />
+              </NavbarSerialProvider>
+            </EditModeProvider>
+          </TooltipProvider>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -111,6 +111,20 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/components/navbar/UserMenu.tsx`      | Client Component: avatar dropdown with username display and `<SignOutButton>`.                                                                                        |
 | `src/components/navbar/SignOutButton.tsx` | Thin Client Component wrapping `signOut()` as a form action (required by Auth.js for CSRF safety).                                                                    |
 
+### React import conventions
+
+Always import React APIs as named imports — never use the `import * as React` namespace:
+
+```ts
+// ✅ correct
+import { useState, useEffect, useCallback } from "react";
+import type { ReactNode } from "react";
+
+// ❌ wrong
+import * as React from "react";
+// React.useState, React.useEffect, React.useCallback, etc.
+```
+
 ### UI component conventions
 
 Always use design-system components instead of bare HTML:

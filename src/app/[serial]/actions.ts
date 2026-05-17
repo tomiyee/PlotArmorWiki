@@ -5,8 +5,9 @@ import { db } from '@/db/index';
 import {
   serials, serialAuthors, volumes, chapters, pages, pageTitles,
   templates, templateSections, templateInfoboxSections,
+  serialAdmins, users,
 } from '@/db/schema';
-import { and, asc, count, eq, gte, gt, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, gt, ilike, inArray, isNotNull, lte, max, not, sql } from 'drizzle-orm';
 import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 import { titleToSlug } from '@/lib/slug';
 import { requireSerialAdmin } from '@/lib/auth-guard';
@@ -619,3 +620,103 @@ export async function deleteTemplateInfoboxSection(serialId: number, formData: F
   await db.delete(templateInfoboxSections).where(eq(templateInfoboxSections.id, infoboxSectionId));
 }
 
+// ── Admin management ─────────────────────────────────────────────────────────
+
+/**
+ * Looks up a user by `username` and grants them admin access to the serial.
+ * Silently no-ops if the user is already an admin (ON CONFLICT DO NOTHING).
+ *
+ * @example
+ * await addSerialAdmin(42, new FormData()); // formData has "username" field
+ */
+export async function addSerialAdmin(serialId: number, formData: FormData) {
+  await requireSerialAdmin(serialId);
+
+  const username = formData.get('username');
+  if (!username || typeof username !== 'string' || username.trim() === '') {
+    throw new Error('Username is required');
+  }
+
+  const [targetUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, username.trim()))
+    .limit(1);
+
+  if (!targetUser) throw new Error(`No user with username "${username.trim()}" found.`);
+
+  await db
+    .insert(serialAdmins)
+    .values({ userId: targetUser.id, serialId })
+    .onConflictDoNothing();
+}
+
+/**
+ * Removes a user from the admin list for a serial. Prevents removal when the
+ * target user is the sole remaining admin.
+ *
+ * @example
+ * await removeSerialAdmin(42, new FormData()); // formData has "userId" field
+ */
+export async function removeSerialAdmin(serialId: number, formData: FormData) {
+  const callerId = await requireSerialAdmin(serialId);
+
+  const targetUserId = formData.get('userId');
+  if (!targetUserId || typeof targetUserId !== 'string') {
+    throw new Error('User ID is required');
+  }
+
+  // Count current admins to prevent removing the last one.
+  const [{ adminCount }] = await db
+    .select({ adminCount: count(serialAdmins.userId) })
+    .from(serialAdmins)
+    .where(eq(serialAdmins.serialId, serialId));
+
+  if (adminCount <= 1) {
+    throw new Error('Cannot remove the sole admin of a serial.');
+  }
+
+  // Extra guard: prevent a caller from removing themselves if they are the sole admin
+  // (already covered above, but kept for clarity).
+  void callerId;
+
+  await db
+    .delete(serialAdmins)
+    .where(and(eq(serialAdmins.userId, targetUserId), eq(serialAdmins.serialId, serialId)));
+}
+
+/**
+ * Returns up to 10 users whose username contains `query` and who are not
+ * already admins of the given serial. Requires the caller to be an admin.
+ *
+ * @example
+ * const users = await searchUsersForSerial(42, "ali");
+ */
+export async function searchUsersForSerial(
+  serialId: number,
+  query: string,
+): Promise<{ userId: string; username: string }[]> {
+  await requireSerialAdmin(serialId);
+
+  const q = query.trim();
+
+  const currentAdmins = await db
+    .select({ userId: serialAdmins.userId })
+    .from(serialAdmins)
+    .where(eq(serialAdmins.serialId, serialId));
+  const excludeIds = currentAdmins.map((a) => a.userId);
+
+  const results = await db
+    .select({ userId: users.id, username: users.username })
+    .from(users)
+    .where(
+      and(
+        isNotNull(users.username),
+        q ? ilike(users.username, `%${q}%`) : undefined,
+        excludeIds.length > 0 ? not(inArray(users.id, excludeIds)) : undefined,
+      ),
+    )
+    .limit(10);
+
+  return results.map((r) => ({ userId: r.userId, username: r.username! }));
+}
