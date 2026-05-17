@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
+import type { JSX } from "react";
 import { MDEditor } from "@/components/MDEditor";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 
 interface WikiPage {
+  /** Display name of the wiki page, used for filtering and completion. */
   name: string;
 }
 
-interface Props {
+type WikiLinkMDEditorProps = {
   value: string;
   onChange: (val: string | undefined) => void;
   height?: number;
@@ -17,7 +19,7 @@ interface Props {
   wikiPages: WikiPage[];
   /** Slug of the serial being edited — used to build preview links. */
   serialSlug: string;
-}
+};
 
 interface Suggestion {
   name: string;
@@ -27,8 +29,9 @@ interface Suggestion {
  * Wraps `<MDEditor>` with `[[Page]]` wiki link autocomplete.
  *
  * Autocomplete is triggered by typing `[[` anywhere in the editor. The
- * dropdown filters pages by name as the user types. Selecting a suggestion
- * replaces the open `[[…` fragment with the completed `[[PageName]]` token.
+ * dropdown filters pages by name (substring match) as the user types.
+ * Selecting a suggestion replaces the open `[[…` fragment with the completed
+ * `[[PageName]]` token.
  *
  * The legacy `[[Category:Page]]` syntax is still valid in markdown (the
  * remark plugin handles both), but new completions only emit `[[PageName]]`.
@@ -36,6 +39,10 @@ interface Suggestion {
  * Uses `onInput` (not `onKeyUp`) to catch paste, IME, and programmatic edits.
  * IME composition state is tracked via `onCompositionStart`/`onCompositionEnd`
  * so dropdown keyboard navigation is suppressed during CJK input.
+ *
+ * Event handlers read the textarea element from `e.currentTarget` rather than
+ * storing a ref, avoiding conflicts with the MDEditor internal ref attached via
+ * `React.cloneElement` inside `renderTextarea`.
  *
  * @example
  * <WikiLinkMDEditor
@@ -45,15 +52,22 @@ interface Suggestion {
  *   serialSlug="one-piece"
  * />
  */
-export function WikiLinkMDEditor({
-  value,
-  onChange,
-  height = 300,
-  preview = "edit",
-  wikiPages,
-  serialSlug,
-}: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
+  const {
+    value,
+    onChange,
+    height = 300,
+    preview = "edit",
+    wikiPages,
+    serialSlug,
+  } = props;
+
+  // Stable ref to the textarea DOM node, populated via the renderTextarea callback.
+  // We attach our own ref callback before MDEditor injects its internal ref via
+  // cloneElement — both refs are compatible because we use a callback ref that
+  // stores the element in a plain object field (no React state).
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -68,11 +82,12 @@ export function WikiLinkMDEditor({
 
   /**
    * Recompute suggestions from the text before the cursor.
-   * Called on every `input` event.
+   * Called on every `input` event. Reads the textarea element directly from
+   * the event target so we are not reliant on a ref surviving MDEditor's
+   * internal `React.cloneElement` call.
    */
-  function handleInput() {
-    const ta = textareaRef.current;
-    if (!ta) return;
+  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
+    const ta = e.currentTarget;
 
     const before = ta.value.substring(0, ta.selectionStart ?? ta.value.length);
     const lastOpen = before.lastIndexOf("[[");
@@ -91,8 +106,9 @@ export function WikiLinkMDEditor({
       colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText
     ).toLowerCase();
 
+    // Substring match: page name must contain the query anywhere (not just prefix).
     const next: Suggestion[] = wikiPages.filter((p) =>
-      p.name.toLowerCase().startsWith(pageQuery),
+      p.name.toLowerCase().includes(pageQuery),
     );
 
     if (next.length === 0) {
@@ -161,6 +177,41 @@ export function WikiLinkMDEditor({
     }
   }
 
+  /**
+   * Custom textarea renderer passed as the top-level `renderTextarea` prop to
+   * MDEditor. Using the top-level prop (not `textareaProps.renderTextarea`)
+   * ensures MDEditor's TextArea factory actually invokes it — the factory
+   * explicitly sets `renderTextarea={components?.textarea || renderTextarea}`
+   * which overrides anything in `textareaProps`.
+   *
+   * We store the element in `textareaRef` via a callback ref so `applySuggestion`
+   * can read the value and move the cursor. MDEditor's cloneElement subsequently
+   * attaches its own internal ref; callback refs survive cloneElement merges
+   * because React calls both the callback ref and the cloneElement ref.
+   *
+   * The second `opts` argument is accepted but unused — MDEditor requires the
+   * two-argument signature per `ITextAreaProps['renderTextarea']`.
+   */
+  function renderTextarea(
+    taProps:
+      | React.TextareaHTMLAttributes<HTMLTextAreaElement>
+      | React.HTMLAttributes<HTMLDivElement>,
+    _opts: Record<string, unknown>,
+  ): JSX.Element {
+    return (
+      <textarea
+        {...(taProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+        ref={(el) => {
+          textareaRef.current = el;
+        }}
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={() => setIsComposing(false)}
+      />
+    );
+  }
+
   return (
     <div className="relative" data-color-mode="light">
       <MDEditor
@@ -175,20 +226,7 @@ export function WikiLinkMDEditor({
             </MarkdownRenderer>
           ),
         }}
-        textareaProps={{
-          onInput: handleInput,
-          onKeyDown: handleKeyDown,
-          onCompositionStart: () => setIsComposing(true),
-          onCompositionEnd: () => setIsComposing(false),
-          renderTextarea: (props) => (
-            <textarea
-              {...(props as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-              ref={(el) => {
-                textareaRef.current = el;
-              }}
-            />
-          ),
-        }}
+        renderTextarea={renderTextarea}
       />
 
       {isOpen && suggestions.length > 0 && (
@@ -210,7 +248,7 @@ export function WikiLinkMDEditor({
                 applySuggestion(s);
               }}
             >
-              <span className="text-gray-900 font-medium">{s.name}</span>
+              <span className="font-medium text-gray-900">{s.name}</span>
             </li>
           ))}
         </ul>
