@@ -4,11 +4,6 @@ import { useState, useRef, useCallback, useEffect, useId } from "react";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import {
-  PopoverRoot,
-  PopoverPortal,
-  PopoverPositioner,
-} from "@/components/ui/Popover";
 import { cn } from "@/lib/utils";
 import type { Option } from "@/components/ui/Select";
 
@@ -54,7 +49,7 @@ function filterStatic<T>(options: Option<T>[], query: string): Option<T>[] {
  * an async `getOptions` callback (server-side, debounced 200 ms). Arrow-key
  * navigation, Enter to select, Escape to dismiss.
  *
- * Uses `PopoverPositioner` for portal + positioning so the dropdown escapes
+ * Uses `@base-ui/react/popover` primitives for portal + positioning so the dropdown escapes
  * `overflow-hidden` containers without manual coordinate tracking.
  *
  * @example
@@ -182,10 +177,10 @@ function Combobox<T>(props: ComboboxProps<T>) {
   return (
     <div className={className}>
       {/*
-       * PopoverRoot provides context for PopoverPortal/PopoverPositioner.
+       * PopoverPrimitive.Root provides context for the portal and positioner.
        * We own the open state ourselves; modal=false keeps focus inside the input.
        */}
-      <PopoverRoot open={isOpen} modal={false}>
+      <PopoverPrimitive.Root open={isOpen} modal={false}>
         <Input
           ref={inputRef}
           id={id}
@@ -203,8 +198,8 @@ function Combobox<T>(props: ComboboxProps<T>) {
           aria-autocomplete="list"
           className="w-full"
         />
-        <PopoverPortal>
-          <PopoverPositioner anchor={inputRef} side="bottom" align="start" sideOffset={4}>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Positioner anchor={inputRef} side="bottom" align="start" sideOffset={4}>
             <PopoverPrimitive.Popup
               ref={popupRef}
               id={listboxId}
@@ -245,9 +240,9 @@ function Combobox<T>(props: ComboboxProps<T>) {
                 ))
               )}
             </PopoverPrimitive.Popup>
-          </PopoverPositioner>
-        </PopoverPortal>
-      </PopoverRoot>
+          </PopoverPrimitive.Positioner>
+        </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Root>
     </div>
   );
 }
