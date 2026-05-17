@@ -1,14 +1,9 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useId } from "react";
-import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import { Popover } from "@/components/ui/Popover";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import {
-  PopoverRoot,
-  PopoverPortal,
-  PopoverPositioner,
-} from "@/components/ui/Popover";
 import { cn } from "@/lib/utils";
 import type { Option } from "@/components/ui/Select";
 
@@ -54,7 +49,7 @@ function filterStatic<T>(options: Option<T>[], query: string): Option<T>[] {
  * an async `getOptions` callback (server-side, debounced 200 ms). Arrow-key
  * navigation, Enter to select, Escape to dismiss.
  *
- * Uses `PopoverPositioner` for portal + positioning so the dropdown escapes
+ * Uses `@base-ui/react/popover` primitives for portal + positioning so the dropdown escapes
  * `overflow-hidden` containers without manual coordinate tracking.
  *
  * @example
@@ -87,6 +82,7 @@ function Combobox<T>(props: ComboboxProps<T>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelRef = useRef<{ cancelled: boolean } | null>(null);
   const listboxId = useId();
 
   // Sync: reset the visible input when the controlled value is cleared externally.
@@ -97,8 +93,14 @@ function Combobox<T>(props: ComboboxProps<T>) {
     if (value == null && inputValue !== "") setInputValue("");
   }
 
-  // Click-outside closes the dropdown. Must check both the input and the
-  // portaled popup since they are separate DOM subtrees.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (cancelRef.current) cancelRef.current.cancelled = true;
+    };
+  }, []);
+
+  // Must check both the input and the portaled popup since they are separate DOM subtrees.
   useEffect(() => {
     if (!isOpen) return;
     function handleClick(e: MouseEvent) {
@@ -118,13 +120,16 @@ function Combobox<T>(props: ComboboxProps<T>) {
         setDisplayedOptions(filterStatic(options, query));
       } else if (getOptions) {
         if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (cancelRef.current) cancelRef.current.cancelled = true;
+        const token = { cancelled: false };
+        cancelRef.current = token;
         debounceRef.current = setTimeout(async () => {
           setIsLoading(true);
           try {
             const results = await getOptions(query);
-            setDisplayedOptions(results);
+            if (!token.cancelled) setDisplayedOptions(results);
           } finally {
-            setIsLoading(false);
+            if (!token.cancelled) setIsLoading(false);
           }
         }, DEBOUNCE_MS);
       }
@@ -141,8 +146,10 @@ function Combobox<T>(props: ComboboxProps<T>) {
   }
 
   function handleFocus() {
-    fetchOptions(inputValue);
-    setIsOpen(true);
+    if (!isOpen) {
+      fetchOptions(inputValue);
+      setIsOpen(true);
+    }
   }
 
   function handleSelect(option: Option<T>) {
@@ -179,75 +186,67 @@ function Combobox<T>(props: ComboboxProps<T>) {
   const highlightedOptionId =
     highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined;
 
+  const dropdownContent = isLoading ? (
+    <div className="px-3 py-2 text-sm text-muted-foreground">Loading…</div>
+  ) : displayedOptions.length === 0 ? (
+    <div className="px-3 py-2 text-sm text-muted-foreground">No results.</div>
+  ) : (
+    displayedOptions.map((option, i) => (
+      <Button
+        key={i}
+        id={`${listboxId}-opt-${i}`}
+        type="button"
+        variant="ghost"
+        role="option"
+        aria-selected={i === highlightedIndex}
+        className={cn(
+          "h-auto w-full justify-start rounded-none px-3 py-1.5 text-sm font-normal",
+          i === highlightedIndex && "bg-primary/10 font-medium text-primary",
+        )}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          handleSelect(option);
+        }}
+        onMouseEnter={() => setHighlightedIndex(i)}
+      >
+        {option.label}
+      </Button>
+    ))
+  );
+
   return (
     <div className={className}>
-      {/*
-       * PopoverRoot provides context for PopoverPortal/PopoverPositioner.
-       * We own the open state ourselves; modal=false keeps focus inside the input.
-       */}
-      <PopoverRoot open={isOpen} modal={false}>
-        <Input
-          ref={inputRef}
-          id={id}
-          value={inputValue}
-          onChange={handleInputChange}
-          onFocus={handleFocus}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          autoComplete="off"
-          role="combobox"
-          aria-expanded={isOpen}
-          aria-controls={isOpen ? listboxId : undefined}
-          aria-activedescendant={highlightedOptionId}
-          aria-autocomplete="list"
-          className="w-full"
-        />
-        <PopoverPortal>
-          <PopoverPositioner anchor={inputRef} side="bottom" align="start" sideOffset={4}>
-            <PopoverPrimitive.Popup
-              ref={popupRef}
-              id={listboxId}
-              role="listbox"
-              initialFocus={false}
-              style={{ width: "var(--anchor-width)" }}
-              className="z-50 max-h-60 overflow-y-auto rounded-lg border border-border bg-background shadow-md py-1"
-            >
-              {isLoading ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  Loading…
-                </div>
-              ) : displayedOptions.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  No results.
-                </div>
-              ) : (
-                displayedOptions.map((option, i) => (
-                  <Button
-                    key={i}
-                    id={`${listboxId}-opt-${i}`}
-                    type="button"
-                    variant="ghost"
-                    role="option"
-                    aria-selected={i === highlightedIndex}
-                    className={cn(
-                      "h-auto w-full justify-start rounded-none px-3 py-1.5 text-sm font-normal",
-                      i === highlightedIndex && "bg-primary/10 font-medium text-primary",
-                    )}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSelect(option);
-                    }}
-                    onMouseEnter={() => setHighlightedIndex(i)}
-                  >
-                    {option.label}
-                  </Button>
-                ))
-              )}
-            </PopoverPrimitive.Popup>
-          </PopoverPositioner>
-        </PopoverPortal>
-      </PopoverRoot>
+      <Input
+        ref={inputRef}
+        id={id}
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-activedescendant={highlightedOptionId}
+        aria-autocomplete="list"
+        className="w-full"
+      />
+      <Popover
+        anchor={inputRef}
+        open={isOpen}
+        modal={false}
+        popupRef={popupRef}
+        popupId={listboxId}
+        popupRole="listbox"
+        initialFocus={false}
+        side="bottom"
+        align="start"
+        popupStyle={{ width: "var(--anchor-width)" }}
+        className="max-h-60 overflow-y-auto bg-background py-1 text-foreground"
+        content={dropdownContent}
+      />
     </div>
   );
 }

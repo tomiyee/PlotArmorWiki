@@ -10,6 +10,19 @@ rtk npx drizzle-kit generate         # generate migration after schema changes
 rtk npx drizzle-kit migrate          # apply pending migrations
 ```
 
+### RTK command prefixes (token savings)
+
+Always prefix these shell commands with `rtk` to compress output:
+
+```bash
+rtk git <args>        # instead of: git <args>
+rtk grep <args>       # instead of: grep <args>
+rtk find <args>       # instead of: find <args>
+rtk ls <args>         # instead of: ls <args>
+rtk gh <args>         # instead of: gh <args>
+rtk read <file>       # instead of: cat <file>
+```
+
 ### Schema change workflow
 
 Whenever `src/db/schema.ts` changes: generate migration → apply → commit schema + migration + `drizzle/meta/` together.
@@ -90,13 +103,14 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/app/[serial]/[page]/actions.ts`      | `savePageContent` (upserts at target chapter) + `getPageContentAtChapter` (pre-fills edit drafts).                                                                    |
 | `src/components/SerialEditor.tsx`         | Volume/chapter edit UI with drag-and-drop reorder (`@dnd-kit`). Uses serial's type names (e.g. "Episode"/"Season").                                                   |
 | `src/components/SerialMetadataEditor.tsx` | Inline serial title/description/authors/art edit. Redirects on slug change.                                                                                           |
-| `src/components/ChapterSelector.tsx`      | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. Grouped volume dropdown with collapsible headers (collapse state persisted).               |
+| `src/components/ChapterSelector.tsx`      | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. Grouped volume dropdown with collapsible headers (collapse state persisted). On first visit shows a `<Popover>` spoiler callout anchored below the trigger button. |
 | `src/components/WikiLinkMDEditor.tsx`     | `<MDEditor>` + `[[Category:Page]]` autocomplete. Uses `MarkdownRenderer` as preview so edit preview matches final render.                                             |
 | `src/components/SerialNavInjector.tsx`    | Client Component (renders null); injects serial data into navbar via `useLayoutEffect`.                                                                               |
 | `src/components/ui/MarkdownRenderer.tsx`  | Single source of truth for markdown styling. No `@tailwindcss/typography` — explicit Tailwind classes. Accepts `serialSlug` for wiki links, `sm` for compact mode.    |
 | `src/components/ui/Text.tsx`              | `<Text variant>` typography. Variants: `h1`–`h4`, `body`, `label`. `as` overrides element. `muted` prop applies `text-gray-500`.                                      |
 | `src/components/ui/Select.tsx`            | Generic `<Select<T>>` over native `<select>`. Client Component.                                                                                                       |
 | `src/components/ui/Dialog.tsx`            | Controlled dialog (`isOpen`/`onClose`).                                                                                                                               |
+| `src/components/ui/Popover.tsx`           | Two-mode popover: **trigger mode** (wraps `children`, self-managed open state) and **anchor mode** (`anchor` ref + controlled `open`). Combobox and ChapterSelector use anchor mode to position dropdowns/callouts under existing elements without a separate trigger. |
 | `src/hooks/useServerAction.ts`            | Wraps server action in `useTransition` + `router.refresh()`. Use in all Client Components calling Server Actions.                                                     |
 | `src/hooks/usePersistedStore.ts`          | `useState`-compatible, backed by `localStorage`. SSR-safe via `useSyncExternalStore`, cross-tab via `storage` event.                                                  |
 | `src/lib/serial-types.ts`                 | `ChapterType`/`VolumeType` types, arrays, parsers, Select options. Single source of truth — don't duplicate.                                                          |
