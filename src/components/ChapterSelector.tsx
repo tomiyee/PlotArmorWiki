@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { Menu, MenuItem } from "@/components/ui/Menu";
+import { Popover } from "@/components/ui/Popover";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileShield } from "@fortawesome/free-solid-svg-icons";
 import { ExternalLinkIcon, XIcon } from "lucide-react";
@@ -83,6 +84,7 @@ export function ChapterSelector(props: Props) {
   const [volCollapsed, setVolCollapsed] = useCollapsedVolumes(serialId);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
 
@@ -167,59 +169,71 @@ export function ChapterSelector(props: Props) {
     );
   });
 
+  const spoilerCallout = (
+    <Box className="items-start gap-2 px-3 py-2 text-sm">
+      <Text variant="label" className="flex-1 leading-snug text-amber-800">
+        We defaulted to the first {chapterType.toLowerCase()} to avoid
+        spoilers. Set your {chapterType.toLowerCase()} here.
+      </Text>
+      <Tooltip content="Dismiss">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={dismissPopover}
+          aria-label="Dismiss spoiler reminder"
+          className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
+        >
+          <XIcon />
+        </Button>
+      </Tooltip>
+    </Box>
+  );
+
   return (
     <Box className="sm:flex items-center gap-2">
-      <Menu
-        isOpen={dropdownOpen}
-        onClose={() => setDropdownOpen(false)}
-        align="right"
-        role="listbox"
-        aria-label="Chapter list"
-        panelClassName="w-60 max-h-80"
-        contents={chapterListContents}
-      >
-        <Tooltip content={`Set your ${chapterType}`} side="bottom">
-          <Button
-            variant="ghost"
-            aria-label={`Set ${chapterType} progress`}
-            onClick={() => setDropdownOpen((o) => !o)}
-          >
-            <FontAwesomeIcon icon={faFileShield} />
-            <Text as="span" variant="label" className="truncate sm:visible">
-              {selectedLabel}
-            </Text>
-          </Button>
-        </Tooltip>
-      </Menu>
-
-      {/* Floating callout — absolute so it doesn't affect navbar height */}
-      {!popoverDismissed && (
-        <div
-          suppressHydrationWarning
-          className="absolute top-full right-0 mt-2 z-50"
+      <div ref={triggerRef}>
+        <Menu
+          isOpen={dropdownOpen}
+          onClose={() => setDropdownOpen(false)}
+          align="right"
+          role="listbox"
+          aria-label="Chapter list"
+          panelClassName="w-60 max-h-80"
+          contents={chapterListContents}
         >
-          <Box className="items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-md w-64">
-            <Text
-              variant="label"
-              className="flex-1 leading-snug text-amber-800"
+          <Tooltip content={`Set your ${chapterType}`} side="bottom">
+            <Button
+              variant="ghost"
+              aria-label={`Set ${chapterType} progress`}
+              onClick={() => setDropdownOpen((o) => !o)}
             >
-              We defaulted to the first {chapterType.toLowerCase()} to avoid
-              spoilers. Set your {chapterType.toLowerCase()} here.
-            </Text>
-            <Tooltip content="Dismiss">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={dismissPopover}
-                aria-label="Dismiss spoiler reminder"
-                className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
-              >
-                <XIcon />
-              </Button>
-            </Tooltip>
-          </Box>
-        </div>
-      )}
+              <FontAwesomeIcon icon={faFileShield} />
+              <Text as="span" variant="label" className="truncate sm:visible">
+                {selectedLabel}
+              </Text>
+            </Button>
+          </Tooltip>
+        </Menu>
+      </div>
+
+      {/*
+       * suppressHydrationWarning: server renders open (popoverDismissed defaults
+       * to false), but the client may have dismissed=true in localStorage.
+       * Intentional mismatch — base-ui's Portal renders client-only anyway.
+       */}
+      <span suppressHydrationWarning>
+        <Popover
+          anchor={triggerRef}
+          open={!popoverDismissed}
+          onOpenChange={(open) => { if (!open) setPopoverDismissed(true); }}
+          modal={false}
+          side="bottom"
+          align="end"
+          sideOffset={8}
+          className="w-64 border-amber-300 bg-amber-50 text-amber-800"
+          content={spoilerCallout}
+        />
+      </span>
     </Box>
   );
 }
