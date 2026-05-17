@@ -91,7 +91,7 @@ export function SerialTOC({
               value={volume.id}
               className="border-none"
             >
-              <AccordionTrigger className="border-none text-xs font-semibold uppercase tracking-wider text-gray-500 py-1 hover:no-underline hover:text-gray-700 bg-transparent hover:bg-transparent rounded-none">
+              <AccordionTrigger className="border-none text-xs font-semibold uppercase tracking-wider text-muted-foreground py-1 hover:no-underline hover:text-foreground bg-transparent hover:bg-transparent rounded-none">
                 {volume.displayName}
               </AccordionTrigger>
               <AccordionContent className="[&_a]:no-underline [&_a]:hover:text-foreground pb-0">
@@ -100,7 +100,7 @@ export function SerialTOC({
                     <li key={chapter.id}>
                       <Link
                         href={`/${serialSlug}/chapter/${chapter.idx}`}
-                        className="block rounded px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                        className="block rounded px-2 py-1 text-sm text-foreground/80 hover:bg-muted hover:text-foreground transition-colors"
                       >
                         {chapter.displayName}
                       </Link>

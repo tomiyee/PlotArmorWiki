@@ -54,7 +54,7 @@ export function Tooltip(props: TooltipProps) {
         <TooltipPrimitive.Positioner side={side} sideOffset={6}>
           <TooltipPrimitive.Popup
             className={cn(
-              "z-50 rounded-md bg-gray-900 px-2.5 py-1 text-xs font-medium text-white shadow-md",
+              "z-50 rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background shadow-md",
               "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 transition-opacity duration-100",
               className,
             )}

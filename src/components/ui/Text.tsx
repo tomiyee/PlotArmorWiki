@@ -8,7 +8,7 @@ const variantStyles: Record<TextVariant, string> = {
   h2: "text-xl font-semibold",
   h3: "text-lg font-semibold",
   h4: "text-base font-semibold",
-  body: "text-base text-gray-700",
+  body: "text-base text-foreground/80",
   label: "text-sm font-medium",
 };
 
@@ -26,7 +26,7 @@ type TextProps<C extends React.ElementType> = {
   variant?: TextVariant;
   /** Override the rendered HTML element. Defaults to the element for the chosen variant. */
   as?: C;
-  /** Apply `text-gray-500` — useful for secondary or helper text. */
+  /** Apply `text-muted-foreground` — useful for secondary or helper text. */
   muted?: boolean;
   /** Extra classes merged onto the rendered element. */
   className?: string;
@@ -44,7 +44,7 @@ type TextProps<C extends React.ElementType> = {
  * <Text variant="h1">Page title</Text>
  * <Text variant="h3">Section heading</Text>
  * <Text>Paragraph text in gray-700.</Text>
- * <Text muted>Secondary note in gray-500.</Text>
+ * <Text muted>Secondary note in muted-foreground.</Text>
  * // For labels, prefer the Label component:
  * // <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
  */
@@ -57,7 +57,7 @@ function Text<C extends React.ElementType = React.ElementType>(
     <Component
       className={cn(
         variantStyles[variant],
-        muted && "text-gray-500",
+        muted && "text-muted-foreground",
         className,
       )}
       {...rest}

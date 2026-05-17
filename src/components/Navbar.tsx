@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShieldHalved } from "@fortawesome/free-solid-svg-icons";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { PagesDropdown } from "@/components/navbar/PagesDropdown";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Box } from "./ui/Box";
 
 type NavbarProps = {
@@ -36,7 +37,7 @@ export default function Navbar(props: NavbarProps) {
   const { serialData, chapterSelectorSlot, tocSlot } = useNavbarSerialContext();
 
   return (
-    <nav className="sticky top-0 z-10 border-b bg-white px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
+    <nav className="sticky top-0 z-10 border-b bg-background px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
       {/* Left — logo + serial breadcrumb + Pages dropdown */}
       <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
         <Link
@@ -50,7 +51,7 @@ export default function Navbar(props: NavbarProps) {
           <>
             <Link
               href={`/${serialData.serialSlug}`}
-              className="truncate text-sm font-medium text-gray-700 hover:text-gray-900 max-w-40 shrink-0"
+              className="truncate text-sm font-medium text-foreground/70 hover:text-foreground max-w-40 shrink-0"
             >
               {serialData.serialTitle}
             </Link>
@@ -64,6 +65,7 @@ export default function Navbar(props: NavbarProps) {
       <Box className="gap-2 items-center">
         {tocSlot}
         {chapterSelectorSlot}
+        <ThemeToggle />
         {authSlot}
       </Box>
     </nav>

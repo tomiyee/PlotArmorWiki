@@ -74,7 +74,7 @@ export function SerialTOCSidebar(props: Props) {
       <div className="flex items-center justify-between mb-3">
         <Text
           variant="label"
-          className="text-xs font-semibold uppercase tracking-wider text-gray-500"
+          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >
           Contents
         </Text>
@@ -88,7 +88,7 @@ export function SerialTOCSidebar(props: Props) {
               size="icon-xs"
               onClick={() => setEditOpen(true)}
               aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
-              className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
+              className="text-muted-foreground hover:text-foreground hover:bg-transparent"
             >
               <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
             </Button>

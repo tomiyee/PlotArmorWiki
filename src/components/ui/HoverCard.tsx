@@ -48,7 +48,7 @@ export function HoverCard(props: HoverCardProps) {
         >
           <PreviewCardPrimitive.Popup
             className={cn(
-              "z-50 w-72 rounded-lg border border-gray-200 bg-white p-4 shadow-lg",
+              "z-50 w-72 rounded-lg border border-border bg-popover text-popover-foreground p-4 shadow-lg",
               "data-starting-style:opacity-0 data-ending-style:opacity-0",
               "transition-opacity duration-150",
               className,
