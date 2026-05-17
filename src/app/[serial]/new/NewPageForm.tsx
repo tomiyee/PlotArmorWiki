@@ -193,7 +193,7 @@ export function NewPageForm({
             No {chapterTypeLabel}s yet.{" "}
             <Link
               href={`/${serialSlug}`}
-              className="text-blue-600 hover:underline"
+              className="text-primary hover:underline"
             >
               Add a {chapterTypeLabel} first.
             </Link>
@@ -233,7 +233,7 @@ export function NewPageForm({
 
           {/* Preview of what the template will create */}
           {selectedTemplate && (
-            <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 flex flex-col gap-3 text-sm">
+            <div className="mt-2 rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-3 text-sm">
               <Text variant="label">Template preview</Text>
 
               {sortedTemplateSections.length > 0 ? (
@@ -245,7 +245,7 @@ export function NewPageForm({
                     {sortedTemplateSections.map((s) => (
                       <Text
                         key={s.id}
-                        className="text-sm pl-2 border-l-2 border-gray-300"
+                        className="text-sm pl-2 border-l-2 border-border"
                       >
                         {s.name}
                       </Text>
@@ -268,7 +268,7 @@ export function NewPageForm({
                       {sortedTemplateInfoboxSections.map((s) => (
                         <Text
                           key={s.id}
-                          className="text-sm pl-2 border-l-2 border-gray-300"
+                          className="text-sm pl-2 border-l-2 border-border"
                         >
                           {s.label}
                         </Text>

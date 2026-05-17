@@ -313,7 +313,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
         <ul
           role="listbox"
           style={{ top: pos.top, left: pos.left }}
-          className="absolute z-50 max-h-48 w-72 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg"
+          className="absolute z-50 max-h-48 w-72 overflow-y-auto rounded border border-border bg-popover shadow-lg"
         >
           {suggestions.map((s, i) => (
             <li
@@ -321,14 +321,14 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
               role="option"
               aria-selected={i === activeIndex}
               className={`flex cursor-pointer select-none items-baseline gap-1.5 px-3 py-2 text-sm ${
-                i === activeIndex ? "bg-blue-50" : "hover:bg-gray-50"
+                i === activeIndex ? "bg-accent" : "hover:bg-muted"
               }`}
               onMouseDown={(e) => {
                 e.preventDefault();
                 applySuggestion(s);
               }}
             >
-              <span className="font-medium text-gray-900">{s.name}</span>
+              <span className="text-foreground font-medium">{s.name}</span>
             </li>
           ))}
         </ul>

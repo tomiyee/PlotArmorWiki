@@ -130,8 +130,8 @@ export function TemplateItem({
   );
 
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden">
-      <Box className="items-center gap-2 px-3 py-2 bg-gray-50">
+    <div className="rounded-lg border border-border overflow-hidden">
+      <Box className="items-center gap-2 px-3 py-2 bg-muted/40">
         <button
           type="button"
           onClick={() => setExpanded((p) => !p)}
@@ -140,7 +140,7 @@ export function TemplateItem({
         >
           <FontAwesomeIcon
             icon={expanded ? faChevronDown : faChevronRight}
-            className="h-3 w-3 text-gray-400 shrink-0"
+            className="h-3 w-3 text-muted-foreground shrink-0"
           />
           {renaming ? (
             <Input
@@ -200,7 +200,7 @@ export function TemplateItem({
               checked={template.hasInfobox}
               onChange={(e) => handleToggleInfobox(e.target.checked)}
               disabled={isPending}
-              className="h-4 w-4 rounded border-gray-300"
+              className="h-4 w-4 rounded border-border"
             />
             <Label htmlFor={`has-infobox-${template.id}`}>
               Has infobox sidebar

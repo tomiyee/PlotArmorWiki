@@ -59,7 +59,7 @@ export function CategoryManager(props: CategoryManagerProps) {
           {categories.map((category) => (
             <Box
               key={category.id}
-              className="items-center gap-2 rounded-lg border border-gray-200 p-3"
+              className="items-center gap-2 rounded-lg border border-border p-3"
             >
               <Box className="flex-1 items-center gap-2">
                 <Text variant="h4" as="span">
@@ -68,14 +68,14 @@ export function CategoryManager(props: CategoryManagerProps) {
                 <Text
                   as="span"
                   muted
-                  className="rounded-full bg-gray-100 px-2 py-0.5 text-xs"
+                  className="rounded-full bg-muted px-2 py-0.5 text-xs"
                 >
                   {category.pageCount}
                 </Text>
               </Box>
               <Link
                 href={`/${serialSlug}/${encodeURIComponent(category.name)}`}
-                className="text-xs text-blue-600 hover:underline px-1"
+                className="text-xs text-primary hover:underline px-1"
                 title={`View ${category.name} index page`}
               >
                 View →
@@ -90,7 +90,7 @@ export function CategoryManager(props: CategoryManagerProps) {
       )}
 
       {isEditing && (
-        <div className="mt-2 pt-4 border-t border-gray-100">
+        <div className="mt-2 pt-4 border-t border-border">
           {addingCategory ? (
             <form
               onSubmit={(e) => {
@@ -125,7 +125,7 @@ export function CategoryManager(props: CategoryManagerProps) {
                   id="hasFloater"
                   checked={hasFloater}
                   onChange={(e) => setHasFloater(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-border"
                 />
                 <Label htmlFor="hasFloater">Has floater sidebar</Label>
               </Box>

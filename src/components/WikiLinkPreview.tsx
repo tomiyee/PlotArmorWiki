@@ -59,7 +59,7 @@ export function WikiLinkPreview({
   const anchor = (
     <a
       href={href}
-      className="text-blue-600 underline hover:text-blue-800"
+      className="text-primary underline hover:text-primary/80"
       onMouseEnter={handleMouseEnter}
     >
       {children}
@@ -99,7 +99,7 @@ function PreviewContent({
   if (preview === "missing") {
     return (
       <div className="flex flex-col gap-1">
-        <Text variant="label" className="font-semibold text-gray-900">
+        <Text variant="label" className="font-semibold text-foreground">
           {pageName}
         </Text>
         <Text muted className="text-sm mt-1">
@@ -112,7 +112,7 @@ function PreviewContent({
   if (preview.hidden) {
     return (
       <div className="flex flex-col gap-1">
-        <Text variant="label" className="font-semibold text-gray-900">
+        <Text variant="label" className="font-semibold text-foreground">
           {preview.pageName}
         </Text>
         <Text muted className="text-sm mt-1">
@@ -132,28 +132,28 @@ function PreviewContent({
     <div className="flex flex-col gap-2">
       {/* Header */}
       <div>
-        <Text variant="label" className="font-semibold text-gray-900 text-sm">
+        <Text variant="label" className="font-semibold text-foreground text-sm">
           {preview.pageName}
         </Text>
         {preview.introChapterName && (
           <Text muted as="span" className="text-xs block">
-            <span className="text-gray-400">{preview.introChapterName}</span>
+            <span className="text-muted-foreground">{preview.introChapterName}</span>
           </Text>
         )}
       </div>
 
       {/* Floater rows */}
       {preview.floaterRows.length > 0 && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs border-t border-gray-100 pt-2">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs border-t border-border pt-2">
           {preview.floaterRows
             .filter((r) => r.content)
             .slice(0, 4)
             .map((row) => (
               <Fragment key={row.label}>
-                <dt className="text-gray-500 font-medium whitespace-nowrap">
+                <dt className="text-muted-foreground font-medium whitespace-nowrap">
                   {row.label}
                 </dt>
-                <dd className="text-gray-800 truncate">{row.content}</dd>
+                <dd className="text-foreground truncate">{row.content}</dd>
               </Fragment>
             ))}
         </dl>
@@ -161,7 +161,7 @@ function PreviewContent({
 
       {/* First section text */}
       {truncatedContent && (
-        <div className="border-t border-gray-100 pt-2">
+        <div className="border-t border-border pt-2">
           <MarkdownRenderer
             sm
             serialSlug={serialSlug}

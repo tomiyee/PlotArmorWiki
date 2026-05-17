@@ -23,7 +23,7 @@ export function LastUpdatedTag({
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-        isCurrent ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+        isCurrent ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
       }`}
     >
       {label}

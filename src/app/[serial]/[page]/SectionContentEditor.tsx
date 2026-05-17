@@ -59,11 +59,11 @@ export function SectionContentEditor({
         )}
       </Box>
       <div className="grid grid-cols-2 gap-4 items-start">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 h-full">
+        <div className="rounded-lg border border-border bg-muted/40 p-4 h-full">
           <div className="mb-2 flex items-center gap-2">
             <Text
               variant="label"
-              className="block text-xs text-gray-400 uppercase tracking-wide"
+              className="block text-xs text-muted-foreground uppercase tracking-wide"
             >
               Current value
             </Text>
