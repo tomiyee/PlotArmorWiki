@@ -52,20 +52,21 @@
  * Palette:
  *   #A98B76 — primary warm brown    → oklch(0.613 0.066 52.6)
  *   #BFA28C — secondary beige/clay  → oklch(0.690 0.057 52.6)
- *   #F3E4C9 — parchment background  → oklch(0.916 0.045 79.3)
+ *   #F3E4C9 — parchment secondary   → oklch(0.916 0.045 79.3)
  *   #BABF94 — sage accent           → oklch(0.758 0.060 113.5)
- *   #FAF3E7 — light surface         → oklch(0.960 0.024 85.7)
+ *   #FAFAF9 — off-white background  → oklch(0.985 0.004 85.7)
+ *   #FFFFFF — white card surface    → oklch(1 0 0)
  *   #2F241D — dark text             → oklch(0.196 0.038 52.6)
  */
 :root {
-    --background: oklch(0.960 0.024 85.7);
+    --background: oklch(0.985 0.004 85.7);
     --foreground: oklch(0.196 0.038 52.6);
-    --card: oklch(0.960 0.024 85.7);
+    --card: oklch(1 0 0);
     --card-foreground: oklch(0.196 0.038 52.6);
-    --popover: oklch(0.960 0.024 85.7);
+    --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.196 0.038 52.6);
     --primary: oklch(0.613 0.066 52.6);
-    --primary-foreground: oklch(0.960 0.024 85.7);
+    --primary-foreground: oklch(1 0 0);
     --secondary: oklch(0.916 0.045 79.3);
     --secondary-foreground: oklch(0.196 0.038 52.6);
     --muted: oklch(0.916 0.045 79.3);
@@ -85,7 +86,7 @@
     --sidebar: oklch(0.916 0.045 79.3);
     --sidebar-foreground: oklch(0.196 0.038 52.6);
     --sidebar-primary: oklch(0.613 0.066 52.6);
-    --sidebar-primary-foreground: oklch(0.960 0.024 85.7);
+    --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: oklch(0.758 0.060 113.5);
     --sidebar-accent-foreground: oklch(0.196 0.038 52.6);
     --sidebar-border: oklch(0.690 0.057 52.6);
@@ -94,12 +95,12 @@
 
 /* Dark mode — warm dark parchment / brown tones
  * Palette:
- *   #3E332B — dark surface          → oklch(0.247 0.034 52.6)
- *   #2F241D — dark text (inverted)  → oklch(0.196 0.038 52.6)
+ *   #2F241D — darkest bg            → oklch(0.196 0.038 52.6)
+ *   #3E332B — dark card surface     → oklch(0.247 0.034 52.6)
+ *   #4A3C32 — slightly lighter dark → oklch(0.298 0.036 52.6)
  *   #BFA28C — secondary beige/clay  → oklch(0.690 0.057 52.6)
- *   #A98B76 — primary warm brown    → oklch(0.613 0.066 52.6)
  *   #BABF94 — sage accent           → oklch(0.758 0.060 113.5)
- *   #F3E4C9 — parchment (fg)        → oklch(0.916 0.045 79.3)
+ *   #F3E4C9 — parchment foreground  → oklch(0.916 0.045 79.3)
  */
 .dark {
     --background: oklch(0.196 0.038 52.6);
