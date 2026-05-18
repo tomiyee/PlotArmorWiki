@@ -11,14 +11,18 @@ import { Text } from "@/components/ui/Text";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { ChapterData, Volume } from "@/types";
 
-interface Props {
+type SerialTOCProps = {
+  /** The serial's database ID, used as the localStorage key namespace. */
   serialId: number;
+  /** The serial's URL slug, used to build chapter hrefs. */
   serialSlug: string;
+  /** Ordered list of volumes to render as accordion sections. */
   volumes: Volume[];
+  /** Map from volume ID to its chapters, used to populate each accordion section. */
   chaptersByVolume: Partial<Record<number, ChapterData[]>>;
+  /** Display label for an individual chapter (e.g. "Chapter", "Episode"). */
   chapterType: string;
-  volumeType: string;
-}
+};
 
 /**
  * Collapsible table-of-contents listing volumes and their chapters. Collapse
@@ -33,17 +37,12 @@ interface Props {
  *   volumes={volumeList}
  *   chaptersByVolume={chaptersByVolume}
  *   chapterType="Chapter"
- *   volumeType="Volume"
  * />
  */
-export function SerialTOC({
-  serialId,
-  serialSlug,
-  volumes,
-  chaptersByVolume,
-  chapterType,
-  volumeType: _volumeType,
-}: Props) {
+export function SerialTOC(props: SerialTOCProps) {
+  const { serialId, serialSlug, volumes, chaptersByVolume, chapterType } =
+    props;
+
   const [volCollapsed, setVolCollapsed] = usePersistedStore<
     Record<number, boolean>
   >(`plotarmor:toc-collapsed:${serialId}`, {});
