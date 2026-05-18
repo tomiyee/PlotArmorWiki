@@ -1,7 +1,6 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { PenIcon, CheckIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -44,7 +43,7 @@ export function EditModeFAB() {
             aria-label="Edit page"
             className="shadow-lg rounded-full size-12"
           >
-            <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
+            <PenIcon className="h-4 w-4" />
           </Button>
         </Tooltip>
       </div>
@@ -54,11 +53,11 @@ export function EditModeFAB() {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex gap-2">
       <Button variant="outline" onClick={discard} className="shadow-lg">
-        <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
+        <XIcon className="h-4 w-4" />
         Discard
       </Button>
       <Button variant="default" onClick={save} className="shadow-lg">
-        <FontAwesomeIcon icon={faCheck} className="h-4 w-4" />
+        <CheckIcon className="h-4 w-4" />
         Save
       </Button>
     </div>

@@ -2,14 +2,13 @@
 
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faPlus,
-  faTrash,
-  faGripVertical,
-  faChevronDown,
-  faChevronRight,
-} from "@fortawesome/free-solid-svg-icons";
+  PlusIcon,
+  Trash2Icon,
+  GripVerticalIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -283,7 +282,7 @@ function SortableChapterItem({
                 className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
                 title="Drag to reorder"
               >
-                <FontAwesomeIcon icon={faGripVertical} className="h-3 w-3" />
+                <GripVerticalIcon className="h-3 w-3" />
               </span>
             )}
             <Text
@@ -309,7 +308,7 @@ function SortableChapterItem({
                   aria-label={`Delete ${chapter.displayName}`}
                   onClick={onDelete}
                 >
-                  <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+                  <Trash2Icon className="h-2.5 w-2.5" />
                 </Button>
               </Tooltip>
             )}
@@ -418,7 +417,7 @@ function SortableVolumeItem({
                   className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
                   title={`Drag to reorder ${volumeType.toLowerCase()}`}
                 >
-                  <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
+                  <GripVerticalIcon className="h-4 w-4" />
                 </span>
               ) : (
                 <Tooltip
@@ -439,10 +438,11 @@ function SortableVolumeItem({
                     }
                     className="text-muted-foreground hover:text-foreground hover:bg-transparent"
                   >
-                    <FontAwesomeIcon
-                      icon={isCollapsed ? faChevronRight : faChevronDown}
-                      className="h-3 w-3"
-                    />
+                    {isCollapsed ? (
+                      <ChevronRightIcon className="h-3 w-3" />
+                    ) : (
+                      <ChevronDownIcon className="h-3 w-3" />
+                    )}
                   </Button>
                 </Tooltip>
               )}
@@ -470,7 +470,7 @@ function SortableVolumeItem({
                   aria-label={`Delete ${volume.displayName} and all its ${chapterType.toLowerCase()}s`}
                   onClick={onDeleteVolume}
                 >
-                  <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
+                  <Trash2Icon className="h-3 w-3" />
                 </Button>
               </Tooltip>
             )}
@@ -540,7 +540,7 @@ function SortableVolumeItem({
             className="self-start ml-3 mt-1"
             onClick={() => onAddChapterClick(volume.id)}
           >
-            <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+            <PlusIcon className="h-3 w-3" />
             Add {chapterType.toLowerCase()}
           </Button>
         ))}
@@ -994,7 +994,7 @@ export function SerialEditor({
                 setAddingChapterToVolumeId(null);
               }}
             >
-              <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+              <PlusIcon className="h-3 w-3" />
               Add {currentVolumeType.toLowerCase()}
             </Button>
           )}

@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faTrash,
-  faPencil,
-  faChevronDown,
-  faChevronRight,
-} from "@fortawesome/free-solid-svg-icons";
+  Trash2Icon,
+  PencilIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -138,10 +137,11 @@ export function TemplateItem({
           className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
           aria-expanded={expanded}
         >
-          <FontAwesomeIcon
-            icon={expanded ? faChevronDown : faChevronRight}
-            className="h-3 w-3 text-muted-foreground shrink-0"
-          />
+          {expanded ? (
+            <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRightIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+          )}
           {renaming ? (
             <Input
               value={renameDraft}
@@ -176,7 +176,7 @@ export function TemplateItem({
             }}
             disabled={isPending}
           >
-            <FontAwesomeIcon icon={faPencil} className="h-3 w-3" />
+            <PencilIcon className="h-3 w-3" />
           </Button>
           <Button
             type="button"
@@ -186,7 +186,7 @@ export function TemplateItem({
             onClick={handleDelete}
             disabled={isPending}
           >
-            <FontAwesomeIcon icon={faTrash} className="h-3 w-3 text-red-500" />
+            <Trash2Icon className="h-3 w-3 text-red-500" />
           </Button>
         </Box>
       </Box>

@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faLock,
-  faPen,
-  faPlus,
-  faTrash,
-} from "@fortawesome/free-solid-svg-icons";
+import { LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -81,7 +75,7 @@ function ReorderableSection({
           </Text>
           <InfoIcon contents="This section appears at the top of the page without a heading. Its content will be shown in preview tooltips when this page is mentioned elsewhere." />
         </Box>
-        <FontAwesomeIcon icon={faLock} className="h-3 w-3 text-muted-foreground" />
+        <LockIcon className="h-3 w-3 text-muted-foreground" />
       </li>
     );
   }
@@ -144,7 +138,7 @@ function ReorderableSection({
                 aria-label={`Rename ${section.name}`}
                 onClick={onStartRename}
               >
-                <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
+                <PenIcon className="h-2.5 w-2.5" />
               </Button>
             </Tooltip>
             <Tooltip content={`Delete ${section.name}`}>
@@ -155,7 +149,7 @@ function ReorderableSection({
                 aria-label={`Delete ${section.name}`}
                 onClick={onDelete}
               >
-                <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+                <Trash2Icon className="h-2.5 w-2.5" />
               </Button>
             </Tooltip>
           </Box>
@@ -291,7 +285,7 @@ export function PageSectionManager({
           className="self-start"
           onClick={() => setAdding(true)}
         >
-          <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+          <PlusIcon className="h-3 w-3" />
           Add section
         </Button>
       )}

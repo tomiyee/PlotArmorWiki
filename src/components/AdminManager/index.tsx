@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
@@ -138,7 +137,7 @@ export function AdminManager(props: AdminManagerProps) {
                       }
                       onClick={() => handleRemove(admin.userId)}
                     >
-                      <FontAwesomeIcon icon={faTrash} />
+                      <Trash2Icon className="h-4 w-4" />
                     </Button>
                   </Box>
                 );
@@ -184,7 +183,7 @@ export function AdminManager(props: AdminManagerProps) {
               variant="outline"
               onClick={() => setAdding(true)}
             >
-              <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+              <PlusIcon className="h-3 w-3" />
               Add admin
             </Button>
           )}

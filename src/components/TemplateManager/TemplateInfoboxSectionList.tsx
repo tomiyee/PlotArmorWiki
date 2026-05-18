@@ -1,7 +1,6 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -50,10 +49,7 @@ export function TemplateInfoboxSectionList(
                 onClick={() => onDelete(row.id)}
                 disabled={isPending}
               >
-                <FontAwesomeIcon
-                  icon={faTrash}
-                  className="h-2.5 w-2.5 text-red-400"
-                />
+                <Trash2Icon className="h-2.5 w-2.5 text-red-400" />
               </Button>
             </Box>
           ))}
@@ -85,7 +81,7 @@ export function TemplateInfoboxSectionList(
           onClick={onAdd}
           disabled={isPending || !value.trim()}
         >
-          <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+          <PlusIcon className="h-3 w-3" />
           Add
         </Button>
       </Box>

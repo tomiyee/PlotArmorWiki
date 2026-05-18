@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -130,7 +129,7 @@ function ReorderableItem({
                 aria-label={`Rename ${label}`}
                 onClick={onStartRename}
               >
-                <FontAwesomeIcon icon={faPen} className="h-2.5 w-2.5" />
+                <PenIcon className="h-2.5 w-2.5" />
               </Button>
             </Tooltip>
             <Tooltip content={`Delete ${label}`}>
@@ -141,7 +140,7 @@ function ReorderableItem({
                 aria-label={`Delete ${label}`}
                 onClick={onDelete}
               >
-                <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+                <Trash2Icon className="h-2.5 w-2.5" />
               </Button>
             </Tooltip>
           </Box>
@@ -323,7 +322,7 @@ export function SectionEditorPanel({
             className="self-start"
             onClick={() => setAddingSection(true)}
           >
-            <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+            <PlusIcon className="h-3 w-3" />
             Add section
           </Button>
         )}
@@ -413,7 +412,7 @@ export function SectionEditorPanel({
               className="self-start"
               onClick={() => setAddingFloaterRow(true)}
             >
-              <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+              <PlusIcon className="h-3 w-3" />
               Add floater row
             </Button>
           )}
