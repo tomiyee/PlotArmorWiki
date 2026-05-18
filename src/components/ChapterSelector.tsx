@@ -12,6 +12,7 @@ import { Popover } from "@/components/ui/Popover";
 import { BookmarkIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { ChapterData, Volume } from "@/types";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { syncUserProgress } from "@/app/[serial]/actions";
 
 interface Props {
   serialId: number;
@@ -19,6 +20,14 @@ interface Props {
   chapterType: string;
   volumes: Volume[];
   chaptersByVolume: Partial<Record<number, ChapterData[]>>;
+  /**
+   * Chapter ID sourced from the `user_progress` database row (for authenticated
+   * users). When provided it seeds the initial selection, overriding any stale
+   * localStorage value, so that progress is consistent across devices.
+   */
+  initialChapterId?: number | null;
+  /** Whether the current visitor is signed in. Enables server-side progress sync. */
+  isAuthenticated?: boolean;
 }
 
 function cookieName(serialId: number) {
@@ -58,8 +67,15 @@ function volCollapsedKey(serialId: number) {
  * />
  */
 export function ChapterSelector(props: Props) {
-  const { serialId, serialSlug, chapterType, volumes, chaptersByVolume } =
-    props;
+  const {
+    serialId,
+    serialSlug,
+    chapterType,
+    volumes,
+    chaptersByVolume,
+    initialChapterId,
+    isAuthenticated,
+  } = props;
 
   const allChapters = volumes
     .flatMap((v) => chaptersByVolume[v.id] ?? [])
@@ -67,9 +83,13 @@ export function ChapterSelector(props: Props) {
 
   const firstChapterId = allChapters[0]?.id ?? null;
 
+  // When the server provides a DB-sourced chapter ID, use it as the default so
+  // that progress from another device/session overrides the stale local value.
+  const defaultChapterId = initialChapterId ?? firstChapterId;
+
   const [selectedChapterId, setSelectedChapterId] = usePersistedStore<
     number | null
-  >(`plotarmor:progress:${serialId}`, firstChapterId);
+  >(`plotarmor:progress:${serialId}`, defaultChapterId);
 
   // Single global key — once dismissed on any serial, never shows again.
   // suppressHydrationWarning: server renders closed (default=false),
@@ -97,6 +117,17 @@ export function ChapterSelector(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When the server provides a DB-sourced initialChapterId, override localStorage
+  // and sync the cookie so SSR sees the correct cutoff without waiting for a
+  // chapter-change interaction.
+  useEffect(() => {
+    if (initialChapterId == null) return;
+    setSelectedChapterId(initialChapterId);
+    writeCookie(initialChapterId);
+    // Only run once on mount when the server provides a DB value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (allChapters.length === 0) return null;
 
   const effectiveChapterId = selectedChapterId ?? firstChapterId;
@@ -110,6 +141,10 @@ export function ChapterSelector(props: Props) {
     setPopoverDismissed(true);
     writeCookie(chapterId);
     setDropdownOpen(false);
+    if (isAuthenticated) {
+      // Fire-and-forget: persist progress to the database for cross-device sync.
+      void syncUserProgress(serialId, chapterId);
+    }
     router.refresh();
   }
 

@@ -6,6 +6,7 @@ import {
   chapters,
   pages,
   pageRelationships,
+  userProgress,
 } from "@/db/schema";
 import { and, asc, eq, max } from "drizzle-orm";
 import { ChapterSelector } from "@/components/ChapterSelector";
@@ -13,6 +14,7 @@ import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
 import { SerialTOCDrawer } from "@/components/SerialTOCDrawer";
 import { ChapterData, NavbarSerialData } from "@/types";
+import { auth } from "@/auth";
 
 interface Props {
   children: React.ReactNode;
@@ -39,6 +41,10 @@ export default async function SerialLayout({ children, params }: Props) {
     notFound();
   }
 
+  // Read authenticated session to determine whether to load DB progress.
+  const session = await auth();
+  const userId = session?.user?.id ?? null;
+
   const [volumeList, chapterList] = await Promise.all([
     db
       .select()
@@ -61,6 +67,23 @@ export default async function SerialLayout({ children, params }: Props) {
   const chaptersByVolume: Partial<Record<number, ChapterData[]>> = {
     ...Object.groupBy(chapterList, (c) => c.volumeId),
   };
+
+  // Priority (1): authenticated user's DB progress for this serial.
+  // Priority (2): cookie/localStorage handled client-side by ChapterSelector.
+  let dbChapterId: number | null = null;
+  if (userId) {
+    const [progressRow] = await db
+      .select({ chapterId: userProgress.chapterId })
+      .from(userProgress)
+      .where(
+        and(
+          eq(userProgress.userId, userId),
+          eq(userProgress.serialId, serial.id),
+        ),
+      )
+      .limit(1);
+    dbChapterId = progressRow?.chapterId ?? null;
+  }
 
   // Navbar "Pages" dropdown: immediate children of the Home page.
   // Uses the max-idx pattern to get each child's latest relationship state
@@ -137,6 +160,8 @@ export default async function SerialLayout({ children, params }: Props) {
             chapterType={serial.chapterType}
             volumes={volumeList}
             chaptersByVolume={chaptersByVolume}
+            initialChapterId={dbChapterId}
+            isAuthenticated={!!userId}
           />
         }
         tocSlot={<SerialTOCDrawer tocContent={tocContent} />}
