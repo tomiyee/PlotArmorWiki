@@ -12,6 +12,8 @@ interface Props {
   floaterRows: FloaterRowData[];
   childPages: { id: number; name: string; slug: string; title: string }[];
   pageId: number;
+  /** slug → title map passed to MarkdownRenderer so `[[slug]]` links show the correct title. */
+  pageTitles?: Record<string, string>;
 }
 
 /**
@@ -37,6 +39,7 @@ export function PageReadView({
   floaterRows,
   childPages,
   pageId,
+  pageTitles,
 }: Props) {
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -79,7 +82,7 @@ export function PageReadView({
             </Text>
           )}
           {section.content ? (
-            <MarkdownRenderer serialSlug={serialSlug}>
+            <MarkdownRenderer serialSlug={serialSlug} pageTitles={pageTitles}>
               {section.content}
             </MarkdownRenderer>
           ) : (

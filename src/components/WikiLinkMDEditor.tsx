@@ -1,19 +1,25 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import { MDEditor } from "@/components/MDEditor";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 
 interface WikiPage {
-  /** Display name of the wiki page, used for filtering and completion. */
+  /** Display title of the wiki page, used for filtering and shown in the dropdown. */
   name: string;
+  /** URL slug used as the `[[slug]]` token inserted on selection. */
+  slug: string;
 }
 
 type WikiLinkMDEditorProps = {
+  /** Current markdown content. */
   value: string;
+  /** Called when content changes. */
   onChange: (val: string | undefined) => void;
+  /** Editor height in pixels. */
   height?: number;
+  /** Which panel to show initially. */
   preview?: "edit" | "live" | "preview";
   /** All wiki pages visible to the reader at their current chapter cutoff. */
   wikiPages: WikiPage[];
@@ -23,26 +29,30 @@ type WikiLinkMDEditorProps = {
 
 interface Suggestion {
   name: string;
+  slug: string;
 }
 
 /**
  * Wraps `<MDEditor>` with `[[Page]]` wiki link autocomplete.
  *
  * Autocomplete is triggered by typing `[[` anywhere in the editor. The
- * dropdown filters pages by name (substring match) as the user types.
- * Selecting a suggestion replaces the open `[[…` fragment with the completed
- * `[[PageName]]` token.
+ * dropdown filters pages by name (substring match) as the user types and is
+ * positioned at the pixel location of the `[[` trigger character.
  *
- * The legacy `[[Category:Page]]` syntax is still valid in markdown (the
- * remark plugin handles both), but new completions only emit `[[PageName]]`.
+ * Selecting a suggestion replaces the open `[[…` fragment with `[[PageName]]`.
  *
- * Uses `onInput` (not `onKeyUp`) to catch paste, IME, and programmatic edits.
+ * Keyboard navigation uses `onKeyDownCapture` on the container div rather than
+ * `onKeyDown` on the textarea. MDEditor's `factory.js` attaches a native
+ * `addEventListener('keydown', …)` to its internal textarea ref, which fires
+ * before React synthetic bubble events. The capture phase on an ancestor fires
+ * before any native listeners on descendants, guaranteeing our handler wins.
+ *
+ * The dropdown is positioned by measuring a hidden mirror div that replicates
+ * the textarea's text layout (font, padding, word-wrap) to find the `[[`
+ * trigger's pixel coordinates relative to the editor container.
+ *
  * IME composition state is tracked via `onCompositionStart`/`onCompositionEnd`
  * so dropdown keyboard navigation is suppressed during CJK input.
- *
- * Event handlers read the textarea element from `e.currentTarget` rather than
- * storing a ref, avoiding conflicts with the MDEditor internal ref attached via
- * `React.cloneElement` inside `renderTextarea`.
  *
  * @example
  * <WikiLinkMDEditor
@@ -62,54 +72,124 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     serialSlug,
   } = props;
 
-  // Stable ref to the textarea DOM node, populated via the renderTextarea callback.
-  // We attach our own ref callback before MDEditor injects its internal ref via
-  // cloneElement — both refs are compatible because we use a callback ref that
-  // stores the element in a plain object field (no React state).
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // slug → display name map for the inline preview renderer.
+  const pageTitles = useMemo(
+    () => Object.fromEntries(wikiPages.map((p) => [p.slug, p.name])),
+    [wikiPages],
+  );
 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
-  /** Close the dropdown and reset suggestion state. */
   function closeSuggestions() {
     setIsOpen(false);
     setSuggestions([]);
     setActiveIndex(0);
+    setDropdownPos(null);
   }
 
   /**
-   * Recompute suggestions from the text before the cursor.
-   * Called on every `input` event. Reads the textarea element directly from
-   * the event target so we are not reliant on a ref surviving MDEditor's
-   * internal `React.cloneElement` call.
+   * Compute the pixel position of character `index` within `ta`, relative to
+   * `containerRef`. Appends a fixed-position mirror div to document.body that
+   * replicates the textarea's text layout so word-wrap is accounted for.
    */
-  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
-    const ta = e.currentTarget;
+  function computeCaretPos(
+    ta: HTMLTextAreaElement,
+    index: number,
+  ): { top: number; left: number } | null {
+    const container = containerRef.current;
+    if (!container) return null;
 
+    const style = window.getComputedStyle(ta);
+    const taRect = ta.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    const mirror = document.createElement("div");
+    Object.assign(mirror.style, {
+      position: "fixed",
+      visibility: "hidden",
+      pointerEvents: "none",
+      zIndex: "-1",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+      overflowWrap: "break-word",
+      boxSizing: "border-box",
+      // Offset by scrollTop so the mirror's text starts where the textarea's does
+      top: `${taRect.top - ta.scrollTop}px`,
+      left: `${taRect.left}px`,
+      width: `${ta.clientWidth}px`,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+      letterSpacing: style.letterSpacing,
+      paddingTop: style.paddingTop,
+      paddingRight: style.paddingRight,
+      paddingBottom: style.paddingBottom,
+      paddingLeft: style.paddingLeft,
+    });
+
+    mirror.appendChild(document.createTextNode(ta.value.substring(0, index)));
+    const marker = document.createElement("span");
+    marker.textContent = "​"; // zero-width space as measurement anchor
+    mirror.appendChild(marker);
+
+    document.body.appendChild(mirror);
+    const markerRect = marker.getBoundingClientRect();
+    document.body.removeChild(mirror);
+
+    const lineH = parseFloat(style.lineHeight) || 20;
+    // Place dropdown below the trigger line; clamp within the textarea bounds
+    const top = Math.max(
+      taRect.top - containerRect.top + lineH,
+      Math.min(
+        markerRect.bottom - containerRect.top + 2,
+        taRect.bottom - containerRect.top,
+      ),
+    );
+    // Keep w-72 (288px) dropdown horizontally inside the container
+    const left = Math.max(
+      0,
+      Math.min(
+        markerRect.left - containerRect.left,
+        containerRect.width - 288,
+      ),
+    );
+
+    return { top, left };
+  }
+
+  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
+    // MDEditor's cloneElement({ ref: textRef }) replaces our ref callback, so
+    // we cache the element here instead — onInput is not overridden by cloneElement.
+    textareaRef.current = e.currentTarget;
+    const ta = e.currentTarget;
     const before = ta.value.substring(0, ta.selectionStart ?? ta.value.length);
     const lastOpen = before.lastIndexOf("[[");
 
-    // No open trigger, or a closing `]]` already follows the last `[[`.
     if (lastOpen === -1 || before.indexOf("]]", lastOpen) !== -1) {
       closeSuggestions();
       return;
     }
 
-    const triggerText = before.slice(lastOpen + 2); // text after `[[`
-
-    // Strip a legacy `Category:` prefix if present — filter by the page part.
+    const triggerText = before.slice(lastOpen + 2);
     const colonIdx = triggerText.indexOf(":");
     const pageQuery = (
       colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText
     ).toLowerCase();
 
-    // Substring match: page name must contain the query anywhere (not just prefix).
-    const next: Suggestion[] = wikiPages.filter((p) =>
-      p.name.toLowerCase().includes(pageQuery),
-    );
+    const next: Suggestion[] = wikiPages
+      .filter((p) => p.name.toLowerCase().includes(pageQuery))
+      .map((p) => ({ name: p.name, slug: p.slug }));
 
     if (next.length === 0) {
       closeSuggestions();
@@ -119,12 +199,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     setSuggestions(next);
     setActiveIndex(0);
     setIsOpen(true);
+    setDropdownPos(computeCaretPos(ta, lastOpen));
   }
 
-  /**
-   * Apply the selected suggestion, replacing the open `[[…` fragment with
-   * the completed `[[PageName]]` token.
-   */
   function applySuggestion(suggestion: Suggestion) {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -133,13 +210,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     const before = ta.value.substring(0, cursorPos);
     const after = ta.value.substring(cursorPos);
     const lastOpen = before.lastIndexOf("[[");
-
-    const replacement = `[[${suggestion.name}]]`;
-
+    const replacement = `[[${suggestion.slug}]]`;
     const newValue = before.slice(0, lastOpen) + replacement + after;
     onChange(newValue);
 
-    // Move cursor to end of replacement
     const newCursor = lastOpen + replacement.length;
     requestAnimationFrame(() => {
       ta.setSelectionRange(newCursor, newCursor);
@@ -149,29 +223,35 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     closeSuggestions();
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (!isOpen) return;
+  /**
+   * Intercepts dropdown navigation keys in the capture phase on the container
+   * div. The capture phase fires before MDEditor's native keydown listener on
+   * the textarea, so our handler always wins when the dropdown is open.
+   * `stopPropagation` prevents the event from reaching the textarea at all,
+   * which avoids newline insertion on Enter and cursor movement on ArrowUp/Down.
+   */
+  function handleKeyDownCapture(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (!isOpen || isComposing) return;
 
     switch (e.key) {
       case "ArrowDown":
-        if (isComposing) return;
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i + 1) % suggestions.length);
         break;
       case "ArrowUp":
-        if (isComposing) return;
         e.preventDefault();
-        setActiveIndex(
-          (i) => (i - 1 + suggestions.length) % suggestions.length,
-        );
+        e.stopPropagation();
+        setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
         break;
       case "Enter":
-        if (isComposing) return;
         e.preventDefault();
+        e.stopPropagation();
         applySuggestion(suggestions[activeIndex]);
         break;
       case "Escape":
         e.preventDefault();
+        e.stopPropagation();
         closeSuggestions();
         break;
     }
@@ -179,18 +259,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
 
   /**
    * Custom textarea renderer passed as the top-level `renderTextarea` prop to
-   * MDEditor. Using the top-level prop (not `textareaProps.renderTextarea`)
-   * ensures MDEditor's TextArea factory actually invokes it — the factory
-   * explicitly sets `renderTextarea={components?.textarea || renderTextarea}`
-   * which overrides anything in `textareaProps`.
-   *
-   * We store the element in `textareaRef` via a callback ref so `applySuggestion`
-   * can read the value and move the cursor. MDEditor's cloneElement subsequently
-   * attaches its own internal ref; callback refs survive cloneElement merges
-   * because React calls both the callback ref and the cloneElement ref.
-   *
-   * The second `opts` argument is accepted but unused — MDEditor requires the
-   * two-argument signature per `ITextAreaProps['renderTextarea']`.
+   * MDEditor. MDEditor's `factory.js` calls
+   * `React.cloneElement(renderTextarea(...), { ref: textRef })` — only the ref
+   * is injected; our other props (onInput, onCompositionStart/End) survive.
+   * We do not set a ref here because cloneElement replaces it; instead we
+   * cache the element in `textareaRef` from the `onInput` event in `handleInput`.
    */
   function renderTextarea(
     taProps:
@@ -201,19 +274,22 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     return (
       <textarea
         {...(taProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-        ref={(el) => {
-          textareaRef.current = el;
-        }}
         onInput={handleInput}
-        onKeyDown={handleKeyDown}
         onCompositionStart={() => setIsComposing(true)}
         onCompositionEnd={() => setIsComposing(false)}
       />
     );
   }
 
+  const pos = dropdownPos ?? { top: 0, left: 0 };
+
   return (
-    <div className="relative" data-color-mode="light">
+    <div
+      ref={containerRef}
+      className="relative"
+      data-color-mode="light"
+      onKeyDownCapture={handleKeyDownCapture}
+    >
       <MDEditor
         value={value}
         onChange={onChange}
@@ -221,7 +297,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
         preview={preview}
         components={{
           preview: (source) => (
-            <MarkdownRenderer serialSlug={serialSlug} className="p-4">
+            <MarkdownRenderer
+              serialSlug={serialSlug}
+              pageTitles={pageTitles}
+              className="p-4"
+            >
               {source}
             </MarkdownRenderer>
           ),
@@ -232,7 +312,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       {isOpen && suggestions.length > 0 && (
         <ul
           role="listbox"
-          className="absolute left-0 top-full z-50 mt-1 max-h-48 w-72 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg"
+          style={{ top: pos.top, left: pos.left }}
+          className="absolute z-50 max-h-48 w-72 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg"
         >
           {suggestions.map((s, i) => (
             <li
@@ -243,7 +324,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
                 i === activeIndex ? "bg-blue-50" : "hover:bg-gray-50"
               }`}
               onMouseDown={(e) => {
-                // Prevent textarea blur before we can read selectionStart
                 e.preventDefault();
                 applySuggestion(s);
               }}

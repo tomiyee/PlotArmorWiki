@@ -4,9 +4,14 @@ import type { Plugin } from "unified";
 import { WIKI_LINK_RE, parseWikiLink, slugifyWikiName } from "./wiki-links";
 
 /**
- * Remark plugin that transforms `[[Page]]` wiki link syntax into standard
- * markdown link nodes. Receives `serialSlug` as a closure parameter so the
- * generated URLs are always scoped to the current serial.
+ * Remark plugin that transforms `[[slug]]` (and `[[slug|text]]`) wiki link
+ * syntax into standard markdown link nodes. Receives `serialSlug` as a
+ * closure parameter so the generated URLs are always scoped to the current
+ * serial.
+ *
+ * When `pageTitles` is supplied, a `[[slug]]` link with no explicit alias
+ * resolves its display text from the map (slug → chapter-versioned title at
+ * the current cutoff), falling back to the raw slug if no entry is found.
  *
  * The legacy `[[Category:Page]]` form is also accepted — the category
  * prefix is ignored and a 2-level URL (`/{serial}/{page-slug}`) is emitted.
@@ -16,9 +21,12 @@ import { WIKI_LINK_RE, parseWikiLink, slugifyWikiName } from "./wiki-links";
  *
  * @example
  * // In a ReactMarkdown remarkPlugins array:
- * remarkPlugins={[remarkGfm, remarkWikiLinks("one-piece")]}
+ * remarkPlugins={[remarkGfm, remarkWikiLinks("one-piece", pageTitles)]}
  */
-export function remarkWikiLinks(serialSlug: string): Plugin<[], Root> {
+export function remarkWikiLinks(
+  serialSlug: string,
+  pageTitles?: Record<string, string>,
+): Plugin<[], Root> {
   return () => (tree) => {
     findAndReplace(tree, [
       WIKI_LINK_RE,
@@ -26,10 +34,12 @@ export function remarkWikiLinks(serialSlug: string): Plugin<[], Root> {
         void match; // capture groups are what we need; full match unused
         const parts = parseWikiLink(inner, alias);
         if (!parts) return false; // leave as literal text
+        const displayText =
+          parts.alias ?? pageTitles?.[parts.page] ?? parts.page;
         return {
           type: "link",
           url: `/${serialSlug}/${slugifyWikiName(parts.page)}`,
-          children: [{ type: "text", value: parts.alias ?? parts.page }],
+          children: [{ type: "text", value: displayText }],
         };
       },
     ]);

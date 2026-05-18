@@ -72,8 +72,10 @@ interface Props {
    */
   readingChapterId: number | null;
   /** Wiki pages visible to the reader at their chapter cutoff, used to power
-   * the `[[Page]]` autocomplete in edit mode. */
-  wikiPages: { name: string }[];
+   * the `[[slug]]` autocomplete in edit mode. */
+  wikiPages: { name: string; slug: string }[];
+  /** slug → chapter-versioned title map for resolving `[[slug]]` display text. */
+  pageTitles?: Record<string, string>;
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
   /**
@@ -164,6 +166,7 @@ export function PageEditor(props: Props) {
     headChapterId,
     readingChapterId,
     wikiPages,
+    pageTitles,
     introChapterIdx,
     childPages,
     parentPages,
@@ -304,6 +307,7 @@ export function PageEditor(props: Props) {
         floaterRows={floaterRows}
         childPages={childPages}
         pageId={pageId}
+        pageTitles={pageTitles}
       />
     );
   }
@@ -394,6 +398,7 @@ export function PageEditor(props: Props) {
           }
           serialSlug={serialSlug}
           wikiPages={wikiPages}
+          pageTitles={pageTitles}
         />
       ))}
 
