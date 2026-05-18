@@ -93,6 +93,7 @@ export async function savePageContent(
 
   await db.transaction(async (tx) => {
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
+      if (!content.trim()) continue; // never write empty revisions
       const sectionId = parseInt(sectionIdStr, 10);
       await tx
         .insert(pageSectionRevisions)
@@ -117,6 +118,7 @@ export async function savePageContent(
         });
 
       for (const [infoboxSectionIdStr, content] of Object.entries(floaterRowContent)) {
+        if (!content.trim()) continue; // never write empty revisions
         const infoboxSectionId = parseInt(infoboxSectionIdStr, 10);
         await tx
           .insert(pageInfoboxRevisions)

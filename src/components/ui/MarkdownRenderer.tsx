@@ -19,6 +19,13 @@ interface MarkdownRendererProps {
    * that is not within a serial context (e.g. the home page).
    */
   serialSlug?: string;
+  /**
+   * Map of page slug → display title at the current chapter cutoff.
+   * When a `[[slug]]` link has no explicit `|text` alias, the renderer looks
+   * up the slug here to show the chapter-accurate title instead of the raw slug.
+   * Only used when `serialSlug` is also provided.
+   */
+  pageTitles?: Record<string, string>;
 }
 
 const COMPONENTS: Components = {
@@ -210,9 +217,9 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
  * <MarkdownRenderer serialSlug="one-piece">{section.content}</MarkdownRenderer>
  */
 export function MarkdownRenderer(props: MarkdownRendererProps) {
-  const { children, className, sm = false, serialSlug } = props;
+  const { children, className, sm = false, serialSlug, pageTitles } = props;
   const remarkPlugins: PluggableList = [remarkGfm];
-  if (serialSlug) remarkPlugins.push(remarkWikiLinks(serialSlug));
+  if (serialSlug) remarkPlugins.push(remarkWikiLinks(serialSlug, pageTitles));
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug

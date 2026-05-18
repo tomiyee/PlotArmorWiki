@@ -15,7 +15,9 @@ interface Props {
   selectedChapterIdx: number | null;
   onChange: (val: string) => void;
   serialSlug: string;
-  wikiPages: { name: string }[];
+  wikiPages: { name: string; slug: string }[];
+  /** slug → title map for resolving `[[slug]]` display text in the current-value panel. */
+  pageTitles?: Record<string, string>;
 }
 
 /**
@@ -46,6 +48,7 @@ export function SectionContentEditor({
   onChange,
   serialSlug,
   wikiPages,
+  pageTitles,
 }: Props) {
   return (
     <Box col className="gap-2">
@@ -70,7 +73,7 @@ export function SectionContentEditor({
             />
           </div>
           {currentContent ? (
-            <MarkdownRenderer serialSlug={serialSlug}>
+            <MarkdownRenderer serialSlug={serialSlug} pageTitles={pageTitles}>
               {currentContent}
             </MarkdownRenderer>
           ) : (

@@ -112,7 +112,7 @@ export default async function PageView({ params }: Props) {
   // Wiki pages visible at the reader's cutoff. Pages with null introChapterId
   // (the home page) are always included since they predate any chapters.
   const rawWikiPages = await db
-    .select({ name: pages.name })
+    .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
     .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
     .where(
@@ -122,7 +122,49 @@ export default async function PageView({ params }: Props) {
       ),
     )
     .orderBy(asc(pages.name));
-  const wikiPages = rawWikiPages.map((p) => ({ name: p.name }));
+
+  // Resolve chapter-versioned titles for all wiki pages at the reader's cutoff.
+  const wikiPageIds = rawWikiPages.map((p) => p.id);
+  let wikiTitleByPageId = new Map<number, string>();
+  if (wikiPageIds.length > 0) {
+    const wikiTitleMaxIdxSq = db
+      .select({
+        pageId: pageTitles.pageId,
+        maxIdx: max(chapters.idx).as("max_idx"),
+      })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .where(
+        and(
+          inArray(pageTitles.pageId, wikiPageIds),
+          lte(chapters.idx, cutoffIdx),
+        ),
+      )
+      .groupBy(pageTitles.pageId)
+      .as("wiki_title_max_idx_sq");
+
+    const wikiTitleRows = await db
+      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .innerJoin(
+        wikiTitleMaxIdxSq,
+        and(
+          eq(pageTitles.pageId, wikiTitleMaxIdxSq.pageId),
+          eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
+        ),
+      );
+    wikiTitleByPageId = new Map(wikiTitleRows.map((r) => [r.pageId, r.title]));
+  }
+
+  // slug → chapter-versioned title (falls back to pages.name for pages without title entries).
+  const wikiPageTitles: Record<string, string> = Object.fromEntries(
+    rawWikiPages.map((p) => [p.slug, wikiTitleByPageId.get(p.id) ?? p.name]),
+  );
+  const wikiPages = rawWikiPages.map((p) => ({
+    name: wikiTitleByPageId.get(p.id) ?? p.name,
+    slug: p.slug,
+  }));
 
   const [page] = await db
     .select()
@@ -603,6 +645,7 @@ export default async function PageView({ params }: Props) {
             headChapterId={headChapterId}
             readingChapterId={readingChapterId}
             wikiPages={wikiPages}
+            pageTitles={wikiPageTitles}
             introChapterIdx={introChapter?.idx ?? null}
             childPages={childPages}
             parentPages={parentPages}
