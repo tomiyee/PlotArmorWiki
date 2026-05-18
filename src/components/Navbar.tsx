@@ -2,8 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faShieldHalved } from "@fortawesome/free-solid-svg-icons";
+import { ShieldHalfIcon } from "lucide-react";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { PagesDropdown } from "@/components/navbar/PagesDropdown";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -44,7 +43,7 @@ export default function Navbar(props: NavbarProps) {
           href="/"
           className="flex items-center gap-2 text-xl font-bold tracking-tight shrink-0"
         >
-          <FontAwesomeIcon icon={faShieldHalved} className="size-5" />
+          <ShieldHalfIcon className="size-5" />
           <span className="hidden sm:inline">PlotArmor</span>
         </Link>
         {serialData && (

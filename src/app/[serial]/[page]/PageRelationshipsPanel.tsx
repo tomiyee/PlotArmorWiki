@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import { Trash2Icon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Select } from "@/components/ui/Select";
@@ -122,7 +121,7 @@ export function PageRelationshipsPanel({
                   disabled={isPending || !chapterId}
                   onClick={() => handleRemoveParent(parent.id)}
                 >
-                  <FontAwesomeIcon icon={faTrash} className="h-2.5 w-2.5" />
+                  <Trash2Icon className="h-2.5 w-2.5" />
                 </Button>
               </Tooltip>
             </li>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { PlusIcon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -151,7 +150,7 @@ export function TemplateManager({
               variant="outline"
               onClick={() => setCreating(true)}
             >
-              <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+              <PlusIcon className="h-3 w-3" />
               New template
             </Button>
           )}

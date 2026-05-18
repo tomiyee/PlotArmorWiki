@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { PlusIcon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -151,7 +150,7 @@ export function CategoryManager(props: CategoryManagerProps) {
               variant="outline"
               onClick={() => setAddingCategory(true)}
             >
-              <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+              <PlusIcon className="h-3 w-3" />
               Add page category
             </Button>
           )}

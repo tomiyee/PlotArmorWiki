@@ -1,8 +1,7 @@
 "use client";
 
 import { MenuItem } from "../ui/Menu";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRightFromBracket } from "@fortawesome/free-solid-svg-icons";
+import { LogOutIcon } from "lucide-react";
 import { Box } from "../ui/Box";
 import { signOut } from "next-auth/react";
 
@@ -14,7 +13,7 @@ export function SignOutButton() {
   return (
     <MenuItem onClick={() => signOut()}>
       <Box className="items-center gap-2">
-        <FontAwesomeIcon icon={faArrowRightFromBracket} />
+        <LogOutIcon className="size-4" />
         Sign out
       </Box>
     </MenuItem>

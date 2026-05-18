@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { PlusIcon, XIcon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -145,7 +144,7 @@ export function SerialMetadataEditor(props: SerialMetadataEditorProps) {
                     onClick={() => removeAuthor(i)}
                     aria-label="Remove author"
                   >
-                    <FontAwesomeIcon icon={faXmark} className="h-3 w-3" />
+                    <XIcon className="h-3 w-3" />
                   </Button>
                 </Tooltip>
               )}
@@ -157,7 +156,7 @@ export function SerialMetadataEditor(props: SerialMetadataEditorProps) {
             onClick={addAuthor}
             className="self-start"
           >
-            <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
+            <PlusIcon className="h-3 w-3" />
             Add author
           </Button>
         </Box>

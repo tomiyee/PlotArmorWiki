@@ -9,9 +9,7 @@ import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { Popover } from "@/components/ui/Popover";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileShield } from "@fortawesome/free-solid-svg-icons";
-import { ExternalLinkIcon, XIcon } from "lucide-react";
+import { BookmarkIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { ChapterData, Volume } from "@/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 
@@ -207,7 +205,7 @@ export function ChapterSelector(props: Props) {
               aria-label={`Set ${chapterType} progress`}
               onClick={() => setDropdownOpen((o) => !o)}
             >
-              <FontAwesomeIcon icon={faFileShield} />
+              <BookmarkIcon className="size-4" />
               <Text as="span" variant="label" className="truncate sm:visible">
                 {selectedLabel}
               </Text>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
+import { PenIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import {
@@ -90,7 +89,7 @@ export function SerialTOCSidebar(props: Props) {
               aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
               className="text-muted-foreground hover:text-foreground hover:bg-transparent"
             >
-              <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
+              <PenIcon className="h-3 w-3" />
             </Button>
           </Tooltip>
         )}
