@@ -1,0 +1,69 @@
+"use server";
+
+import { db } from "@/db/index";
+import { pages, chapters, serials } from "@/db/schema";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { cookies } from "next/headers";
+
+export interface PageSearchResult {
+  /** DB primary key. */
+  id: number;
+  /** Display name used as the search label. */
+  name: string;
+  /** URL slug for navigation to /{serial}/{slug}. */
+  slug: string;
+}
+
+/**
+ * Returns all non-home wiki pages in the given serial that are visible at the
+ * user's current chapter cutoff (read from the progress cookie set by
+ * ChapterSelector). Pages whose intro chapter is beyond the cutoff are
+ * excluded — the same spoiler rule used by page rendering.
+ *
+ * Cutoff falls back to idx=0 when no progress cookie exists, so only pages
+ * with no intro chapter (impossible in practice) would appear on first visit.
+ *
+ * @example
+ * const results = await getVisiblePages("my-serial");
+ */
+export async function getVisiblePages(
+  serialSlug: string,
+): Promise<PageSearchResult[]> {
+  const [serial] = await db
+    .select({ id: serials.id })
+    .from(serials)
+    .where(eq(serials.slug, serialSlug))
+    .limit(1);
+
+  if (!serial) return [];
+
+  // Read the chapter cutoff from the progress cookie written by ChapterSelector.
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
+  let cutoffIdx = 0;
+  if (raw) {
+    const chapterId = parseInt(raw, 10);
+    if (!isNaN(chapterId)) {
+      const [row] = await db
+        .select({ idx: chapters.idx })
+        .from(chapters)
+        .where(eq(chapters.id, chapterId))
+        .limit(1);
+      if (row) cutoffIdx = row.idx;
+    }
+  }
+
+  return db
+    .select({ id: pages.id, name: pages.name, slug: pages.slug })
+    .from(pages)
+    .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(
+      and(
+        eq(pages.serialId, serial.id),
+        // Exclude the home page — users navigate to it via the serial breadcrumb.
+        eq(pages.isHomePage, false),
+        or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+      ),
+    )
+    .orderBy(asc(pages.name));
+}
