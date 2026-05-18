@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldHalfIcon } from "lucide-react";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { PagesDropdown } from "@/components/navbar/PagesDropdown";
+import { SerialSearch } from "@/components/navbar/SerialSearch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Box } from "./ui/Box";
 
@@ -63,6 +64,7 @@ export default function Navbar(props: NavbarProps) {
       </div>
       <Box className="gap-2 items-center">
         {tocSlot}
+        {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
         {chapterSelectorSlot}
         <ThemeToggle />
         {authSlot}
