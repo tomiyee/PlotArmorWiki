@@ -5,12 +5,13 @@ import { db } from '@/db/index';
 import {
   serials, serialAuthors, volumes, chapters, pages, pageTitles,
   templates, templateSections, templateInfoboxSections,
-  serialAdmins, users,
+  serialAdmins, users, userProgress,
 } from '@/db/schema';
 import { and, asc, count, eq, gte, gt, ilike, inArray, isNotNull, lte, max, not, sql } from 'drizzle-orm';
 import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
 import { titleToSlug } from '@/lib/slug';
 import { requireSerialAdmin } from '@/lib/auth-guard';
+import { auth } from '@/auth';
 
 export async function deleteChapter(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
@@ -719,4 +720,39 @@ export async function searchUsersForSerial(
     .limit(10);
 
   return results.map((r) => ({ userId: r.userId, username: r.username! }));
+}
+
+/**
+ * Upserts a `user_progress` row for the authenticated user so that their
+ * chapter progress is persisted in the database across devices and sessions.
+ *
+ * Silently no-ops when the caller is not authenticated (anonymous users rely
+ * on cookie/localStorage only). Does NOT require serial admin privileges — any
+ * logged-in user can save their own reading progress.
+ *
+ * @example
+ * await syncUserProgress(serialId, chapterId);
+ */
+export async function syncUserProgress(
+  serialId: number,
+  chapterId: number,
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  await db
+    .insert(userProgress)
+    .values({
+      userId: session.user.id,
+      serialId,
+      chapterId,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [userProgress.userId, userProgress.serialId],
+      set: {
+        chapterId,
+        updatedAt: new Date(),
+      },
+    });
 }
