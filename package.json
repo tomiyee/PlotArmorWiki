@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "prepare": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
+    "prepare": "scripts/install-hooks.sh"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
