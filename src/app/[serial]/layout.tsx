@@ -145,7 +145,6 @@ export default async function SerialLayout({ children, params }: Props) {
       volumes={volumeList}
       chaptersByVolume={chaptersByVolume}
       chapterType={serial.chapterType}
-      volumeType={serial.volumeType}
     />
   );
 

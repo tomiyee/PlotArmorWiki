@@ -16,28 +16,43 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { ChapterData, Volume } from "@/types";
 import { ChapterType, VolumeType } from "@/lib/serial-types";
 
-interface Props {
+type SerialTOCSidebarProps = {
+  /** The serial's database ID. */
   serialId: number;
+  /** The serial's URL slug, forwarded to SerialTOC for chapter links. */
   serialSlug: string;
+  /** Ordered list of volumes to display in the TOC. */
   volumes: Volume[];
+  /** Map from volume ID to its chapters, forwarded to SerialTOC and SerialEditor. */
   chaptersByVolume: Record<number, ChapterData[]>;
+  /** Display label for an individual chapter (e.g. "Chapter", "Episode"). */
   chapterType: ChapterType;
+  /** Display label for a volume group (e.g. "Volume", "Season"). Used in SerialEditor. */
   volumeType: VolumeType;
+  /** Server action to add a new chapter to a volume. */
   addChapterAction: (formData: FormData) => Promise<void>;
+  /** Server action to add a new volume to the serial. */
   addVolumeAction: (formData: FormData) => Promise<void>;
+  /** Server action to delete a chapter. */
   deleteChapterAction: (formData: FormData) => Promise<void>;
+  /** Server action to delete a volume and all its chapters. */
   deleteVolumeAction: (formData: FormData) => Promise<void>;
+  /** Server action to rename a chapter. */
   renameChapterAction: (formData: FormData) => Promise<void>;
+  /** Server action to rename a volume. */
   renameVolumeAction: (formData: FormData) => Promise<void>;
+  /** Server action to persist a new volume order. */
   reorderVolumesAction: (orderedVolumeIds: number[]) => Promise<void>;
+  /** Server action to persist new chapter order across all volumes. */
   reorderAllChaptersAction: (
     volumeOrder: number[],
     chaptersByVolumeId: Record<number, number[]>,
   ) => Promise<void>;
+  /** Server action to update the serial's chapter/volume type labels. */
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
   /** When false, hides the edit (pen) icon so non-admins cannot open SerialEditor. */
   isAdmin?: boolean;
-}
+};
 
 /**
  * Desktop left sidebar: collapsible TOC with an inline edit icon. The pen icon
@@ -47,7 +62,7 @@ interface Props {
  * @example
  * <SerialTOCSidebar serialId={1} serialSlug="my-serial" volumes={...} ... />
  */
-export function SerialTOCSidebar(props: Props) {
+export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
   const {
     serialId,
     serialSlug,
@@ -101,7 +116,6 @@ export function SerialTOCSidebar(props: Props) {
         volumes={volumes}
         chaptersByVolume={chaptersByVolume}
         chapterType={chapterType}
-        volumeType={volumeType}
       />
 
       <Dialog isOpen={editOpen} onClose={() => setEditOpen(false)}>
