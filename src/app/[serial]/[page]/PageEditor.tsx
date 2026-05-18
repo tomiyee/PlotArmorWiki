@@ -177,7 +177,7 @@ export function PageEditor(props: Props) {
   } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const { isEditing, registerHandlers } = useEditMode();
+  const { isEditing, registerHandlers, setIsDirty } = useEditMode();
 
   const [draftSectionContent, setDraftSectionContent] = useState<
     Record<number, string>
@@ -211,6 +211,20 @@ export function PageEditor(props: Props) {
   );
 
   const hasInfobox = infoboxSectionStructure.length > 0;
+
+  // Compute dirty state: true when any draft differs from the server-provided value.
+  const isDirty =
+    sections.some((s) => draftSectionContent[s.id] !== s.content) ||
+    (hasInfobox && draftFloaterImageUrl !== (floaterImageUrl ?? "")) ||
+    (hasInfobox &&
+      floaterRows.some((r) => draftFloaterRowContent[r.id] !== r.content));
+
+  // Propagate dirty state into EditModeContext so the navigation guard can react.
+  useEffect(() => {
+    setIsDirty(isDirty);
+    // Reset dirty flag on unmount so the guard doesn't fire after discarding.
+    return () => setIsDirty(false);
+  }, [isDirty, setIsDirty]);
 
   const handleDiscard = useCallback(() => {
     setDraftSectionContent(
