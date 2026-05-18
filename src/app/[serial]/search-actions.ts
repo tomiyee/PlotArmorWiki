@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db/index";
-import { pages, chapters, serials } from "@/db/schema";
-import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { pages, chapters, serials, pageTitles } from "@/db/schema";
+import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export interface PageSearchResult {
@@ -53,7 +53,8 @@ export async function getVisiblePages(
     }
   }
 
-  return db
+  // Step 1: pages visible at the cutoff (same filter as page rendering).
+  const rawPages = await db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
     .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
@@ -66,4 +67,41 @@ export async function getVisiblePages(
       ),
     )
     .orderBy(asc(pages.name));
+
+  if (rawPages.length === 0) return [];
+
+  // Step 2: resolve each page's chapter-versioned title at the cutoff.
+  // Mirrors the same max-idx pattern used by the page view.
+  const pageIds = rawPages.map((p) => p.id);
+  const titleMaxIdxSq = db
+    .select({
+      pageId: pageTitles.pageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .where(and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)))
+    .groupBy(pageTitles.pageId)
+    .as("title_max_idx_sq");
+
+  const titleRows = await db
+    .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+    .from(pageTitles)
+    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+    .innerJoin(
+      titleMaxIdxSq,
+      and(
+        eq(pageTitles.pageId, titleMaxIdxSq.pageId),
+        eq(chapters.idx, titleMaxIdxSq.maxIdx),
+      ),
+    );
+
+  const titleByPageId = new Map(titleRows.map((r) => [r.pageId, r.title]));
+
+  return rawPages.map((p) => ({
+    id: p.id,
+    // Fall back to pages.name for pages without any pageTitles entry yet.
+    name: titleByPageId.get(p.id) ?? p.name,
+    slug: p.slug,
+  }));
 }
