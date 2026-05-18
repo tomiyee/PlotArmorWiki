@@ -26,6 +26,7 @@ import {
   reorderVolumes,
   reorderAllChapters,
   updateSerialTypes,
+  bulkApplyToc,
 } from "../../actions";
 
 interface Props {
@@ -129,6 +130,7 @@ export default async function ChapterPage({ params }: Props) {
   const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
   const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
+  const bulkApplyTocForSerial = bulkApplyToc.bind(null, serial.id);
 
   let synopsisContent = "";
   let groupedIntroductions: {
@@ -201,6 +203,7 @@ export default async function ChapterPage({ params }: Props) {
               reorderVolumesAction={reorderVolumesForSerial}
               reorderAllChaptersAction={reorderAllChaptersForSerial}
               updateSerialTypesAction={updateSerialTypesForSerial}
+              bulkApplyTocAction={bulkApplyTocForSerial}
             />
           </div>
         </aside>

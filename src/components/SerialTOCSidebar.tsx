@@ -15,6 +15,7 @@ import { SerialEditor } from "@/components/SerialEditor";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { ChapterData, Volume } from "@/types";
 import { ChapterType, VolumeType } from "@/lib/serial-types";
+import type { BulkTocPayload } from "@/app/[serial]/actions";
 
 type SerialTOCSidebarProps = {
   /** The serial's database ID. */
@@ -50,6 +51,8 @@ type SerialTOCSidebarProps = {
   ) => Promise<void>;
   /** Server action to update the serial's chapter/volume type labels. */
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
+  /** Server action that atomically applies a bulk TOC edit. */
+  bulkApplyTocAction: (payload: BulkTocPayload) => Promise<void>;
   /** When false, hides the edit (pen) icon so non-admins cannot open SerialEditor. */
   isAdmin?: boolean;
 };
@@ -79,6 +82,7 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
     reorderVolumesAction,
     reorderAllChaptersAction,
     updateSerialTypesAction,
+    bulkApplyTocAction,
     isAdmin = false,
   } = props;
   const [editOpen, setEditOpen] = useState(false);
@@ -140,6 +144,7 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
             reorderVolumesAction={reorderVolumesAction}
             reorderAllChaptersAction={reorderAllChaptersAction}
             updateSerialTypesAction={updateSerialTypesAction}
+            bulkApplyTocAction={bulkApplyTocAction}
           />
         </DialogBody>
       </Dialog>
