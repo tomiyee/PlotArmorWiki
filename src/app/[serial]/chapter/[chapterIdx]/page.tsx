@@ -232,7 +232,7 @@ export default async function ChapterPage({ params }: Props) {
             {spoilered ? (
               <Box
                 col
-                className="gap-2 rounded-md border border-dashed border-gray-300 px-6 py-8 items-center text-center"
+                className="gap-2 rounded-md border border-dashed border-border px-6 py-8 items-center text-center"
               >
                 <Text variant="h3" muted>
                   Spoilers ahead
@@ -271,7 +271,7 @@ export default async function ChapterPage({ params }: Props) {
                                 <li key={page.id}>
                                   <Link
                                     href={`/${serialSlug}/${encodeURIComponent(page.slug)}`}
-                                    className="text-blue-600 hover:underline"
+                                    className="text-primary hover:underline"
                                   >
                                     {page.name}
                                   </Link>

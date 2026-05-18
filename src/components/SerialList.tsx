@@ -49,7 +49,7 @@ export default function SerialList({ serials }: Props) {
             <li key={serial.id}>
               <Link
                 href={`/${serial.slug}`}
-                className="block rounded-lg border px-4 py-3 hover:bg-gray-50 transition-colors"
+                className="block rounded-lg border px-4 py-3 hover:bg-muted transition-colors"
               >
                 <Text as="span" variant="label" className="font-medium">
                   {serial.title}
@@ -65,7 +65,7 @@ export default function SerialList({ serials }: Props) {
           ) : (
             <>
               No wikis yet —{" "}
-              <Link href="/new" className="text-blue-600 hover:underline">
+              <Link href="/new" className="text-primary hover:underline">
                 create one
               </Link>
               .

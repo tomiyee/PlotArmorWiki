@@ -99,7 +99,7 @@ export function PageRelationshipsPanel({
   }));
 
   return (
-    <Box col className="gap-3 rounded-lg border border-gray-200 bg-white p-4">
+    <Box col className="gap-3 rounded-lg border border-border bg-card p-4">
       <Text variant="h4">Relationships</Text>
 
       {/* Current parents list */}
@@ -108,7 +108,7 @@ export function PageRelationshipsPanel({
           {parentPages.map((parent) => (
             <li
               key={parent.id}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50"
             >
               <Text as="span" variant="label" className="flex-1">
                 {parent.title}

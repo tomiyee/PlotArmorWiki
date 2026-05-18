@@ -24,7 +24,7 @@ export function InfoIcon(props: InfoIconProps) {
       <button
         type="button"
         aria-label="More info"
-        className="inline-flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+        className="inline-flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
       >
         <Info size={15} />
       </button>

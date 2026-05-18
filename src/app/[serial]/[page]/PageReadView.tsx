@@ -47,7 +47,7 @@ export function PageReadView({
   return (
     <div className="overflow-hidden">
       {hasFloaterContent && (
-        <aside className="float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
+        <aside className="float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-border bg-muted/40 p-4 flex flex-col gap-3">
           {floaterImageUrl && (
             <Image
               src={floaterImageUrl}
@@ -63,9 +63,9 @@ export function PageReadView({
             <dl className="flex flex-col gap-2 text-sm">
               {floaterRows.map((row) => (
                 <div key={row.id}>
-                  <dt className="font-medium text-gray-600">{row.label}</dt>
-                  <dd className="text-gray-800 whitespace-pre-wrap">
-                    {row.content || <span className="text-gray-400">—</span>}
+                  <dt className="font-medium text-muted-foreground">{row.label}</dt>
+                  <dd className="text-foreground whitespace-pre-wrap">
+                    {row.content || <span className="text-muted-foreground">—</span>}
                   </dd>
                 </div>
               ))}
@@ -91,7 +91,7 @@ export function PageReadView({
         </div>
       ))}
 
-      <div className="mt-6 pt-6 border-t border-gray-200">
+      <div className="mt-6 pt-6 border-t border-border">
         <Text variant="h3" className="mb-3">
           Child pages
         </Text>
@@ -101,7 +101,7 @@ export function PageReadView({
               <li key={child.id}>
                 <Link
                   href={`/${serialSlug}/${child.slug}`}
-                  className="rounded-lg border border-gray-200 px-4 py-2 flex items-center hover:bg-gray-50 transition-colors"
+                  className="rounded-lg border border-border px-4 py-2 flex items-center hover:bg-muted transition-colors"
                 >
                   <Text variant="body" as="span">
                     {child.title}
@@ -117,7 +117,7 @@ export function PageReadView({
         )}
         <Link
           href={`/${serialSlug}/new?parentPageId=${pageId}`}
-          className="mt-3 text-sm text-blue-600 hover:underline inline-block"
+          className="mt-3 text-sm text-primary hover:underline inline-block"
         >
           + New page
         </Link>

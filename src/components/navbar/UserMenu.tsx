@@ -42,7 +42,7 @@ export function UserMenu(props: UserMenuProps) {
             className="rounded-full"
           />
         ) : (
-          <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+          <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
             {name?.[0]?.toUpperCase() ?? "?"}
           </span>
         )}

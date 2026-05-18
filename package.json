@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "prepare": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
+    "prepare": "scripts/install-hooks.sh"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
@@ -30,6 +30,7 @@
     "mdast-util-find-and-replace": "^3.0.2",
     "next": "16.2.4",
     "next-auth": "5.0.0-beta.31",
+    "next-themes": "^0.4.6",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",

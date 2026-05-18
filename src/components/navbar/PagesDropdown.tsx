@@ -61,7 +61,7 @@ export function PagesDropdown({ serialSlug, categories }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Pages menu"
-        className="font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 aria-expanded:bg-gray-100 aria-expanded:text-gray-900"
+        className="font-medium text-foreground/70 hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
       >
         Pages
         <ChevronDownIcon

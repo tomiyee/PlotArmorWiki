@@ -173,11 +173,11 @@ function VolumeDragPreview({
   return (
     <Box
       col
-      className="gap-2 rounded-lg bg-white border border-gray-200 shadow-xl p-2"
+      className="gap-2 rounded-lg bg-card border border-border shadow-xl p-2"
     >
       <Text variant="h4">{volume.displayName}</Text>
       {vChapters.length > 0 && (
-        <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+        <ol className="flex flex-col gap-1 pl-3 border-l-2 border-border">
           {vChapters.map((chapter) => (
             <li
               key={chapter.id}
@@ -200,7 +200,7 @@ function VolumeDragPreview({
 // Non-interactive clone of a chapter rendered by DragOverlay.
 function ChapterDragPreview({ chapter }: { chapter: Chapter }) {
   return (
-    <li className="flex items-center justify-between rounded-md px-3 py-2 text-sm bg-white border border-gray-200 shadow-lg list-none">
+    <li className="flex items-center justify-between rounded-md px-3 py-2 text-sm bg-card border border-border shadow-lg list-none">
       <Text as="span" variant="label" className="truncate">
         {chapter.displayName}
       </Text>
@@ -280,7 +280,7 @@ function SortableChapterItem({
               <span
                 {...attributes}
                 {...listeners}
-                className="text-gray-400 cursor-grab active:cursor-grabbing touch-none"
+                className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
                 title="Drag to reorder"
               >
                 <FontAwesomeIcon icon={faGripVertical} className="h-3 w-3" />
@@ -415,7 +415,7 @@ function SortableVolumeItem({
                 <span
                   {...attributes}
                   {...listeners}
-                  className="text-gray-400 cursor-grab active:cursor-grabbing touch-none"
+                  className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
                   title={`Drag to reorder ${volumeType.toLowerCase()}`}
                 >
                   <FontAwesomeIcon icon={faGripVertical} className="h-4 w-4" />
@@ -437,7 +437,7 @@ function SortableVolumeItem({
                         ? `Expand ${volume.displayName}`
                         : `Collapse ${volume.displayName}`
                     }
-                    className="text-gray-400 hover:text-gray-600 hover:bg-transparent"
+                    className="text-muted-foreground hover:text-foreground hover:bg-transparent"
                   >
                     <FontAwesomeIcon
                       icon={isCollapsed ? faChevronRight : faChevronDown}
@@ -486,7 +486,7 @@ function SortableVolumeItem({
             items={vChapters.map((c) => c.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ol className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+            <ol className="flex flex-col gap-1 pl-3 border-l-2 border-border">
               {vChapters.map((chapter) => (
                 <SortableChapterItem
                   key={chapter.id}
@@ -959,7 +959,7 @@ export function SerialEditor({
 
       {/* Add volume — toggle between button and inline form */}
       {editing && (
-        <div className="mt-2 pt-4 border-t border-gray-100">
+        <div className="mt-2 pt-4 border-t border-border">
           {addingVolume ? (
             <form
               ref={addVolumeFormRef}

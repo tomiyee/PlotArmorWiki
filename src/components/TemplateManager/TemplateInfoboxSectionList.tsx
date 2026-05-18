@@ -39,7 +39,7 @@ export function TemplateInfoboxSectionList(
           {rows.map((row) => (
             <Box
               key={row.id}
-              className="items-center gap-2 rounded border border-gray-100 px-2 py-1"
+              className="items-center gap-2 rounded border border-border px-2 py-1"
             >
               <Text className="flex-1 text-sm">{row.label}</Text>
               <Button

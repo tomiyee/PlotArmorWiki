@@ -58,7 +58,7 @@ export function PageInfoboxPanel({
   const disabled = isPending || externalIsPending;
 
   return (
-    <Box col className="gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+    <Box col className="gap-4 rounded-lg border border-border bg-muted/40 p-4">
       <Box className="items-center gap-2">
         <Text variant="h3">Infobox</Text>
         <InfoIcon contents="The infobox floats on the right side of the page showing an image and key facts about this subject. It's chapter-versioned: each row's content is tied to the 'Writing as of:' chapter you select above." />

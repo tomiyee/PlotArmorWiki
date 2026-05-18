@@ -75,7 +75,7 @@ export function PageTitlesPanel({
   }
 
   return (
-    <Box col className="gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+    <Box col className="gap-3 rounded-lg border border-border bg-muted/40 p-4">
       <Box className="items-center gap-2">
         <Text variant="h3">Titles</Text>
         <InfoIcon contents="A page's display name can change over the story. Each revision is shown to readers whose chapter cutoff is at or after the listed chapter." />
@@ -86,12 +86,12 @@ export function PageTitlesPanel({
           {pageTitleEntries.map((entry) => (
             <li
               key={entry.chapterId}
-              className="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded border border-border bg-card px-3 py-2"
             >
               <div className="flex flex-col min-w-0">
                 <Text
                   variant="label"
-                  className="text-xs text-gray-400 uppercase tracking-wide"
+                  className="text-xs text-muted-foreground uppercase tracking-wide"
                 >
                   {entry.chapterLabel}
                 </Text>

@@ -75,7 +75,7 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           <Box col className="gap-1">
             <Label htmlFor="description">
               Description{" "}
-              <span className="text-gray-400">(optional, Markdown)</span>
+              <span className="text-muted-foreground">(optional, Markdown)</span>
             </Label>
             <WikiLinkMDEditor
               value={description}
@@ -147,7 +147,7 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           {/* Splash art URL */}
           <Box col className="gap-1">
             <Label htmlFor="splashArtUrl">
-              Splash art URL <span className="text-gray-400">(optional)</span>
+              Splash art URL <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Input
               id="splashArtUrl"

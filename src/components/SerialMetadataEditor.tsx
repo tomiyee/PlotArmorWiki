@@ -165,7 +165,7 @@ export function SerialMetadataEditor(props: SerialMetadataEditorProps) {
         {/* Splash art URL */}
         <Box col className="gap-1">
           <Label htmlFor="meta-splashArtUrl">
-            Splash art URL <span className="text-gray-400">(optional)</span>
+            Splash art URL <span className="text-muted-foreground">(optional)</span>
           </Label>
           <Input
             id="meta-splashArtUrl"

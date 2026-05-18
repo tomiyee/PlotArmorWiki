@@ -32,7 +32,7 @@ const COMPONENTS: Components = {
   h1: ({ children }) => (
     <Text
       variant="h1"
-      className="mt-6 mb-4 text-2xl pb-2 border-b border-gray-200"
+      className="mt-6 mb-4 text-2xl pb-2 border-b border-border"
     >
       {children}
     </Text>
@@ -53,12 +53,12 @@ const COMPONENTS: Components = {
     </Text>
   ),
   h5: ({ children }) => (
-    <h5 className="text-sm font-semibold mt-3 mb-1 text-gray-900">
+    <h5 className="text-sm font-semibold mt-3 mb-1 text-foreground">
       {children}
     </h5>
   ),
   h6: ({ children }) => (
-    <h6 className="text-xs font-semibold mt-2 mb-1 text-gray-900">
+    <h6 className="text-xs font-semibold mt-2 mb-1 text-foreground">
       {children}
     </h6>
   ),
@@ -68,60 +68,60 @@ const COMPONENTS: Components = {
     </Text>
   ),
   ul: ({ children }) => (
-    <ul className="list-disc list-outside pl-6 mb-4 space-y-1 text-gray-700">
+    <ul className="list-disc list-outside pl-6 mb-4 space-y-1 text-foreground/80">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="list-decimal list-outside pl-6 mb-4 space-y-1 text-gray-700">
+    <ol className="list-decimal list-outside pl-6 mb-4 space-y-1 text-foreground/80">
       {children}
     </ol>
   ),
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-500 my-4">
+    <blockquote className="border-l-4 border-border pl-4 italic text-muted-foreground my-4">
       {children}
     </blockquote>
   ),
   // In react-markdown v10, block code is always inside <pre>; bare <code> is inline only.
   code: ({ children }) => (
-    <code className="bg-gray-100 text-gray-800 rounded px-1 py-0.5 text-sm font-mono">
+    <code className="bg-muted text-foreground rounded px-1 py-0.5 text-sm font-mono">
       {children}
     </code>
   ),
   pre: ({ children }) => (
-    <pre className="bg-gray-100 rounded-md p-4 overflow-x-auto mb-4 text-sm font-mono text-gray-800 [&>code]:bg-transparent [&>code]:p-0 [&>code]:rounded-none">
+    <pre className="bg-muted rounded-md p-4 overflow-x-auto mb-4 text-sm font-mono text-foreground [&>code]:bg-transparent [&>code]:p-0 [&>code]:rounded-none">
       {children}
     </pre>
   ),
-  hr: () => <hr className="border-gray-200 my-6" />,
+  hr: () => <hr className="border-border my-6" />,
   a: ({ href, children }) => (
-    <a href={href} className="text-blue-600 underline hover:text-blue-800">
+    <a href={href} className="text-primary underline hover:text-primary/80">
       {children}
     </a>
   ),
   strong: ({ children }) => (
-    <strong className="font-semibold text-gray-900">{children}</strong>
+    <strong className="font-semibold text-foreground">{children}</strong>
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
   table: ({ children }) => (
     <div className="overflow-x-auto mb-4">
-      <table className="min-w-full border border-gray-200 text-sm">
+      <table className="min-w-full border border-border text-sm">
         {children}
       </table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
+  thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
   tbody: ({ children }) => (
-    <tbody className="divide-y divide-gray-200">{children}</tbody>
+    <tbody className="divide-y divide-border">{children}</tbody>
   ),
   tr: ({ children }) => <tr>{children}</tr>,
   th: ({ children }) => (
-    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b border-gray-200">
+    <th className="px-3 py-2 text-left font-semibold text-foreground/80 border-b border-border">
       {children}
     </th>
   ),
-  td: ({ children }) => <td className="px-3 py-2 text-gray-700">{children}</td>,
+  td: ({ children }) => <td className="px-3 py-2 text-foreground/80">{children}</td>,
 };
 
 const SM_COMPONENTS: Components = {
@@ -143,25 +143,25 @@ const SM_COMPONENTS: Components = {
     </Text>
   ),
   h4: ({ children }) => (
-    <h4 className="text-sm font-semibold mt-2 mb-1 text-gray-900">
+    <h4 className="text-sm font-semibold mt-2 mb-1 text-foreground">
       {children}
     </h4>
   ),
   p: ({ children }) => (
-    <p className="mb-3 text-sm leading-relaxed text-gray-700">{children}</p>
+    <p className="mb-3 text-sm leading-relaxed text-foreground/80">{children}</p>
   ),
   ul: ({ children }) => (
-    <ul className="list-disc list-outside pl-5 mb-3 space-y-0.5 text-sm text-gray-700">
+    <ul className="list-disc list-outside pl-5 mb-3 space-y-0.5 text-sm text-foreground/80">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="list-decimal list-outside pl-5 mb-3 space-y-0.5 text-sm text-gray-700">
+    <ol className="list-decimal list-outside pl-5 mb-3 space-y-0.5 text-sm text-foreground/80">
       {children}
     </ol>
   ),
   pre: ({ children }) => (
-    <pre className="bg-gray-100 rounded-md p-3 overflow-x-auto mb-3 text-xs font-mono text-gray-800 [&>code]:bg-transparent [&>code]:p-0 [&>code]:rounded-none">
+    <pre className="bg-muted rounded-md p-3 overflow-x-auto mb-3 text-xs font-mono text-foreground [&>code]:bg-transparent [&>code]:p-0 [&>code]:rounded-none">
       {children}
     </pre>
   ),
@@ -195,7 +195,7 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
       }
     }
     return (
-      <a href={href} className="text-blue-600 underline hover:text-blue-800">
+      <a href={href} className="text-primary underline hover:text-primary/80">
         {children}
       </a>
     );

@@ -73,7 +73,7 @@ function ReorderableSection({
 }) {
   if (isLocked) {
     return (
-      <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
+      <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50">
         <Box className="w-4 mr-1 flex-shrink-0" />
         <Box className="flex-1 items-center gap-1.5">
           <Text as="span" variant="label">
@@ -81,13 +81,13 @@ function ReorderableSection({
           </Text>
           <InfoIcon contents="This section appears at the top of the page without a heading. Its content will be shown in preview tooltips when this page is mentioned elsewhere." />
         </Box>
-        <FontAwesomeIcon icon={faLock} className="h-3 w-3 text-gray-400" />
+        <FontAwesomeIcon icon={faLock} className="h-3 w-3 text-muted-foreground" />
       </li>
     );
   }
 
   return (
-    <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-gray-50">
+    <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50">
       {isRenaming ? (
         <RenameForm
           hiddenName="sectionId"
@@ -108,7 +108,7 @@ function ReorderableSection({
                 title="Move up"
                 disabled={isFirst || isPending}
                 onClick={onMoveUp}
-                className="h-3 w-4 p-0 rounded-sm text-gray-400 hover:text-gray-600 hover:bg-transparent disabled:opacity-30 leading-none"
+                className="h-3 w-4 p-0 rounded-sm text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-30 leading-none"
                 aria-label={`Move ${section.name} up`}
               >
                 ▲
@@ -119,7 +119,7 @@ function ReorderableSection({
                 title="Move down"
                 disabled={isLast || isPending}
                 onClick={onMoveDown}
-                className="h-3 w-4 p-0 rounded-sm text-gray-400 hover:text-gray-600 hover:bg-transparent disabled:opacity-30 leading-none"
+                className="h-3 w-4 p-0 rounded-sm text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-30 leading-none"
                 aria-label={`Move ${section.name} down`}
               >
                 ▼
@@ -214,7 +214,7 @@ export function PageSectionManager({
   }
 
   return (
-    <Box col className="gap-3 rounded-lg border border-gray-200 bg-white p-4">
+    <Box col className="gap-3 rounded-lg border border-border bg-card p-4">
       <Text variant="h4">Sections</Text>
 
       {sections.length > 0 ? (
