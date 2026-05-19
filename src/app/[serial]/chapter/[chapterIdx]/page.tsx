@@ -16,6 +16,8 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { ChapterSynopsisEditor } from "./ChapterSynopsisEditor";
 import { saveChapterSynopsis } from "./actions";
+import { EditModeAdminSetter } from "@/contexts/EditModeContext";
+import { isSerialAdmin } from "@/lib/auth-guard";
 import {
   addChapter,
   addVolume,
@@ -51,23 +53,26 @@ export default async function ChapterPage({ params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList] = await Promise.all([
-    db
-      .select()
-      .from(volumes)
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(volumes.idx),
-    db
-      .select({
-        id: chapters.id,
-        displayName: chapters.displayName,
-        idx: chapters.idx,
-        volumeId: chapters.volumeId,
-      })
-      .from(chapters)
-      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(chapters.idx),
+  const [isAdmin, [volumeList, chapterList]] = await Promise.all([
+    isSerialAdmin(serial.id),
+    Promise.all([
+      db
+        .select()
+        .from(volumes)
+        .where(eq(volumes.serialId, serial.id))
+        .orderBy(volumes.idx),
+      db
+        .select({
+          id: chapters.id,
+          displayName: chapters.displayName,
+          idx: chapters.idx,
+          volumeId: chapters.volumeId,
+        })
+        .from(chapters)
+        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+        .where(eq(volumes.serialId, serial.id))
+        .orderBy(chapters.idx),
+    ]),
   ]);
 
   const chaptersByVolume: Record<
@@ -183,6 +188,7 @@ export default async function ChapterPage({ params }: Props) {
 
   return (
     <main>
+      <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
         {/* Left sidebar — sticky, independent scroll, desktop only */}
         <aside className="hidden md:block w-56 shrink-0">
@@ -204,6 +210,7 @@ export default async function ChapterPage({ params }: Props) {
               reorderAllChaptersAction={reorderAllChaptersForSerial}
               updateSerialTypesAction={updateSerialTypesForSerial}
               bulkApplyTocAction={bulkApplyTocForSerial}
+              isAdmin={isAdmin}
             />
           </div>
         </aside>
