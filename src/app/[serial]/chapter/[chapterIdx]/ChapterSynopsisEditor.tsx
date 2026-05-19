@@ -6,24 +6,30 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { useEditMode } from "@/contexts/EditModeContext";
-import { MDEditor } from "@/components/MDEditor";
+import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 
-interface Props {
+type ChapterSynopsisEditorProps = {
+  /** URL slug of the serial, used for markdown preview links. */
   serialSlug: string;
+  /** Global ordering index of the chapter being edited. */
   chapterIdx: number;
+  /** Saved synopsis content loaded from the server. */
   initialContent: string;
+  /** Wiki pages visible at the reader's cutoff, used for `[[` autocomplete. */
+  wikiPages: { name: string; slug: string }[];
+  /** Server action that persists the synopsis. */
   saveAction: (
     serialSlug: string,
     chapterIdx: number,
     content: string,
   ) => Promise<void>;
-}
+};
 
 /**
  * Inline markdown editor for a chapter's synopsis. In read mode renders the
  * synopsis as styled markdown (or a placeholder when empty). In edit mode
- * (driven by the global `EditModeContext` / bottom-right FAB) shows an
- * MDEditor so the author can write formatted content.
+ * (driven by the global `EditModeContext` / bottom-right FAB) shows a
+ * `WikiLinkMDEditor` with `[[Page]]` autocomplete.
  *
  * Save and discard are handled by the global FAB via registered handlers,
  * keeping this component consistent with the rest of the edit-mode pattern.
@@ -33,15 +39,13 @@ interface Props {
  *   serialSlug="one-piece"
  *   chapterIdx={42}
  *   initialContent=""
+ *   wikiPages={wikiPages}
  *   saveAction={saveChapterSynopsis}
  * />
  */
-export function ChapterSynopsisEditor({
-  serialSlug,
-  chapterIdx,
-  initialContent,
-  saveAction,
-}: Props) {
+export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
+  const { serialSlug, chapterIdx, initialContent, wikiPages, saveAction } =
+    props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isEditing, registerHandlers } = useEditMode();
@@ -68,21 +72,14 @@ export function ChapterSynopsisEditor({
   if (isEditing) {
     return (
       <Box col className="gap-3">
-        <div data-color-mode="light">
-          <MDEditor
-            value={draft}
-            onChange={(val) => setDraft(val ?? "")}
-            height={300}
-            preview="edit"
-            components={{
-              preview: (source) => (
-                <MarkdownRenderer serialSlug={serialSlug} className="p-4">
-                  {source}
-                </MarkdownRenderer>
-              ),
-            }}
-          />
-        </div>
+        <WikiLinkMDEditor
+          value={draft}
+          onChange={(val) => setDraft(val ?? "")}
+          height={300}
+          preview="edit"
+          wikiPages={wikiPages}
+          serialSlug={serialSlug}
+        />
         {isPending && (
           <Text muted className="text-sm">
             Saving…

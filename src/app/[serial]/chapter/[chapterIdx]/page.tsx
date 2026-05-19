@@ -9,13 +9,15 @@ import {
   chapterSynopses,
   pages,
 } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { ChapterSynopsisEditor } from "./ChapterSynopsisEditor";
 import { saveChapterSynopsis } from "./actions";
+import { EditModeAdminSetter } from "@/contexts/EditModeContext";
+import { isSerialAdmin } from "@/lib/auth-guard";
 import {
   addChapter,
   addVolume,
@@ -51,23 +53,26 @@ export default async function ChapterPage({ params }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList] = await Promise.all([
-    db
-      .select()
-      .from(volumes)
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(volumes.idx),
-    db
-      .select({
-        id: chapters.id,
-        displayName: chapters.displayName,
-        idx: chapters.idx,
-        volumeId: chapters.volumeId,
-      })
-      .from(chapters)
-      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(chapters.idx),
+  const [isAdmin, [volumeList, chapterList]] = await Promise.all([
+    isSerialAdmin(serial.id),
+    Promise.all([
+      db
+        .select()
+        .from(volumes)
+        .where(eq(volumes.serialId, serial.id))
+        .orderBy(volumes.idx),
+      db
+        .select({
+          id: chapters.id,
+          displayName: chapters.displayName,
+          idx: chapters.idx,
+          volumeId: chapters.volumeId,
+        })
+        .from(chapters)
+        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+        .where(eq(volumes.serialId, serial.id))
+        .orderBy(chapters.idx),
+    ]),
   ]);
 
   const chaptersByVolume: Record<
@@ -133,6 +138,7 @@ export default async function ChapterPage({ params }: Props) {
   const bulkApplyTocForSerial = bulkApplyToc.bind(null, serial.id);
 
   let synopsisContent = "";
+  let wikiPages: { name: string; slug: string }[] = [];
   let groupedIntroductions: {
     categoryName: string;
     pages: { id: number; name: string; slug: string }[];
@@ -148,6 +154,19 @@ export default async function ChapterPage({ params }: Props) {
       .limit(1);
 
     synopsisContent = synopsisRow?.content ?? "";
+
+    // Fetch wiki pages visible at the reader's cutoff for autocomplete
+    wikiPages = await db
+      .select({ name: pages.name, slug: pages.slug })
+      .from(pages)
+      .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+      .where(
+        and(
+          eq(pages.serialId, serial.id),
+          or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+        ),
+      )
+      .orderBy(asc(pages.name));
 
     // Fetch all pages introduced in this chapter
     const introducedPages = await db
@@ -183,6 +202,7 @@ export default async function ChapterPage({ params }: Props) {
 
   return (
     <main>
+      <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
         {/* Left sidebar — sticky, independent scroll, desktop only */}
         <aside className="hidden md:block w-56 shrink-0">
@@ -204,6 +224,7 @@ export default async function ChapterPage({ params }: Props) {
               reorderAllChaptersAction={reorderAllChaptersForSerial}
               updateSerialTypesAction={updateSerialTypesForSerial}
               bulkApplyTocAction={bulkApplyTocForSerial}
+              isAdmin={isAdmin}
             />
           </div>
         </aside>
@@ -254,6 +275,7 @@ export default async function ChapterPage({ params }: Props) {
                     serialSlug={serialSlug}
                     chapterIdx={chapterIdx}
                     initialContent={synopsisContent}
+                    wikiPages={wikiPages}
                     saveAction={boundSaveAction!}
                   />
                 </Box>
