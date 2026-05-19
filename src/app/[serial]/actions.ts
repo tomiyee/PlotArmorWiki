@@ -1,27 +1,54 @@
-'use server';
+"use server";
 
-import { redirect } from 'next/navigation';
-import { db } from '@/db/index';
+import { redirect } from "next/navigation";
+import { db } from "@/db/index";
 import {
-  serials, serialAuthors, volumes, chapters, pages, pageTitles,
-  templates, templateSections, templateInfoboxSections,
-  serialAdmins, users, userProgress,
-} from '@/db/schema';
-import { and, asc, count, eq, gte, gt, ilike, inArray, isNotNull, lte, max, not, sql } from 'drizzle-orm';
-import { parseChapterType, parseVolumeType } from '@/lib/serialTypes';
-import { titleToSlug } from '@/lib/slug';
-import { requireSerialAdmin } from '@/lib/auth-guard';
-import { auth } from '@/auth';
+  serials,
+  serialAuthors,
+  volumes,
+  chapters,
+  pages,
+  pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
+  serialAdmins,
+  users,
+  userProgress,
+} from "@/db/schema";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  gt,
+  ilike,
+  inArray,
+  isNotNull,
+  lte,
+  max,
+  not,
+  sql,
+} from "drizzle-orm";
+import { parseChapterType, parseVolumeType } from "@/lib/serialTypes";
+import { titleToSlug } from "@/lib/slug";
+import { requireSerialAdmin } from "@/lib/auth-guard";
+import { auth } from "@/auth";
 
 export async function deleteChapter(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const chapterIdRaw = formData.get('chapterId');
-  if (!chapterIdRaw || typeof chapterIdRaw !== 'string') throw new Error('Chapter ID is required');
+  const chapterIdRaw = formData.get("chapterId");
+  if (!chapterIdRaw || typeof chapterIdRaw !== "string")
+    throw new Error("Chapter ID is required");
 
   const chapterId = parseInt(chapterIdRaw, 10);
-  if (isNaN(chapterId)) throw new Error('Invalid chapter ID');
+  if (isNaN(chapterId)) throw new Error("Invalid chapter ID");
 
-  const [target] = await db.select({ idx: chapters.idx }).from(chapters).where(eq(chapters.id, chapterId));
+  const [target] = await db
+    .select({ idx: chapters.idx })
+    .from(chapters)
+    .where(eq(chapters.id, chapterId));
 
   await db.delete(chapters).where(eq(chapters.id, chapterId));
 
@@ -35,17 +62,23 @@ export async function deleteChapter(serialId: number, formData: FormData) {
     await db
       .update(chapters)
       .set({ idx: sql`${chapters.idx} - 1` })
-      .where(inArray(chapters.id, toShift.map((c) => c.id)));
+      .where(
+        inArray(
+          chapters.id,
+          toShift.map((c) => c.id),
+        ),
+      );
   }
 }
 
 export async function deleteVolume(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const volumeIdRaw = formData.get('volumeId');
-  if (!volumeIdRaw || typeof volumeIdRaw !== 'string') throw new Error('Volume ID is required');
+  const volumeIdRaw = formData.get("volumeId");
+  if (!volumeIdRaw || typeof volumeIdRaw !== "string")
+    throw new Error("Volume ID is required");
 
   const volumeId = parseInt(volumeIdRaw, 10);
-  if (isNaN(volumeId)) throw new Error('Invalid volume ID');
+  if (isNaN(volumeId)) throw new Error("Invalid volume ID");
 
   const volumeChapters = await db
     .select({ id: chapters.id, idx: chapters.idx })
@@ -53,7 +86,8 @@ export async function deleteVolume(serialId: number, formData: FormData) {
     .where(eq(chapters.volumeId, volumeId));
 
   const count = volumeChapters.length;
-  const minIdx = count > 0 ? Math.min(...volumeChapters.map((c) => c.idx)) : null;
+  const minIdx =
+    count > 0 ? Math.min(...volumeChapters.map((c) => c.idx)) : null;
 
   await db.delete(chapters).where(eq(chapters.volumeId, volumeId));
   await db.delete(volumes).where(eq(volumes.id, volumeId));
@@ -69,16 +103,25 @@ export async function deleteVolume(serialId: number, formData: FormData) {
       await db
         .update(chapters)
         .set({ idx: sql`${chapters.idx} - ${count}` })
-        .where(inArray(chapters.id, toShift.map((c) => c.id)));
+        .where(
+          inArray(
+            chapters.id,
+            toShift.map((c) => c.id),
+          ),
+        );
     }
   }
 }
 
 export async function addVolume(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const displayName = formData.get('displayName');
-  if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') {
-    throw new Error('Volume display name is required');
+  const displayName = formData.get("displayName");
+  if (
+    !displayName ||
+    typeof displayName !== "string" ||
+    displayName.trim() === ""
+  ) {
+    throw new Error("Volume display name is required");
   }
 
   const [{ maxIdx }] = await db
@@ -95,37 +138,58 @@ export async function addVolume(serialId: number, formData: FormData) {
 
 export async function renameVolume(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const volumeIdRaw = formData.get('volumeId');
-  const displayName = formData.get('displayName');
+  const volumeIdRaw = formData.get("volumeId");
+  const displayName = formData.get("displayName");
 
-  if (!volumeIdRaw || typeof volumeIdRaw !== 'string') throw new Error('Volume ID is required');
-  if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') throw new Error('Display name is required');
+  if (!volumeIdRaw || typeof volumeIdRaw !== "string")
+    throw new Error("Volume ID is required");
+  if (
+    !displayName ||
+    typeof displayName !== "string" ||
+    displayName.trim() === ""
+  )
+    throw new Error("Display name is required");
 
   const volumeId = parseInt(volumeIdRaw, 10);
-  if (isNaN(volumeId)) throw new Error('Invalid volume ID');
+  if (isNaN(volumeId)) throw new Error("Invalid volume ID");
 
-  await db.update(volumes).set({ displayName: displayName.trim() }).where(eq(volumes.id, volumeId));
+  await db
+    .update(volumes)
+    .set({ displayName: displayName.trim() })
+    .where(eq(volumes.id, volumeId));
 }
 
 export async function renameChapter(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const chapterIdRaw = formData.get('chapterId');
-  const displayName = formData.get('displayName');
+  const chapterIdRaw = formData.get("chapterId");
+  const displayName = formData.get("displayName");
 
-  if (!chapterIdRaw || typeof chapterIdRaw !== 'string') throw new Error('Chapter ID is required');
-  if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') throw new Error('Display name is required');
+  if (!chapterIdRaw || typeof chapterIdRaw !== "string")
+    throw new Error("Chapter ID is required");
+  if (
+    !displayName ||
+    typeof displayName !== "string" ||
+    displayName.trim() === ""
+  )
+    throw new Error("Display name is required");
 
   const chapterId = parseInt(chapterIdRaw, 10);
-  if (isNaN(chapterId)) throw new Error('Invalid chapter ID');
+  if (isNaN(chapterId)) throw new Error("Invalid chapter ID");
 
-  await db.update(chapters).set({ displayName: displayName.trim() }).where(eq(chapters.id, chapterId));
+  await db
+    .update(chapters)
+    .set({ displayName: displayName.trim() })
+    .where(eq(chapters.id, chapterId));
 }
 
 export async function updateSerialTypes(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const chapterType = parseChapterType(formData.get('chapterType'));
-  const volumeType = parseVolumeType(formData.get('volumeType'));
-  await db.update(serials).set({ chapterType, volumeType }).where(eq(serials.id, serialId));
+  const chapterType = parseChapterType(formData.get("chapterType"));
+  const volumeType = parseVolumeType(formData.get("volumeType"));
+  await db
+    .update(serials)
+    .set({ chapterType, volumeType })
+    .where(eq(serials.id, serialId));
 }
 
 /**
@@ -135,7 +199,10 @@ export async function updateSerialTypes(serialId: number, formData: FormData) {
  * @example
  * await reorderVolumes(serialId, [3, 1, 2]);
  */
-export async function reorderVolumes(serialId: number, orderedVolumeIds: number[]) {
+export async function reorderVolumes(
+  serialId: number,
+  orderedVolumeIds: number[],
+) {
   await requireSerialAdmin(serialId);
   if (orderedVolumeIds.length === 0) return;
 
@@ -144,7 +211,12 @@ export async function reorderVolumes(serialId: number, orderedVolumeIds: number[
       await tx
         .update(volumes)
         .set({ idx: i + 1 })
-        .where(and(eq(volumes.id, orderedVolumeIds[i]), eq(volumes.serialId, serialId)));
+        .where(
+          and(
+            eq(volumes.id, orderedVolumeIds[i]),
+            eq(volumes.serialId, serialId),
+          ),
+        );
     }
 
     // Re-sequence chapter idx to match the new volume order, preserving within-volume order.
@@ -158,10 +230,12 @@ export async function reorderVolumes(serialId: number, orderedVolumeIds: number[
 
       for (const chapter of volumeChapters) {
         chapterIdx++;
-        await tx.update(chapters).set({ idx: chapterIdx }).where(eq(chapters.id, chapter.id));
+        await tx
+          .update(chapters)
+          .set({ idx: chapterIdx })
+          .where(eq(chapters.id, chapter.id));
       }
     }
-
   });
 }
 
@@ -189,7 +263,7 @@ export async function reorderChapters(
       .from(volumes)
       .where(and(eq(volumes.id, volumeId), eq(volumes.serialId, serialId)));
 
-    if (!targetVolume) throw new Error('Volume not found');
+    if (!targetVolume) throw new Error("Volume not found");
 
     // baseIdx is the highest global idx among all chapters that precede this volume,
     // so we can start numbering this volume's chapters immediately after.
@@ -197,7 +271,12 @@ export async function reorderChapters(
       .select({ maxIdx: max(chapters.idx) })
       .from(chapters)
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-      .where(and(eq(volumes.serialId, serialId), sql`${volumes.idx} < ${targetVolume.idx}`));
+      .where(
+        and(
+          eq(volumes.serialId, serialId),
+          sql`${volumes.idx} < ${targetVolume.idx}`,
+        ),
+      );
 
     const baseIdx = precedingResult[0]?.maxIdx ?? 0;
 
@@ -214,7 +293,12 @@ export async function reorderChapters(
       .select({ id: chapters.id })
       .from(chapters)
       .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-      .where(and(eq(volumes.serialId, serialId), sql`${volumes.idx} > ${targetVolume.idx}`))
+      .where(
+        and(
+          eq(volumes.serialId, serialId),
+          sql`${volumes.idx} > ${targetVolume.idx}`,
+        ),
+      )
       .orderBy(asc(chapters.idx));
 
     for (let i = 0; i < followingChapters.length; i++) {
@@ -223,7 +307,6 @@ export async function reorderChapters(
         .set({ idx: baseIdx + orderedChapterIds.length + i + 1 })
         .where(eq(chapters.id, followingChapters[i].id));
     }
-
   });
 }
 
@@ -257,35 +340,45 @@ export async function reorderAllChapters(
       if (!validVolumeIds.has(volumeId)) continue;
       for (const chapterId of chaptersByVolumeId[volumeId] ?? []) {
         idx++;
-        await tx.update(chapters).set({ idx, volumeId }).where(eq(chapters.id, chapterId));
+        await tx
+          .update(chapters)
+          .set({ idx, volumeId })
+          .where(eq(chapters.id, chapterId));
       }
     }
-
   });
 }
 
-export async function updateSerialMetadata(serialId: number, formData: FormData) {
+export async function updateSerialMetadata(
+  serialId: number,
+  formData: FormData,
+) {
   await requireSerialAdmin(serialId);
-  const title = formData.get('title');
-  if (!title || typeof title !== 'string' || title.trim() === '') {
-    throw new Error('Title is required');
+  const title = formData.get("title");
+  if (!title || typeof title !== "string" || title.trim() === "") {
+    throw new Error("Title is required");
   }
 
-  const splashArtUrl = formData.get('splashArtUrl');
+  const splashArtUrl = formData.get("splashArtUrl");
 
-  const authorValues = formData.getAll('authors') as string[];
-  const filteredAuthors = authorValues.map((a) => a.trim()).filter((a) => a.length > 0);
+  const authorValues = formData.getAll("authors") as string[];
+  const filteredAuthors = authorValues
+    .map((a) => a.trim())
+    .filter((a) => a.length > 0);
 
   const newSlug = titleToSlug(title.trim());
 
-  await db.update(serials).set({
-    title: title.trim(),
-    slug: newSlug,
-    splashArtUrl:
-      splashArtUrl && typeof splashArtUrl === 'string' && splashArtUrl.trim()
-        ? splashArtUrl.trim()
-        : null,
-  }).where(eq(serials.id, serialId));
+  await db
+    .update(serials)
+    .set({
+      title: title.trim(),
+      slug: newSlug,
+      splashArtUrl:
+        splashArtUrl && typeof splashArtUrl === "string" && splashArtUrl.trim()
+          ? splashArtUrl.trim()
+          : null,
+    })
+    .where(eq(serials.id, serialId));
 
   // Replace all authors: delete existing rows and insert fresh ones.
   await db.delete(serialAuthors).where(eq(serialAuthors.serialId, serialId));
@@ -295,7 +388,7 @@ export async function updateSerialMetadata(serialId: number, formData: FormData)
         serialId,
         name,
         displayOrder: i + 1,
-      }))
+      })),
     );
   }
 
@@ -304,16 +397,21 @@ export async function updateSerialMetadata(serialId: number, formData: FormData)
 
 export async function addChapter(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const displayName = formData.get('displayName');
-  const volumeIdRaw = formData.get('volumeId');
+  const displayName = formData.get("displayName");
+  const volumeIdRaw = formData.get("volumeId");
 
-  if (!displayName || typeof displayName !== 'string' || displayName.trim() === '') {
-    throw new Error('Chapter display name is required');
+  if (
+    !displayName ||
+    typeof displayName !== "string" ||
+    displayName.trim() === ""
+  ) {
+    throw new Error("Chapter display name is required");
   }
-  if (!volumeIdRaw || typeof volumeIdRaw !== 'string') throw new Error('Volume is required');
+  if (!volumeIdRaw || typeof volumeIdRaw !== "string")
+    throw new Error("Volume is required");
 
   const volumeId = parseInt(volumeIdRaw, 10);
-  if (isNaN(volumeId)) throw new Error('Invalid volume');
+  if (isNaN(volumeId)) throw new Error("Invalid volume");
 
   const [targetVolume] = await db
     .select({ idx: volumes.idx })
@@ -324,7 +422,9 @@ export async function addChapter(serialId: number, formData: FormData) {
     .select({ insertAfterIdx: max(chapters.idx) })
     .from(chapters)
     .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-    .where(and(eq(volumes.serialId, serialId), lte(volumes.idx, targetVolume.idx)));
+    .where(
+      and(eq(volumes.serialId, serialId), lte(volumes.idx, targetVolume.idx)),
+    );
 
   const newIdx = (insertAfterIdx ?? 0) + 1;
 
@@ -338,7 +438,12 @@ export async function addChapter(serialId: number, formData: FormData) {
     await db
       .update(chapters)
       .set({ idx: sql`${chapters.idx} + 1` })
-      .where(inArray(chapters.id, toShift.map((c) => c.id)));
+      .where(
+        inArray(
+          chapters.id,
+          toShift.map((c) => c.id),
+        ),
+      );
   }
 
   // Check whether this is the first chapter for the serial before inserting.
@@ -368,11 +473,14 @@ export async function addChapter(serialId: number, formData: FormData) {
       .where(and(eq(pages.serialId, serialId), eq(pages.isHomePage, true)));
 
     if (homePage) {
-      await db.insert(pageTitles).values({
-        pageId: homePage.id,
-        chapterId: newChapter.id,
-        title: 'Home',
-      }).onConflictDoNothing();
+      await db
+        .insert(pageTitles)
+        .values({
+          pageId: homePage.id,
+          chapterId: newChapter.id,
+          title: "Home",
+        })
+        .onConflictDoNothing();
     }
   }
 }
@@ -461,11 +569,11 @@ export async function bulkApplyToc(
   if (missingVolumeIds.length > 0 || missingChapterIds.length > 0) {
     const parts: string[] = [];
     if (missingVolumeIds.length > 0)
-      parts.push(`volume IDs: ${missingVolumeIds.join(', ')}`);
+      parts.push(`volume IDs: ${missingVolumeIds.join(", ")}`);
     if (missingChapterIds.length > 0)
-      parts.push(`chapter IDs: ${missingChapterIds.join(', ')}`);
+      parts.push(`chapter IDs: ${missingChapterIds.join(", ")}`);
     throw new Error(
-      `Bulk TOC import rejected: the following existing IDs are absent from the payload (use the per-entry delete UI to remove them): ${parts.join('; ')}`,
+      `Bulk TOC import rejected: the following existing IDs are absent from the payload (use the per-entry delete UI to remove them): ${parts.join("; ")}`,
     );
   }
 
@@ -579,9 +687,9 @@ export async function bulkApplyToc(
  */
 export async function createTemplate(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const name = formData.get('name');
-  if (!name || typeof name !== 'string' || name.trim() === '') {
-    throw new Error('Template name is required');
+  const name = formData.get("name");
+  if (!name || typeof name !== "string" || name.trim() === "") {
+    throw new Error("Template name is required");
   }
 
   await db.insert(templates).values({
@@ -599,21 +707,26 @@ export async function createTemplate(serialId: number, formData: FormData) {
  */
 export async function deleteTemplate(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const templateIdRaw = formData.get('templateId');
-  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+  const templateIdRaw = formData.get("templateId");
+  if (!templateIdRaw || typeof templateIdRaw !== "string")
+    throw new Error("Template ID is required");
   const templateId = parseInt(templateIdRaw, 10);
-  if (isNaN(templateId)) throw new Error('Invalid template ID');
+  if (isNaN(templateId)) throw new Error("Invalid template ID");
 
   // Verify the template belongs to this serial before deleting.
   const [target] = await db
     .select({ id: templates.id })
     .from(templates)
     .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
-  if (!target) throw new Error('Template not found');
+  if (!target) throw new Error("Template not found");
 
   await db.transaction(async (tx) => {
-    await tx.delete(templateInfoboxSections).where(eq(templateInfoboxSections.templateId, templateId));
-    await tx.delete(templateSections).where(eq(templateSections.templateId, templateId));
+    await tx
+      .delete(templateInfoboxSections)
+      .where(eq(templateInfoboxSections.templateId, templateId));
+    await tx
+      .delete(templateSections)
+      .where(eq(templateSections.templateId, templateId));
     await tx.delete(templates).where(eq(templates.id, templateId));
   });
 }
@@ -626,13 +739,15 @@ export async function deleteTemplate(serialId: number, formData: FormData) {
  */
 export async function renameTemplate(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const templateIdRaw = formData.get('templateId');
-  const name = formData.get('name');
-  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
-  if (!name || typeof name !== 'string' || name.trim() === '') throw new Error('Template name is required');
+  const templateIdRaw = formData.get("templateId");
+  const name = formData.get("name");
+  if (!templateIdRaw || typeof templateIdRaw !== "string")
+    throw new Error("Template ID is required");
+  if (!name || typeof name !== "string" || name.trim() === "")
+    throw new Error("Template name is required");
 
   const templateId = parseInt(templateIdRaw, 10);
-  if (isNaN(templateId)) throw new Error('Invalid template ID');
+  if (isNaN(templateId)) throw new Error("Invalid template ID");
 
   await db
     .update(templates)
@@ -646,16 +761,20 @@ export async function renameTemplate(serialId: number, formData: FormData) {
  * @example
  * await toggleTemplateInfobox(42, new FormData()); // formData has "templateId" and "hasInfobox" fields
  */
-export async function toggleTemplateInfobox(serialId: number, formData: FormData) {
+export async function toggleTemplateInfobox(
+  serialId: number,
+  formData: FormData,
+) {
   await requireSerialAdmin(serialId);
-  const templateIdRaw = formData.get('templateId');
-  const hasInfoboxRaw = formData.get('hasInfobox');
-  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
+  const templateIdRaw = formData.get("templateId");
+  const hasInfoboxRaw = formData.get("hasInfobox");
+  if (!templateIdRaw || typeof templateIdRaw !== "string")
+    throw new Error("Template ID is required");
 
   const templateId = parseInt(templateIdRaw, 10);
-  if (isNaN(templateId)) throw new Error('Invalid template ID');
+  if (isNaN(templateId)) throw new Error("Invalid template ID");
 
-  const hasInfobox = hasInfoboxRaw === 'true';
+  const hasInfobox = hasInfoboxRaw === "true";
 
   await db
     .update(templates)
@@ -671,20 +790,22 @@ export async function toggleTemplateInfobox(serialId: number, formData: FormData
  */
 export async function addTemplateSection(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
-  const templateIdRaw = formData.get('templateId');
-  const name = formData.get('name');
-  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
-  if (!name || typeof name !== 'string' || name.trim() === '') throw new Error('Section name is required');
+  const templateIdRaw = formData.get("templateId");
+  const name = formData.get("name");
+  if (!templateIdRaw || typeof templateIdRaw !== "string")
+    throw new Error("Template ID is required");
+  if (!name || typeof name !== "string" || name.trim() === "")
+    throw new Error("Section name is required");
 
   const templateId = parseInt(templateIdRaw, 10);
-  if (isNaN(templateId)) throw new Error('Invalid template ID');
+  if (isNaN(templateId)) throw new Error("Invalid template ID");
 
   // Verify ownership.
   const [target] = await db
     .select({ id: templates.id })
     .from(templates)
     .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
-  if (!target) throw new Error('Template not found');
+  if (!target) throw new Error("Template not found");
 
   const [{ maxOrder }] = await db
     .select({ maxOrder: max(templateSections.displayOrder) })
@@ -704,20 +825,26 @@ export async function addTemplateSection(serialId: number, formData: FormData) {
  * @example
  * await deleteTemplateSection(42, new FormData()); // formData has "sectionId" field
  */
-export async function deleteTemplateSection(serialId: number, formData: FormData) {
+export async function deleteTemplateSection(
+  serialId: number,
+  formData: FormData,
+) {
   await requireSerialAdmin(serialId);
-  const sectionIdRaw = formData.get('sectionId');
-  if (!sectionIdRaw || typeof sectionIdRaw !== 'string') throw new Error('Section ID is required');
+  const sectionIdRaw = formData.get("sectionId");
+  if (!sectionIdRaw || typeof sectionIdRaw !== "string")
+    throw new Error("Section ID is required");
   const sectionId = parseInt(sectionIdRaw, 10);
-  if (isNaN(sectionId)) throw new Error('Invalid section ID');
+  if (isNaN(sectionId)) throw new Error("Invalid section ID");
 
   // Verify the section's template belongs to this serial.
   const [target] = await db
     .select({ id: templateSections.id })
     .from(templateSections)
     .innerJoin(templates, eq(templateSections.templateId, templates.id))
-    .where(and(eq(templateSections.id, sectionId), eq(templates.serialId, serialId)));
-  if (!target) throw new Error('Section not found');
+    .where(
+      and(eq(templateSections.id, sectionId), eq(templates.serialId, serialId)),
+    );
+  if (!target) throw new Error("Section not found");
 
   await db.delete(templateSections).where(eq(templateSections.id, sectionId));
 }
@@ -742,14 +869,19 @@ export async function reorderTemplateSections(
     .select({ id: templates.id })
     .from(templates)
     .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
-  if (!target) throw new Error('Template not found');
+  if (!target) throw new Error("Template not found");
 
   await db.transaction(async (tx) => {
     for (let i = 0; i < orderedSectionIds.length; i++) {
       await tx
         .update(templateSections)
         .set({ displayOrder: i })
-        .where(and(eq(templateSections.id, orderedSectionIds[i]), eq(templateSections.templateId, templateId)));
+        .where(
+          and(
+            eq(templateSections.id, orderedSectionIds[i]),
+            eq(templateSections.templateId, templateId),
+          ),
+        );
     }
   });
 }
@@ -760,22 +892,27 @@ export async function reorderTemplateSections(
  * @example
  * await addTemplateInfoboxSection(42, new FormData()); // formData has "templateId" and "label" fields
  */
-export async function addTemplateInfoboxSection(serialId: number, formData: FormData) {
+export async function addTemplateInfoboxSection(
+  serialId: number,
+  formData: FormData,
+) {
   await requireSerialAdmin(serialId);
-  const templateIdRaw = formData.get('templateId');
-  const label = formData.get('label');
-  if (!templateIdRaw || typeof templateIdRaw !== 'string') throw new Error('Template ID is required');
-  if (!label || typeof label !== 'string' || label.trim() === '') throw new Error('Label is required');
+  const templateIdRaw = formData.get("templateId");
+  const label = formData.get("label");
+  if (!templateIdRaw || typeof templateIdRaw !== "string")
+    throw new Error("Template ID is required");
+  if (!label || typeof label !== "string" || label.trim() === "")
+    throw new Error("Label is required");
 
   const templateId = parseInt(templateIdRaw, 10);
-  if (isNaN(templateId)) throw new Error('Invalid template ID');
+  if (isNaN(templateId)) throw new Error("Invalid template ID");
 
   // Verify ownership.
   const [target] = await db
     .select({ id: templates.id })
     .from(templates)
     .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
-  if (!target) throw new Error('Template not found');
+  if (!target) throw new Error("Template not found");
 
   const [{ maxOrder }] = await db
     .select({ maxOrder: max(templateInfoboxSections.displayOrder) })
@@ -795,22 +932,33 @@ export async function addTemplateInfoboxSection(serialId: number, formData: Form
  * @example
  * await deleteTemplateInfoboxSection(42, new FormData()); // formData has "infoboxSectionId" field
  */
-export async function deleteTemplateInfoboxSection(serialId: number, formData: FormData) {
+export async function deleteTemplateInfoboxSection(
+  serialId: number,
+  formData: FormData,
+) {
   await requireSerialAdmin(serialId);
-  const infoboxSectionIdRaw = formData.get('infoboxSectionId');
-  if (!infoboxSectionIdRaw || typeof infoboxSectionIdRaw !== 'string') throw new Error('Infobox section ID is required');
+  const infoboxSectionIdRaw = formData.get("infoboxSectionId");
+  if (!infoboxSectionIdRaw || typeof infoboxSectionIdRaw !== "string")
+    throw new Error("Infobox section ID is required");
   const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
-  if (isNaN(infoboxSectionId)) throw new Error('Invalid infobox section ID');
+  if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
 
   // Verify the infobox section's template belongs to this serial.
   const [target] = await db
     .select({ id: templateInfoboxSections.id })
     .from(templateInfoboxSections)
     .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
-    .where(and(eq(templateInfoboxSections.id, infoboxSectionId), eq(templates.serialId, serialId)));
-  if (!target) throw new Error('Infobox section not found');
+    .where(
+      and(
+        eq(templateInfoboxSections.id, infoboxSectionId),
+        eq(templates.serialId, serialId),
+      ),
+    );
+  if (!target) throw new Error("Infobox section not found");
 
-  await db.delete(templateInfoboxSections).where(eq(templateInfoboxSections.id, infoboxSectionId));
+  await db
+    .delete(templateInfoboxSections)
+    .where(eq(templateInfoboxSections.id, infoboxSectionId));
 }
 
 // ── Admin management ─────────────────────────────────────────────────────────
@@ -825,9 +973,9 @@ export async function deleteTemplateInfoboxSection(serialId: number, formData: F
 export async function addSerialAdmin(serialId: number, formData: FormData) {
   await requireSerialAdmin(serialId);
 
-  const username = formData.get('username');
-  if (!username || typeof username !== 'string' || username.trim() === '') {
-    throw new Error('Username is required');
+  const username = formData.get("username");
+  if (!username || typeof username !== "string" || username.trim() === "") {
+    throw new Error("Username is required");
   }
 
   const [targetUser] = await db
@@ -836,7 +984,8 @@ export async function addSerialAdmin(serialId: number, formData: FormData) {
     .where(eq(users.username, username.trim()))
     .limit(1);
 
-  if (!targetUser) throw new Error(`No user with username "${username.trim()}" found.`);
+  if (!targetUser)
+    throw new Error(`No user with username "${username.trim()}" found.`);
 
   await db
     .insert(serialAdmins)
@@ -854,9 +1003,9 @@ export async function addSerialAdmin(serialId: number, formData: FormData) {
 export async function removeSerialAdmin(serialId: number, formData: FormData) {
   const callerId = await requireSerialAdmin(serialId);
 
-  const targetUserId = formData.get('userId');
-  if (!targetUserId || typeof targetUserId !== 'string') {
-    throw new Error('User ID is required');
+  const targetUserId = formData.get("userId");
+  if (!targetUserId || typeof targetUserId !== "string") {
+    throw new Error("User ID is required");
   }
 
   // Count current admins to prevent removing the last one.
@@ -866,7 +1015,7 @@ export async function removeSerialAdmin(serialId: number, formData: FormData) {
     .where(eq(serialAdmins.serialId, serialId));
 
   if (adminCount <= 1) {
-    throw new Error('Cannot remove the sole admin of a serial.');
+    throw new Error("Cannot remove the sole admin of a serial.");
   }
 
   // Extra guard: prevent a caller from removing themselves if they are the sole admin
@@ -875,7 +1024,12 @@ export async function removeSerialAdmin(serialId: number, formData: FormData) {
 
   await db
     .delete(serialAdmins)
-    .where(and(eq(serialAdmins.userId, targetUserId), eq(serialAdmins.serialId, serialId)));
+    .where(
+      and(
+        eq(serialAdmins.userId, targetUserId),
+        eq(serialAdmins.serialId, serialId),
+      ),
+    );
 }
 
 /**
