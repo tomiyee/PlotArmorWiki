@@ -32,6 +32,7 @@ import {
   reorderVolumes,
   reorderAllChapters,
   updateSerialMetadata,
+  bulkApplyToc,
   createTemplate,
   deleteTemplate,
   renameTemplate,
@@ -199,6 +200,7 @@ export default async function SerialPage({ params }: Props) {
   const reorderVolumesForSerial = reorderVolumes.bind(null, serial.id);
   const reorderAllChaptersForSerial = reorderAllChapters.bind(null, serial.id);
   const updateSerialTypesForSerial = updateSerialTypes.bind(null, serial.id);
+  const bulkApplyTocForSerial = bulkApplyToc.bind(null, serial.id);
 
   // Admin actions bound to this serial.
   const addAdminForSerial = addSerialAdmin.bind(null, serial.id);
@@ -605,6 +607,7 @@ export default async function SerialPage({ params }: Props) {
               reorderVolumesAction={reorderVolumesForSerial}
               reorderAllChaptersAction={reorderAllChaptersForSerial}
               updateSerialTypesAction={updateSerialTypesForSerial}
+              bulkApplyTocAction={bulkApplyTocForSerial}
               isAdmin={isAdmin}
             />
           </div>

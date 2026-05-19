@@ -377,6 +377,198 @@ export async function addChapter(serialId: number, formData: FormData) {
   }
 }
 
+// ── Bulk TOC apply ────────────────────────────────────────────────────────────
+
+/** A chapter entry in the bulk-TOC JSON payload. */
+export interface TocChapterEntry {
+  /** Existing chapter DB id, or null for new inserts. */
+  id: number | null;
+  /** New display name (may differ from the current name to trigger a rename). */
+  displayName: string;
+}
+
+/** A volume entry in the bulk-TOC JSON payload. */
+export interface TocVolumeEntry {
+  /** Existing volume DB id, or null for new inserts. */
+  id: number | null;
+  /** New display name (may differ from the current name to trigger a rename). */
+  displayName: string;
+  /** Ordered list of chapters belonging to this volume. */
+  chapters: TocChapterEntry[];
+}
+
+/** The full payload shape accepted by `bulkApplyToc`. */
+export interface BulkTocPayload {
+  volumes: TocVolumeEntry[];
+}
+
+/**
+ * Atomically applies a bulk TOC edit: renames existing volumes/chapters,
+ * inserts new ones, and reorders everything according to the supplied payload.
+ *
+ * **Safety invariant**: every volume and chapter ID that currently exists in the
+ * DB for this serial must appear in the payload. If any existing ID is absent the
+ * action throws a validation error rather than silently deleting data.
+ *
+ * @example
+ * await bulkApplyToc(serialId, {
+ *   volumes: [
+ *     { id: 1, displayName: "Volume 1", chapters: [{ id: 10, displayName: "Chapter 1" }] },
+ *     { id: null, displayName: "Volume 2", chapters: [{ id: null, displayName: "Chapter 1" }] },
+ *   ],
+ * });
+ */
+export async function bulkApplyToc(
+  serialId: number,
+  payload: BulkTocPayload,
+): Promise<void> {
+  await requireSerialAdmin(serialId);
+
+  // ── 1. Load current state ──────────────────────────────────────────────────
+  const [existingVolumes, existingChapters] = await Promise.all([
+    db
+      .select({ id: volumes.id })
+      .from(volumes)
+      .where(eq(volumes.serialId, serialId)),
+    db
+      .select({ id: chapters.id })
+      .from(chapters)
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(volumes.serialId, serialId)),
+  ]);
+
+  const existingVolumeIds = new Set(existingVolumes.map((v) => v.id));
+  const existingChapterIds = new Set(existingChapters.map((c) => c.id));
+
+  // ── 2. Validate — no implicit deletes ────────────────────────────────────
+  const payloadVolumeIds = new Set<number>();
+  const payloadChapterIds = new Set<number>();
+
+  for (const vol of payload.volumes) {
+    if (vol.id !== null) payloadVolumeIds.add(vol.id);
+    for (const ch of vol.chapters) {
+      if (ch.id !== null) payloadChapterIds.add(ch.id);
+    }
+  }
+
+  const missingVolumeIds = [...existingVolumeIds].filter(
+    (id) => !payloadVolumeIds.has(id),
+  );
+  const missingChapterIds = [...existingChapterIds].filter(
+    (id) => !payloadChapterIds.has(id),
+  );
+
+  if (missingVolumeIds.length > 0 || missingChapterIds.length > 0) {
+    const parts: string[] = [];
+    if (missingVolumeIds.length > 0)
+      parts.push(`volume IDs: ${missingVolumeIds.join(', ')}`);
+    if (missingChapterIds.length > 0)
+      parts.push(`chapter IDs: ${missingChapterIds.join(', ')}`);
+    throw new Error(
+      `Bulk TOC import rejected: the following existing IDs are absent from the payload (use the per-entry delete UI to remove them): ${parts.join('; ')}`,
+    );
+  }
+
+  // ── 3. Apply in a single transaction ────────────────────────────────────
+  await db.transaction(async (tx) => {
+    // Track newly-inserted volume ids in payload order.
+    const resolvedVolumeIds: number[] = [];
+    // Track newly-inserted chapter ids grouped by resolved volume id.
+    const resolvedChaptersByVolume: Record<number, number[]> = {};
+
+    // 3a. Ensure all volumes exist and are renamed if needed.
+    for (const vol of payload.volumes) {
+      let volumeId: number;
+
+      if (vol.id === null) {
+        // Insert new volume with a temporary idx; final reorder happens below.
+        const [{ maxIdx }] = await tx
+          .select({ maxIdx: max(volumes.idx) })
+          .from(volumes)
+          .where(eq(volumes.serialId, serialId));
+
+        const [newVol] = await tx
+          .insert(volumes)
+          .values({
+            serialId,
+            displayName: vol.displayName.trim(),
+            idx: (maxIdx ?? 0) + 1,
+          })
+          .returning({ id: volumes.id });
+        volumeId = newVol.id;
+      } else {
+        volumeId = vol.id;
+        // Rename if necessary.
+        await tx
+          .update(volumes)
+          .set({ displayName: vol.displayName.trim() })
+          .where(and(eq(volumes.id, volumeId), eq(volumes.serialId, serialId)));
+      }
+
+      resolvedVolumeIds.push(volumeId);
+      resolvedChaptersByVolume[volumeId] = [];
+    }
+
+    // 3b. Ensure all chapters exist and are renamed / moved if needed.
+    for (let vi = 0; vi < payload.volumes.length; vi++) {
+      const vol = payload.volumes[vi];
+      const volumeId = resolvedVolumeIds[vi];
+
+      for (const ch of vol.chapters) {
+        let chapterId: number;
+
+        if (ch.id === null) {
+          // Insert new chapter with a temporary idx.
+          const [{ maxIdx }] = await tx
+            .select({ maxIdx: max(chapters.idx) })
+            .from(chapters)
+            .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+            .where(eq(volumes.serialId, serialId));
+
+          const [newCh] = await tx
+            .insert(chapters)
+            .values({
+              volumeId,
+              displayName: ch.displayName.trim(),
+              idx: (maxIdx ?? 0) + 1,
+            })
+            .returning({ id: chapters.id });
+          chapterId = newCh.id;
+        } else {
+          chapterId = ch.id;
+          // Rename if necessary and update volumeId for cross-volume moves.
+          await tx
+            .update(chapters)
+            .set({ displayName: ch.displayName.trim(), volumeId })
+            .where(eq(chapters.id, chapterId));
+        }
+
+        resolvedChaptersByVolume[volumeId].push(chapterId);
+      }
+    }
+
+    // 3c. Re-sequence all idx values so they are strictly increasing in the
+    //     new volume order, reusing the same logic as reorderAllChapters.
+    let volIdx = 0;
+    let chIdx = 0;
+    for (const volumeId of resolvedVolumeIds) {
+      volIdx++;
+      await tx
+        .update(volumes)
+        .set({ idx: volIdx })
+        .where(eq(volumes.id, volumeId));
+
+      for (const chapterId of resolvedChaptersByVolume[volumeId] ?? []) {
+        chIdx++;
+        await tx
+          .update(chapters)
+          .set({ idx: chIdx, volumeId })
+          .where(eq(chapters.id, chapterId));
+      }
+    }
+  });
+}
+
 // ── Template management ───────────────────────────────────────────────────────
 
 /**

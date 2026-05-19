@@ -8,7 +8,10 @@ import {
   GripVerticalIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  DownloadIcon,
+  UploadIcon,
 } from "lucide-react";
+import type { BulkTocPayload } from "@/app/[serial]/actions";
 import {
   DndContext,
   DragOverlay,
@@ -92,6 +95,8 @@ interface SerialEditorProps {
     chaptersByVolumeId: Record<number, number[]>,
   ) => Promise<void>;
   updateSerialTypesAction: (formData: FormData) => Promise<void>;
+  /** Server action that atomically applies a bulk TOC edit. */
+  bulkApplyTocAction: (payload: BulkTocPayload) => Promise<void>;
 }
 
 type RenameVolumeFormProps = {
@@ -548,6 +553,315 @@ function SortableVolumeItem({
   );
 }
 
+// ── Bulk TOC helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Parses and validates an unknown value as a `BulkTocPayload`.
+ * Throws a descriptive error if the shape is wrong.
+ */
+function validateBulkTocPayload(raw: unknown): BulkTocPayload {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("JSON root must be an object.");
+  }
+  const obj = raw as Record<string, unknown>;
+  if (!Array.isArray(obj.volumes)) {
+    throw new Error('JSON must have a "volumes" array at the root.');
+  }
+  const parsedVolumes = obj.volumes.map((v: unknown, vi: number) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) {
+      throw new Error(`volumes[${vi}] must be an object.`);
+    }
+    const vo = v as Record<string, unknown>;
+    if (vo.id !== null && typeof vo.id !== "number") {
+      throw new Error(`volumes[${vi}].id must be a number or null.`);
+    }
+    if (typeof vo.displayName !== "string" || !vo.displayName.trim()) {
+      throw new Error(`volumes[${vi}].displayName must be a non-empty string.`);
+    }
+    if (!Array.isArray(vo.chapters)) {
+      throw new Error(`volumes[${vi}].chapters must be an array.`);
+    }
+    const parsedChapters = vo.chapters.map((c: unknown, ci: number) => {
+      if (!c || typeof c !== "object" || Array.isArray(c)) {
+        throw new Error(`volumes[${vi}].chapters[${ci}] must be an object.`);
+      }
+      const co = c as Record<string, unknown>;
+      if (co.id !== null && typeof co.id !== "number") {
+        throw new Error(
+          `volumes[${vi}].chapters[${ci}].id must be a number or null.`,
+        );
+      }
+      if (typeof co.displayName !== "string" || !co.displayName.trim()) {
+        throw new Error(
+          `volumes[${vi}].chapters[${ci}].displayName must be a non-empty string.`,
+        );
+      }
+      return { id: co.id as number | null, displayName: co.displayName as string };
+    });
+    return {
+      id: vo.id as number | null,
+      displayName: vo.displayName as string,
+      chapters: parsedChapters,
+    };
+  });
+  return { volumes: parsedVolumes };
+}
+
+// ── Bulk TOC diff helpers ───────────────────────────────────────────────────
+
+/** A single chapter diff line shown in the preview dialog. */
+type ChapterDiffLine =
+  | { kind: "unchanged"; id: number; name: string }
+  | { kind: "renamed"; id: number; oldName: string; newName: string }
+  | { kind: "moved"; id: number; name: string; fromVolume: string }
+  | { kind: "new"; name: string };
+
+/** A single volume diff line plus its chapter diff lines. */
+type VolumeDiffEntry = {
+  kind: "unchanged" | "renamed" | "new";
+  id: number | null;
+  displayName: string;
+  oldDisplayName?: string;
+  chapters: ChapterDiffLine[];
+};
+
+/**
+ * Computes a human-readable diff between current TOC state and the uploaded
+ * payload. Returns an array of VolumeDiffEntry objects ready to render.
+ */
+function computeTocDiff(
+  currentVolumes: Volume[],
+  currentChaptersByVolume: Record<number, Chapter[]>,
+  payload: BulkTocPayload,
+): VolumeDiffEntry[] {
+  // Build lookup maps from current state.
+  const currentVolumeById = new Map(currentVolumes.map((v) => [v.id, v]));
+  const allCurrentChapters = Object.values(currentChaptersByVolume).flat();
+  const currentChapterById = new Map(
+    allCurrentChapters.map((c) => [c.id, c]),
+  );
+  // volumeId → displayName for cross-volume move labels
+  const volumeNameById = new Map(currentVolumes.map((v) => [v.id, v.displayName]));
+
+  return payload.volumes.map((payloadVol): VolumeDiffEntry => {
+    let volumeKind: VolumeDiffEntry["kind"];
+    let oldDisplayName: string | undefined;
+
+    if (payloadVol.id === null) {
+      volumeKind = "new";
+    } else {
+      const existing = currentVolumeById.get(payloadVol.id);
+      volumeKind =
+        existing && existing.displayName !== payloadVol.displayName
+          ? "renamed"
+          : "unchanged";
+      oldDisplayName = existing?.displayName;
+    }
+
+    const chapterLines: ChapterDiffLine[] = payloadVol.chapters.map(
+      (payloadCh): ChapterDiffLine => {
+        if (payloadCh.id === null) return { kind: "new", name: payloadCh.displayName };
+
+        const existing = currentChapterById.get(payloadCh.id);
+        if (!existing) return { kind: "new", name: payloadCh.displayName };
+
+        const nameChanged = existing.displayName !== payloadCh.displayName;
+        const volumeChanged =
+          payloadVol.id !== null && existing.volumeId !== payloadVol.id;
+        const fromVolumeName = volumeChanged
+          ? (volumeNameById.get(existing.volumeId) ?? "")
+          : "";
+
+        if (nameChanged && volumeChanged) {
+          // Show as renamed (the volume move is already shown by position).
+          return {
+            kind: "renamed",
+            id: payloadCh.id,
+            oldName: existing.displayName,
+            newName: payloadCh.displayName,
+          };
+        }
+        if (nameChanged) {
+          return {
+            kind: "renamed",
+            id: payloadCh.id,
+            oldName: existing.displayName,
+            newName: payloadCh.displayName,
+          };
+        }
+        if (volumeChanged) {
+          return {
+            kind: "moved",
+            id: payloadCh.id,
+            name: payloadCh.displayName,
+            fromVolume: fromVolumeName,
+          };
+        }
+        return { kind: "unchanged", id: payloadCh.id, name: payloadCh.displayName };
+      },
+    );
+
+    return {
+      kind: volumeKind,
+      id: payloadVol.id,
+      displayName: payloadVol.displayName,
+      oldDisplayName,
+      chapters: chapterLines,
+    };
+  });
+}
+
+type TocDiffPreviewDialogProps = {
+  /** Whether the dialog is open. */
+  isOpen: boolean;
+  /** Called when the user cancels or closes the dialog. */
+  onClose: () => void;
+  /** Pre-computed diff entries to display. */
+  diff: VolumeDiffEntry[];
+  /** Whether the apply action is in-flight. */
+  isPending: boolean;
+  /** Called when the user confirms the changes. */
+  onConfirm: () => void;
+  /** Label for an individual chapter (e.g. "Chapter", "Episode"). */
+  chapterType: string;
+  /** Label for a volume group (e.g. "Volume", "Season"). */
+  volumeType: string;
+};
+
+/**
+ * Shows a diff-preview of a pending bulk TOC import before committing.
+ * New entries are highlighted green, renamed entries yellow, moved chapters
+ * display their source volume.
+ */
+function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
+  const { isOpen, onClose, diff, isPending, onConfirm, chapterType, volumeType } = props;
+
+  const hasChanges = diff.some(
+    (v) =>
+      v.kind !== "unchanged" ||
+      v.chapters.some((c) => c.kind !== "unchanged"),
+  );
+
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose}>
+      <DialogHeader>
+        <DialogTitle>Preview TOC changes</DialogTitle>
+      </DialogHeader>
+      <DialogBody className="max-h-[60vh]">
+        {!hasChanges ? (
+          <Text muted>No changes detected — the uploaded TOC matches the current one.</Text>
+        ) : (
+          <Box col className="gap-4">
+            <Text variant="body" muted>
+              Review the changes below. New entries are{" "}
+              <span className="text-green-600 dark:text-green-400 font-medium">green</span>,
+              renamed entries are{" "}
+              <span className="text-yellow-600 dark:text-yellow-400 font-medium">yellow</span>,
+              and moved {chapterType.toLowerCase()}s show their source{" "}
+              {volumeType.toLowerCase()}.
+            </Text>
+            <Box col className="gap-3">
+              {diff.map((vol, vi) => (
+                <Box col key={vol.id ?? `new-${vi}`} className="gap-1">
+                  {/* Volume header */}
+                  <Box className="items-center gap-2">
+                    {vol.kind === "new" ? (
+                      <Text
+                        variant="h4"
+                        className="text-green-600 dark:text-green-400"
+                      >
+                        + {vol.displayName}
+                        <Text as="span" variant="label" muted className="ml-2 text-xs">
+                          (new {volumeType.toLowerCase()})
+                        </Text>
+                      </Text>
+                    ) : vol.kind === "renamed" ? (
+                      <Text
+                        variant="h4"
+                        className="text-yellow-600 dark:text-yellow-400"
+                      >
+                        {vol.displayName}
+                        <Text as="span" variant="label" muted className="ml-2 text-xs">
+                          (was: {vol.oldDisplayName})
+                        </Text>
+                      </Text>
+                    ) : (
+                      <Text variant="h4">{vol.displayName}</Text>
+                    )}
+                  </Box>
+
+                  {/* Chapter list */}
+                  {vol.chapters.length > 0 && (
+                    <ol className="flex flex-col gap-0.5 pl-4 border-l-2 border-border">
+                      {vol.chapters.map((ch, ci) => {
+                        if (ch.kind === "new") {
+                          return (
+                            <li
+                              key={`new-${ci}`}
+                              className="text-sm text-green-600 dark:text-green-400"
+                            >
+                              + {ch.name}{" "}
+                              <span className="text-muted-foreground text-xs">
+                                (new {chapterType.toLowerCase()})
+                              </span>
+                            </li>
+                          );
+                        }
+                        if (ch.kind === "renamed") {
+                          return (
+                            <li
+                              key={ch.id}
+                              className="text-sm text-yellow-600 dark:text-yellow-400"
+                            >
+                              {ch.newName}{" "}
+                              <span className="text-muted-foreground text-xs">
+                                (was: {ch.oldName})
+                              </span>
+                            </li>
+                          );
+                        }
+                        if (ch.kind === "moved") {
+                          return (
+                            <li
+                              key={ch.id}
+                              className="text-sm text-blue-600 dark:text-blue-400"
+                            >
+                              {ch.name}{" "}
+                              <span className="text-muted-foreground text-xs">
+                                ← moved from {ch.fromVolume}
+                              </span>
+                            </li>
+                          );
+                        }
+                        return (
+                          <li key={ch.id} className="text-sm text-foreground">
+                            {ch.name}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                  {vol.chapters.length === 0 && (
+                    <Text muted className="pl-4 text-xs">
+                      No {chapterType.toLowerCase()}s
+                    </Text>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+      </DialogBody>
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+        <Button disabled={isPending || !hasChanges} onClick={onConfirm}>
+          {isPending ? "Applying…" : "Apply changes"}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+
 /**
  * Client Component managing edit mode for a serial's volumes and chapters.
  * Uses a single DndContext for both volume reordering and chapter reordering
@@ -570,24 +884,28 @@ function SortableVolumeItem({
  *   reorderVolumesAction={reorderVolumesForSerial}
  *   reorderAllChaptersAction={reorderAllChaptersForSerial}
  *   updateSerialTypesAction={updateSerialTypesForSerial}
+ *   bulkApplyTocAction={bulkApplyTocForSerial}
  * />
  */
-export function SerialEditor({
-  serialId,
-  volumes: initialVolumes,
-  chaptersByVolume: initialChaptersByVolume,
-  chapterType,
-  volumeType,
-  addChapterAction,
-  addVolumeAction,
-  deleteChapterAction,
-  deleteVolumeAction,
-  renameChapterAction,
-  renameVolumeAction,
-  reorderVolumesAction,
-  reorderAllChaptersAction,
-  updateSerialTypesAction,
-}: SerialEditorProps) {
+export function SerialEditor(props: SerialEditorProps) {
+  const {
+    serialId,
+    volumes: initialVolumes,
+    chaptersByVolume: initialChaptersByVolume,
+    chapterType,
+    volumeType,
+    addChapterAction,
+    addVolumeAction,
+    deleteChapterAction,
+    deleteVolumeAction,
+    renameChapterAction,
+    renameVolumeAction,
+    reorderVolumesAction,
+    reorderAllChaptersAction,
+    updateSerialTypesAction,
+    bulkApplyTocAction,
+  } = props;
+
   const { run, isPending } = useServerAction();
   // SerialEditor is always in edit mode; it is rendered inside a dialog that
   // the user explicitly opens to manage volumes and chapters.
@@ -613,6 +931,15 @@ export function SerialEditor({
     number | null
   >(null);
   const [addingVolume, setAddingVolume] = useState(false);
+
+  // ── Bulk TOC import state ──────────────────────────────────────────────────
+  const [bulkDiff, setBulkDiff] = useState<VolumeDiffEntry[] | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<BulkTocPayload | null>(
+    null,
+  );
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [isBulkPending, startBulkTransition] = useTransition();
+  const jsonUploadRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -685,6 +1012,71 @@ export function SerialEditor({
     fd.set("chapterType", newChapterType);
     fd.set("volumeType", newVolumeType);
     run(updateSerialTypesAction, fd);
+  }
+
+  // ── Bulk TOC: export ───────────────────────────────────────────────────────
+  function handleExportJson() {
+    const payload: BulkTocPayload = {
+      volumes: volumes.map((v) => ({
+        id: v.id,
+        displayName: v.displayName,
+        chapters: (chaptersByVolume[v.id] ?? []).map((c) => ({
+          id: c.id,
+          displayName: c.displayName,
+        })),
+      })),
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `toc-${serialId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Bulk TOC: import ───────────────────────────────────────────────────────
+  function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so re-uploading the same file fires the event again.
+    e.target.value = "";
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const raw = JSON.parse(ev.target?.result as string) as unknown;
+        const validated = validateBulkTocPayload(raw);
+        const diff = computeTocDiff(volumes, chaptersByVolume, validated);
+        setPendingPayload(validated);
+        setBulkDiff(diff);
+        setBulkError(null);
+      } catch (err) {
+        setBulkError(
+          err instanceof Error ? err.message : "Invalid JSON file.",
+        );
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function handleBulkConfirm() {
+    if (!pendingPayload) return;
+    startBulkTransition(async () => {
+      try {
+        await bulkApplyTocAction(pendingPayload);
+        router.refresh();
+        setBulkDiff(null);
+        setPendingPayload(null);
+      } catch (err) {
+        setBulkError(
+          err instanceof Error ? err.message : "Failed to apply changes.",
+        );
+        setBulkDiff(null);
+        setPendingPayload(null);
+      }
+    });
   }
 
   function confirmDelete() {
@@ -1001,6 +1393,51 @@ export function SerialEditor({
         </div>
       )}
 
+      {/* Bulk TOC export / import */}
+      <div className="pt-4 border-t border-border flex flex-col gap-2">
+        <Text variant="label" muted className="text-xs">
+          Bulk edit
+        </Text>
+        <Box className="gap-2 flex-wrap">
+          <Tooltip content="Download current TOC as JSON for bulk editing">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportJson}
+            >
+              <DownloadIcon className="h-3 w-3" />
+              Download JSON
+            </Button>
+          </Tooltip>
+          <Tooltip content="Upload an edited JSON file to preview and apply bulk changes">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => jsonUploadRef.current?.click()}
+              disabled={isBulkPending}
+            >
+              <UploadIcon className="h-3 w-3" />
+              Upload JSON
+            </Button>
+          </Tooltip>
+          {/* Hidden file input for JSON upload */}
+          <input
+            ref={jsonUploadRef}
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            onChange={handleImportFileChange}
+          />
+        </Box>
+        {bulkError && (
+          <Text variant="label" className="text-destructive text-xs">
+            {bulkError}
+          </Text>
+        )}
+      </div>
+
       {/* Delete confirmation dialog */}
       <Dialog
         isOpen={pendingDelete !== null}
@@ -1026,6 +1463,23 @@ export function SerialEditor({
           </Button>
         </DialogFooter>
       </Dialog>
+
+      {/* Bulk TOC diff-preview dialog */}
+      {bulkDiff !== null && (
+        <TocDiffPreviewDialog
+          isOpen={bulkDiff !== null}
+          onClose={() => {
+            setBulkDiff(null);
+            setPendingPayload(null);
+            setBulkError(null);
+          }}
+          diff={bulkDiff}
+          isPending={isBulkPending}
+          onConfirm={handleBulkConfirm}
+          chapterType={currentChapterType}
+          volumeType={currentVolumeType}
+        />
+      )}
     </section>
   );
 }
