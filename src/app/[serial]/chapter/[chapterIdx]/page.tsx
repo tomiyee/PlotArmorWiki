@@ -9,7 +9,7 @@ import {
   chapterSynopses,
   pages,
 } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -138,6 +138,7 @@ export default async function ChapterPage({ params }: Props) {
   const bulkApplyTocForSerial = bulkApplyToc.bind(null, serial.id);
 
   let synopsisContent = "";
+  let wikiPages: { name: string; slug: string }[] = [];
   let groupedIntroductions: {
     categoryName: string;
     pages: { id: number; name: string; slug: string }[];
@@ -153,6 +154,19 @@ export default async function ChapterPage({ params }: Props) {
       .limit(1);
 
     synopsisContent = synopsisRow?.content ?? "";
+
+    // Fetch wiki pages visible at the reader's cutoff for autocomplete
+    wikiPages = await db
+      .select({ name: pages.name, slug: pages.slug })
+      .from(pages)
+      .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+      .where(
+        and(
+          eq(pages.serialId, serial.id),
+          or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+        ),
+      )
+      .orderBy(asc(pages.name));
 
     // Fetch all pages introduced in this chapter
     const introducedPages = await db
@@ -261,6 +275,7 @@ export default async function ChapterPage({ params }: Props) {
                     serialSlug={serialSlug}
                     chapterIdx={chapterIdx}
                     initialContent={synopsisContent}
+                    wikiPages={wikiPages}
                     saveAction={boundSaveAction!}
                   />
                 </Box>
