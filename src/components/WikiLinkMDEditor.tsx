@@ -268,9 +268,13 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     const before = ta.value.substring(0, cursorPos);
     const after = ta.value.substring(cursorPos);
     const lastOpen = before.lastIndexOf("[[");
+    const triggerText = before.slice(lastOpen + 2);
+    const hasPagePrefix = triggerText.toLowerCase().startsWith("page:");
     const token =
       suggestion.kind === "chapter" && chapterType
         ? `${chapterType}:${suggestion.name}`
+        : hasPagePrefix
+        ? `page:${suggestion.slug}`
         : suggestion.slug;
     const replacement = `[[${token}]]`;
     const newValue = before.slice(0, lastOpen) + replacement + after;
