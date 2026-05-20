@@ -640,6 +640,8 @@ export default async function SerialPage({ params }: Props) {
                 readingChapterId={readingChapterId}
                 wikiPages={wikiPages}
                 pageTitles={wikiPageTitles}
+                wikiChapters={allChapters.map((c) => ({ name: c.displayName, idx: c.idx }))}
+                chapterType={serial.chapterType}
                 introChapterIdx={null}
                 childPages={childPages}
                 parentPages={[]}

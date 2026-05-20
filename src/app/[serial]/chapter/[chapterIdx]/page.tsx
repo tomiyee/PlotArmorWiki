@@ -276,6 +276,11 @@ export default async function ChapterPage({ params }: Props) {
                     chapterIdx={chapterIdx}
                     initialContent={synopsisContent}
                     wikiPages={wikiPages}
+                    wikiChapters={chapterList.map((c) => ({
+                      name: c.displayName,
+                      idx: c.idx,
+                    }))}
+                    chapterType={serial.chapterType}
                     saveAction={boundSaveAction!}
                   />
                 </Box>

@@ -17,6 +17,16 @@ type ChapterSynopsisEditorProps = {
   initialContent: string;
   /** Wiki pages visible at the reader's cutoff, used for `[[` autocomplete. */
   wikiPages: { name: string; slug: string }[];
+  /**
+   * All chapters in the serial, used for `[[Chapter:Name]]` autocomplete and
+   * chapter link routing in the markdown preview.
+   */
+  wikiChapters?: { name: string; idx: number }[];
+  /**
+   * The serial's chapter type label (e.g. `"Chapter"`, `"Episode"`).
+   * Required alongside `wikiChapters` to enable chapter link autocomplete.
+   */
+  chapterType?: string;
   /** Server action that persists the synopsis. */
   saveAction: (
     serialSlug: string,
@@ -44,8 +54,15 @@ type ChapterSynopsisEditorProps = {
  * />
  */
 export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
-  const { serialSlug, chapterIdx, initialContent, wikiPages, saveAction } =
-    props;
+  const {
+    serialSlug,
+    chapterIdx,
+    initialContent,
+    wikiPages,
+    wikiChapters,
+    chapterType,
+    saveAction,
+  } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isEditing, registerHandlers } = useEditMode();
@@ -79,6 +96,8 @@ export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
           preview="edit"
           wikiPages={wikiPages}
           serialSlug={serialSlug}
+          wikiChapters={wikiChapters}
+          chapterType={chapterType}
         />
         {isPending && (
           <Text muted className="text-sm">
@@ -92,7 +111,17 @@ export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
   return (
     <Box col className="gap-2">
       {committed ? (
-        <MarkdownRenderer serialSlug={serialSlug}>{committed}</MarkdownRenderer>
+        <MarkdownRenderer
+          serialSlug={serialSlug}
+          chapterType={chapterType}
+          wikiChapters={
+            wikiChapters
+              ? Object.fromEntries(wikiChapters.map((c) => [c.name, c.idx]))
+              : undefined
+          }
+        >
+          {committed}
+        </MarkdownRenderer>
       ) : (
         <Text muted>No synopsis written yet.</Text>
       )}

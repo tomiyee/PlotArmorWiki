@@ -12,6 +12,13 @@ interface WikiPage {
   slug: string;
 }
 
+interface WikiChapter {
+  /** Chapter display name (e.g. "Chapter 5"), used for filtering and shown in the dropdown. */
+  name: string;
+  /** Numeric chapter idx, used to verify the chapter exists. */
+  idx: number;
+}
+
 type WikiLinkMDEditorProps = {
   /** Current markdown content. */
   value: string;
@@ -25,10 +32,26 @@ type WikiLinkMDEditorProps = {
   wikiPages: WikiPage[];
   /** Slug of the serial being edited — used to build preview links. */
   serialSlug: string;
+  /**
+   * All chapters for this serial. When provided, typing `[[` also shows chapter
+   * suggestions as a separate group. Selecting one inserts
+   * `[[{chapterType}:{displayName}]]`.
+   */
+  wikiChapters?: WikiChapter[];
+  /**
+   * The serial's chapter type label (e.g. `"Chapter"`, `"Episode"`).
+   * Required when `wikiChapters` is provided so the correct namespace prefix
+   * is inserted (`[[Episode:Episode 3]]` vs `[[Chapter:Chapter 5]]`).
+   */
+  chapterType?: string;
 };
 
+type SuggestionKind = "page" | "chapter";
+
 interface Suggestion {
+  kind: SuggestionKind;
   name: string;
+  /** For page suggestions: the slug. For chapter suggestions: the display name. */
   slug: string;
 }
 
@@ -59,6 +82,8 @@ interface Suggestion {
  *   value={draft}
  *   onChange={(v) => setDraft(v ?? "")}
  *   wikiPages={wikiPages}
+ *   wikiChapters={chapters}
+ *   chapterType="Chapter"
  *   serialSlug="one-piece"
  * />
  */
@@ -70,6 +95,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     preview = "edit",
     wikiPages,
     serialSlug,
+    wikiChapters = [],
+    chapterType,
   } = props;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -79,6 +106,12 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const pageTitles = useMemo(
     () => Object.fromEntries(wikiPages.map((p) => [p.slug, p.name])),
     [wikiPages],
+  );
+
+  // chapter display name → idx map for the inline preview renderer.
+  const wikiChaptersByName = useMemo(
+    () => Object.fromEntries(wikiChapters.map((c) => [c.name, c.idx])),
+    [wikiChapters],
   );
 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -183,13 +216,38 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
 
     const triggerText = before.slice(lastOpen + 2);
     const colonIdx = triggerText.indexOf(":");
+    // When user types a prefix like "Chapter:" or "page:", filter by what comes after the colon.
+    const prefixTyped = colonIdx !== -1 ? triggerText.slice(0, colonIdx).toLowerCase() : null;
     const pageQuery = (
       colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText
     ).toLowerCase();
 
-    const next: Suggestion[] = wikiPages
-      .filter((p) => p.name.toLowerCase().includes(pageQuery))
-      .map((p) => ({ name: p.name, slug: p.slug }));
+    // When the user types a namespace prefix (e.g. "Chapter:"), restrict
+    // suggestions to the matching group. With no prefix (null), show both.
+    const isChapterPrefix =
+      prefixTyped !== null &&
+      chapterType !== undefined &&
+      prefixTyped === chapterType.toLowerCase();
+    const isExplicitPagePrefix = prefixTyped === "page";
+    // Show page suggestions: no prefix typed, or explicit "page:" prefix.
+    const showPages = prefixTyped === null || isExplicitPagePrefix;
+    // Show chapter suggestions: no prefix typed, or a matching chapter-type prefix.
+    const showChapters = prefixTyped === null || isChapterPrefix;
+
+    const pageSuggestions: Suggestion[] = showPages
+      ? wikiPages
+          .filter((p) => p.name.toLowerCase().includes(pageQuery))
+          .map((p) => ({ kind: "page" as SuggestionKind, name: p.name, slug: p.slug }))
+      : [];
+
+    const chapterSuggestions: Suggestion[] =
+      showChapters && wikiChapters.length > 0
+        ? wikiChapters
+            .filter((c) => c.name.toLowerCase().includes(pageQuery))
+            .map((c) => ({ kind: "chapter" as SuggestionKind, name: c.name, slug: c.name }))
+        : [];
+
+    const next: Suggestion[] = [...pageSuggestions, ...chapterSuggestions];
 
     if (next.length === 0) {
       closeSuggestions();
@@ -210,7 +268,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     const before = ta.value.substring(0, cursorPos);
     const after = ta.value.substring(cursorPos);
     const lastOpen = before.lastIndexOf("[[");
-    const replacement = `[[${suggestion.slug}]]`;
+    const token =
+      suggestion.kind === "chapter" && chapterType
+        ? `${chapterType}:${suggestion.name}`
+        : suggestion.slug;
+    const replacement = `[[${token}]]`;
     const newValue = before.slice(0, lastOpen) + replacement + after;
     onChange(newValue);
 
@@ -300,6 +362,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
             <MarkdownRenderer
               serialSlug={serialSlug}
               pageTitles={pageTitles}
+              chapterType={chapterType}
+              wikiChapters={wikiChaptersByName}
               className="p-4"
             >
               {source}
@@ -317,7 +381,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
         >
           {suggestions.map((s, i) => (
             <li
-              key={s.name}
+              key={`${s.kind}:${s.name}`}
               role="option"
               aria-selected={i === activeIndex}
               className={`flex cursor-pointer select-none items-baseline gap-1.5 px-3 py-2 text-sm ${
@@ -329,6 +393,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
               }}
             >
               <span className="text-foreground font-medium">{s.name}</span>
+              {s.kind === "chapter" && chapterType && (
+                <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                  {chapterType}
+                </span>
+              )}
             </li>
           ))}
         </ul>

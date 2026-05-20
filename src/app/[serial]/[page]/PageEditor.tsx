@@ -76,6 +76,18 @@ interface Props {
   wikiPages: { name: string; slug: string }[];
   /** slug → chapter-versioned title map for resolving `[[slug]]` display text. */
   pageTitles?: Record<string, string>;
+  /**
+   * All chapters in the serial (name + idx), used to power the
+   * `[[Chapter:Name]]` autocomplete in edit mode and resolve chapter links
+   * in the markdown preview.
+   */
+  wikiChapters?: { name: string; idx: number }[];
+  /**
+   * The serial's chapter type (e.g. `"Chapter"`, `"Episode"`).
+   * Required alongside `wikiChapters` to enable chapter link autocomplete
+   * and routing in the editor preview.
+   */
+  chapterType?: string;
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
   /**
@@ -167,6 +179,8 @@ export function PageEditor(props: Props) {
     readingChapterId,
     wikiPages,
     pageTitles,
+    wikiChapters,
+    chapterType,
     introChapterIdx,
     childPages,
     parentPages,
@@ -311,6 +325,11 @@ export function PageEditor(props: Props) {
     });
   }
 
+  // Build chapter name → idx map for MarkdownRenderer
+  const wikiChaptersByName = wikiChapters
+    ? Object.fromEntries(wikiChapters.map((c) => [c.name, c.idx]))
+    : undefined;
+
   if (!isAdmin || !isEditing) {
     return (
       <PageReadView
@@ -322,6 +341,8 @@ export function PageEditor(props: Props) {
         childPages={childPages}
         pageId={pageId}
         pageTitles={pageTitles}
+        wikiChapters={wikiChaptersByName}
+        chapterType={chapterType}
       />
     );
   }
@@ -413,6 +434,8 @@ export function PageEditor(props: Props) {
           serialSlug={serialSlug}
           wikiPages={wikiPages}
           pageTitles={pageTitles}
+          wikiChapters={wikiChapters}
+          chapterType={chapterType}
         />
       ))}
 
