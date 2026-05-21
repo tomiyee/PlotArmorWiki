@@ -646,6 +646,8 @@ export default async function PageView({ params }: Props) {
             readingChapterId={readingChapterId}
             wikiPages={wikiPages}
             pageTitles={wikiPageTitles}
+            wikiChapters={allChapters.map((c) => ({ name: c.displayName, idx: c.idx }))}
+            chapterType={serial.chapterType}
             introChapterIdx={introChapter?.idx ?? null}
             childPages={childPages}
             parentPages={parentPages}

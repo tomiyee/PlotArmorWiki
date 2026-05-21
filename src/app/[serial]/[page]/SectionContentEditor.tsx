@@ -18,6 +18,10 @@ interface Props {
   wikiPages: { name: string; slug: string }[];
   /** slug → title map for resolving `[[slug]]` display text in the current-value panel. */
   pageTitles?: Record<string, string>;
+  /** Chapters for `[[Chapter:Name]]` autocomplete in the editor. */
+  wikiChapters?: { name: string; idx: number }[];
+  /** The serial's chapter type label (e.g. `"Chapter"`). */
+  chapterType?: string;
 }
 
 /**
@@ -49,6 +53,8 @@ export function SectionContentEditor({
   serialSlug,
   wikiPages,
   pageTitles,
+  wikiChapters,
+  chapterType,
 }: Props) {
   return (
     <Box col className="gap-2">
@@ -73,7 +79,16 @@ export function SectionContentEditor({
             />
           </div>
           {currentContent ? (
-            <MarkdownRenderer serialSlug={serialSlug} pageTitles={pageTitles}>
+            <MarkdownRenderer
+              serialSlug={serialSlug}
+              pageTitles={pageTitles}
+              chapterType={chapterType}
+              wikiChapters={
+                wikiChapters
+                  ? Object.fromEntries(wikiChapters.map((c) => [c.name, c.idx]))
+                  : undefined
+              }
+            >
               {currentContent}
             </MarkdownRenderer>
           ) : (
@@ -89,6 +104,8 @@ export function SectionContentEditor({
           preview="edit"
           wikiPages={wikiPages}
           serialSlug={serialSlug}
+          wikiChapters={wikiChapters}
+          chapterType={chapterType}
         />
       </div>
     </Box>

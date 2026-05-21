@@ -6,6 +6,8 @@ import {
   serials,
   pages,
   chapters,
+  chapterSynopses,
+  volumes,
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
@@ -233,5 +235,110 @@ export async function getWikiLinkPreview(
     firstSectionContent,
     floaterImageUrl,
     floaterRows,
+  };
+}
+
+export interface ChapterLinkPreviewData {
+  /** Full display name of the chapter (e.g. "Chapter 5"). */
+  displayName: string;
+  /** Volume this chapter belongs to (e.g. "Volume 1"). */
+  volumeName: string;
+  /** The chapter type label from the serial (e.g. "Chapter", "Episode"). */
+  chapterType: string;
+  /** First 200 characters of the chapter synopsis, or empty string. */
+  synopsisSnippet: string;
+  /** Whether the chapter is beyond the user's reading cutoff. */
+  hidden: boolean;
+}
+
+/**
+ * Fetches a compact preview for a chapter link (`/{serial}/chapter/{idx}`).
+ * Respects the user's chapter cutoff — chapters beyond the cutoff return
+ * `hidden: true` so the UI can show a spoiler-safe placeholder.
+ *
+ * Returns `null` when the serial or chapter cannot be resolved.
+ *
+ * @example
+ * const preview = await getChapterLinkPreview("one-piece", 5);
+ * if (preview?.hidden) { ... }
+ */
+export async function getChapterLinkPreview(
+  serialSlug: string,
+  chapterIdx: number,
+): Promise<ChapterLinkPreviewData | null> {
+  // Resolve serial
+  const [serial] = await db
+    .select({ id: serials.id, chapterType: serials.chapterType })
+    .from(serials)
+    .where(eq(serials.slug, serialSlug))
+    .limit(1);
+  if (!serial) return null;
+
+  // Read chapter cutoff from cookie
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
+  let cutoffIdx = 0;
+  if (raw) {
+    const chapterId = parseInt(raw, 10);
+    if (!isNaN(chapterId)) {
+      const [row] = await db
+        .select({ idx: chapters.idx })
+        .from(chapters)
+        .where(eq(chapters.id, chapterId))
+        .limit(1);
+      if (row) cutoffIdx = row.idx;
+    }
+  }
+
+  // Resolve chapter by serial + idx
+  const [chapter] = await db
+    .select({
+      id: chapters.id,
+      displayName: chapters.displayName,
+      idx: chapters.idx,
+      volumeId: chapters.volumeId,
+    })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .where(and(eq(volumes.serialId, serial.id), eq(chapters.idx, chapterIdx)))
+    .limit(1);
+  if (!chapter) return null;
+
+  // Resolve volume name
+  const [volume] = await db
+    .select({ displayName: volumes.displayName })
+    .from(volumes)
+    .where(eq(volumes.id, chapter.volumeId))
+    .limit(1);
+
+  const hidden = chapter.idx > cutoffIdx;
+
+  if (hidden) {
+    return {
+      displayName: chapter.displayName,
+      volumeName: volume?.displayName ?? "",
+      chapterType: serial.chapterType,
+      synopsisSnippet: "",
+      hidden: true,
+    };
+  }
+
+  // Fetch synopsis snippet
+  const [synopsisRow] = await db
+    .select({ content: chapterSynopses.content })
+    .from(chapterSynopses)
+    .where(eq(chapterSynopses.chapterId, chapter.id))
+    .limit(1);
+
+  const synopsis = synopsisRow?.content ?? "";
+  const synopsisSnippet =
+    synopsis.length > 200 ? synopsis.slice(0, 200).trimEnd() + "…" : synopsis;
+
+  return {
+    displayName: chapter.displayName,
+    volumeName: volume?.displayName ?? "",
+    chapterType: serial.chapterType,
+    synopsisSnippet,
+    hidden: false,
   };
 }

@@ -14,6 +14,10 @@ interface Props {
   pageId: number;
   /** slug → title map passed to MarkdownRenderer so `[[slug]]` links show the correct title. */
   pageTitles?: Record<string, string>;
+  /** Chapter display name → idx map for resolving `[[Chapter:Name]]` links. */
+  wikiChapters?: Record<string, number>;
+  /** The serial's chapter type (e.g. `"Chapter"`, `"Episode"`). */
+  chapterType?: string;
 }
 
 /**
@@ -40,6 +44,8 @@ export function PageReadView({
   childPages,
   pageId,
   pageTitles,
+  wikiChapters,
+  chapterType,
 }: Props) {
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -82,7 +88,12 @@ export function PageReadView({
             </Text>
           )}
           {section.content ? (
-            <MarkdownRenderer serialSlug={serialSlug} pageTitles={pageTitles}>
+            <MarkdownRenderer
+              serialSlug={serialSlug}
+              pageTitles={pageTitles}
+              chapterType={chapterType}
+              wikiChapters={wikiChapters}
+            >
               {section.content}
             </MarkdownRenderer>
           ) : (
