@@ -237,6 +237,8 @@ export function ChapterSelector(props: Props) {
           <Tooltip content={`Set your ${chapterType}`} side="bottom">
             <Button
               variant="ghost"
+              size="icon"
+              className="sm:w-auto sm:px-2.5 sm:gap-1.5"
               aria-label={`Set ${chapterType} progress`}
               onClick={() => setDropdownOpen((o) => !o)}
             >
