@@ -75,7 +75,7 @@ export default function Navbar(props: NavbarProps) {
           <>
             <Link
               href={`/${serialData.serialSlug}`}
-              className="truncate text-sm font-medium text-foreground/70 hover:text-foreground max-w-40 shrink-0"
+              className="truncate min-w-0 text-sm font-medium text-foreground/70 hover:text-foreground max-w-40"
             >
               {serialData.serialTitle}
             </Link>
