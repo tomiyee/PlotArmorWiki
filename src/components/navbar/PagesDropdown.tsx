@@ -63,7 +63,7 @@ export function PagesDropdown({ serialSlug, categories }: Props) {
         aria-label="Pages menu"
         className="font-medium text-foreground/70 hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
       >
-        Pages
+        <span className="hidden sm:inline">Pages</span>
         <ChevronDownIcon
           aria-hidden
           className={cn(

@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import Link from "next/link";
+import { LogInIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { UserMenu } from "@/components/navbar/UserMenu";
 
@@ -18,7 +19,10 @@ export async function AuthControls() {
   if (!session?.user) {
     return (
       <Link href="/api/auth/signin">
-        <Button size="sm">Sign in</Button>
+        <Button size="sm" aria-label="Sign in">
+          <LogInIcon className="size-4 sm:hidden" />
+          <span className="hidden sm:inline">Sign in</span>
+        </Button>
       </Link>
     );
   }
