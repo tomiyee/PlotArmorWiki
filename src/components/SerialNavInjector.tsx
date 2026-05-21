@@ -8,6 +8,8 @@ interface SerialNavInjectorProps {
   data: NavbarSerialData;
   chapterSelectorSlot: ReactNode;
   tocSlot: ReactNode;
+  /** Raw SerialTOC tree shown inline in the mobile hamburger drawer. */
+  tocContent: ReactNode;
 }
 
 /**
@@ -29,14 +31,14 @@ interface SerialNavInjectorProps {
  * />
  */
 export function SerialNavInjector(props: SerialNavInjectorProps) {
-  const { data, chapterSelectorSlot, tocSlot } = props;
+  const { data, chapterSelectorSlot, tocSlot, tocContent } = props;
   const { setSerial, clearSerial } = useNavbarSerialContext();
 
   // Update navbar context whenever props change (e.g. after router.refresh() adds chapters).
   // RSC serialisation always produces new object references, so this fires on every
   // RSC re-render — that's intentional and keeps the navbar in sync.
   useLayoutEffect(() => {
-    setSerial(data, chapterSelectorSlot, tocSlot);
+    setSerial(data, chapterSelectorSlot, tocSlot, tocContent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, chapterSelectorSlot, tocSlot]);
 

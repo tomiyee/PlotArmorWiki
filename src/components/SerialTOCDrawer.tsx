@@ -35,7 +35,6 @@ export function SerialTOCDrawer({ tocContent }: Props) {
           size="icon"
           aria-label="Open table of contents"
           onClick={() => setOpen(true)}
-          className="md:hidden"
         >
           <TableOfContentsIcon />
         </Button>

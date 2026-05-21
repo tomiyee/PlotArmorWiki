@@ -223,7 +223,7 @@ export function ChapterSelector(props: Props) {
   );
 
   return (
-    <Box className="sm:flex items-center gap-2">
+    <Box className="items-center">
       <div ref={triggerRef}>
         <Menu
           isOpen={dropdownOpen}
@@ -237,11 +237,17 @@ export function ChapterSelector(props: Props) {
           <Tooltip content={`Set your ${chapterType}`} side="bottom">
             <Button
               variant="ghost"
+              size="icon"
+              className="sm:w-auto sm:px-2.5"
               aria-label={`Set ${chapterType} progress`}
               onClick={() => setDropdownOpen((o) => !o)}
             >
               <BookmarkIcon className="size-4" />
-              <Text as="span" variant="label" className="truncate sm:visible">
+              <Text
+                as="span"
+                variant="label"
+                className="hidden sm:inline truncate"
+              >
                 {selectedLabel}
               </Text>
             </Button>

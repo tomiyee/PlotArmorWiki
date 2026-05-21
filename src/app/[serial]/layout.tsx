@@ -140,6 +140,7 @@ export default async function SerialLayout({ children, params }: Props) {
 
   const tocContent = (
     <SerialTOC
+      key="serial-toc"
       serialId={serial.id}
       serialSlug={serialSlug}
       volumes={volumeList}
@@ -154,6 +155,7 @@ export default async function SerialLayout({ children, params }: Props) {
         data={serialNavData}
         chapterSelectorSlot={
           <ChapterSelector
+            key="chapter-selector"
             serialId={serial.id}
             serialSlug={serialSlug}
             chapterType={serial.chapterType}
@@ -163,7 +165,8 @@ export default async function SerialLayout({ children, params }: Props) {
             isAuthenticated={!!userId}
           />
         }
-        tocSlot={<SerialTOCDrawer tocContent={tocContent} />}
+        tocSlot={<SerialTOCDrawer key="toc-drawer" tocContent={tocContent} />}
+        tocContent={tocContent}
       />
       <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>
     </>

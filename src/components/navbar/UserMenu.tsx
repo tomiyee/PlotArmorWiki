@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
+import { Box } from "@/components/ui/Box";
 import { SignOutButton } from "@/components/navbar/SignOutButton";
 import { Menu } from "../ui/Menu";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type UserMenuProps = {
   /** Display name of the authenticated user. */
@@ -29,7 +31,15 @@ export function UserMenu(props: UserMenuProps) {
     <Menu
       isOpen={isOpen}
       align="right"
-      contents={<SignOutButton />}
+      contents={
+        <>
+          <Box className="items-center justify-between gap-4 px-3 py-1.5 border-b border-border">
+            <span className="text-sm text-muted-foreground">Theme</span>
+            <ThemeToggle />
+          </Box>
+          <SignOutButton />
+        </>
+      }
       onClose={() => setIsOpen(false)}
     >
       <Button variant="ghost" size="icon" onClick={() => setIsOpen((v) => !v)}>
