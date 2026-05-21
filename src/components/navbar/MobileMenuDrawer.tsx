@@ -81,7 +81,13 @@ export function MobileMenuDrawer(props: MobileMenuDrawerProps) {
             </div>
           )}
           {tocContent && (
-            <div className="flex flex-col gap-0.5">
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+            <div
+              className="flex flex-col gap-0.5"
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a")) setOpen(false);
+              }}
+            >
               <Text
                 variant="label"
                 muted
