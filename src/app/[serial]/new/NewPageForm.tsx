@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { Combobox } from "@/components/ui/Combobox";
+import type { Option } from "@/components/ui/Combobox";
 
 interface Chapter {
   id: number;
@@ -86,38 +88,28 @@ export function NewPageForm({
     chapterIdxById[c.id] = c.idx;
   });
 
-  // Build grouped chapter options.
-  const chaptersByVolume: Record<number, Chapter[]> = {};
+  // Build volume id → name lookup for flat chapter option labels.
+  const volumeNameById: Record<number, string> = {};
   volumeList.forEach((v) => {
-    chaptersByVolume[v.id] = [];
-  });
-  chapterList.forEach((c) => {
-    chaptersByVolume[c.volumeId]?.push(c);
+    volumeNameById[v.id] = v.displayName;
   });
 
-  const firstChapterId = chapterList[0]?.id ?? 0;
-  const [selectedIntroChapterId, setSelectedIntroChapterId] =
-    useState<number>(firstChapterId);
+  const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<
+    number | null
+  >(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
 
-  const chapterOptions = [
-    { label: `Select a ${chapterTypeLabel}…`, value: 0, disabled: true },
-    ...volumeList
-      .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
-      .map((v) => ({
-        label: v.displayName,
-        value: -v.id,
-        children: (chaptersByVolume[v.id] ?? []).map((c) => ({
-          label: c.displayName,
-          value: c.id,
-        })),
-      })),
-  ];
+  // Flat chapter options for the searchable Combobox: "{Volume} — {Chapter}".
+  // Using a volume-name prefix avoids needing grouped option support in Combobox.
+  const flatChapterOptions: Option<number>[] = chapterList.map((c) => ({
+    label: `${volumeNameById[c.volumeId] ?? ""} — ${c.displayName}`,
+    value: c.id,
+  }));
 
   // Pages visible at the selected intro chapter: home page (null introChapterId)
   // is always included; others must have been introduced at or before it.
   const selectedIdx =
-    selectedIntroChapterId > 0
+    selectedIntroChapterId !== null
       ? (chapterIdxById[selectedIntroChapterId] ?? Infinity)
       : Infinity;
   const visiblePages = existingPages.filter(
@@ -181,13 +173,23 @@ export function NewPageForm({
           Intro {chapterTypeLabel} <span className="text-red-500">*</span>
         </Label>
         {hasChapters ? (
-          <Select
-            id="introChapterId"
-            name="introChapterId"
-            options={chapterOptions}
-            value={selectedIntroChapterId}
-            onChange={(val) => setSelectedIntroChapterId(val as number)}
-          />
+          <>
+            {/* Hidden input carries the selected chapter ID for form submission,
+                mirroring the template field pattern. Combobox drives a text input
+                for search, not a native select, so it cannot submit its own value. */}
+            <input
+              type="hidden"
+              name="introChapterId"
+              value={selectedIntroChapterId ?? ""}
+            />
+            <Combobox<number>
+              id="introChapterId"
+              options={flatChapterOptions}
+              value={selectedIntroChapterId}
+              onChange={(val) => setSelectedIntroChapterId(val)}
+              placeholder={`Search for a ${chapterTypeLabel}…`}
+            />
+          </>
         ) : (
           <Text muted className="text-sm">
             No {chapterTypeLabel}s yet.{" "}
