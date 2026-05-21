@@ -40,12 +40,8 @@ export function SerialSearch(props: SerialSearchProps) {
   const router = useRouter();
 
   // Fetch visible pages (spoiler-filtered) each time the dialog opens.
-  // Reset on close so the next open gets fresh data if the cutoff changed.
   useEffect(() => {
-    if (!open) {
-      setResults([]);
-      return;
-    }
+    if (!open) return;
     let cancelled = false;
     getVisiblePages(serialSlug).then((data) => {
       if (!cancelled) setResults(data);
@@ -85,7 +81,15 @@ export function SerialSearch(props: SerialSearchProps) {
       >
         <SearchIcon className="size-4" />
       </Button>
-      <Dialog isOpen={open} onClose={() => setOpen(false)} showCloseButton={false}>
+      <Dialog
+          isOpen={open}
+          onClose={() => {
+            setOpen(false);
+            // Reset results so the next open gets fresh data if the cutoff changed.
+            setResults([]);
+          }}
+          showCloseButton={false}
+        >
         <Command>
           <CommandInput placeholder="Search pages…" autoFocus />
           <CommandList>
