@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Accordion,
@@ -7,6 +8,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/Accordion";
+import { Input } from "@/components/ui/Input";
 import { Text } from "@/components/ui/Text";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { ChapterData, Volume } from "@/types";
@@ -47,6 +49,9 @@ export function SerialTOC(props: SerialTOCProps) {
     Record<number, boolean>
   >(`plotarmor:toc-collapsed:${serialId}`, {});
 
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+
   const visibleVolumes = volumes.filter(
     (v) => (chaptersByVolume[v.id] ?? []).length > 0,
   );
@@ -59,10 +64,19 @@ export function SerialTOC(props: SerialTOCProps) {
     );
   }
 
-  // Accordion expects the list of open (non-collapsed) item values.
-  const openIds = visibleVolumes
-    .filter((v) => !volCollapsed[v.id])
-    .map((v) => v.id);
+  // When a search is active, only show volumes that have at least one match
+  // and auto-expand them all. Otherwise respect the persisted collapse state.
+  const filteredVolumes = normalizedQuery
+    ? visibleVolumes.filter((v) =>
+        (chaptersByVolume[v.id] ?? []).some((c) =>
+          c.displayName.toLowerCase().includes(normalizedQuery),
+        ),
+      )
+    : visibleVolumes;
+
+  const openIds = normalizedQuery
+    ? filteredVolumes.map((v) => v.id)
+    : filteredVolumes.filter((v) => !volCollapsed[v.id]).map((v) => v.id);
 
   function handleValueChange(newValues: number[]) {
     setVolCollapsed(() => {
@@ -74,17 +88,34 @@ export function SerialTOC(props: SerialTOCProps) {
     });
   }
 
+  function getChapters(volumeId: number): ChapterData[] {
+    const chaps = chaptersByVolume[volumeId] ?? [];
+    if (!normalizedQuery) return chaps;
+    return chaps.filter((c) =>
+      c.displayName.toLowerCase().includes(normalizedQuery),
+    );
+  }
+
   return (
     <nav aria-label="Table of contents">
-      <Accordion
-        value={openIds}
-        onValueChange={handleValueChange}
-        multiple
-        className="gap-0"
-      >
-        {visibleVolumes.map((volume) => {
-          const chaps = chaptersByVolume[volume.id] ?? [];
-          return (
+      <Input
+        placeholder={`Search ${chapterType.toLowerCase()}s…`}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="mb-2 h-7 text-sm"
+      />
+      {filteredVolumes.length === 0 ? (
+        <Text muted className="text-sm px-2">
+          No {chapterType.toLowerCase()}s match &ldquo;{query}&rdquo;
+        </Text>
+      ) : (
+        <Accordion
+          value={openIds}
+          onValueChange={normalizedQuery ? undefined : handleValueChange}
+          multiple
+          className="gap-0"
+        >
+          {filteredVolumes.map((volume) => (
             <AccordionItem
               key={volume.id}
               value={volume.id}
@@ -95,7 +126,7 @@ export function SerialTOC(props: SerialTOCProps) {
               </AccordionTrigger>
               <AccordionContent className="[&_a]:no-underline [&_a]:hover:text-foreground pb-0">
                 <ul className="space-y-0.5 mb-2">
-                  {chaps.map((chapter) => (
+                  {getChapters(volume.id).map((chapter) => (
                     <li key={chapter.id}>
                       <Link
                         href={`/${serialSlug}/chapter/${chapter.idx}`}
@@ -108,9 +139,9 @@ export function SerialTOC(props: SerialTOCProps) {
                 </ul>
               </AccordionContent>
             </AccordionItem>
-          );
-        })}
-      </Accordion>
+          ))}
+        </Accordion>
+      )}
     </nav>
   );
 }
