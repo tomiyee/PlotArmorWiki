@@ -1,6 +1,6 @@
 ---
 name: create-issue
-description: Explore relevant code then create a meaningful GitHub Issue with root cause analysis and potential solutions.
+description: Explore relevant code then create a meaningful GitHub Issue with root cause analysis and a recommended fix.
 ---
 
 Create a GitHub Issue for the task description provided as the skill argument. Do not ask for confirmation at any step — explore, analyse, and file the issue autonomously.
@@ -59,13 +59,10 @@ Explain the technical reason this happens. Reference specific files, line number
 ### Affected Files
 A short list of the files and line ranges directly involved.
 
-### Potential Solutions
-Two to four distinct options. For each:
-- What change it requires (code, config, external service, docs).
-- Trade-offs (complexity, risk, maintenance burden).
-
 ### Recommended Fix
-Pick the best option and say why. Be direct.
+Pick the best option and say why. Be direct. Include the specific change required (code, config, external service, docs) and any notable trade-offs.
+
+Only add a second option if another approach is genuinely equally valid — different trade-offs, not just a worse alternative. If there is a clear best fix, state only that one.
 
 ---
 

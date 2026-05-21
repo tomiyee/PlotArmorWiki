@@ -19,7 +19,12 @@ interface NavbarSerialContextValue {
   /** Raw pre-rendered SerialTOC tree used inline in the mobile hamburger drawer. */
   tocContent: ReactNode;
   /** Called by SerialNavInjector on mount to populate both sides of the navbar. */
-  setSerial: (data: NavbarSerialData, chapterSlot: ReactNode, tocSlot: ReactNode, tocContent: ReactNode) => void;
+  setSerial: (
+    data: NavbarSerialData,
+    chapterSlot: ReactNode,
+    tocSlot: ReactNode,
+    tocContent: ReactNode,
+  ) => void;
   /** Called by SerialNavInjector on unmount to restore the default navbar. */
   clearSerial: () => void;
 }
@@ -47,7 +52,12 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
   const [tocContent, setTocContent] = useState<ReactNode>(null);
 
   const setSerial = useCallback(
-    (data: NavbarSerialData, chapterSlot: ReactNode, toc: ReactNode, content: ReactNode) => {
+    (
+      data: NavbarSerialData,
+      chapterSlot: ReactNode,
+      toc: ReactNode,
+      content: ReactNode,
+    ) => {
       setSerialData(data);
       setChapterSelectorSlot(chapterSlot);
       setTocSlot(toc);
@@ -65,7 +75,14 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
 
   return (
     <NavbarSerialContext.Provider
-      value={{ serialData, chapterSelectorSlot, tocSlot, tocContent, setSerial, clearSerial }}
+      value={{
+        serialData,
+        chapterSelectorSlot,
+        tocSlot,
+        tocContent,
+        setSerial,
+        clearSerial,
+      }}
     >
       {children}
     </NavbarSerialContext.Provider>
