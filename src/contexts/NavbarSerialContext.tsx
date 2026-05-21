@@ -14,10 +14,12 @@ interface NavbarSerialContextValue {
   serialData: NavbarSerialData | null;
   /** Pre-rendered ChapterSelector for the right side of the navbar. */
   chapterSelectorSlot: ReactNode;
-  /** Pre-rendered SerialTOCDrawer (mobile Contents button) for the right side of the navbar. */
+  /** Pre-rendered SerialTOCDrawer button (desktop Contents button) for the left side of the navbar. */
   tocSlot: ReactNode;
+  /** Raw pre-rendered SerialTOC tree used inline in the mobile hamburger drawer. */
+  tocContent: ReactNode;
   /** Called by SerialNavInjector on mount to populate both sides of the navbar. */
-  setSerial: (data: NavbarSerialData, chapterSlot: ReactNode, tocSlot: ReactNode) => void;
+  setSerial: (data: NavbarSerialData, chapterSlot: ReactNode, tocSlot: ReactNode, tocContent: ReactNode) => void;
   /** Called by SerialNavInjector on unmount to restore the default navbar. */
   clearSerial: () => void;
 }
@@ -42,12 +44,14 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
   const [chapterSelectorSlot, setChapterSelectorSlot] =
     useState<ReactNode>(null);
   const [tocSlot, setTocSlot] = useState<ReactNode>(null);
+  const [tocContent, setTocContent] = useState<ReactNode>(null);
 
   const setSerial = useCallback(
-    (data: NavbarSerialData, chapterSlot: ReactNode, toc: ReactNode) => {
+    (data: NavbarSerialData, chapterSlot: ReactNode, toc: ReactNode, content: ReactNode) => {
       setSerialData(data);
       setChapterSelectorSlot(chapterSlot);
       setTocSlot(toc);
+      setTocContent(content);
     },
     [],
   );
@@ -56,11 +60,12 @@ export function NavbarSerialProvider({ children }: { children: ReactNode }) {
     setSerialData(null);
     setChapterSelectorSlot(null);
     setTocSlot(null);
+    setTocContent(null);
   }, []);
 
   return (
     <NavbarSerialContext.Provider
-      value={{ serialData, chapterSelectorSlot, tocSlot, setSerial, clearSerial }}
+      value={{ serialData, chapterSelectorSlot, tocSlot, tocContent, setSerial, clearSerial }}
     >
       {children}
     </NavbarSerialContext.Provider>

@@ -1,13 +1,17 @@
 import { auth } from "@/auth";
 import Link from "next/link";
-import { LogInIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { UserMenu } from "@/components/navbar/UserMenu";
+import { UnauthMenu } from "@/components/navbar/UnauthMenu";
 
 /**
- * Server Component that reads the Auth.js session and renders either a
- * "Sign in" button (unauthenticated) or a user avatar dropdown
+ * Server Component that reads the Auth.js session and renders either
+ * a sign-in button + user icon (unauthenticated) or a user avatar dropdown
  * (authenticated). Rendered in the root layout so it is never stale.
+ *
+ * When unauthenticated: the sign-in button is hidden on narrow viewports
+ * (sm:), but the user icon is always visible and opens a menu with a
+ * sign-in link and the theme toggle.
  *
  * @example
  * // Inside a Server Component layout:
@@ -18,12 +22,12 @@ export async function AuthControls() {
 
   if (!session?.user) {
     return (
-      <Link href="/api/auth/signin">
-        <Button size="sm" aria-label="Sign in">
-          <LogInIcon className="size-4 sm:hidden" />
-          <span className="hidden sm:inline">Sign in</span>
-        </Button>
-      </Link>
+      <>
+        <Link href="/api/auth/signin" className="hidden sm:block">
+          <Button size="sm">Sign in</Button>
+        </Link>
+        <UnauthMenu />
+      </>
     );
   }
 

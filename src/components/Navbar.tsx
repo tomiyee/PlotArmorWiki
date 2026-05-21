@@ -6,7 +6,7 @@ import { ShieldHalfIcon } from "lucide-react";
 import { useNavbarSerialContext } from "@/contexts/NavbarSerialContext";
 import { PagesDropdown } from "@/components/navbar/PagesDropdown";
 import { SerialSearch } from "@/components/navbar/SerialSearch";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { MobileMenuDrawer } from "@/components/navbar/MobileMenuDrawer";
 import { Box } from "./ui/Box";
 
 type NavbarProps = {
@@ -16,17 +16,21 @@ type NavbarProps = {
 
 /**
  * Global top navbar. When on a serial route, the serial layout injects typed
- * data (serial title + schemas) and a pre-rendered ChapterSelector via
+ * data (serial title + schemas) and pre-rendered ChapterSelector/TOC slots via
  * NavbarSerialContext. When not on a serial route, only the logo and auth
  * controls are shown.
+ *
+ * Layout by breakpoint:
+ * - Mobile (<md): hamburger (or logo if no serial) | serial title · · search + chapter selector + auth
+ * - Desktop (md+): logo | serial title | Pages | TOC button · · search + chapter selector + auth
  *
  * `authSlot` is passed from the root server layout (which can call `auth()`)
  * so the Navbar can remain a client component while still displaying
  * server-side auth state.
  *
- * The dynamic containers use `suppressHydrationWarning` because data is
- * injected client-side via `useLayoutEffect` — the server renders them empty
- * and the client fills them in before the first paint.
+ * The left-side container uses `suppressHydrationWarning` because serial data
+ * is injected client-side via `useLayoutEffect` — the server renders it empty
+ * and the client fills it in before the first paint.
  *
  * @example
  * // Rendered once in the root layout:
@@ -34,18 +38,38 @@ type NavbarProps = {
  */
 export default function Navbar(props: NavbarProps) {
   const { authSlot } = props;
-  const { serialData, chapterSelectorSlot, tocSlot } = useNavbarSerialContext();
+  const { serialData, chapterSelectorSlot, tocSlot, tocContent } =
+    useNavbarSerialContext();
 
   return (
     <nav className="sticky top-0 z-10 border-b bg-background px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
-      {/* Left — logo + serial breadcrumb + Pages dropdown */}
+      {/* Left: hamburger (mobile) or logo (desktop) + serial breadcrumb + Pages + TOC */}
       <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
+        {/* Mobile: hamburger replaces the logo */}
+        <div className="md:hidden shrink-0">
+          {serialData ? (
+            <MobileMenuDrawer
+              serialTitle={serialData.serialTitle}
+              serialSlug={serialData.serialSlug}
+              categories={serialData.categories}
+              tocContent={tocContent}
+            />
+          ) : (
+            <Link
+              href="/"
+              className="flex items-center text-xl font-bold tracking-tight"
+            >
+              <ShieldHalfIcon className="size-5" />
+            </Link>
+          )}
+        </div>
+        {/* Desktop: full logo with wordmark */}
         <Link
           href="/"
-          className="flex items-center gap-2 text-xl font-bold tracking-tight shrink-0"
+          className="hidden md:flex items-center gap-2 text-xl font-bold tracking-tight shrink-0"
         >
           <ShieldHalfIcon className="size-5" />
-          <span className="hidden sm:inline">PlotArmor</span>
+          <span>PlotArmor</span>
         </Link>
         {serialData && (
           <>
@@ -55,18 +79,21 @@ export default function Navbar(props: NavbarProps) {
             >
               {serialData.serialTitle}
             </Link>
-            <PagesDropdown
-              serialSlug={serialData.serialSlug}
-              categories={serialData.categories}
-            />
+            {/* Pages dropdown + TOC button: desktop only (mobile lives in hamburger drawer) */}
+            <div className="hidden md:flex items-center gap-1">
+              <PagesDropdown
+                serialSlug={serialData.serialSlug}
+                categories={serialData.categories}
+              />
+              {tocSlot}
+            </div>
           </>
         )}
       </div>
+      {/* Right: search + chapter selector + auth */}
       <Box className="gap-2 items-center">
-        {tocSlot}
         {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
         {chapterSelectorSlot}
-        <ThemeToggle />
         {authSlot}
       </Box>
     </nav>
