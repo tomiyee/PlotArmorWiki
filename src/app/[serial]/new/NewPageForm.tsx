@@ -88,23 +88,22 @@ export function NewPageForm({
     chapterIdxById[c.id] = c.idx;
   });
 
-  // Build volume id → name lookup for flat chapter option labels.
-  const volumeNameById: Record<number, string> = {};
-  volumeList.forEach((v) => {
-    volumeNameById[v.id] = v.displayName;
-  });
-
   const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<
     number | null
   >(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
 
-  // Flat chapter options for the searchable Combobox: "{Volume} — {Chapter}".
-  // Using a volume-name prefix avoids needing grouped option support in Combobox.
-  const flatChapterOptions: Option<number>[] = chapterList.map((c) => ({
-    label: `${volumeNameById[c.volumeId] ?? ""} — ${c.displayName}`,
-    value: c.id,
-  }));
+  // Chapter options grouped by volume. Group header value is a sentinel (-1)
+  // that is never emitted — Combobox skips groups on selection.
+  const groupedChapterOptions: Option<number>[] = volumeList
+    .map((v) => ({
+      label: v.displayName,
+      value: -1 as number,
+      children: chapterList
+        .filter((c) => c.volumeId === v.id)
+        .map((c) => ({ label: c.displayName, value: c.id })),
+    }))
+    .filter((g) => g.children.length > 0);
 
   // Pages visible at the selected intro chapter: home page (null introChapterId)
   // is always included; others must have been introduced at or before it.
@@ -184,7 +183,7 @@ export function NewPageForm({
             />
             <Combobox<number>
               id="introChapterId"
-              options={flatChapterOptions}
+              options={groupedChapterOptions}
               value={selectedIntroChapterId}
               onChange={(val) => setSelectedIntroChapterId(val)}
               placeholder={`Search for a ${chapterTypeLabel}…`}

@@ -28,7 +28,7 @@ type ComboboxBaseProps<T> = {
 
 export type ComboboxProps<T> =
   | (ComboboxBaseProps<T> & {
-      /** Static list of options; filtered client-side as the user types. */
+      /** Static list of options (may include groups via `Option.children`); filtered client-side as the user types. */
       options: Option<T>[];
       getOptions?: never;
     })
@@ -38,26 +38,53 @@ export type ComboboxProps<T> =
       getOptions: (query: string) => Promise<Option<T>[]>;
     });
 
-function filterStatic<T>(options: Option<T>[], query: string): Option<T>[] {
+/** Returns only the leaf (selectable) options from a possibly-grouped tree. */
+function flatLeaves<T>(opts: Option<T>[]): Option<T>[] {
+  return opts.flatMap((o) => (o.children ? flatLeaves(o.children) : [o]));
+}
+
+/** Filters a possibly-grouped option list; groups with no matching children are dropped. */
+function filterOptions<T>(options: Option<T>[], query: string): Option<T>[] {
   const q = query.toLowerCase().trim();
   if (!q) return options;
-  return options.filter((o) => o.label.toLowerCase().includes(q));
+  return options.flatMap((opt) => {
+    if (opt.children) {
+      const filtered = opt.children.filter((c) =>
+        c.label.toLowerCase().includes(q),
+      );
+      return filtered.length ? [{ ...opt, children: filtered }] : [];
+    }
+    return opt.label.toLowerCase().includes(q) ? [opt] : [];
+  });
 }
 
 /**
  * Searchable combobox supporting a static option list (client-side filter) or
- * an async `getOptions` callback (server-side, debounced 200 ms). Arrow-key
- * navigation, Enter to select, Escape to dismiss.
+ * an async `getOptions` callback (server-side, debounced 200 ms). Supports
+ * grouped options via `Option.children` — group headers are non-selectable and
+ * visually distinct; children are indented. Arrow-key navigation skips group
+ * headers; Enter selects, Escape dismisses.
  *
  * Uses `@base-ui/react/popover` primitives for portal + positioning so the dropdown escapes
  * `overflow-hidden` containers without manual coordinate tracking.
  *
  * @example
- * // Static
+ * // Static flat
  * <Combobox
  *   options={users.map(u => ({ label: u.name, value: u.id }))}
  *   onChange={(id) => setUserId(id)}
  *   placeholder="Pick a user…"
+ * />
+ *
+ * @example
+ * // Grouped (group header value is a sentinel — never emitted to onChange)
+ * <Combobox
+ *   options={volumes.map(v => ({
+ *     label: v.name, value: -1,
+ *     children: v.chapters.map(c => ({ label: c.name, value: c.id })),
+ *   }))}
+ *   onChange={(id) => setChapterId(id)}
+ *   placeholder="Search chapters…"
  * />
  *
  * @example
@@ -117,7 +144,7 @@ function Combobox<T>(props: ComboboxProps<T>) {
     (query: string) => {
       setHighlightedIndex(-1);
       if (options !== undefined) {
-        setDisplayedOptions(filterStatic(options, query));
+        setDisplayedOptions(filterOptions(options, query));
       } else if (getOptions) {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (cancelRef.current) cancelRef.current.cancelled = true;
@@ -159,6 +186,7 @@ function Combobox<T>(props: ComboboxProps<T>) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    const selectableCount = flatLeaves(displayedOptions).length;
     if (!isOpen) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -169,13 +197,13 @@ function Combobox<T>(props: ComboboxProps<T>) {
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex((i) => Math.min(i + 1, displayedOptions.length - 1));
+      setHighlightedIndex((i) => Math.min(i + 1, selectableCount - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightedIndex((i) => Math.max(i - 1, -1));
     } else if (e.key === "Enter" && highlightedIndex >= 0) {
       e.preventDefault();
-      const opt = displayedOptions[highlightedIndex];
+      const opt = flatLeaves(displayedOptions)[highlightedIndex];
       if (opt) handleSelect(opt);
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -186,32 +214,59 @@ function Combobox<T>(props: ComboboxProps<T>) {
   const highlightedOptionId =
     highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined;
 
+  // Renders the option tree, assigning sequential indices to leaf options only.
+  // `counter.n` is incremented for each leaf so arrow-key navigation maps
+  // directly to flat indices without re-deriving the tree on every keystroke.
+  function renderOptionTree(
+    opts: Option<T>[],
+    counter: { n: number },
+    depth = 0,
+  ): React.ReactNode {
+    return opts.map((opt, i) => {
+      if (opt.children) {
+        return (
+          <div key={i} role="group" aria-label={opt.label}>
+            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none">
+              {opt.label}
+            </div>
+            {renderOptionTree(opt.children, counter, depth + 1)}
+          </div>
+        );
+      }
+      const idx = counter.n++;
+      const isHighlighted = idx === highlightedIndex;
+      return (
+        <Button
+          key={i}
+          id={`${listboxId}-opt-${idx}`}
+          type="button"
+          variant="ghost"
+          role="option"
+          aria-selected={isHighlighted}
+          className={cn(
+            "h-auto w-full justify-start rounded-none py-1.5 text-sm font-normal",
+            depth > 0 ? "px-5" : "px-3",
+            isHighlighted && "bg-primary/10 font-medium text-primary",
+          )}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            handleSelect(opt);
+          }}
+          onMouseEnter={() => setHighlightedIndex(idx)}
+        >
+          {opt.label}
+        </Button>
+      );
+    });
+  }
+
+  const leaves = flatLeaves(displayedOptions);
   const dropdownContent = isLoading ? (
     <div className="px-3 py-2 text-sm text-muted-foreground">Loading…</div>
-  ) : displayedOptions.length === 0 ? (
+  ) : leaves.length === 0 ? (
     <div className="px-3 py-2 text-sm text-muted-foreground">No results.</div>
   ) : (
-    displayedOptions.map((option, i) => (
-      <Button
-        key={i}
-        id={`${listboxId}-opt-${i}`}
-        type="button"
-        variant="ghost"
-        role="option"
-        aria-selected={i === highlightedIndex}
-        className={cn(
-          "h-auto w-full justify-start rounded-none px-3 py-1.5 text-sm font-normal",
-          i === highlightedIndex && "bg-primary/10 font-medium text-primary",
-        )}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          handleSelect(option);
-        }}
-        onMouseEnter={() => setHighlightedIndex(i)}
-      >
-        {option.label}
-      </Button>
-    ))
+    renderOptionTree(displayedOptions, { n: 0 })
   );
 
   return (
