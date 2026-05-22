@@ -43,10 +43,7 @@ type MarkdownRendererProps = {
 
 const COMPONENTS: Components = {
   h1: ({ children }) => (
-    <Text
-      variant="h1"
-      className="mt-6 mb-4 text-2xl pb-2 border-b border-border"
-    >
+    <Text variant="h1" className="mt-6 mb-4 text-2xl">
       {children}
     </Text>
   ),

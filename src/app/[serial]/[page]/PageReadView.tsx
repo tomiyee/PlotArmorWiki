@@ -102,7 +102,7 @@ export function PageReadView({
         </div>
       ))}
 
-      <div className="mt-6 pt-6 border-t border-border">
+      <div className="clear-right mt-6 pt-6 border-t border-border">
         <Text variant="h3" className="mb-3">
           Child pages
         </Text>
