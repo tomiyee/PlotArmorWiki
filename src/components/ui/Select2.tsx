@@ -7,9 +7,11 @@ import {
   useEffect,
   useId,
   useMemo,
+  type ChangeEvent,
+  type KeyboardEvent,
 } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Popover } from "@/components/ui/Popover";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +41,7 @@ export type Option<T> = {
 };
 
 // ---------------------------------------------------------------------------
-// Internal flat-row type used by the virtualizer
+// Internal flat-row type
 // ---------------------------------------------------------------------------
 
 type FlatRow<T> = {
@@ -81,6 +83,12 @@ type Select2Props<T> = {
    * - `"fixed"`: fixed 200 px width.
    */
   widthMode?: "trigger" | "fixed";
+  /**
+   * When false, the search input is hidden and options are never filtered.
+   * Useful for short, well-known lists where search adds no value.
+   * Defaults to true.
+   */
+  searchable?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -100,7 +108,6 @@ function buildFlatRows<T>(
   const q = query.toLowerCase().trim();
 
   function matchesFilter(opt: Option<T>): boolean {
-    if (!q) return true;
     if (opt.label.toLowerCase().includes(q)) return true;
     if (opt.description?.toLowerCase().includes(q)) return true;
     if (opt.children) return opt.children.some((c) => matchesFilter(c));
@@ -179,14 +186,13 @@ function findLabel<T>(options: Option<T>[], value: T): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * Searchable, hierarchical dropdown select with virtualization, keyboard
- * navigation, and full ARIA accessibility (combobox + tree semantics).
+ * Searchable, hierarchical dropdown select with keyboard navigation and full
+ * ARIA accessibility (combobox + tree semantics).
  *
  * Unlike the native `<Select>`, `Select2` supports:
  * - Searchable input inside the dropdown
  * - Structural (non-selectable) group headers
  * - Expandable accordion sections with multi-level nesting
- * - Efficient rendering of large option lists via `@tanstack/react-virtual`
  * - Full keyboard navigation (ArrowUp/Down/Home/End/Enter/Escape)
  *
  * All persistent state (open, search, expanded accordions, active option) is
@@ -223,6 +229,7 @@ function Select2<T>(props: Select2Props<T>) {
     disabled,
     id,
     widthMode = "trigger",
+    searchable = true,
   } = props;
 
   // -------------------------------------------------------------------------
@@ -245,7 +252,6 @@ function Select2<T>(props: Select2Props<T>) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLDivElement>(null);
 
   // -------------------------------------------------------------------------
@@ -280,8 +286,8 @@ function Select2<T>(props: Select2Props<T>) {
   }, [expandedInitialized, expandedIds, allRowIds]);
 
   const flatRows = useMemo(
-    () => buildFlatRows(options, effectiveExpandedIds, query),
-    [options, effectiveExpandedIds, query],
+    () => buildFlatRows(options, effectiveExpandedIds, searchable ? query : ""),
+    [options, effectiveExpandedIds, query, searchable],
   );
 
   const selectableRows = useMemo(
@@ -290,19 +296,6 @@ function Select2<T>(props: Select2Props<T>) {
   );
 
   const totalSelectableCount = selectableRows.length;
-
-  // -------------------------------------------------------------------------
-  // Virtualizer
-  // -------------------------------------------------------------------------
-
-  const virtualizer = useVirtualizer({
-    count: flatRows.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 36,
-    overscan: 5,
-    // Stable key: use row.id (not index) so DOM is stable during filtering/expand.
-    getItemKey: (index) => flatRows[index]?.id ?? index,
-  });
 
   // -------------------------------------------------------------------------
   // Effects
@@ -319,13 +312,8 @@ function Select2<T>(props: Select2Props<T>) {
   // Scroll active row into view when activeSelectableIdx changes.
   useEffect(() => {
     if (!isOpen) return;
-    const activeRow = selectableRows[activeSelectableIdx];
-    if (!activeRow) return;
-    const flatIdx = flatRows.findIndex((r) => r.id === activeRow.id);
-    if (flatIdx >= 0) {
-      virtualizer.scrollToIndex(flatIdx, { align: "auto" });
-    }
-  }, [activeSelectableIdx, isOpen, selectableRows, flatRows, virtualizer]);
+    activeRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeSelectableIdx, isOpen]);
 
   // Close on outside click (input + popup are in separate DOM subtrees).
   useEffect(() => {
@@ -390,7 +378,7 @@ function Select2<T>(props: Select2Props<T>) {
   );
 
   const handleQueryChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       setQuery(e.target.value);
       setActiveSelectableIdx(0);
     },
@@ -398,7 +386,7 @@ function Select2<T>(props: Select2Props<T>) {
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
+    (e: KeyboardEvent<HTMLInputElement>) => {
       if (!isOpen) return;
 
       switch (e.key) {
@@ -462,7 +450,7 @@ function Select2<T>(props: Select2Props<T>) {
   // Render row
   // -------------------------------------------------------------------------
 
-  function renderRow(row: FlatRow<T>, virtualStyle: React.CSSProperties) {
+  function renderRow(row: FlatRow<T>) {
     const { option, depth, expanded, id } = row;
     const hasChildren = (option.children?.length ?? 0) > 0;
     const isActive = row.selectable && row.selectableIdx === activeSelectableIdx;
@@ -481,7 +469,7 @@ function Select2<T>(props: Select2Props<T>) {
           aria-level={depth + 1}
           aria-selected={false}
           aria-expanded={isAccordion ? expanded : undefined}
-          style={{ ...virtualStyle, paddingLeft: indentPx + 8 }}
+          style={{ paddingLeft: indentPx + 8 }}
           className="flex items-center gap-1.5 pr-3 h-9 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none cursor-pointer hover:bg-muted/50"
           onClick={() => isAccordion && handleToggleExpand(id)}
         >
@@ -514,7 +502,7 @@ function Select2<T>(props: Select2Props<T>) {
         aria-selected={isSelected}
         aria-disabled={option.disabled}
         ref={isActive ? activeRowRef : undefined}
-        style={{ ...virtualStyle, paddingLeft: indentPx + 8 }}
+        style={{ paddingLeft: indentPx + 8 }}
         className={cn(
           "flex items-start gap-2 pr-3 h-9 cursor-pointer select-none",
           "transition-colors",
@@ -542,34 +530,34 @@ function Select2<T>(props: Select2Props<T>) {
   // Dropdown content
   // -------------------------------------------------------------------------
 
-  const items = virtualizer.getVirtualItems();
-
   const dropdownContent = (
     <div className="flex flex-col h-full">
-      {/* Search input */}
-      <div className="px-2 py-1.5 border-b border-border shrink-0">
-        <div className="relative">
-          <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-          <input
-            ref={searchRef}
-            type="text"
-            value={query}
-            onChange={handleQueryChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Search…"
-            autoComplete="off"
-            role="combobox"
-            aria-expanded={isOpen}
-            aria-controls={treeId}
-            aria-autocomplete="list"
-            aria-activedescendant={activeRowDomId}
-            className={cn(
-              "w-full h-7 pl-7 pr-2 text-sm bg-transparent outline-none",
-              "placeholder:text-muted-foreground",
-            )}
-          />
+      {/* Search input — omitted when searchable={false} */}
+      {searchable && (
+        <div className="px-2 py-1.5 border-b border-border shrink-0">
+          <div className="relative">
+            <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={handleQueryChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Search…"
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-controls={treeId}
+              aria-autocomplete="list"
+              aria-activedescendant={activeRowDomId}
+              className={cn(
+                "w-full h-7 pl-7 pr-2 text-sm bg-transparent outline-none",
+                "placeholder:text-muted-foreground",
+              )}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Live region for screen readers */}
       <div
@@ -594,26 +582,9 @@ function Select2<T>(props: Select2Props<T>) {
           No options available.
         </div>
       ) : (
-        <div
-          ref={scrollContainerRef}
-          className="overflow-y-auto flex-1"
-        >
-          <div
-            id={treeId}
-            role="tree"
-            style={{ height: virtualizer.getTotalSize(), position: "relative" }}
-          >
-            {items.map((virtualRow) => {
-              const row = flatRows[virtualRow.index];
-              if (!row) return null;
-              return renderRow(row, {
-                position: "absolute",
-                top: virtualRow.start,
-                left: 0,
-                right: 0,
-                height: virtualRow.size,
-              });
-            })}
+        <div className="overflow-y-auto flex-1">
+          <div id={treeId} role="tree">
+            {flatRows.map((row) => renderRow(row))}
           </div>
         </div>
       )}
@@ -630,7 +601,7 @@ function Select2<T>(props: Select2Props<T>) {
   return (
     <div data-slot="select2-wrapper" className={cn("relative", className)}>
       {/* Trigger button */}
-      <button
+      <Button
         ref={triggerRef}
         id={id}
         type="button"
@@ -639,10 +610,10 @@ function Select2<T>(props: Select2Props<T>) {
         aria-expanded={isOpen}
         aria-controls={isOpen ? treeId : undefined}
         onClick={handleOpen}
+        variant="outline"
+        size="lg"
         className={cn(
-          "flex h-9 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow]",
-          "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-          "disabled:pointer-events-none disabled:opacity-50",
+          "w-full justify-between px-3 border-input shadow-xs",
           !selectedLabel && "text-muted-foreground",
         )}
       >
@@ -656,7 +627,7 @@ function Select2<T>(props: Select2Props<T>) {
             isOpen && "rotate-180",
           )}
         />
-      </button>
+      </Button>
 
       {/* Dropdown */}
       <Popover

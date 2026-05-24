@@ -10,7 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
-import { Select } from "@/components/ui/Select";
+import { Select2 } from "@/components/ui/Select2";
 import {
   savePageContent,
   getPageContentAtChapter,
@@ -387,7 +387,7 @@ export function PageEditor(props: Props) {
           <Label htmlFor="target-chapter" className="shrink-0 text-sm">
             Writing as of:
           </Label>
-          <Select<number>
+          <Select2<number>
             id="target-chapter"
             options={chapterSelectOptions}
             value={selectedChapterId ?? undefined}

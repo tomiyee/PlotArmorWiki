@@ -38,7 +38,7 @@ import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import { Select2 } from "@/components/ui/Select2";
 import {
   Dialog,
   DialogHeader,
@@ -1244,7 +1244,7 @@ export function SerialEditor(props: SerialEditorProps) {
         <Text variant="body" as="span">
           Each
         </Text>
-        <Select
+        <Select2
           id="chapterType"
           options={CHAPTER_TYPE_OPTIONS}
           value={currentChapterType}
@@ -1252,11 +1252,12 @@ export function SerialEditor(props: SerialEditorProps) {
             setCurrentChapterType(val);
             runTypeUpdate(currentVolumeType, val);
           }}
+          searchable={false}
         />
         <Text variant="body" as="span">
           is grouped by
         </Text>
-        <Select
+        <Select2
           id="volumeType"
           options={VOLUME_TYPE_OPTIONS}
           value={currentVolumeType}
@@ -1264,6 +1265,7 @@ export function SerialEditor(props: SerialEditorProps) {
             setCurrentVolumeType(val);
             runTypeUpdate(val, currentChapterType);
           }}
+          searchable={false}
         />
       </Box>
 
