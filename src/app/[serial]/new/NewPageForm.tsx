@@ -99,20 +99,20 @@ export function NewPageForm({
   const [selectedIntroChapterId, setSelectedIntroChapterId] =
     useState<number>(firstChapterId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
+  const [selectedParentPageId, setSelectedParentPageId] = useState<
+    number | undefined
+  >(undefined);
 
-  const chapterOptions = [
-    { label: `Select a ${chapterTypeLabel}…`, value: 0, disabled: true },
-    ...volumeList
-      .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
-      .map((v) => ({
-        label: v.displayName,
-        value: -v.id,
-        children: (chaptersByVolume[v.id] ?? []).map((c) => ({
-          label: c.displayName,
-          value: c.id,
-        })),
+  const chapterOptions = volumeList
+    .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
+    .map((v) => ({
+      label: v.displayName,
+      value: -v.id,
+      children: (chaptersByVolume[v.id] ?? []).map((c) => ({
+        label: c.displayName,
+        value: c.id,
       })),
-  ];
+    }));
 
   // Pages visible at the selected intro chapter: home page (null introChapterId)
   // is always included; others must have been introduced at or before it.
@@ -136,6 +136,14 @@ export function NewPageForm({
     visiblePages.some((p) => p.id === defaultParentPageId)
       ? defaultParentPageId
       : undefined;
+
+  // If the user's selection is still visible at the current intro chapter, keep it;
+  // otherwise fall back to the prop default or the first visible page.
+  const effectiveParentPageId =
+    selectedParentPageId !== undefined &&
+    parentPageOptions.some((p) => p.value === selectedParentPageId)
+      ? selectedParentPageId
+      : (visibleParentDefault ?? parentPageOptions[0]?.value);
 
   // Template options — 0 means "no template".
   const templateOptions = [
@@ -181,13 +189,20 @@ export function NewPageForm({
           Intro {chapterTypeLabel} <span className="text-red-500">*</span>
         </Label>
         {hasChapters ? (
-          <Select
-            id="introChapterId"
-            name="introChapterId"
-            options={chapterOptions}
-            value={selectedIntroChapterId}
-            onChange={(val) => setSelectedIntroChapterId(val as number)}
-          />
+          <>
+            <input
+              type="hidden"
+              name="introChapterId"
+              value={selectedIntroChapterId}
+            />
+            <Select<number>
+              id="introChapterId"
+              options={chapterOptions}
+              placeholder={`Select a ${chapterTypeLabel}…`}
+              value={selectedIntroChapterId}
+              onChange={setSelectedIntroChapterId}
+            />
+          </>
         ) : (
           <Text muted className="text-sm">
             No {chapterTypeLabel}s yet.{" "}
@@ -206,11 +221,17 @@ export function NewPageForm({
         <Label htmlFor="parentPageId">
           Parent page <span className="text-red-500">*</span>
         </Label>
-        <Select
-          id="parentPageId"
+        <input
+          type="hidden"
           name="parentPageId"
+          value={effectiveParentPageId ?? ""}
+        />
+        <Select<number>
+          id="parentPageId"
           options={parentPageOptions}
-          defaultValue={visibleParentDefault}
+          value={effectiveParentPageId}
+          onChange={setSelectedParentPageId}
+          placeholder="Select a parent page…"
         />
       </Box>
 
@@ -224,11 +245,11 @@ export function NewPageForm({
             name="templateId"
             value={selectedTemplateId > 0 ? selectedTemplateId : ""}
           />
-          <Select
+          <Select<number>
             id="templateId"
             options={templateOptions}
             value={selectedTemplateId}
-            onChange={(val) => setSelectedTemplateId(val as number)}
+            onChange={setSelectedTemplateId}
           />
 
           {/* Preview of what the template will create */}

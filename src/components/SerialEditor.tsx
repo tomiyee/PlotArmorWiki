@@ -596,7 +596,10 @@ function validateBulkTocPayload(raw: unknown): BulkTocPayload {
           `volumes[${vi}].chapters[${ci}].displayName must be a non-empty string.`,
         );
       }
-      return { id: co.id as number | null, displayName: co.displayName as string };
+      return {
+        id: co.id as number | null,
+        displayName: co.displayName as string,
+      };
     });
     return {
       id: vo.id as number | null,
@@ -637,11 +640,11 @@ function computeTocDiff(
   // Build lookup maps from current state.
   const currentVolumeById = new Map(currentVolumes.map((v) => [v.id, v]));
   const allCurrentChapters = Object.values(currentChaptersByVolume).flat();
-  const currentChapterById = new Map(
-    allCurrentChapters.map((c) => [c.id, c]),
-  );
+  const currentChapterById = new Map(allCurrentChapters.map((c) => [c.id, c]));
   // volumeId → displayName for cross-volume move labels
-  const volumeNameById = new Map(currentVolumes.map((v) => [v.id, v.displayName]));
+  const volumeNameById = new Map(
+    currentVolumes.map((v) => [v.id, v.displayName]),
+  );
 
   return payload.volumes.map((payloadVol): VolumeDiffEntry => {
     let volumeKind: VolumeDiffEntry["kind"];
@@ -660,7 +663,8 @@ function computeTocDiff(
 
     const chapterLines: ChapterDiffLine[] = payloadVol.chapters.map(
       (payloadCh): ChapterDiffLine => {
-        if (payloadCh.id === null) return { kind: "new", name: payloadCh.displayName };
+        if (payloadCh.id === null)
+          return { kind: "new", name: payloadCh.displayName };
 
         const existing = currentChapterById.get(payloadCh.id);
         if (!existing) return { kind: "new", name: payloadCh.displayName };
@@ -697,7 +701,11 @@ function computeTocDiff(
             fromVolume: fromVolumeName,
           };
         }
-        return { kind: "unchanged", id: payloadCh.id, name: payloadCh.displayName };
+        return {
+          kind: "unchanged",
+          id: payloadCh.id,
+          name: payloadCh.displayName,
+        };
       },
     );
 
@@ -734,12 +742,19 @@ type TocDiffPreviewDialogProps = {
  * display their source volume.
  */
 function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
-  const { isOpen, onClose, diff, isPending, onConfirm, chapterType, volumeType } = props;
+  const {
+    isOpen,
+    onClose,
+    diff,
+    isPending,
+    onConfirm,
+    chapterType,
+    volumeType,
+  } = props;
 
   const hasChanges = diff.some(
     (v) =>
-      v.kind !== "unchanged" ||
-      v.chapters.some((c) => c.kind !== "unchanged"),
+      v.kind !== "unchanged" || v.chapters.some((c) => c.kind !== "unchanged"),
   );
 
   return (
@@ -749,15 +764,21 @@ function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
       </DialogHeader>
       <DialogBody className="max-h-[60vh]">
         {!hasChanges ? (
-          <Text muted>No changes detected — the uploaded TOC matches the current one.</Text>
+          <Text muted>
+            No changes detected — the uploaded TOC matches the current one.
+          </Text>
         ) : (
           <Box col className="gap-4">
             <Text variant="body" muted>
               Review the changes below. New entries are{" "}
-              <span className="text-green-600 dark:text-green-400 font-medium">green</span>,
-              renamed entries are{" "}
-              <span className="text-yellow-600 dark:text-yellow-400 font-medium">yellow</span>,
-              and moved {chapterType.toLowerCase()}s show their source{" "}
+              <span className="text-green-600 dark:text-green-400 font-medium">
+                green
+              </span>
+              , renamed entries are{" "}
+              <span className="text-yellow-600 dark:text-yellow-400 font-medium">
+                yellow
+              </span>
+              , and moved {chapterType.toLowerCase()}s show their source{" "}
               {volumeType.toLowerCase()}.
             </Text>
             <Box col className="gap-3">
@@ -771,7 +792,12 @@ function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
                         className="text-green-600 dark:text-green-400"
                       >
                         + {vol.displayName}
-                        <Text as="span" variant="label" muted className="ml-2 text-xs">
+                        <Text
+                          as="span"
+                          variant="label"
+                          muted
+                          className="ml-2 text-xs"
+                        >
                           (new {volumeType.toLowerCase()})
                         </Text>
                       </Text>
@@ -781,7 +807,12 @@ function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
                         className="text-yellow-600 dark:text-yellow-400"
                       >
                         {vol.displayName}
-                        <Text as="span" variant="label" muted className="ml-2 text-xs">
+                        <Text
+                          as="span"
+                          variant="label"
+                          muted
+                          className="ml-2 text-xs"
+                        >
                           (was: {vol.oldDisplayName})
                         </Text>
                       </Text>
@@ -1053,9 +1084,7 @@ export function SerialEditor(props: SerialEditorProps) {
         setBulkDiff(diff);
         setBulkError(null);
       } catch (err) {
-        setBulkError(
-          err instanceof Error ? err.message : "Invalid JSON file.",
-        );
+        setBulkError(err instanceof Error ? err.message : "Invalid JSON file.");
       }
     };
     reader.readAsText(file);
@@ -1252,6 +1281,7 @@ export function SerialEditor(props: SerialEditorProps) {
             setCurrentChapterType(val);
             runTypeUpdate(currentVolumeType, val);
           }}
+          searchable={false}
         />
         <Text variant="body" as="span">
           is grouped by
@@ -1264,6 +1294,7 @@ export function SerialEditor(props: SerialEditorProps) {
             setCurrentVolumeType(val);
             runTypeUpdate(val, currentChapterType);
           }}
+          searchable={false}
         />
       </Box>
 

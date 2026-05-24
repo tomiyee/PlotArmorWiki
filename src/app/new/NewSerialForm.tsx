@@ -9,7 +9,12 @@ import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { PageContainer } from "@/components/ui/PageContainer";
-import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from "@/lib/serial-types";
+import {
+  CHAPTER_TYPE_OPTIONS,
+  VOLUME_TYPE_OPTIONS,
+  type ChapterType,
+  type VolumeType,
+} from "@/lib/serial-types";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 
 type Props = {
@@ -29,6 +34,8 @@ type Props = {
 export default function NewSerialForm({ defaultTitle }: Props) {
   const [authors, setAuthors] = useState<string[]>([""]);
   const [description, setDescription] = useState("");
+  const [volumeType, setVolumeType] = useState<VolumeType>("Volume");
+  const [chapterType, setChapterType] = useState<ChapterType>("Chapter");
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,7 +82,9 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           <Box col className="gap-1">
             <Label htmlFor="description">
               Description{" "}
-              <span className="text-muted-foreground">(optional, Markdown)</span>
+              <span className="text-muted-foreground">
+                (optional, Markdown)
+              </span>
             </Label>
             <WikiLinkMDEditor
               value={description}
@@ -123,23 +132,28 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           </Box>
 
           {/* Volume type and Chapter type */}
+          {/* Hidden inputs carry the selected values into FormData for the server action */}
+          <input type="hidden" name="volumeType" value={volumeType} />
+          <input type="hidden" name="chapterType" value={chapterType} />
           <Box className="gap-4">
             <Box col className="gap-1 flex-1">
               <Label htmlFor="volumeType">Volume type</Label>
-              <Select
+              <Select<VolumeType>
                 id="volumeType"
-                name="volumeType"
                 options={VOLUME_TYPE_OPTIONS}
-                defaultValue="Volume"
+                value={volumeType}
+                onChange={setVolumeType}
+                placeholder="Volume type"
               />
             </Box>
             <Box col className="gap-1 flex-1">
               <Label htmlFor="chapterType">Chapter type</Label>
-              <Select
+              <Select<ChapterType>
                 id="chapterType"
-                name="chapterType"
                 options={CHAPTER_TYPE_OPTIONS}
-                defaultValue="Chapter"
+                value={chapterType}
+                onChange={setChapterType}
+                placeholder="Chapter type"
               />
             </Box>
           </Box>
@@ -147,7 +161,8 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           {/* Splash art URL */}
           <Box col className="gap-1">
             <Label htmlFor="splashArtUrl">
-              Splash art URL <span className="text-muted-foreground">(optional)</span>
+              Splash art URL{" "}
+              <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Input
               id="splashArtUrl"

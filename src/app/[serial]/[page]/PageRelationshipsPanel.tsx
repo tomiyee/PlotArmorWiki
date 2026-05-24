@@ -143,12 +143,10 @@ export function PageRelationshipsPanel({
       {addablePages.length > 0 && (
         <Box className="items-center gap-2 flex-wrap">
           <Select<number>
-            options={[
-              { label: "Add a parent page…", value: -1, disabled: true },
-              ...addSelectOptions,
-            ]}
-            value={selectedParentId ?? -1}
-            onChange={(v) => setSelectedParentId(v === -1 ? null : v)}
+            options={addSelectOptions}
+            value={selectedParentId ?? undefined}
+            onChange={setSelectedParentId}
+            placeholder="Add a parent page…"
             className="flex-1 min-w-40"
             disabled={isPending || !chapterId}
           />

@@ -43,13 +43,15 @@ export function PageTitlesPanel({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [newTitleChapterId, setNewTitleChapterId] = useState<number>(-1);
+  const [newTitleChapterId, setNewTitleChapterId] = useState<
+    number | undefined
+  >(undefined);
   const [newTitleText, setNewTitleText] = useState<string>("");
 
   const disabled = isPending || externalIsPending;
 
   function handleAddTitle() {
-    if (newTitleChapterId === -1 || !newTitleText.trim()) return;
+    if (newTitleChapterId == null || !newTitleText.trim()) return;
     startTransition(async () => {
       await addPageTitle(
         serialSlug,
@@ -58,7 +60,7 @@ export function PageTitlesPanel({
         newTitleText.trim(),
       );
       setNewTitleText("");
-      setNewTitleChapterId(-1);
+      setNewTitleChapterId(undefined);
       router.refresh();
     });
   }
@@ -125,14 +127,10 @@ export function PageTitlesPanel({
             </Label>
             <Select<number>
               id="new-title-chapter"
-              options={[
-                { label: "Select a chapter…", value: -1, disabled: true },
-                ...chapterSelectOptions,
-              ]}
+              options={chapterSelectOptions}
               value={newTitleChapterId}
-              onChange={(id) => {
-                if (id !== -1) setNewTitleChapterId(id);
-              }}
+              onChange={setNewTitleChapterId}
+              placeholder="Select a chapter…"
               disabled={disabled}
               className="w-full"
             />
@@ -158,7 +156,7 @@ export function PageTitlesPanel({
           <Button
             onClick={handleAddTitle}
             disabled={
-              disabled || newTitleChapterId === -1 || !newTitleText.trim()
+              disabled || newTitleChapterId == null || !newTitleText.trim()
             }
             size="sm"
           >

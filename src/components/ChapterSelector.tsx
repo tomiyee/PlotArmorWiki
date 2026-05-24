@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePersistedStore } from "@/hooks/usePersistedStore";
 import { Button } from "@/components/ui/Button";
 import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
-import { Menu, MenuItem } from "@/components/ui/Menu";
 import { Popover } from "@/components/ui/Popover";
-import { BookmarkIcon, ExternalLinkIcon, XIcon } from "lucide-react";
+import { Select } from "@/components/ui/Select";
+import type { Option } from "@/components/ui/Select";
+import { BookmarkIcon, XIcon } from "lucide-react";
 import { ChapterData, Volume } from "@/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { syncUserProgress } from "@/app/[serial]/actions";
@@ -34,15 +34,12 @@ function cookieName(serialId: number) {
   return `plotarmor_chapter_${serialId}`;
 }
 
-/**
- * Global key for the one-time spoiler popover. Once dismissed on any serial,
- * it never shows again across all serials.
- */
-const GLOBAL_POPOVER_DISMISSED_KEY = "plotarmor:spoiler_popover_dismissed";
-
-function volCollapsedKey(serialId: number) {
-  return `plotarmor:vol-collapsed:${serialId}`;
+function writeCookie(serialId: number, chapterId: number) {
+  document.cookie = `${cookieName(serialId)}=${chapterId}; path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}`;
 }
+
+/** Once dismissed on any serial, the spoiler popover never shows again. */
+const GLOBAL_POPOVER_DISMISSED_KEY = "plotarmor:spoiler_popover_dismissed";
 
 /**
  * Chapter-progress selector that persists to localStorage and mirrors the
@@ -69,7 +66,6 @@ function volCollapsedKey(serialId: number) {
 export function ChapterSelector(props: Props) {
   const {
     serialId,
-    serialSlug,
     chapterType,
     volumes,
     chaptersByVolume,
@@ -77,43 +73,74 @@ export function ChapterSelector(props: Props) {
     isAuthenticated,
   } = props;
 
-  const allChapters = volumes
-    .flatMap((v) => chaptersByVolume[v.id] ?? [])
-    .sort((a, b) => a.idx - b.idx);
+  const allChapters = useMemo(
+    () =>
+      volumes
+        .flatMap((v) => chaptersByVolume[v.id] ?? [])
+        .sort((a, b) => a.idx - b.idx),
+    [volumes, chaptersByVolume],
+  );
 
   const firstChapterId = allChapters[0]?.id ?? null;
-
-  // When the server provides a DB-sourced chapter ID, use it as the default so
-  // that progress from another device/session overrides the stale local value.
   const defaultChapterId = initialChapterId ?? firstChapterId;
 
   const [selectedChapterId, setSelectedChapterId] = usePersistedStore<
     number | null
   >(`plotarmor:progress:${serialId}`, defaultChapterId);
 
-  // Single global key — once dismissed on any serial, never shows again.
-  // suppressHydrationWarning: server renders closed (default=false),
-  // client may have stored dismissed=true — intentional mismatch accepted.
+  // suppressHydrationWarning: server renders open (default=false); client may
+  // have dismissed=true in localStorage — intentional mismatch accepted.
   const [popoverDismissed, setPopoverDismissed] = usePersistedStore<boolean>(
     GLOBAL_POPOVER_DISMISSED_KEY,
     false,
   );
 
-  const [volCollapsed, setVolCollapsed] = useCollapsedVolumes(serialId);
-
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Wraps the Select trigger; anchors the spoiler Popover callout.
   const triggerRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
 
-  function writeCookie(id: number) {
-    document.cookie = `${cookieName(serialId)}=${id}; path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}`;
-  }
+  // Stable options array; new reference each render would bust Select's memos.
+  const options = useMemo<Option<number | null>[]>(
+    () =>
+      volumes
+        .filter((v) => (chaptersByVolume[v.id] ?? []).length > 0)
+        .map((v) => ({
+          label: v.displayName,
+          value: null,
+          structural: true as const,
+          children: (chaptersByVolume[v.id] ?? []).map(
+            (c): Option<number | null> => ({
+              label: c.displayName,
+              value: c.id,
+            }),
+          ),
+        })),
+    [volumes, chaptersByVolume],
+  );
+
+  const handleChange = useCallback(
+    (id: number | null) => {
+      if (id === null) return;
+      setSelectedChapterId(id);
+      setPopoverDismissed(true);
+      writeCookie(serialId, id);
+      if (isAuthenticated) void syncUserProgress(serialId, id);
+      router.refresh();
+    },
+    [
+      serialId,
+      isAuthenticated,
+      router,
+      setSelectedChapterId,
+      setPopoverDismissed,
+    ],
+  );
 
   useEffect(() => {
     const id = selectedChapterId ?? firstChapterId;
     if (id === null) return;
-    writeCookie(id);
+    writeCookie(serialId, id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -123,7 +150,7 @@ export function ChapterSelector(props: Props) {
   useEffect(() => {
     if (initialChapterId == null) return;
     setSelectedChapterId(initialChapterId);
-    writeCookie(initialChapterId);
+    writeCookie(serialId, initialChapterId);
     // Only run once on mount when the server provides a DB value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -136,72 +163,6 @@ export function ChapterSelector(props: Props) {
     ? selectedChapter.displayName
     : `Select ${chapterType}`;
 
-  function handleSelectChapter(chapterId: number) {
-    setSelectedChapterId(chapterId);
-    setPopoverDismissed(true);
-    writeCookie(chapterId);
-    setDropdownOpen(false);
-    if (isAuthenticated) {
-      // Fire-and-forget: persist progress to the database for cross-device sync.
-      void syncUserProgress(serialId, chapterId);
-    }
-    router.refresh();
-  }
-
-  function dismissPopover() {
-    setPopoverDismissed(true);
-  }
-
-  function toggleVolume(volumeId: number) {
-    setVolCollapsed((prev) => ({
-      ...prev,
-      [volumeId]: !prev[volumeId],
-    }));
-  }
-
-  const visibleVolumes = volumes.filter(
-    (v) => (chaptersByVolume[v.id] ?? []).length > 0,
-  );
-
-  /** Shared chapter list rendered inside both the dropdown and the mobile drawer. */
-  const chapterListContents = visibleVolumes.map((volume) => {
-    const isCollapsed = !!volCollapsed[volume.id];
-    const chaps = chaptersByVolume[volume.id] ?? [];
-    return (
-      <MenuItem
-        key={volume.id}
-        group
-        label={volume.displayName}
-        isOpen={!isCollapsed}
-        onClick={() => toggleVolume(volume.id)}
-      >
-        {chaps.map((chapter) => (
-          <MenuItem
-            key={chapter.id}
-            selected={chapter.id === effectiveChapterId}
-            onClick={() => handleSelectChapter(chapter.id)}
-            className="px-6"
-          >
-            <Box className="items-center justify-between gap-1 w-full">
-              <Text as="span" variant="label" className="truncate">
-                {chapter.displayName}
-              </Text>
-              <Link
-                href={`/${serialSlug}/chapter/${chapter.idx}`}
-                onClick={(e) => e.stopPropagation()}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-                aria-label={`View ${chapter.displayName} page`}
-                title={`View ${chapter.displayName} page`}
-              >
-                <ExternalLinkIcon className="size-3" />
-              </Link>
-            </Box>
-          </MenuItem>
-        ))}
-      </MenuItem>
-    );
-  });
-
   const spoilerCallout = (
     <Box className="items-start gap-2 px-3 py-2 text-sm">
       <Text variant="label" className="flex-1 leading-snug text-amber-800">
@@ -212,7 +173,7 @@ export function ChapterSelector(props: Props) {
         <Button
           variant="ghost"
           size="icon-xs"
-          onClick={dismissPopover}
+          onClick={() => setPopoverDismissed(true)}
           aria-label="Dismiss spoiler reminder"
           className="shrink-0 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
         >
@@ -225,22 +186,19 @@ export function ChapterSelector(props: Props) {
   return (
     <Box className="items-center">
       <div ref={triggerRef}>
-        <Menu
-          isOpen={dropdownOpen}
-          onClose={() => setDropdownOpen(false)}
-          align="right"
-          role="listbox"
-          aria-label="Chapter list"
-          panelClassName="w-60 max-h-80"
-          contents={chapterListContents}
+        <Select
+          options={options}
+          value={effectiveChapterId ?? undefined}
+          onChange={handleChange}
+          popupWidth="240px"
+          aria-label={`Set ${chapterType} progress`}
         >
-          <Tooltip content={`Set your ${chapterType}`} side="bottom">
+          <Tooltip content={`Set your ${chapterType}`}>
             <Button
               variant="ghost"
               size="icon"
-              className="sm:w-auto sm:px-2.5"
+              className="sm:w-auto sm:px-2.5 gap-1 items-center"
               aria-label={`Set ${chapterType} progress`}
-              onClick={() => setDropdownOpen((o) => !o)}
             >
               <BookmarkIcon className="size-4" />
               <Text
@@ -252,14 +210,9 @@ export function ChapterSelector(props: Props) {
               </Text>
             </Button>
           </Tooltip>
-        </Menu>
+        </Select>
       </div>
 
-      {/*
-       * suppressHydrationWarning: server renders open (popoverDismissed defaults
-       * to false), but the client may have dismissed=true in localStorage.
-       * Intentional mismatch — base-ui's Portal renders client-only anyway.
-       */}
       <span suppressHydrationWarning>
         <Popover
           anchor={triggerRef}
@@ -277,6 +230,3 @@ export function ChapterSelector(props: Props) {
     </Box>
   );
 }
-
-const useCollapsedVolumes = (serialId: number) =>
-  usePersistedStore<Record<number, boolean>>(volCollapsedKey(serialId), {});

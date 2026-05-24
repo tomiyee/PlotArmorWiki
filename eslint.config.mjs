@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
   ]),
   {
     rules: {
+      // setState inside useEffect is intentional in several components (e.g. resetting
+      // selection index on open, syncing derived state). Disable the rule project-wide.
+      "react-hooks/set-state-in-effect": "off",
       // Allow underscore-prefixed variables to be unused (intentional omission pattern).
       "@typescript-eslint/no-unused-vars": [
         "error",
