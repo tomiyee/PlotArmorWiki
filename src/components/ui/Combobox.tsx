@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, useId } from "react";
 import { Popover } from "@/components/ui/Popover";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { cn, normalizeQuery } from "@/lib/utils";
 import type { Option } from "@/components/ui/Select";
 
 export type { Option } from "@/components/ui/Select";
@@ -39,7 +39,7 @@ export type ComboboxProps<T> =
     });
 
 function filterStatic<T>(options: Option<T>[], query: string): Option<T>[] {
-  const q = query.toLowerCase().trim();
+  const q = normalizeQuery(query);
   if (!q) return options;
   return options.filter((o) => o.label.toLowerCase().includes(q));
 }

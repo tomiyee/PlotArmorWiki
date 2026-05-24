@@ -8,12 +8,16 @@ import {
   useId,
   useMemo,
   type ChangeEvent,
+  type Dispatch,
   type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  type SetStateAction,
 } from "react";
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Popover } from "@/components/ui/Popover";
-import { cn } from "@/lib/utils";
+import { cn, normalizeQuery } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Option type
@@ -78,34 +82,40 @@ type SelectProps<T> = {
   /** Forwarded to the trigger button as an `id`. */
   id?: string;
   /**
-   * Width behaviour.
-   * - `"trigger"` (default): dropdown matches trigger width.
-   * - `"fixed"`: fixed 200 px width.
+   * CSS width value applied to the popup (e.g. `"240px"`, `"var(--anchor-width)"`).
+   * Defaults to `"var(--anchor-width)"` (match trigger width).
    */
-  widthMode?: "trigger" | "fixed";
+  popupWidth?: string;
   /**
    * When false, the search input is hidden and options are never filtered.
    * Useful for short, well-known lists where search adds no value.
    * Defaults to true.
    */
   searchable?: boolean;
+  /**
+   * Optional custom trigger element rendered in place of the default outline
+   * button. Clicking anywhere inside the element opens the dropdown.
+   * The dropdown is positioned relative to this element.
+   *
+   * @example
+   * <Select options={opts} value={v} onChange={setV}>
+   *   <Button variant="ghost"><CalendarIcon /></Button>
+   * </Select>
+   */
+  children?: ReactNode;
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// buildFlatRows — flattens the option tree into a visible row list
 // ---------------------------------------------------------------------------
 
-/**
- * Builds a flat list of visible rows from the option tree, respecting
- * accordion expansion state and filtering.
- */
 function buildFlatRows<T>(
   options: Option<T>[],
   expandedIds: ReadonlySet<string>,
   query: string,
   parentId = "",
 ): FlatRow<T>[] {
-  const q = query.toLowerCase().trim();
+  const q = normalizeQuery(query);
 
   function matchesFilter(opt: Option<T>): boolean {
     if (opt.label.toLowerCase().includes(q)) return true;
@@ -127,44 +137,30 @@ function buildFlatRows<T>(
       const id = prefix ? `${prefix}-${i}` : `${i}`;
       const hasChildren = (opt.children?.length ?? 0) > 0;
 
-      // Filter: skip options that don't match (and have no matching descendants).
       if (q && !matchesFilter(opt)) continue;
 
       const selectable = !opt.structural && !opt.disabled && !hasChildren;
       const selectableIdx = selectable ? selectableCounter.n++ : -1;
+      // When filtering, force-expand all accordions so matches are always visible.
+      const isExpanded = q ? true : expandedIds.has(id);
 
-      // When filtering, auto-expand all ancestor accordions.
-      const isExpanded = q
-        ? true
-        : expandedIds.has(id) !== false
-          ? expandedIds.has(id)
-          : true; // default: expanded
-
-      rows.push({
-        id,
-        option: opt,
-        depth,
-        expanded: isExpanded,
-        selectable,
-        selectableIdx,
-      });
+      rows.push({ id, option: opt, depth, expanded: isExpanded, selectable, selectableIdx });
 
       if (hasChildren && isExpanded) {
-        const childRows = walk(opt.children!, depth + 1, id, selectableCounter);
-        rows.push(...childRows);
+        rows.push(...walk(opt.children!, depth + 1, id, selectableCounter));
       }
     }
 
     return rows;
   }
 
-  const counter = { n: 0 };
-  return walk(options, 0, parentId, counter);
+  return walk(options, 0, parentId, { n: 0 });
 }
 
-/**
- * Returns the label of the option matching `value`, or `undefined` if not found.
- */
+// ---------------------------------------------------------------------------
+// findLabel — walks the tree to find the display label for a value
+// ---------------------------------------------------------------------------
+
 function findLabel<T>(options: Option<T>[], value: T): string | undefined {
   for (const opt of options) {
     if (opt.value === value) return opt.label;
@@ -174,6 +170,337 @@ function findLabel<T>(options: Option<T>[], value: T): string | undefined {
     }
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// useAccordionState — manages expand/collapse for grouped options
+// ---------------------------------------------------------------------------
+
+/**
+ * Tracks which accordion sections are expanded. Starts with all expanded
+ * (null sentinel), then switches to an explicit set on first user toggle.
+ *
+ * @example
+ * const { effectiveExpandedIds, toggleExpand } = useAccordionState(options);
+ */
+function useAccordionState<T>(options: Option<T>[]) {
+  // null = uninitialized: treat every ID as expanded (same as allRowIds)
+  const [expandedIds, setExpandedIds] = useState<Set<string> | null>(null);
+
+  const allRowIds = useMemo(() => {
+    function collectIds(opts: Option<T>[], prefix = ""): string[] {
+      return opts.flatMap((opt, i) => {
+        const id = prefix ? `${prefix}-${i}` : `${i}`;
+        return [id, ...(opt.children ? collectIds(opt.children, id) : [])];
+      });
+    }
+    return new Set(collectIds(options));
+  }, [options]);
+
+  const effectiveExpandedIds: ReadonlySet<string> = expandedIds ?? allRowIds;
+
+  const toggleExpand = useCallback(
+    (rowId: string) => {
+      setExpandedIds((prev) => {
+        const base = prev ?? allRowIds;
+        const next = new Set(base);
+        if (next.has(rowId)) next.delete(rowId);
+        else next.add(rowId);
+        return next;
+      });
+    },
+    [allRowIds],
+  );
+
+  return { effectiveExpandedIds, toggleExpand };
+}
+
+// ---------------------------------------------------------------------------
+// useFlatRows — derives the visible row list and keyboard-nav metadata
+// ---------------------------------------------------------------------------
+
+function useFlatRows<T>(
+  options: Option<T>[],
+  effectiveExpandedIds: ReadonlySet<string>,
+  query: string,
+  searchable: boolean,
+) {
+  const flatRows = useMemo(
+    () => buildFlatRows(options, effectiveExpandedIds, searchable ? query : ""),
+    [options, effectiveExpandedIds, query, searchable],
+  );
+  const selectableRows = useMemo(
+    () => flatRows.filter((r) => r.selectable),
+    [flatRows],
+  );
+  return { flatRows, selectableRows, totalSelectableCount: selectableRows.length };
+}
+
+// ---------------------------------------------------------------------------
+// useKeyboardNav — keyboard handler for the search input
+// ---------------------------------------------------------------------------
+
+type KeyboardNavOptions<T> = {
+  isOpen: boolean;
+  totalSelectableCount: number;
+  selectableRows: FlatRow<T>[];
+  activeSelectableIdx: number;
+  setActiveSelectableIdx: Dispatch<SetStateAction<number>>;
+  onSelect: (row: FlatRow<T>) => void;
+  onClose: () => void;
+};
+
+function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
+  const {
+    isOpen,
+    totalSelectableCount,
+    selectableRows,
+    activeSelectableIdx,
+    setActiveSelectableIdx,
+    onSelect,
+    onClose,
+  } = opts;
+
+  return useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!isOpen) return;
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setActiveSelectableIdx((i) => Math.min(i + 1, totalSelectableCount - 1));
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setActiveSelectableIdx((i) => Math.max(i - 1, 0));
+          break;
+        case "Home":
+          e.preventDefault();
+          setActiveSelectableIdx(0);
+          break;
+        case "End":
+          e.preventDefault();
+          setActiveSelectableIdx(Math.max(0, totalSelectableCount - 1));
+          break;
+        case "Enter": {
+          e.preventDefault();
+          const row = selectableRows[activeSelectableIdx];
+          if (row) onSelect(row);
+          break;
+        }
+        case "Escape":
+          e.preventDefault();
+          onClose();
+          break;
+      }
+    },
+    [
+      isOpen,
+      totalSelectableCount,
+      selectableRows,
+      activeSelectableIdx,
+      setActiveSelectableIdx,
+      onSelect,
+      onClose,
+    ],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GroupRow — non-selectable section header / accordion trigger
+// ---------------------------------------------------------------------------
+
+type GroupRowProps = {
+  /** DOM element id for ARIA references. */
+  domId: string;
+  label: string;
+  description?: string;
+  /** Nesting depth used to compute left-padding. */
+  depth: number;
+  expanded: boolean;
+  /** When false, the row is a static label with no expand/collapse behavior. */
+  isAccordion: boolean;
+  onToggle: () => void;
+};
+
+function GroupRow(props: GroupRowProps) {
+  const { domId, label, description, depth, expanded, isAccordion, onToggle } = props;
+  return (
+    <div
+      id={domId}
+      role="treeitem"
+      aria-level={depth + 1}
+      aria-selected={false}
+      aria-expanded={isAccordion ? expanded : undefined}
+      style={{ paddingLeft: depth * 16 + 8 }}
+      className="flex items-center gap-1.5 pr-3 h-9 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none cursor-pointer hover:bg-muted/50"
+      onClick={() => isAccordion && onToggle()}
+    >
+      {isAccordion && (
+        <span className="shrink-0 text-muted-foreground">
+          {expanded ? (
+            <ChevronDownIcon className="size-3" />
+          ) : (
+            <ChevronRightIcon className="size-3" />
+          )}
+        </span>
+      )}
+      <span className="truncate">{label}</span>
+      {description && (
+        <span className="truncate text-muted-foreground/70 ml-1">{description}</span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LeafRow — selectable or disabled leaf option
+// ---------------------------------------------------------------------------
+
+type LeafRowProps = {
+  /** DOM element id for ARIA references. */
+  domId: string;
+  label: string;
+  description?: string;
+  /** Nesting depth used to compute left-padding. */
+  depth: number;
+  disabled?: boolean;
+  isActive: boolean;
+  isSelected: boolean;
+  /** Attached only when this row is the keyboard-active item, for scroll-into-view. */
+  activeRowRef?: RefObject<HTMLDivElement | null>;
+  onSelect: () => void;
+};
+
+function LeafRow(props: LeafRowProps) {
+  const {
+    domId, label, description, depth, disabled, isActive, isSelected, activeRowRef, onSelect,
+  } = props;
+  return (
+    <div
+      id={domId}
+      role="treeitem"
+      aria-level={depth + 1}
+      aria-selected={isSelected}
+      aria-disabled={disabled}
+      ref={activeRowRef}
+      style={{ paddingLeft: depth * 16 + 8 }}
+      className={cn(
+        "flex items-start gap-2 pr-3 h-9 cursor-pointer select-none transition-colors",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/40",
+        isActive && !disabled && "bg-primary/10 font-medium text-primary",
+      )}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        if (!disabled) onSelect();
+      }}
+    >
+      <span className="truncate text-sm leading-9">{label}</span>
+      {description && (
+        <span className="truncate text-xs text-muted-foreground leading-9 shrink-0 max-w-[40%]">
+          {description}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DropdownContent — the panel rendered inside the Popover
+// ---------------------------------------------------------------------------
+
+type DropdownContentProps = {
+  searchable: boolean;
+  query: string;
+  onQueryChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  isOpen: boolean;
+  treeId: string;
+  activeRowDomId: string | undefined;
+  hasOptions: boolean;
+  selectableCount: number;
+  children: ReactNode;
+};
+
+function DropdownContent(props: DropdownContentProps) {
+  const {
+    searchable,
+    query,
+    onQueryChange,
+    onKeyDown,
+    isOpen,
+    treeId,
+    activeRowDomId,
+    hasOptions,
+    selectableCount,
+    children,
+  } = props;
+
+  const liveRegionId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const t = setTimeout(() => searchRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
+  return (
+    <div className="flex flex-col h-full">
+      {searchable && (
+        <div className="px-2 py-1.5 border-b border-border shrink-0">
+          <div className="relative">
+            <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={onQueryChange}
+              onKeyDown={onKeyDown}
+              placeholder="Search…"
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-controls={treeId}
+              aria-autocomplete="list"
+              aria-activedescendant={activeRowDomId}
+              className={cn(
+                "w-full h-7 pl-7 pr-2 text-sm bg-transparent outline-none",
+                "placeholder:text-muted-foreground",
+              )}
+            />
+          </div>
+        </div>
+      )}
+
+      <div
+        id={liveRegionId}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {hasOptions
+          ? `${selectableCount} option${selectableCount === 1 ? "" : "s"} available`
+          : "No options available."}
+      </div>
+
+      {hasOptions ? (
+        <div className="overflow-y-auto flex-1">
+          <div id={treeId} role="tree">
+            {children}
+          </div>
+        </div>
+      ) : (
+        <div
+          role="status"
+          aria-label="No options available."
+          className="px-3 py-3 text-sm text-muted-foreground text-center"
+        >
+          No options available.
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +540,12 @@ function findLabel<T>(options: Option<T>[], value: T): string | undefined {
  *   onChange={setSelectedChapterId}
  *   placeholder="Select chapter…"
  * />
+ *
+ * @example
+ * // Custom trigger — any element as the dropdown button
+ * <Select options={opts} value={v} onChange={setV}>
+ *   <Button variant="ghost" size="icon"><BookmarkIcon /></Button>
+ * </Select>
  */
 function Select<T>(props: SelectProps<T>) {
   const {
@@ -223,140 +556,38 @@ function Select<T>(props: SelectProps<T>) {
     className,
     disabled,
     id,
-    widthMode = "trigger",
+    popupWidth = "var(--anchor-width)",
     searchable = true,
+    children,
   } = props;
-
-  // -------------------------------------------------------------------------
-  // State — all internal; value/onChange are the only controlled interface.
-  // -------------------------------------------------------------------------
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  /** Set of row IDs whose accordions are explicitly expanded. Defaults to all expanded. */
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  /** Whether the expandedIds set has been explicitly initialized (first open). */
-  const [expandedInitialized, setExpandedInitialized] = useState(false);
-  /** Selectable-index of the currently "active" (keyboard-highlighted) option. */
   const [activeSelectableIdx, setActiveSelectableIdx] = useState(0);
 
-  // -------------------------------------------------------------------------
-  // Refs
-  // -------------------------------------------------------------------------
-
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLDivElement>(null);
 
-  // -------------------------------------------------------------------------
-  // IDs
-  // -------------------------------------------------------------------------
+  const hasCustomTrigger = children != null;
 
   const uid = useId();
   const treeId = `${uid}-tree`;
-  const liveRegionId = `${uid}-live`;
 
-  // -------------------------------------------------------------------------
-  // Derived: flat visible rows
-  // -------------------------------------------------------------------------
-
-  // Build the full expanded-id set on first open (all IDs expanded by default).
-  const allRowIds = useMemo(() => {
-    function collectIds(opts: Option<T>[], prefix = ""): string[] {
-      return opts.flatMap((opt, i) => {
-        const id = prefix ? `${prefix}-${i}` : `${i}`;
-        return [id, ...(opt.children ? collectIds(opt.children, id) : [])];
-      });
-    }
-    return new Set(collectIds(options));
-  }, [options]);
-
-  const effectiveExpandedIds: ReadonlySet<string> = useMemo(() => {
-    if (!expandedInitialized) return allRowIds;
-    return expandedIds;
-  }, [expandedInitialized, expandedIds, allRowIds]);
-
-  const flatRows = useMemo(
-    () => buildFlatRows(options, effectiveExpandedIds, searchable ? query : ""),
-    [options, effectiveExpandedIds, query, searchable],
+  const { effectiveExpandedIds, toggleExpand } = useAccordionState(options);
+  const { flatRows, selectableRows, totalSelectableCount } = useFlatRows(
+    options,
+    effectiveExpandedIds,
+    query,
+    searchable,
   );
-
-  const selectableRows = useMemo(
-    () => flatRows.filter((r) => r.selectable),
-    [flatRows],
-  );
-
-  const totalSelectableCount = selectableRows.length;
-
-  // -------------------------------------------------------------------------
-  // Effects
-  // -------------------------------------------------------------------------
-
-  // Focus the search input when the dropdown opens.
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => searchRef.current?.focus(), 0);
-      setActiveSelectableIdx(0);
-    }
-  }, [isOpen]);
-
-  // Scroll active row into view when activeSelectableIdx changes.
-  useEffect(() => {
-    if (!isOpen) return;
-    activeRowRef.current?.scrollIntoView({ block: "nearest" });
-  }, [activeSelectableIdx, isOpen]);
-
-  // Close on outside click (input + popup are in separate DOM subtrees).
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleClick(e: MouseEvent) {
-      const target = e.target as Node;
-      const inTrigger = triggerRef.current?.contains(target) ?? false;
-      const inPopup = popupRef.current?.contains(target) ?? false;
-      if (!inTrigger && !inPopup) setIsOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [isOpen]);
-
-  // -------------------------------------------------------------------------
-  // Handlers
-  // -------------------------------------------------------------------------
-
-  const handleOpen = useCallback(() => {
-    if (disabled) return;
-    if (!expandedInitialized) setExpandedInitialized(true);
-    setQuery("");
-    setIsOpen(true);
-  }, [disabled, expandedInitialized]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
     setQuery("");
     triggerRef.current?.focus();
   }, []);
-
-  const handleToggleExpand = useCallback(
-    (rowId: string) => {
-      if (!expandedInitialized) {
-        // Initialize from allRowIds then toggle.
-        const next = new Set(allRowIds);
-        if (next.has(rowId)) next.delete(rowId);
-        else next.add(rowId);
-        setExpandedIds(next);
-        setExpandedInitialized(true);
-      } else {
-        setExpandedIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(rowId)) next.delete(rowId);
-          else next.add(rowId);
-          return next;
-        });
-      }
-    },
-    [expandedInitialized, allRowIds],
-  );
 
   const handleSelect = useCallback(
     (row: FlatRow<T>) => {
@@ -369,65 +600,52 @@ function Select<T>(props: SelectProps<T>) {
     [onChange],
   );
 
+  const handleOpen = useCallback(() => {
+    if (disabled) return;
+    setQuery("");
+    setIsOpen(true);
+  }, [disabled]);
+
   const handleQueryChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
     setActiveSelectableIdx(0);
   }, []);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
-      if (!isOpen) return;
+  const handleKeyDown = useKeyboardNav({
+    isOpen,
+    totalSelectableCount,
+    selectableRows,
+    activeSelectableIdx,
+    setActiveSelectableIdx,
+    onSelect: handleSelect,
+    onClose: handleClose,
+  });
 
-      switch (e.key) {
-        case "ArrowDown": {
-          e.preventDefault();
-          setActiveSelectableIdx((i) =>
-            Math.min(i + 1, totalSelectableCount - 1),
-          );
-          // Auto-expand collapsed accordion if active item is inside it.
-          break;
-        }
-        case "ArrowUp": {
-          e.preventDefault();
-          setActiveSelectableIdx((i) => Math.max(i - 1, 0));
-          break;
-        }
-        case "Home": {
-          e.preventDefault();
-          setActiveSelectableIdx(0);
-          break;
-        }
-        case "End": {
-          e.preventDefault();
-          setActiveSelectableIdx(Math.max(0, totalSelectableCount - 1));
-          break;
-        }
-        case "Enter": {
-          e.preventDefault();
-          const activeRow = selectableRows[activeSelectableIdx];
-          if (activeRow) handleSelect(activeRow);
-          break;
-        }
-        case "Escape": {
-          e.preventDefault();
-          handleClose();
-          break;
-        }
-      }
-    },
-    [
-      isOpen,
-      totalSelectableCount,
-      selectableRows,
-      activeSelectableIdx,
-      handleSelect,
-      handleClose,
-    ],
-  );
+  // Reset active index when the dropdown opens.
+  useEffect(() => {
+    if (isOpen) setActiveSelectableIdx(0);
+  }, [isOpen]);
 
-  // -------------------------------------------------------------------------
-  // Derived display values
-  // -------------------------------------------------------------------------
+  // Scroll the keyboard-active row into view.
+  useEffect(() => {
+    if (!isOpen) return;
+    activeRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeSelectableIdx, isOpen]);
+
+  // Close when the user clicks outside the trigger and popup.
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      const inTrigger =
+        (triggerRef.current?.contains(target) ?? false) ||
+        (wrapperRef.current?.contains(target) ?? false);
+      const inPopup = popupRef.current?.contains(target) ?? false;
+      if (!inTrigger && !inPopup) setIsOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isOpen]);
 
   const selectedLabel =
     value !== undefined ? findLabel(options, value) : undefined;
@@ -435,192 +653,88 @@ function Select<T>(props: SelectProps<T>) {
   const activeRow = selectableRows[activeSelectableIdx];
   const activeRowDomId = activeRow ? `${uid}-row-${activeRow.id}` : undefined;
 
-  // -------------------------------------------------------------------------
-  // Render row
-  // -------------------------------------------------------------------------
-
   function renderRow(row: FlatRow<T>) {
-    const { option, depth, expanded, id } = row;
+    const { option, depth, expanded, id: rowId } = row;
     const hasChildren = (option.children?.length ?? 0) > 0;
-    const isActive =
-      row.selectable && row.selectableIdx === activeSelectableIdx;
-    const isSelected = value !== undefined && option.value === value;
-    const domId = `${uid}-row-${id}`;
-    const indentPx = depth * 16;
+    const domId = `${uid}-row-${rowId}`;
 
-    if (option.structural || (hasChildren && !option.structural)) {
-      // Group header / accordion trigger
-      const isAccordion = hasChildren;
+    if (option.structural || hasChildren) {
       return (
-        <div
-          key={id}
-          id={domId}
-          role="treeitem"
-          aria-level={depth + 1}
-          aria-selected={false}
-          aria-expanded={isAccordion ? expanded : undefined}
-          style={{ paddingLeft: indentPx + 8 }}
-          className="flex items-center gap-1.5 pr-3 h-9 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none cursor-pointer hover:bg-muted/50"
-          onClick={() => isAccordion && handleToggleExpand(id)}
-        >
-          {isAccordion && (
-            <span className="shrink-0 text-muted-foreground">
-              {expanded ? (
-                <ChevronDownIcon className="size-3" />
-              ) : (
-                <ChevronRightIcon className="size-3" />
-              )}
-            </span>
-          )}
-          <span className="truncate">{option.label}</span>
-          {option.description && (
-            <span className="truncate text-muted-foreground/70 ml-1">
-              {option.description}
-            </span>
-          )}
-        </div>
+        <GroupRow
+          key={rowId}
+          domId={domId}
+          label={option.label}
+          description={option.description}
+          depth={depth}
+          expanded={expanded}
+          isAccordion={hasChildren}
+          onToggle={() => toggleExpand(rowId)}
+        />
       );
     }
 
-    // Selectable or disabled leaf option
+    const isActive = row.selectable && row.selectableIdx === activeSelectableIdx;
+    const isSelected = value !== undefined && option.value === value;
     return (
-      <div
-        key={id}
-        id={domId}
-        role="treeitem"
-        aria-level={depth + 1}
-        aria-selected={isSelected}
-        aria-disabled={option.disabled}
-        ref={isActive ? activeRowRef : undefined}
-        style={{ paddingLeft: indentPx + 8 }}
-        className={cn(
-          "flex items-start gap-2 pr-3 h-9 cursor-pointer select-none",
-          "transition-colors",
-          option.disabled
-            ? "opacity-50 cursor-not-allowed"
-            : "hover:bg-muted/40",
-          isActive &&
-            !option.disabled &&
-            "bg-primary/10 font-medium text-primary",
-        )}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          if (!option.disabled) handleSelect(row);
-        }}
-      >
-        <span className="truncate text-sm leading-9">{option.label}</span>
-        {option.description && (
-          <span className="truncate text-xs text-muted-foreground leading-9 shrink-0 max-w-[40%]">
-            {option.description}
-          </span>
-        )}
-      </div>
+      <LeafRow
+        key={rowId}
+        domId={domId}
+        label={option.label}
+        description={option.description}
+        depth={depth}
+        disabled={option.disabled}
+        isActive={isActive}
+        isSelected={isSelected}
+        activeRowRef={isActive ? activeRowRef : undefined}
+        onSelect={() => handleSelect(row)}
+      />
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Dropdown content
-  // -------------------------------------------------------------------------
-
-  const dropdownContent = (
-    <div className="flex flex-col h-full">
-      {/* Search input — omitted when searchable={false} */}
-      {searchable && (
-        <div className="px-2 py-1.5 border-b border-border shrink-0">
-          <div className="relative">
-            <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={handleQueryChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Search…"
-              autoComplete="off"
-              role="combobox"
-              aria-expanded={isOpen}
-              aria-controls={treeId}
-              aria-autocomplete="list"
-              aria-activedescendant={activeRowDomId}
-              className={cn(
-                "w-full h-7 pl-7 pr-2 text-sm bg-transparent outline-none",
-                "placeholder:text-muted-foreground",
-              )}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Live region for screen readers */}
-      <div
-        id={liveRegionId}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
-        {flatRows.length === 0
-          ? "No options available."
-          : `${totalSelectableCount} option${totalSelectableCount === 1 ? "" : "s"} available`}
-      </div>
-
-      {/* Option list */}
-      {flatRows.length === 0 ? (
-        <div
-          role="status"
-          aria-label="No options available."
-          className="px-3 py-3 text-sm text-muted-foreground text-center"
-        >
-          No options available.
-        </div>
-      ) : (
-        <div className="overflow-y-auto flex-1">
-          <div id={treeId} role="tree">
-            {flatRows.map((row) => renderRow(row))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
-
-  const popupWidth = widthMode === "trigger" ? "var(--anchor-width)" : "200px";
+  const anchorRef = hasCustomTrigger
+    ? (wrapperRef as RefObject<Element | null>)
+    : (triggerRef as RefObject<Element | null>);
 
   return (
-    <div data-slot="select2-wrapper" className={cn("relative", className)}>
-      {/* Trigger button */}
-      <Button
-        ref={triggerRef}
-        id={id}
-        type="button"
-        disabled={disabled}
-        aria-haspopup="tree"
-        aria-expanded={isOpen}
-        aria-controls={isOpen ? treeId : undefined}
-        onClick={handleOpen}
-        variant="outline"
-        size="lg"
-        className={cn(
-          "w-full justify-between px-3 border-input shadow-xs",
-          !selectedLabel && "text-muted-foreground",
-        )}
-      >
-        <span className="truncate">{selectedLabel ?? placeholder}</span>
-        <ChevronDownIcon
-          aria-hidden
+    <div data-slot="select-wrapper" className={cn("relative", className)}>
+      {hasCustomTrigger ? (
+        <div
+          ref={wrapperRef}
+          onClick={disabled ? undefined : handleOpen}
+          className="inline-flex"
+        >
+          {children}
+        </div>
+      ) : (
+        <Button
+          ref={triggerRef}
+          id={id}
+          type="button"
+          disabled={disabled}
+          aria-haspopup="tree"
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? treeId : undefined}
+          onClick={handleOpen}
+          variant="outline"
+          size="lg"
           className={cn(
-            "shrink-0 size-4 text-muted-foreground transition-transform",
-            isOpen && "rotate-180",
+            "w-full justify-between px-3 border-input shadow-xs",
+            !selectedLabel && "text-muted-foreground",
           )}
-        />
-      </Button>
+        >
+          <span className="truncate">{selectedLabel ?? placeholder}</span>
+          <ChevronDownIcon
+            aria-hidden
+            className={cn(
+              "shrink-0 size-4 text-muted-foreground transition-transform",
+              isOpen && "rotate-180",
+            )}
+          />
+        </Button>
+      )}
 
-      {/* Dropdown */}
       <Popover
-        anchor={triggerRef}
+        anchor={anchorRef}
         open={isOpen}
         modal={false}
         popupRef={popupRef}
@@ -631,7 +745,21 @@ function Select<T>(props: SelectProps<T>) {
         align="start"
         popupStyle={{ width: popupWidth, height: "min(300px, 60vh)" }}
         className="flex flex-col bg-background text-foreground overflow-hidden"
-        content={dropdownContent}
+        content={
+          <DropdownContent
+            searchable={searchable}
+            query={query}
+            onQueryChange={handleQueryChange}
+            onKeyDown={handleKeyDown}
+            isOpen={isOpen}
+            treeId={treeId}
+            activeRowDomId={activeRowDomId}
+            hasOptions={flatRows.length > 0}
+            selectableCount={totalSelectableCount}
+          >
+            {flatRows.map((row) => renderRow(row))}
+          </DropdownContent>
+        }
       />
     </div>
   );
