@@ -1,9 +1,30 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import type { JSX } from "react";
-import { MDEditor } from "@/components/MDEditor";
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import type { MDXEditorMethods, RealmPlugin } from "@mdxeditor/editor";
+import {
+  headingsPlugin,
+  listsPlugin,
+  quotePlugin,
+  thematicBreakPlugin,
+  markdownShortcutPlugin,
+  linkPlugin,
+  linkDialogPlugin,
+  tablePlugin,
+  codeBlockPlugin,
+  toolbarPlugin,
+  diffSourcePlugin,
+  BoldItalicUnderlineToggles,
+  BlockTypeSelect,
+  UndoRedo,
+  ListsToggle,
+  InsertTable,
+  InsertThematicBreak,
+  DiffSourceToggleWrapper,
+  CodeToggle,
+  Separator,
+} from "@mdxeditor/editor";
+import { MDXEditorClient } from "@/components/MDEditor";
 
 interface WikiPage {
   /** Display title of the wiki page, used for filtering and shown in the dropdown. */
@@ -26,7 +47,10 @@ type WikiLinkMDEditorProps = {
   onChange: (val: string | undefined) => void;
   /** Editor height in pixels. */
   height?: number;
-  /** Which panel to show initially. */
+  /**
+   * Kept for API compatibility with existing callers. Has no effect: MDXEditor
+   * is always WYSIWYG; a "Source" toggle in the toolbar gives access to raw markdown.
+   */
   preview?: "edit" | "live" | "preview";
   /** All wiki pages visible to the reader at their current chapter cutoff. */
   wikiPages: WikiPage[];
@@ -56,23 +80,21 @@ interface Suggestion {
 }
 
 /**
- * Wraps `<MDEditor>` with `[[Page]]` wiki link autocomplete.
+ * Wraps MDXEditor (WYSIWYG) with `[[Page]]` wiki link autocomplete.
  *
- * Autocomplete is triggered by typing `[[` anywhere in the editor. The
- * dropdown filters pages by name (substring match) as the user types and is
- * positioned at the pixel location of the `[[` trigger character.
+ * Autocomplete is triggered by typing `[[` anywhere in the editor. The dropdown
+ * filters pages and chapters by name (substring match) as the user types and is
+ * positioned at the cursor's pixel location via the DOM Selection API.
  *
- * Selecting a suggestion replaces the open `[[…` fragment with `[[PageName]]`.
+ * Selecting a suggestion replaces the open `[[…` fragment with `[[token]]` by
+ * calling `editorRef.setMarkdown()` on the modified markdown string.
  *
- * Keyboard navigation uses `onKeyDownCapture` on the container div rather than
- * `onKeyDown` on the textarea. MDEditor's `factory.js` attaches a native
- * `addEventListener('keydown', …)` to its internal textarea ref, which fires
- * before React synthetic bubble events. The capture phase on an ancestor fires
- * before any native listeners on descendants, guaranteeing our handler wins.
+ * The `preview` prop is accepted for API compatibility but has no effect:
+ * MDXEditor is always WYSIWYG. A "Source" toggle in the toolbar allows raw
+ * markdown editing when needed.
  *
- * The dropdown is positioned by measuring a hidden mirror div that replicates
- * the textarea's text layout (font, padding, word-wrap) to find the `[[`
- * trigger's pixel coordinates relative to the editor container.
+ * Keyboard navigation uses `onKeyDownCapture` on the wrapper div to fire before
+ * MDXEditor's Lexical key handlers, ensuring the dropdown always wins.
  *
  * IME composition state is tracked via `onCompositionStart`/`onCompositionEnd`
  * so dropdown keyboard navigation is suppressed during CJK input.
@@ -92,27 +114,21 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     value,
     onChange,
     height = 300,
-    preview = "edit",
     wikiPages,
-    serialSlug,
     wikiChapters = [],
     chapterType,
   } = props;
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<MDXEditorMethods>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // slug → display name map for the inline preview renderer.
-  const pageTitles = useMemo(
-    () => Object.fromEntries(wikiPages.map((p) => [p.slug, p.name])),
-    [wikiPages],
-  );
-
-  // chapter display name → idx map for the inline preview renderer.
-  const wikiChaptersByName = useMemo(
-    () => Object.fromEntries(wikiChapters.map((c) => [c.name, c.idx])),
-    [wikiChapters],
-  );
+  // Tracks the last markdown value we emitted so applySuggestion can read it.
+  const lastEmittedRef = useRef<string>(value);
+  // True while we are programmatically calling setMarkdown to apply a suggestion,
+  // so the onChange handler does not re-open the dropdown.
+  const isApplyingRef = useRef(false);
+  // Track the previous `value` prop so we can sync external changes into the editor.
+  const prevValueRef = useRef<string>(value);
 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -123,6 +139,15 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     left: number;
   } | null>(null);
 
+  // Sync external value changes (e.g. chapter switch pre-fills draft) into the editor.
+  useEffect(() => {
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value;
+      lastEmittedRef.current = value;
+      editorRef.current?.setMarkdown(value);
+    }
+  }, [value]);
+
   function closeSuggestions() {
     setIsOpen(false);
     setSuggestions([]);
@@ -131,166 +156,165 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   }
 
   /**
-   * Compute the pixel position of character `index` within `ta`, relative to
-   * `containerRef`. Appends a fixed-position mirror div to document.body that
-   * replicates the textarea's text layout so word-wrap is accounted for.
+   * Reads the cursor's pixel position from the DOM Selection API and returns
+   * coordinates relative to `containerRef` so the autocomplete dropdown
+   * appears just below the current insertion point.
    */
-  function computeCaretPos(
-    ta: HTMLTextAreaElement,
-    index: number,
-  ): { top: number; left: number } | null {
+  function getCursorPos(): { top: number; left: number } | null {
     const container = containerRef.current;
     if (!container) return null;
 
-    const style = window.getComputedStyle(ta);
-    const taRect = ta.getBoundingClientRect();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
 
-    const mirror = document.createElement("div");
-    Object.assign(mirror.style, {
-      position: "fixed",
-      visibility: "hidden",
-      pointerEvents: "none",
-      zIndex: "-1",
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-word",
-      overflowWrap: "break-word",
-      boxSizing: "border-box",
-      // Offset by scrollTop so the mirror's text starts where the textarea's does
-      top: `${taRect.top - ta.scrollTop}px`,
-      left: `${taRect.left}px`,
-      width: `${ta.clientWidth}px`,
-      fontFamily: style.fontFamily,
-      fontSize: style.fontSize,
-      fontWeight: style.fontWeight,
-      lineHeight: style.lineHeight,
-      letterSpacing: style.letterSpacing,
-      paddingTop: style.paddingTop,
-      paddingRight: style.paddingRight,
-      paddingBottom: style.paddingBottom,
-      paddingLeft: style.paddingLeft,
-    });
+    // If the selection rect is zero-size the caret is at the start of a block;
+    // fall back to positioning at the top of the editor.
+    if (rect.width === 0 && rect.height === 0) return null;
 
-    mirror.appendChild(document.createTextNode(ta.value.substring(0, index)));
-    const marker = document.createElement("span");
-    marker.textContent = "​"; // zero-width space as measurement anchor
-    mirror.appendChild(marker);
-
-    document.body.appendChild(mirror);
-    const markerRect = marker.getBoundingClientRect();
-    document.body.removeChild(mirror);
-
-    const lineH = parseFloat(style.lineHeight) || 20;
-    // Place dropdown below the trigger line; clamp within the textarea bounds
-    const top = Math.max(
-      taRect.top - containerRect.top + lineH,
-      Math.min(
-        markerRect.bottom - containerRect.top + 2,
-        taRect.bottom - containerRect.top,
+    const lineH = 24; // approximate line height in px
+    return {
+      top: rect.bottom - containerRect.top + lineH / 4,
+      // Keep w-72 (288 px) dropdown horizontally inside the container
+      left: Math.max(
+        0,
+        Math.min(rect.left - containerRect.left, containerRect.width - 288),
       ),
-    );
-    // Keep w-72 (288px) dropdown horizontally inside the container
-    const left = Math.max(
-      0,
-      Math.min(
-        markerRect.left - containerRect.left,
-        containerRect.width - 288,
-      ),
-    );
-
-    return { top, left };
-  }
-
-  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
-    // MDEditor's cloneElement({ ref: textRef }) replaces our ref callback, so
-    // we cache the element here instead — onInput is not overridden by cloneElement.
-    textareaRef.current = e.currentTarget;
-    const ta = e.currentTarget;
-    const before = ta.value.substring(0, ta.selectionStart ?? ta.value.length);
-    const lastOpen = before.lastIndexOf("[[");
-
-    if (lastOpen === -1 || before.indexOf("]]", lastOpen) !== -1) {
-      closeSuggestions();
-      return;
-    }
-
-    const triggerText = before.slice(lastOpen + 2);
-    const colonIdx = triggerText.indexOf(":");
-    // When user types a prefix like "Chapter:" or "page:", filter by what comes after the colon.
-    const prefixTyped = colonIdx !== -1 ? triggerText.slice(0, colonIdx).toLowerCase() : null;
-    const pageQuery = (
-      colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText
-    ).toLowerCase();
-
-    // When the user types a namespace prefix (e.g. "Chapter:"), restrict
-    // suggestions to the matching group. With no prefix (null), show both.
-    const isChapterPrefix =
-      prefixTyped !== null &&
-      chapterType !== undefined &&
-      prefixTyped === chapterType.toLowerCase();
-    const isExplicitPagePrefix = prefixTyped === "page";
-    // Show page suggestions: no prefix typed, or explicit "page:" prefix.
-    const showPages = prefixTyped === null || isExplicitPagePrefix;
-    // Show chapter suggestions: no prefix typed, or a matching chapter-type prefix.
-    const showChapters = prefixTyped === null || isChapterPrefix;
-
-    const pageSuggestions: Suggestion[] = showPages
-      ? wikiPages
-          .filter((p) => p.name.toLowerCase().includes(pageQuery))
-          .map((p) => ({ kind: "page" as SuggestionKind, name: p.name, slug: p.slug }))
-      : [];
-
-    const chapterSuggestions: Suggestion[] =
-      showChapters && wikiChapters.length > 0
-        ? wikiChapters
-            .filter((c) => c.name.toLowerCase().includes(pageQuery))
-            .map((c) => ({ kind: "chapter" as SuggestionKind, name: c.name, slug: c.name }))
-        : [];
-
-    const next: Suggestion[] = [...pageSuggestions, ...chapterSuggestions];
-
-    if (next.length === 0) {
-      closeSuggestions();
-      return;
-    }
-
-    setSuggestions(next);
-    setActiveIndex(0);
-    setIsOpen(true);
-    setDropdownPos(computeCaretPos(ta, lastOpen));
-  }
-
-  function applySuggestion(suggestion: Suggestion) {
-    const ta = textareaRef.current;
-    if (!ta) return;
-
-    const cursorPos = ta.selectionStart ?? ta.value.length;
-    const before = ta.value.substring(0, cursorPos);
-    const after = ta.value.substring(cursorPos);
-    const lastOpen = before.lastIndexOf("[[");
-    const token =
-      suggestion.kind === "chapter" && chapterType
-        ? `${chapterType}:${suggestion.name}`
-        : `page:${suggestion.slug}`;
-    const replacement = `[[${token}]]`;
-    const newValue = before.slice(0, lastOpen) + replacement + after;
-    onChange(newValue);
-
-    const newCursor = lastOpen + replacement.length;
-    requestAnimationFrame(() => {
-      ta.setSelectionRange(newCursor, newCursor);
-      ta.focus();
-    });
-
-    closeSuggestions();
+    };
   }
 
   /**
-   * Intercepts dropdown navigation keys in the capture phase on the container
-   * div. The capture phase fires before MDEditor's native keydown listener on
-   * the textarea, so our handler always wins when the dropdown is open.
-   * `stopPropagation` prevents the event from reaching the textarea at all,
-   * which avoids newline insertion on Enter and cursor movement on ArrowUp/Down.
+   * Called on every MDXEditor onChange event. Detects the `[[` trigger by
+   * looking for the last `[[` in the markdown that does not have a closing `]]`
+   * after it — this represents the fragment the user is currently typing.
+   *
+   * When the dropdown is active the suggestions are updated on every keystroke.
+   * When there is no open trigger the dropdown is closed.
+   */
+  const handleChange = useCallback(
+    (markdown: string) => {
+      // Skip re-processing when we ourselves called setMarkdown to apply a suggestion.
+      if (isApplyingRef.current) return;
+
+      lastEmittedRef.current = markdown;
+      prevValueRef.current = markdown;
+      onChange(markdown);
+
+      // Find the last unclosed `[[` in the full markdown string.
+      const lastOpen = markdown.lastIndexOf("[[");
+      if (lastOpen === -1 || markdown.indexOf("]]", lastOpen) !== -1) {
+        closeSuggestions();
+        return;
+      }
+
+      const triggerText = markdown.slice(lastOpen + 2);
+      const colonIdx = triggerText.indexOf(":");
+      // When user types a namespace prefix (e.g. "Chapter:"), restrict suggestions.
+      const prefixTyped =
+        colonIdx !== -1 ? triggerText.slice(0, colonIdx).toLowerCase() : null;
+      const query = (
+        colonIdx !== -1 ? triggerText.slice(colonIdx + 1) : triggerText
+      ).toLowerCase();
+
+      const isChapterPrefix =
+        prefixTyped !== null &&
+        chapterType !== undefined &&
+        prefixTyped === chapterType.toLowerCase();
+      const isExplicitPagePrefix = prefixTyped === "page";
+      const showPages = prefixTyped === null || isExplicitPagePrefix;
+      const showChapters = prefixTyped === null || isChapterPrefix;
+
+      const pageSuggestions: Suggestion[] = showPages
+        ? wikiPages
+            .filter((p) => p.name.toLowerCase().includes(query))
+            .map((p) => ({
+              kind: "page" as SuggestionKind,
+              name: p.name,
+              slug: p.slug,
+            }))
+        : [];
+
+      const chapterSuggestions: Suggestion[] =
+        showChapters && wikiChapters.length > 0
+          ? wikiChapters
+              .filter((c) => c.name.toLowerCase().includes(query))
+              .map((c) => ({
+                kind: "chapter" as SuggestionKind,
+                name: c.name,
+                slug: c.name,
+              }))
+          : [];
+
+      const next: Suggestion[] = [...pageSuggestions, ...chapterSuggestions];
+
+      if (next.length === 0) {
+        closeSuggestions();
+        return;
+      }
+
+      setSuggestions(next);
+      setActiveIndex(0);
+      setIsOpen(true);
+      setDropdownPos(getCursorPos());
+    },
+    [onChange, wikiPages, wikiChapters, chapterType],
+  );
+
+  /**
+   * Replaces the open `[[…` fragment with the chosen `[[token]]` by calling
+   * `setMarkdown` on the full markdown string, then re-focuses the editor.
+   */
+  const applySuggestion = useCallback(
+    (suggestion: Suggestion) => {
+      const current = lastEmittedRef.current;
+      const lastOpen = current.lastIndexOf("[[");
+      if (lastOpen === -1) return;
+
+      const token =
+        suggestion.kind === "chapter" && chapterType
+          ? `${chapterType}:${suggestion.name}`
+          : `page:${suggestion.slug}`;
+      const replacement = `[[${token}]]`;
+
+      // Determine the end of the trigger fragment — either the closing `]]` if
+      // present (e.g. user typed `[[Foo]]` manually) or end of string.
+      const afterOpen = current.slice(lastOpen + 2);
+      const closingIdx = afterOpen.indexOf("]]");
+      const endOfTrigger =
+        lastOpen +
+        2 +
+        (closingIdx !== -1 ? closingIdx + 2 : afterOpen.length);
+
+      const newMarkdown =
+        current.slice(0, lastOpen) +
+        replacement +
+        current.slice(endOfTrigger);
+
+      isApplyingRef.current = true;
+      editorRef.current?.setMarkdown(newMarkdown);
+      lastEmittedRef.current = newMarkdown;
+      prevValueRef.current = newMarkdown;
+      onChange(newMarkdown);
+
+      // Reset the guard flag after a tick so the onChange fired by setMarkdown is skipped.
+      requestAnimationFrame(() => {
+        isApplyingRef.current = false;
+        editorRef.current?.focus();
+      });
+
+      closeSuggestions();
+    },
+    [chapterType, onChange],
+  );
+
+  /**
+   * Intercepts dropdown navigation keys in the capture phase on the wrapper div.
+   * Capture fires before MDXEditor's Lexical key handlers, so our handler always
+   * wins when the dropdown is open. `stopPropagation` prevents Enter from
+   * inserting a newline and ArrowUp/Down from moving the Lexical cursor.
    */
   function handleKeyDownCapture(e: React.KeyboardEvent<HTMLDivElement>) {
     if (!isOpen || isComposing) return;
@@ -304,7 +328,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       case "ArrowUp":
         e.preventDefault();
         e.stopPropagation();
-        setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+        setActiveIndex(
+          (i) => (i - 1 + suggestions.length) % suggestions.length,
+        );
         break;
       case "Enter":
         e.preventDefault();
@@ -319,59 +345,60 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     }
   }
 
-  /**
-   * Custom textarea renderer passed as the top-level `renderTextarea` prop to
-   * MDEditor. MDEditor's `factory.js` calls
-   * `React.cloneElement(renderTextarea(...), { ref: textRef })` — only the ref
-   * is injected; our other props (onInput, onCompositionStart/End) survive.
-   * We do not set a ref here because cloneElement replaces it; instead we
-   * cache the element in `textareaRef` from the `onInput` event in `handleInput`.
-   */
-  function renderTextarea(
-    taProps:
-      | React.TextareaHTMLAttributes<HTMLTextAreaElement>
-      | React.HTMLAttributes<HTMLDivElement>,
-    _opts: Record<string, unknown>,
-  ): JSX.Element {
-    return (
-      <textarea
-        {...(taProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-        onInput={handleInput}
-        onCompositionStart={() => setIsComposing(true)}
-        onCompositionEnd={() => setIsComposing(false)}
-      />
-    );
-  }
+  // Standard plugin set for a wiki content editor.
+  // Memoised so the plugin array identity is stable across re-renders.
+  const plugins = useMemo((): RealmPlugin[] => {
+    return [
+      toolbarPlugin({
+        toolbarContents: () => (
+          <DiffSourceToggleWrapper>
+            <UndoRedo />
+            <Separator />
+            <BlockTypeSelect />
+            <Separator />
+            <BoldItalicUnderlineToggles options={["Bold", "Italic"]} />
+            <CodeToggle />
+            <Separator />
+            <ListsToggle />
+            <Separator />
+            <InsertTable />
+            <InsertThematicBreak />
+          </DiffSourceToggleWrapper>
+        ),
+      }),
+      headingsPlugin({ allowedHeadingLevels: [1, 2, 3, 4] }),
+      listsPlugin(),
+      quotePlugin(),
+      thematicBreakPlugin(),
+      markdownShortcutPlugin(),
+      linkPlugin(),
+      linkDialogPlugin(),
+      tablePlugin(),
+      codeBlockPlugin(),
+      diffSourcePlugin({ viewMode: "rich-text" }),
+    ];
+  }, []);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
 
   return (
     <div
       ref={containerRef}
-      className="relative"
-      data-color-mode="light"
+      className="relative rounded border border-border"
       onKeyDownCapture={handleKeyDownCapture}
+      onCompositionStart={() => setIsComposing(true)}
+      onCompositionEnd={() => setIsComposing(false)}
     >
-      <MDEditor
-        value={value}
-        onChange={onChange}
-        height={height}
-        preview={preview}
-        components={{
-          preview: (source) => (
-            <MarkdownRenderer
-              serialSlug={serialSlug}
-              pageTitles={pageTitles}
-              chapterType={chapterType}
-              wikiChapters={wikiChaptersByName}
-              className="p-4"
-            >
-              {source}
-            </MarkdownRenderer>
-          ),
-        }}
-        renderTextarea={renderTextarea}
+      <MDXEditorClient
+        ref={editorRef}
+        markdown={value}
+        onChange={handleChange}
+        plugins={plugins}
+        className="mdx-editor-wiki"
+        contentEditableClassName="prose prose-sm max-w-none px-4 py-3 focus:outline-none"
       />
+      {/* Apply the height constraint to MDXEditor's content-editable area */}
+      <style>{`.mdx-editor-wiki .mdxeditor-root-contenteditable { min-height: ${height}px; }`}</style>
 
       {isOpen && suggestions.length > 0 && (
         <ul
