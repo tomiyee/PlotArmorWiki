@@ -128,7 +128,13 @@ export function ChapterSelector(props: Props) {
       if (isAuthenticated) void syncUserProgress(serialId, id);
       router.refresh();
     },
-    [serialId, isAuthenticated, router, setSelectedChapterId, setPopoverDismissed],
+    [
+      serialId,
+      isAuthenticated,
+      router,
+      setSelectedChapterId,
+      setPopoverDismissed,
+    ],
   );
 
   useEffect(() => {
@@ -184,15 +190,14 @@ export function ChapterSelector(props: Props) {
           options={options}
           value={effectiveChapterId ?? undefined}
           onChange={handleChange}
-          searchable={false}
           popupWidth="240px"
           aria-label={`Set ${chapterType} progress`}
         >
-          <Tooltip content={`Set your ${chapterType}`} side="bottom">
+          <Tooltip content={`Set your ${chapterType}`}>
             <Button
               variant="ghost"
               size="icon"
-              className="sm:w-auto sm:px-2.5"
+              className="sm:w-auto sm:px-2.5 gap-1 items-center"
               aria-label={`Set ${chapterType} progress`}
             >
               <BookmarkIcon className="size-4" />

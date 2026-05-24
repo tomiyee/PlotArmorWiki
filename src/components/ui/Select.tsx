@@ -19,10 +19,6 @@ import { Button } from "@/components/ui/Button";
 import { Popover } from "@/components/ui/Popover";
 import { cn, normalizeQuery } from "@/lib/utils";
 
-// ---------------------------------------------------------------------------
-// Option type
-// ---------------------------------------------------------------------------
-
 export type Option<T> = {
   /** Display text shown in the dropdown and used for filtering. */
   label: string;
@@ -44,10 +40,6 @@ export type Option<T> = {
   children?: Option<T>[];
 };
 
-// ---------------------------------------------------------------------------
-// Internal flat-row type
-// ---------------------------------------------------------------------------
-
 type FlatRow<T> = {
   /** Stable string key derived from the option's path in the tree (not index-based). */
   id: string;
@@ -61,10 +53,6 @@ type FlatRow<T> = {
   /** Sequential index among selectable rows only — used for keyboard navigation. */
   selectableIdx: number;
 };
-
-// ---------------------------------------------------------------------------
-// Select props
-// ---------------------------------------------------------------------------
 
 type SelectProps<T> = {
   /** Flat or hierarchical option list. */
@@ -105,86 +93,22 @@ type SelectProps<T> = {
   children?: ReactNode;
 };
 
-// ---------------------------------------------------------------------------
-// buildFlatRows — flattens the option tree into a visible row list
-// ---------------------------------------------------------------------------
-
-function buildFlatRows<T>(
-  options: Option<T>[],
-  expandedIds: ReadonlySet<string>,
-  query: string,
-  parentId = "",
-): FlatRow<T>[] {
-  const q = normalizeQuery(query);
-
-  function matchesFilter(opt: Option<T>): boolean {
-    if (opt.label.toLowerCase().includes(q)) return true;
-    if (opt.description?.toLowerCase().includes(q)) return true;
-    if (opt.children) return opt.children.some((c) => matchesFilter(c));
-    return false;
-  }
-
-  function walk(
-    opts: Option<T>[],
-    depth: number,
-    prefix: string,
-    selectableCounter: { n: number },
-  ): FlatRow<T>[] {
-    const rows: FlatRow<T>[] = [];
-
-    for (let i = 0; i < opts.length; i++) {
-      const opt = opts[i];
-      const id = prefix ? `${prefix}-${i}` : `${i}`;
-      const hasChildren = (opt.children?.length ?? 0) > 0;
-
-      if (q && !matchesFilter(opt)) continue;
-
-      const selectable = !opt.structural && !opt.disabled && !hasChildren;
-      const selectableIdx = selectable ? selectableCounter.n++ : -1;
-      // When filtering, force-expand all accordions so matches are always visible.
-      const isExpanded = q ? true : expandedIds.has(id);
-
-      rows.push({ id, option: opt, depth, expanded: isExpanded, selectable, selectableIdx });
-
-      if (hasChildren && isExpanded) {
-        rows.push(...walk(opt.children!, depth + 1, id, selectableCounter));
-      }
-    }
-
-    return rows;
-  }
-
-  return walk(options, 0, parentId, { n: 0 });
-}
-
-// ---------------------------------------------------------------------------
-// findLabel — walks the tree to find the display label for a value
-// ---------------------------------------------------------------------------
-
-function findLabel<T>(options: Option<T>[], value: T): string | undefined {
-  for (const opt of options) {
-    if (opt.value === value) return opt.label;
-    if (opt.children) {
-      const found = findLabel(opt.children, value);
-      if (found !== undefined) return found;
-    }
-  }
-  return undefined;
-}
-
-// ---------------------------------------------------------------------------
-// useAccordionState — manages expand/collapse for grouped options
-// ---------------------------------------------------------------------------
-
 /**
- * Tracks which accordion sections are expanded. Starts with all expanded
- * (null sentinel), then switches to an explicit set on first user toggle.
+ * Manages expand/collapse state for grouped accordion sections.
+ *
+ * Uses `Set<string> | null` as a sentinel: `null` means "not yet
+ * initialized — treat every section as expanded." On the first toggle the
+ * set is seeded from `allRowIds` and the clicked ID is removed (collapse)
+ * or added (expand). This avoids a separate initialization render.
+ *
+ * Row IDs are the path-based strings produced by `buildFlatRows`
+ * (e.g. `"0"`, `"0-1"`, `"0-1-2"`).
  *
  * @example
  * const { effectiveExpandedIds, toggleExpand } = useAccordionState(options);
+ * // Pass effectiveExpandedIds to buildFlatRows; call toggleExpand on header click.
  */
 function useAccordionState<T>(options: Option<T>[]) {
-  // null = uninitialized: treat every ID as expanded (same as allRowIds)
   const [expandedIds, setExpandedIds] = useState<Set<string> | null>(null);
 
   const allRowIds = useMemo(() => {
@@ -197,6 +121,7 @@ function useAccordionState<T>(options: Option<T>[]) {
     return new Set(collectIds(options));
   }, [options]);
 
+  // null sentinel: treat everything as expanded until the user first toggles
   const effectiveExpandedIds: ReadonlySet<string> = expandedIds ?? allRowIds;
 
   const toggleExpand = useCallback(
@@ -215,10 +140,17 @@ function useAccordionState<T>(options: Option<T>[]) {
   return { effectiveExpandedIds, toggleExpand };
 }
 
-// ---------------------------------------------------------------------------
-// useFlatRows — derives the visible row list and keyboard-nav metadata
-// ---------------------------------------------------------------------------
-
+/**
+ * Derives the visible row list and keyboard-navigation metadata from the
+ * current option tree, expansion state, and search query. All three returned
+ * values are memoized independently, so a query change does not invalidate
+ * the expansion-state memo and vice versa.
+ *
+ * @example
+ * const { flatRows, selectableRows, totalSelectableCount } = useFlatRows(
+ *   options, effectiveExpandedIds, query, searchable,
+ * );
+ */
 function useFlatRows<T>(
   options: Option<T>[],
   effectiveExpandedIds: ReadonlySet<string>,
@@ -233,23 +165,43 @@ function useFlatRows<T>(
     () => flatRows.filter((r) => r.selectable),
     [flatRows],
   );
-  return { flatRows, selectableRows, totalSelectableCount: selectableRows.length };
+  return {
+    flatRows,
+    selectableRows,
+    totalSelectableCount: selectableRows.length,
+  };
 }
 
-// ---------------------------------------------------------------------------
-// useKeyboardNav — keyboard handler for the search input
-// ---------------------------------------------------------------------------
-
 type KeyboardNavOptions<T> = {
+  /** Whether the dropdown is currently open; handler is a no-op when false. */
   isOpen: boolean;
+  /** Total number of selectable (non-header) rows, used to clamp navigation bounds. */
   totalSelectableCount: number;
+  /** Flat list of rendered rows, used to resolve the active index to an item on Enter. */
   selectableRows: FlatRow<T>[];
+  /** Index into `selectableRows` of the currently highlighted option. */
   activeSelectableIdx: number;
+  /** Updates the highlighted index; called on Arrow/Home/End key presses. */
   setActiveSelectableIdx: Dispatch<SetStateAction<number>>;
+  /** Confirms the selection of a row; called when Enter is pressed. */
   onSelect: (row: FlatRow<T>) => void;
+  /** Closes the dropdown; called when Escape is pressed. */
   onClose: () => void;
 };
 
+/**
+ * Returns a stable `onKeyDown` handler for the search input that drives
+ * keyboard navigation through the option list.
+ *
+ * Arrow keys move the highlight; Home/End jump to the first/last selectable
+ * option; Enter confirms the active option; Escape closes the dropdown.
+ * The handler is a no-op when `isOpen` is false, so it is safe to attach
+ * unconditionally.
+ *
+ * @example
+ * const handleKeyDown = useKeyboardNav({ isOpen, totalSelectableCount, ... });
+ * // <input onKeyDown={handleKeyDown} />
+ */
 function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
   const {
     isOpen,
@@ -267,7 +219,9 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setActiveSelectableIdx((i) => Math.min(i + 1, totalSelectableCount - 1));
+          setActiveSelectableIdx((i) =>
+            Math.min(i + 1, totalSelectableCount - 1),
+          );
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -305,10 +259,6 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// GroupRow — non-selectable section header / accordion trigger
-// ---------------------------------------------------------------------------
-
 type GroupRowProps = {
   /** DOM element id for ARIA references. */
   domId: string;
@@ -322,8 +272,27 @@ type GroupRowProps = {
   onToggle: () => void;
 };
 
+/**
+ * Non-selectable section header that doubles as an accordion trigger when
+ * `isAccordion` is true (i.e. the option has children).
+ *
+ * The chevron direction reflects expanded state; clicking calls `onToggle`.
+ * When `isAccordion` is false the row is a visual label only — no chevron,
+ * no click handler.
+ *
+ * @example
+ * <GroupRow
+ *   domId={`${uid}-row-0`}
+ *   label="Volume 1"
+ *   depth={0}
+ *   expanded={true}
+ *   isAccordion={true}
+ *   onToggle={() => toggleExpand("0")}
+ * />
+ */
 function GroupRow(props: GroupRowProps) {
-  const { domId, label, description, depth, expanded, isAccordion, onToggle } = props;
+  const { domId, label, description, depth, expanded, isAccordion, onToggle } =
+    props;
   return (
     <div
       id={domId}
@@ -346,15 +315,13 @@ function GroupRow(props: GroupRowProps) {
       )}
       <span className="truncate">{label}</span>
       {description && (
-        <span className="truncate text-muted-foreground/70 ml-1">{description}</span>
+        <span className="truncate text-muted-foreground/70 ml-1">
+          {description}
+        </span>
       )}
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// LeafRow — selectable or disabled leaf option
-// ---------------------------------------------------------------------------
 
 type LeafRowProps = {
   /** DOM element id for ARIA references. */
@@ -366,14 +333,44 @@ type LeafRowProps = {
   disabled?: boolean;
   isActive: boolean;
   isSelected: boolean;
-  /** Attached only when this row is the keyboard-active item, for scroll-into-view. */
+  /** Attached only when this row is keyboard-active, enabling the parent's scroll-into-view effect. */
   activeRowRef?: RefObject<HTMLDivElement | null>;
   onSelect: () => void;
 };
 
+/**
+ * Selectable leaf option inside the dropdown.
+ *
+ * Receives `isActive` and `isSelected` as pre-computed booleans so this
+ * component stays free of generic type `T` — value comparisons happen in
+ * `renderRow` inside `Select`. `activeRowRef` is passed conditionally (only
+ * when active) so the parent's scroll-into-view effect targets the right DOM
+ * node without iterating the list itself.
+ *
+ * Uses `onMouseDown` instead of `onClick` to fire before the input's
+ * `onBlur`, preventing the dropdown from closing before the selection lands.
+ *
+ * @example
+ * <LeafRow
+ *   domId={`${uid}-row-0-1`}
+ *   label="Chapter 5"
+ *   depth={1}
+ *   isActive={false}
+ *   isSelected={true}
+ *   onSelect={() => handleSelect(row)}
+ * />
+ */
 function LeafRow(props: LeafRowProps) {
   const {
-    domId, label, description, depth, disabled, isActive, isSelected, activeRowRef, onSelect,
+    domId,
+    label,
+    description,
+    depth,
+    disabled,
+    isActive,
+    isSelected,
+    activeRowRef,
+    onSelect,
   } = props;
   return (
     <div
@@ -404,10 +401,6 @@ function LeafRow(props: LeafRowProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// DropdownContent — the panel rendered inside the Popover
-// ---------------------------------------------------------------------------
-
 type DropdownContentProps = {
   searchable: boolean;
   query: string;
@@ -421,6 +414,27 @@ type DropdownContentProps = {
   children: ReactNode;
 };
 
+/**
+ * The panel rendered inside the dropdown Popover: an optional search input,
+ * a screen-reader live region, and the scrollable option tree.
+ *
+ * Owns its `searchRef` and focuses the input whenever `isOpen` transitions
+ * to `true`, keeping focus management self-contained and out of `Select`.
+ * The rendered rows are passed as `children`; this component never inspects
+ * them — it only uses `hasOptions` to choose between the tree view and the
+ * empty-state message.
+ *
+ * @example
+ * <DropdownContent
+ *   isOpen={isOpen}
+ *   treeId={treeId}
+ *   hasOptions={flatRows.length > 0}
+ *   selectableCount={totalSelectableCount}
+ *   {...searchProps}
+ * >
+ *   {flatRows.map(renderRow)}
+ * </DropdownContent>
+ */
 function DropdownContent(props: DropdownContentProps) {
   const {
     searchable,
@@ -502,10 +516,6 @@ function DropdownContent(props: DropdownContentProps) {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Select component
-// ---------------------------------------------------------------------------
 
 /**
  * Searchable, hierarchical dropdown select with keyboard navigation and full
@@ -621,18 +631,15 @@ function Select<T>(props: SelectProps<T>) {
     onClose: handleClose,
   });
 
-  // Reset active index when the dropdown opens.
   useEffect(() => {
     if (isOpen) setActiveSelectableIdx(0);
   }, [isOpen]);
 
-  // Scroll the keyboard-active row into view.
   useEffect(() => {
     if (!isOpen) return;
     activeRowRef.current?.scrollIntoView({ block: "nearest" });
   }, [activeSelectableIdx, isOpen]);
 
-  // Close when the user clicks outside the trigger and popup.
   useEffect(() => {
     if (!isOpen) return;
     function handleClick(e: MouseEvent) {
@@ -673,7 +680,8 @@ function Select<T>(props: SelectProps<T>) {
       );
     }
 
-    const isActive = row.selectable && row.selectableIdx === activeSelectableIdx;
+    const isActive =
+      row.selectable && row.selectableIdx === activeSelectableIdx;
     const isSelected = value !== undefined && option.value === value;
     return (
       <LeafRow
@@ -766,3 +774,93 @@ function Select<T>(props: SelectProps<T>) {
 }
 
 export { Select };
+
+/**
+ * Flattens the option tree into a linear list of visible rows, honoring
+ * accordion expansion state and the active search query.
+ *
+ * Row IDs are path-based (e.g. `"0"`, `"0-1"`, `"0-1-2"`) so they remain
+ * stable when siblings are filtered out — keyboard-navigation indices never
+ * jump unexpectedly.
+ *
+ * When a query is active every ancestor accordion is force-expanded so
+ * matching descendants are always reachable regardless of prior collapse state.
+ *
+ * @example
+ * const rows = buildFlatRows(options, effectiveExpandedIds, query);
+ */
+function buildFlatRows<T>(
+  options: Option<T>[],
+  expandedIds: ReadonlySet<string>,
+  query: string,
+  parentId = "",
+): FlatRow<T>[] {
+  const q = normalizeQuery(query);
+
+  function matchesFilter(opt: Option<T>): boolean {
+    if (opt.label.toLowerCase().includes(q)) return true;
+    if (opt.description?.toLowerCase().includes(q)) return true;
+    if (opt.children) return opt.children.some((c) => matchesFilter(c));
+    return false;
+  }
+
+  function walk(
+    opts: Option<T>[],
+    depth: number,
+    prefix: string,
+    selectableCounter: { n: number },
+  ): FlatRow<T>[] {
+    const rows: FlatRow<T>[] = [];
+
+    for (let i = 0; i < opts.length; i++) {
+      const opt = opts[i];
+      const id = prefix ? `${prefix}-${i}` : `${i}`;
+      const hasChildren = (opt.children?.length ?? 0) > 0;
+
+      if (q && !matchesFilter(opt)) continue;
+
+      const selectable = !opt.structural && !opt.disabled && !hasChildren;
+      const selectableIdx = selectable ? selectableCounter.n++ : -1;
+      // When filtering, force-expand all accordions so matches are always visible.
+      const isExpanded = q ? true : expandedIds.has(id);
+
+      rows.push({
+        id,
+        option: opt,
+        depth,
+        expanded: isExpanded,
+        selectable,
+        selectableIdx,
+      });
+
+      if (hasChildren && isExpanded) {
+        rows.push(...walk(opt.children!, depth + 1, id, selectableCounter));
+      }
+    }
+
+    return rows;
+  }
+
+  return walk(options, 0, parentId, { n: 0 });
+}
+
+/**
+ * Recursively searches the option tree for the option whose `value` matches
+ * and returns its `label`, or `undefined` when not found.
+ *
+ * Used to derive the trigger button's display text from the controlled value
+ * without requiring the caller to maintain a label-to-value mapping.
+ *
+ * @example
+ * const label = findLabel(options, selectedChapterId); // "Chapter 5"
+ */
+function findLabel<T>(options: Option<T>[], value: T): string | undefined {
+  for (const opt of options) {
+    if (opt.value === value) return opt.label;
+    if (opt.children) {
+      const found = findLabel(opt.children, value);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
