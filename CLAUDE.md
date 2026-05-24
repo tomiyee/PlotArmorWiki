@@ -108,7 +108,7 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/components/SerialNavInjector.tsx`    | Client Component (renders null); injects serial data into navbar via `useLayoutEffect`.                                                                               |
 | `src/components/ui/MarkdownRenderer.tsx`  | Single source of truth for markdown styling. No `@tailwindcss/typography` — explicit Tailwind classes. Accepts `serialSlug` for wiki links, `sm` for compact mode.    |
 | `src/components/ui/Text.tsx`              | `<Text variant>` typography. Variants: `h1`–`h4`, `body`, `label`. `as` overrides element. `muted` prop applies `text-gray-500`.                                      |
-| `src/components/ui/Select.tsx`            | Generic `<Select<T>>` over native `<select>`. Client Component.                                                                                                       |
+| `src/components/ui/Select.tsx`            | Searchable, hierarchical `<Select<T>>` combobox with keyboard navigation and ARIA semantics. Supports grouped options (accordion headers), `placeholder`, and `searchable={false}` to hide the search input. Client Component. |
 | `src/components/ui/Dialog.tsx`            | Controlled dialog (`isOpen`/`onClose`).                                                                                                                               |
 | `src/components/ui/Popover.tsx`           | Two-mode popover: **trigger mode** (wraps `children`, self-managed open state) and **anchor mode** (`anchor` ref + controlled `open`). Combobox and ChapterSelector use anchor mode to position dropdowns/callouts under existing elements without a separate trigger. |
 | `src/hooks/useServerAction.ts`            | Wraps server action in `useTransition` + `router.refresh()`. Use in all Client Components calling Server Actions.                                                     |
@@ -146,7 +146,7 @@ Always use design-system components instead of bare HTML:
 | Instead of                                | Use                                              |
 | ----------------------------------------- | ------------------------------------------------ |
 | `<input>`                                 | `<Input>` from `@/components/ui/input`           |
-| `<select>`                                | `<Select>` from `@/components/ui/select`         |
+| `<select>`                                | `<Select>` from `@/components/ui/Select`         |
 | `<button>`                                | `<Button>` from `@/components/ui/button`         |
 | `<h1>`–`<h4>`, `<p>`, `<label>`, `<span>` | `<Text variant="…">` from `@/components/ui/Text` |
 

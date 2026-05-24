@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Trash2Icon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
-import { Select2 } from "@/components/ui/Select2";
+import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useServerAction } from "@/hooks/useServerAction";
@@ -142,7 +142,7 @@ export function PageRelationshipsPanel({
       {/* Add parent */}
       {addablePages.length > 0 && (
         <Box className="items-center gap-2 flex-wrap">
-          <Select2<number>
+          <Select<number>
             options={addSelectOptions}
             value={selectedParentId ?? undefined}
             onChange={setSelectedParentId}

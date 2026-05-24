@@ -8,7 +8,7 @@ import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
-import { Select2 } from "@/components/ui/Select2";
+import { Select } from "@/components/ui/Select";
 
 interface Chapter {
   id: number;
@@ -190,8 +190,12 @@ export function NewPageForm({
         </Label>
         {hasChapters ? (
           <>
-            <input type="hidden" name="introChapterId" value={selectedIntroChapterId} />
-            <Select2<number>
+            <input
+              type="hidden"
+              name="introChapterId"
+              value={selectedIntroChapterId}
+            />
+            <Select<number>
               id="introChapterId"
               options={chapterOptions}
               placeholder={`Select a ${chapterTypeLabel}…`}
@@ -217,8 +221,12 @@ export function NewPageForm({
         <Label htmlFor="parentPageId">
           Parent page <span className="text-red-500">*</span>
         </Label>
-        <input type="hidden" name="parentPageId" value={effectiveParentPageId ?? ""} />
-        <Select2<number>
+        <input
+          type="hidden"
+          name="parentPageId"
+          value={effectiveParentPageId ?? ""}
+        />
+        <Select<number>
           id="parentPageId"
           options={parentPageOptions}
           value={effectiveParentPageId}
@@ -237,7 +245,7 @@ export function NewPageForm({
             name="templateId"
             value={selectedTemplateId > 0 ? selectedTemplateId : ""}
           />
-          <Select2<number>
+          <Select<number>
             id="templateId"
             options={templateOptions}
             value={selectedTemplateId}

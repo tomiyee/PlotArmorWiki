@@ -6,7 +6,7 @@ import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Select2 } from "@/components/ui/Select2";
+import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { addPageTitle, deletePageTitle } from "./actions";
@@ -43,7 +43,9 @@ export function PageTitlesPanel({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [newTitleChapterId, setNewTitleChapterId] = useState<number | undefined>(undefined);
+  const [newTitleChapterId, setNewTitleChapterId] = useState<
+    number | undefined
+  >(undefined);
   const [newTitleText, setNewTitleText] = useState<string>("");
 
   const disabled = isPending || externalIsPending;
@@ -123,7 +125,7 @@ export function PageTitlesPanel({
             <Label htmlFor="new-title-chapter" className="text-xs">
               Chapter
             </Label>
-            <Select2<number>
+            <Select<number>
               id="new-title-chapter"
               options={chapterSelectOptions}
               value={newTitleChapterId}

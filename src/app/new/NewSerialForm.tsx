@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createSerial } from "./actions";
 import { Input } from "@/components/ui/Input";
-import { Select2 } from "@/components/ui/Select2";
+import { Select } from "@/components/ui/Select";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
@@ -82,7 +82,9 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           <Box col className="gap-1">
             <Label htmlFor="description">
               Description{" "}
-              <span className="text-muted-foreground">(optional, Markdown)</span>
+              <span className="text-muted-foreground">
+                (optional, Markdown)
+              </span>
             </Label>
             <WikiLinkMDEditor
               value={description}
@@ -136,7 +138,7 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           <Box className="gap-4">
             <Box col className="gap-1 flex-1">
               <Label htmlFor="volumeType">Volume type</Label>
-              <Select2<VolumeType>
+              <Select<VolumeType>
                 id="volumeType"
                 options={VOLUME_TYPE_OPTIONS}
                 value={volumeType}
@@ -146,7 +148,7 @@ export default function NewSerialForm({ defaultTitle }: Props) {
             </Box>
             <Box col className="gap-1 flex-1">
               <Label htmlFor="chapterType">Chapter type</Label>
-              <Select2<ChapterType>
+              <Select<ChapterType>
                 id="chapterType"
                 options={CHAPTER_TYPE_OPTIONS}
                 value={chapterType}
@@ -159,7 +161,8 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           {/* Splash art URL */}
           <Box col className="gap-1">
             <Label htmlFor="splashArtUrl">
-              Splash art URL <span className="text-muted-foreground">(optional)</span>
+              Splash art URL{" "}
+              <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Input
               id="splashArtUrl"
