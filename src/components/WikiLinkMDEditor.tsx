@@ -333,9 +333,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       | React.HTMLAttributes<HTMLDivElement>,
     _opts: Record<string, unknown>,
   ): JSX.Element {
+    const castProps = taProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>;
     return (
       <textarea
-        {...(taProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+        {...castProps}
+        style={{ ...castProps.style, height: "100%" }}
         onInput={handleInput}
         onCompositionStart={() => setIsComposing(true)}
         onCompositionEnd={() => setIsComposing(false)}
