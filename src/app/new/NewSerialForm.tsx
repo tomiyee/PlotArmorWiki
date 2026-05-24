@@ -3,13 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { createSerial } from "./actions";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { Select2 } from "@/components/ui/Select2";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { PageContainer } from "@/components/ui/PageContainer";
-import { CHAPTER_TYPE_OPTIONS, VOLUME_TYPE_OPTIONS } from "@/lib/serial-types";
+import {
+  CHAPTER_TYPE_OPTIONS,
+  VOLUME_TYPE_OPTIONS,
+  type ChapterType,
+  type VolumeType,
+} from "@/lib/serial-types";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 
 type Props = {
@@ -29,6 +34,8 @@ type Props = {
 export default function NewSerialForm({ defaultTitle }: Props) {
   const [authors, setAuthors] = useState<string[]>([""]);
   const [description, setDescription] = useState("");
+  const [volumeType, setVolumeType] = useState<VolumeType>("Volume");
+  const [chapterType, setChapterType] = useState<ChapterType>("Chapter");
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -123,23 +130,28 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           </Box>
 
           {/* Volume type and Chapter type */}
+          {/* Hidden inputs carry the selected values into FormData for the server action */}
+          <input type="hidden" name="volumeType" value={volumeType} />
+          <input type="hidden" name="chapterType" value={chapterType} />
           <Box className="gap-4">
             <Box col className="gap-1 flex-1">
               <Label htmlFor="volumeType">Volume type</Label>
-              <Select
+              <Select2<VolumeType>
                 id="volumeType"
-                name="volumeType"
                 options={VOLUME_TYPE_OPTIONS}
-                defaultValue="Volume"
+                value={volumeType}
+                onChange={setVolumeType}
+                placeholder="Volume type"
               />
             </Box>
             <Box col className="gap-1 flex-1">
               <Label htmlFor="chapterType">Chapter type</Label>
-              <Select
+              <Select2<ChapterType>
                 id="chapterType"
-                name="chapterType"
                 options={CHAPTER_TYPE_OPTIONS}
-                defaultValue="Chapter"
+                value={chapterType}
+                onChange={setChapterType}
+                placeholder="Chapter type"
               />
             </Box>
           </Box>
