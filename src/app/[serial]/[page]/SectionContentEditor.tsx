@@ -1,6 +1,6 @@
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
-import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
+import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { SectionData } from "./types";
