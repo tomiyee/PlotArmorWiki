@@ -113,6 +113,13 @@ export function PageReadView(props: PageReadViewProps) {
     id: s.id,
     name: s.name,
     content: s.content,
+    lastUpdatedChapterIdx: s.lastUpdatedChapterIdx,
+  }));
+
+  const initialInfoboxSections = floaterRows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    content: r.content,
   }));
 
   // Status banner for pending/approved/rejected suggestions.
@@ -225,6 +232,7 @@ export function PageReadView(props: PageReadViewProps) {
             chapterType={chapterType}
             serialSlug={serialSlug}
             initialSections={initialSections}
+            initialInfoboxSections={initialInfoboxSections}
             onClose={() => setShowSuggestionForm(false)}
           />
         )}

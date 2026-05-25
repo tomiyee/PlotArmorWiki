@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
 import { Text } from "@/components/ui/Text";
+import { Textarea } from "@/components/ui/Textarea";
 import { submitPageSuggestion, getSectionsAtChapter } from "./suggestionActions";
+import { InfoIcon } from "@/components/ui/InfoIcon";
+import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { ChapterData, ChapterGroupOption } from "./types";
 
 const WikiLinkMDEditor = dynamic(
@@ -36,7 +39,9 @@ type SuggestionFormProps = {
   /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
   /** Pre-loaded sections at the reader's current cutoff (avoids an extra round-trip). */
-  initialSections: { id: number; name: string; content: string }[];
+  initialSections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[];
+  /** Pre-loaded infobox rows at the reader's current cutoff. Empty when page has no infobox. */
+  initialInfoboxSections: { id: number; label: string; content: string }[];
   /** Called when the user cancels or successfully submits the suggestion. */
   onClose: () => void;
 };
@@ -54,6 +59,7 @@ type SuggestionFormProps = {
  *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  *   serialSlug="one-piece"
  *   initialSections={[{ id: 1, name: "Summary", content: "..." }]}
+ *   initialInfoboxSections={[{ id: 3, label: "Age", content: "19" }]}
  *   onClose={() => setShowForm(false)}
  * />
  */
@@ -67,6 +73,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
     chapterType,
     serialSlug,
     initialSections,
+    initialInfoboxSections,
     onClose,
   } = props;
 
@@ -77,9 +84,15 @@ export function SuggestionForm(props: SuggestionFormProps) {
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
     readingChapterId ?? headChapterId,
   );
+  const selectedChapterIdx =
+    allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
   const [sections, setSections] = useState(initialSections);
+  const [infoboxSections, setInfoboxSections] = useState(initialInfoboxSections);
   const [draftContent, setDraftContent] = useState<Record<number, string>>(
     Object.fromEntries(initialSections.map((s) => [s.id, s.content])),
+  );
+  const [infoboxDraftContent, setInfoboxDraftContent] = useState<Record<number, string>>(
+    Object.fromEntries(initialInfoboxSections.map((s) => [s.id, s.content])),
   );
   const [citation, setCitation] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -88,7 +101,8 @@ export function SuggestionForm(props: SuggestionFormProps) {
   // Dirty state: true when any draft differs from the section content or citation is non-empty.
   const isDirty =
     citation.trim().length > 0 ||
-    sections.some((s) => draftContent[s.id] !== s.content);
+    sections.some((s) => draftContent[s.id] !== s.content) ||
+    infoboxSections.some((s) => infoboxDraftContent[s.id] !== s.content);
 
   // Warn before navigating away with a started draft.
   useEffect(() => {
@@ -106,9 +120,11 @@ export function SuggestionForm(props: SuggestionFormProps) {
     (chapterId: number) => {
       setSelectedChapterId(chapterId);
       startTransition(async () => {
-        const { sections: newSections } = await getSectionsAtChapter(pageId, chapterId);
+        const { sections: newSections, infoboxSections: newIbSections } = await getSectionsAtChapter(pageId, chapterId);
         setSections(newSections);
         setDraftContent(Object.fromEntries(newSections.map((s) => [s.id, s.content])));
+        setInfoboxSections(newIbSections);
+        setInfoboxDraftContent(Object.fromEntries(newIbSections.map((s) => [s.id, s.content])));
       });
     },
     [pageId],
@@ -126,7 +142,10 @@ export function SuggestionForm(props: SuggestionFormProps) {
     const changes = sections
       .filter((s) => draftContent[s.id] !== s.content && draftContent[s.id]?.trim())
       .map((s) => ({ sectionId: s.id, proposedContent: draftContent[s.id] }));
-    if (changes.length === 0) {
+    const infoboxChanges = infoboxSections
+      .filter((s) => infoboxDraftContent[s.id] !== s.content && infoboxDraftContent[s.id]?.trim())
+      .map((s) => ({ infoboxSectionId: s.id, proposedContent: infoboxDraftContent[s.id] }));
+    if (changes.length === 0 && infoboxChanges.length === 0) {
       setSubmitError("Make at least one change before submitting.");
       return;
     }
@@ -137,6 +156,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
         selectedChapterId,
         citation,
         changes,
+        infoboxChanges,
       );
       if (result.error) {
         setSubmitError(result.error);
@@ -204,7 +224,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
           {selectedChapterName && (
             <Text className="text-sm text-amber-600 dark:text-amber-400">
               Write for readers up to {chapterLabel} {selectedChapterName}.
-              Avoid referencing later events — admin review is the spoiler gate.
+              Avoid referencing later events — an admin will review your suggestion.
             </Text>
           )}
         </Box>
@@ -213,8 +233,16 @@ export function SuggestionForm(props: SuggestionFormProps) {
       {/* Section editors */}
       {sections.map((section, i) => (
         <Box col key={section.id} className="gap-2">
-          {i > 0 && <Text variant="h3">{section.name}</Text>}
-          {i === 0 && <Label>Summary</Label>}
+          <Box className="items-center gap-2">
+            {i > 0 && <Text variant="h3">{section.name}</Text>}
+            {i === 0 && (
+              <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
+            )}
+            <LastUpdatedTag
+              lastUpdatedIdx={section.lastUpdatedChapterIdx}
+              selectedChapterIdx={selectedChapterIdx}
+            />
+          </Box>
           <WikiLinkMDEditor
             value={draftContent[section.id] ?? ""}
             onChange={(val) =>
@@ -229,6 +257,27 @@ export function SuggestionForm(props: SuggestionFormProps) {
           />
         </Box>
       ))}
+
+      {/* Infobox row editors */}
+      {infoboxSections.length > 0 && (
+        <Box col className="gap-4">
+          <Text variant="h3">Infobox</Text>
+          {infoboxSections.map((row) => (
+            <Box col key={row.id} className="gap-1.5">
+              <Label htmlFor={`ib-suggestion-${row.id}`}>{row.label}</Label>
+              <Textarea
+                id={`ib-suggestion-${row.id}`}
+                value={infoboxDraftContent[row.id] ?? ""}
+                onChange={(e) =>
+                  setInfoboxDraftContent((prev) => ({ ...prev, [row.id]: e.target.value }))
+                }
+                rows={2}
+                disabled={isPending}
+              />
+            </Box>
+          ))}
+        </Box>
+      )}
 
       {/* Citation */}
       <Box col className="gap-2">

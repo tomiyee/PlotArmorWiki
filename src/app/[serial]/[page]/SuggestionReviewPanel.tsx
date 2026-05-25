@@ -16,6 +16,13 @@ type SectionChange = {
   proposedContent: string;
 };
 
+type InfoboxChange = {
+  infoboxSectionId: number;
+  infoboxSectionLabel: string;
+  currentContent: string;
+  proposedContent: string;
+};
+
 type PendingSuggestion = {
   id: number;
   proposerUsername: string | null;
@@ -24,6 +31,7 @@ type PendingSuggestion = {
   citation: string;
   createdAt: Date;
   sectionChanges: SectionChange[];
+  infoboxChanges: InfoboxChange[];
 };
 
 type SuggestionReviewPanelProps = {
@@ -171,6 +179,34 @@ function SuggestionCard(props: SuggestionCardProps) {
                 <MarkdownRenderer serialSlug={serialSlug} sm>
                   {change.proposedContent}
                 </MarkdownRenderer>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      ))}
+
+      {/* Infobox diffs */}
+      {suggestion.infoboxChanges.map((change) => (
+        <Box col key={change.infoboxSectionId} className="gap-2">
+          <Text variant="h4">Infobox: {change.infoboxSectionLabel}</Text>
+          <Box className="gap-3 items-start flex-col sm:flex-row">
+            <Box col className="flex-1 gap-1 min-w-0">
+              <Text muted className="text-xs font-medium uppercase tracking-wide">
+                Current
+              </Text>
+              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-[40px]">
+                {change.currentContent || <Text muted className="text-sm">(empty)</Text>}
+              </Box>
+            </Box>
+            <Box col className="flex-1 gap-1 min-w-0">
+              <Text
+                className="text-xs font-medium uppercase tracking-wide"
+                style={{ color: "var(--color-primary)" }}
+              >
+                Proposed
+              </Text>
+              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-[40px]">
+                {change.proposedContent}
               </Box>
             </Box>
           </Box>

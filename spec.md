@@ -263,6 +263,39 @@ Templates are manageable from the serial index page by administrators in edit mo
 
 ---
 
+# Contributor Suggestions
+
+Authenticated non-admin users can propose content changes for admin review. Suggestions never go live without an explicit admin approval — admin review is the sole spoiler gate.
+
+## What can be suggested
+
+- **Wiki page sections** — one or more body section edits per suggestion.
+- **Infobox rows** — proposed values for any row on the page's infobox.
+- **Chapter synopses** — a proposed replacement for the synopsis text on a chapter page.
+
+## Suggestion workflow
+
+1. A logged-in non-admin clicks "Suggest an edit" on a wiki page or "Suggest an edit to the synopsis" on a chapter page.
+2. They edit the content (using the same WYSIWYG editor as admins for body sections; plain text for infobox rows and synopses), select a "Writing as of:" target chapter, and provide a required citation.
+3. On submit, a pending suggestion record is created. The contributor sees a status banner indicating their suggestion is under review.
+4. The admin reviews suggestions inline — on the wiki page itself (in the admin review panel below the page body) or on the chapter page (in the synopsis review panel). The panel shows a before/after diff for each changed field.
+5. Approving a suggestion writes the proposed content directly into the appropriate revision table at the target chapter (same upsert as a direct admin save). Rejecting accepts an optional review note shown to the contributor.
+
+## Data model
+
+```
+page_suggestions                 id, page_id, proposed_by_user_id, target_chapter_id, status, citation, created_at, reviewed_at, reviewed_by_user_id, review_note
+page_suggestion_section_changes  id, suggestion_id, section_id, proposed_content
+page_suggestion_infobox_changes  id, suggestion_id, infobox_section_id, proposed_content
+chapter_synopsis_suggestions     id, chapter_id, serial_id, proposed_by_user_id, proposed_content, citation, status, created_at, reviewed_at, reviewed_by_user_id, review_note
+```
+
+One `page_suggestions` row covers all body section and infobox row changes for a single page suggestion. `chapter_synopsis_suggestions` is a separate table since synopses are keyed by chapter rather than page.
+
+The serial home page shows admins an accordion listing all pages with pending suggestions and their counts, so outstanding review work can be found without visiting every page.
+
+---
+
 # Home Page
 
 The home page provides:

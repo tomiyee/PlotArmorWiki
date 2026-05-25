@@ -73,6 +73,11 @@ templates                     id, serial_id, name, has_infobox
 template_sections             id, template_id, name, display_order
 template_infobox_sections     id, template_id, label, display_order
 
+page_suggestions                 id, page_id, proposed_by_user_id, target_chapter_id, status, citation, ...review fields
+page_suggestion_section_changes  id, suggestion_id, section_id, proposed_content
+page_suggestion_infobox_changes  id, suggestion_id, infobox_section_id, proposed_content
+chapter_synopsis_suggestions     id, chapter_id, serial_id, proposed_by_user_id, proposed_content, citation, status, ...review fields
+
 users                   id, name, username, email, email_verified, image, created_at
 accounts                user_id, type, provider, provider_account_id, ...
 sessions                session_token, user_id, expires

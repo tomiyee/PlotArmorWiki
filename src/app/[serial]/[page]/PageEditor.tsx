@@ -155,6 +155,12 @@ interface Props {
       currentContent: string;
       proposedContent: string;
     }[];
+    infoboxChanges: {
+      infoboxSectionId: number;
+      infoboxSectionLabel: string;
+      currentContent: string;
+      proposedContent: string;
+    }[];
   }[];
   /**
    * The current non-admin user's most recent suggestion for this page.
