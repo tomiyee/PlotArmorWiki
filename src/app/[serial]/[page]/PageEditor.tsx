@@ -171,6 +171,9 @@ interface Props {
     status: "pending" | "approved" | "rejected";
     reviewNote: string | null;
     createdAt: Date;
+    targetChapterName: string;
+    sectionChanges: { sectionName: string; proposedContent: string }[];
+    infoboxChanges: { label: string; proposedContent: string }[];
   } | null;
 }
 

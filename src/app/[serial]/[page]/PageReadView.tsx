@@ -14,6 +14,9 @@ type MyPageSuggestion = {
   status: "pending" | "approved" | "rejected";
   reviewNote: string | null;
   createdAt: Date;
+  targetChapterName: string;
+  sectionChanges: { sectionName: string; proposedContent: string }[];
+  infoboxChanges: { label: string; proposedContent: string }[];
 } | null;
 
 /**
@@ -99,6 +102,7 @@ export function PageReadView(props: PageReadViewProps) {
   } = props;
 
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
+  const [showSuggestionDetail, setShowSuggestionDetail] = useState(false);
 
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -126,9 +130,55 @@ export function PageReadView(props: PageReadViewProps) {
     if (!suggestion || suggestionContext?.isAdmin) return null;
     const { status, reviewNote } = suggestion;
     if (status === "pending") {
+      const hasChanges =
+        suggestion.sectionChanges.length > 0 ||
+        suggestion.infoboxChanges.length > 0;
       return (
         <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Your suggestion is pending admin review.
+          <div className="flex items-center justify-between gap-2">
+            <span>
+              Your suggestion is pending admin review.
+            </span>
+            {hasChanges && (
+              <Button
+                variant="ghost"
+                className="h-auto px-2 py-1 text-xs shrink-0"
+                onClick={() => setShowSuggestionDetail((v) => !v)}
+              >
+                {showSuggestionDetail ? "Hide" : "View your suggestion"}
+              </Button>
+            )}
+          </div>
+          {showSuggestionDetail && hasChanges && (
+            <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+              <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Writing as of {suggestion.targetChapterName}
+              </Text>
+              {suggestion.sectionChanges.map((change, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  {suggestion.sectionChanges.length > 1 && (
+                    <Text className="text-xs font-medium">{change.sectionName}</Text>
+                  )}
+                  <div className="rounded border border-border bg-background p-3 text-xs overflow-auto">
+                    <MarkdownRenderer serialSlug={serialSlug} sm>
+                      {change.proposedContent}
+                    </MarkdownRenderer>
+                  </div>
+                </div>
+              ))}
+              {suggestion.infoboxChanges.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <Text className="text-xs font-medium">Infobox changes</Text>
+                  {suggestion.infoboxChanges.map((change, i) => (
+                    <div key={i} className="flex gap-2 text-xs">
+                      <span className="font-medium text-muted-foreground shrink-0">{change.label}:</span>
+                      <span className="whitespace-pre-wrap">{change.proposedContent}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }

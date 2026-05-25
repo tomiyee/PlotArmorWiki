@@ -129,6 +129,9 @@ export async function getMyPageSuggestion(pageId: number): Promise<{
   status: "pending" | "approved" | "rejected";
   reviewNote: string | null;
   createdAt: Date;
+  targetChapterName: string;
+  sectionChanges: { sectionName: string; proposedContent: string }[];
+  infoboxChanges: { label: string; proposedContent: string }[];
 } | null> {
   const userId = await requireAuthenticated().catch(() => null);
   if (!userId) return null;
@@ -139,23 +142,48 @@ export async function getMyPageSuggestion(pageId: number): Promise<{
       status: pageSuggestions.status,
       reviewNote: pageSuggestions.reviewNote,
       createdAt: pageSuggestions.createdAt,
+      targetChapterName: chapters.displayName,
     })
     .from(pageSuggestions)
+    .innerJoin(chapters, eq(pageSuggestions.targetChapterId, chapters.id))
     .where(
       and(
         eq(pageSuggestions.pageId, pageId),
         eq(pageSuggestions.proposedByUserId, userId),
       ),
     )
-    .orderBy(pageSuggestions.createdAt)
+    .orderBy(desc(pageSuggestions.createdAt))
     .limit(1);
 
   if (!row) return null;
+
+  const [sectionChangeRows, infoboxChangeRows] = await Promise.all([
+    db
+      .select({
+        sectionName: pageSections.name,
+        proposedContent: pageSuggestionSectionChanges.proposedContent,
+      })
+      .from(pageSuggestionSectionChanges)
+      .innerJoin(pageSections, eq(pageSuggestionSectionChanges.sectionId, pageSections.id))
+      .where(eq(pageSuggestionSectionChanges.suggestionId, row.id)),
+    db
+      .select({
+        label: pageInfoboxSections.label,
+        proposedContent: pageSuggestionInfoboxChanges.proposedContent,
+      })
+      .from(pageSuggestionInfoboxChanges)
+      .innerJoin(pageInfoboxSections, eq(pageSuggestionInfoboxChanges.infoboxSectionId, pageInfoboxSections.id))
+      .where(eq(pageSuggestionInfoboxChanges.suggestionId, row.id)),
+  ]);
+
   return {
     id: row.id,
     status: row.status as "pending" | "approved" | "rejected",
     reviewNote: row.reviewNote,
     createdAt: row.createdAt,
+    targetChapterName: row.targetChapterName,
+    sectionChanges: sectionChangeRows,
+    infoboxChanges: infoboxChangeRows,
   };
 }
 
