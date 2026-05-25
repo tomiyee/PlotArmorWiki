@@ -1,16 +1,35 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Text } from "@/components/ui/Text";
+import { Button } from "@/components/ui/Button";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
-import type { SectionData, FloaterRowData } from "./types";
+import { SuggestionForm } from "./SuggestionForm";
+import type { SectionData, FloaterRowData, ChapterData } from "./types";
 
-interface Props {
+type MyPageSuggestion = {
+  id: number;
+  status: "pending" | "approved" | "rejected";
+  reviewNote: string | null;
+  createdAt: Date;
+} | null;
+
+type PageReadViewProps = {
+  /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
+  /** Page sections with chapter-versioned content. */
   sections: SectionData[];
+  /** True when the page has infobox rows. */
   hasInfobox: boolean;
+  /** URL of the infobox cover image, or null/undefined when absent. */
   floaterImageUrl: string | null | undefined;
+  /** Infobox rows to render in the floater panel. */
   floaterRows: FloaterRowData[];
+  /** Child pages active at the reader's chapter cutoff. */
   childPages: { id: number; name: string; slug: string; title: string }[];
+  /** DB id of this page, used for linking to the new-page form and suggestion submission. */
   pageId: number;
   /** slug → title map passed to MarkdownRenderer so `[[slug]]` links show the correct title. */
   pageTitles?: Record<string, string>;
@@ -18,11 +37,35 @@ interface Props {
   wikiChapters?: Record<string, number>;
   /** The serial's chapter type (e.g. `"Chapter"`, `"Episode"`). */
   chapterType?: string;
-}
+  /**
+   * When true, shows a "Suggest an Edit" button to allow authenticated
+   * non-admins to submit a content suggestion.
+   */
+  isAuthenticated?: boolean;
+  /**
+   * When true, hides the "Suggest an Edit" button — admins use the edit mode
+   * instead. Also hides user-facing suggestion status UI.
+   */
+  isAdmin?: boolean;
+  /** All chapters for this serial — passed through to SuggestionForm. */
+  allChapters?: ChapterData[];
+  /** The chapter the user is currently reading up to. */
+  readingChapterId?: number | null;
+  /** Wiki pages for suggestion form autocomplete. */
+  wikiPagesList?: { name: string; slug: string }[];
+  /** Chapters for suggestion form chapter-link autocomplete. */
+  wikiChaptersList?: { name: string; idx: number }[];
+  /**
+   * The current user's most recent suggestion for this page, or null.
+   * Used to render per-page status feedback (pending / approved / rejected).
+   */
+  myPageSuggestion?: MyPageSuggestion;
+};
 
 /**
  * Read-mode layout for a wiki page: infobox floater, section content, and child page list.
- * Renders directly from server-provided props so router.refresh() delivers fresh content.
+ * Authenticated non-admins see a "Suggest an Edit" button that opens an inline form.
+ * After submitting, the per-page status indicator shows review feedback.
  *
  * @example
  * <PageReadView
@@ -33,22 +76,77 @@ interface Props {
  *   floaterRows={[{ id: 1, label: "Age", content: "19" }]}
  *   childPages={[]}
  *   pageId={42}
+ *   isAuthenticated={true}
+ *   isAdmin={false}
  * />
  */
-export function PageReadView({
-  serialSlug,
-  sections,
-  hasInfobox,
-  floaterImageUrl,
-  floaterRows,
-  childPages,
-  pageId,
-  pageTitles,
-  wikiChapters,
-  chapterType,
-}: Props) {
+export function PageReadView(props: PageReadViewProps) {
+  const {
+    serialSlug,
+    sections,
+    hasInfobox,
+    floaterImageUrl,
+    floaterRows,
+    childPages,
+    pageId,
+    pageTitles,
+    wikiChapters,
+    chapterType,
+    isAuthenticated = false,
+    isAdmin = false,
+    allChapters = [],
+    readingChapterId = null,
+    wikiPagesList = [],
+    wikiChaptersList = [],
+    myPageSuggestion = null,
+  } = props;
+
+  const [showSuggestionForm, setShowSuggestionForm] = useState(false);
+
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
+
+  const showSuggestButton = isAuthenticated && !isAdmin && !showSuggestionForm;
+
+  // Map sections to the flat format expected by SuggestionForm as initialSections.
+  const initialSections = sections.map((s) => ({
+    id: s.id,
+    name: s.name,
+    content: s.content,
+  }));
+
+  // Status banner for pending/approved/rejected suggestions.
+  const suggestionStatusBanner = (() => {
+    if (!myPageSuggestion || isAdmin) return null;
+    const { status, reviewNote } = myPageSuggestion;
+    if (status === "pending") {
+      return (
+        <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Your suggestion is pending admin review.
+        </div>
+      );
+    }
+    if (status === "approved") {
+      return (
+        <div className="rounded-md border border-green-500/30 bg-green-50/50 dark:bg-green-950/20 px-4 py-3 text-sm text-green-700 dark:text-green-400">
+          Your suggestion was approved and applied to the page.
+        </div>
+      );
+    }
+    if (status === "rejected") {
+      return (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          Your suggestion was not accepted.
+          {reviewNote && (
+            <span className="block mt-1 text-muted-foreground">
+              Admin note: {reviewNote}
+            </span>
+          )}
+        </div>
+      );
+    }
+    return null;
+  })();
 
   return (
     <div className="overflow-hidden">
@@ -101,6 +199,36 @@ export function PageReadView({
           )}
         </div>
       ))}
+
+      {/* Suggestion form or status feedback */}
+      <div className="clear-right mt-4 flex flex-col gap-4">
+        {suggestionStatusBanner}
+
+        {showSuggestButton && (
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => setShowSuggestionForm(true)}
+            >
+              Suggest an edit
+            </Button>
+          </div>
+        )}
+
+        {showSuggestionForm && (
+          <SuggestionForm
+            pageId={pageId}
+            allChapters={allChapters}
+            readingChapterId={readingChapterId}
+            wikiPages={wikiPagesList}
+            wikiChapters={wikiChaptersList}
+            chapterType={chapterType}
+            serialSlug={serialSlug}
+            initialSections={initialSections}
+            onClose={() => setShowSuggestionForm(false)}
+          />
+        )}
+      </div>
 
       <div className="clear-right mt-6 pt-6 border-t border-border">
         <Text variant="h3" className="mb-3">

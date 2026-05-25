@@ -4,7 +4,6 @@ import { db } from "@/db/index";
 import {
   pages,
   chapters,
-  volumes,
   pageSections,
   pageSectionRevisions,
   pageSuggestions,
@@ -16,6 +15,7 @@ import {
   asc,
   count,
   eq,
+  inArray,
   isNull,
   lte,
   max,
@@ -228,11 +228,7 @@ export async function getPendingSuggestions(pageId: number): Promise<
     })
     .from(pageSuggestionSectionChanges)
     .innerJoin(pageSections, eq(pageSuggestionSectionChanges.sectionId, pageSections.id))
-    .where(
-      and(
-        ...suggestionIds.map((id) => eq(pageSuggestionSectionChanges.suggestionId, id)),
-      ),
-    );
+    .where(inArray(pageSuggestionSectionChanges.suggestionId, suggestionIds));
 
   // For current content: fetch the latest revision at each suggestion's target chapter idx.
   // We resolve this per-suggestion using the max-idx pattern.

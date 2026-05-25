@@ -56,6 +56,7 @@ import { AdminManager } from "@/components/AdminManager";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { auth } from "@/auth";
+import { getTotalPendingSuggestions } from "./[page]/suggestionActions";
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -104,6 +105,7 @@ export default async function SerialPage({ params }: Props) {
     isAdmin,
     serialAdminList,
     session,
+    totalPendingSuggestions,
   ] = await Promise.all([
     getChapterCutoff(serial.id),
     db
@@ -175,6 +177,7 @@ export default async function SerialPage({ params }: Props) {
       .where(eq(serialAdmins.serialId, serial.id))
       .orderBy(asc(serialAdmins.grantedAt)),
     auth(),
+    getTotalPendingSuggestions(serial.id),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -623,6 +626,13 @@ export default async function SerialPage({ params }: Props) {
               updateMetadataAction={updateMetadataForSerial}
               isAdmin={isAdmin}
             />
+
+            {isAdmin && totalPendingSuggestions > 0 && (
+              <div className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                <span className="font-medium">{totalPendingSuggestions}</span>
+                pending {totalPendingSuggestions === 1 ? "suggestion" : "suggestions"} across all pages — visit each page to review.
+              </div>
+            )}
 
             {homePage ? (
               <PageEditor

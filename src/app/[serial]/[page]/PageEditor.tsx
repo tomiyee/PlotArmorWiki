@@ -27,6 +27,7 @@ import {
   PageRelationshipsPanel,
   type ParentPageEntry,
 } from "./PageRelationshipsPanel";
+import { SuggestionReviewPanel } from "./SuggestionReviewPanel";
 import type {
   SectionData,
   FloaterRowData,
@@ -126,6 +127,45 @@ interface Props {
    * for resolving this value via `isSerialAdmin`.
    */
   isAdmin?: boolean;
+  /**
+   * Whether the current user is authenticated (but not necessarily an admin).
+   * When `true` and `isAdmin` is false, shows the "Suggest an Edit" button in
+   * read mode. Resolved by the parent via `isAuthenticated()` from auth-guard.
+   */
+  isAuthenticated?: boolean;
+  /**
+   * Number of pending suggestions for this page. Shown as a badge next to the
+   * edit mode controls when `isAdmin` is true and value > 0.
+   */
+  pendingSuggestionCount?: number;
+  /**
+   * Pre-fetched pending suggestions for this page, passed to `SuggestionReviewPanel`.
+   * Only populated when `isAdmin` is true.
+   */
+  pendingSuggestions?: {
+    id: number;
+    proposerUsername: string | null;
+    targetChapterId: number;
+    targetChapterName: string;
+    citation: string;
+    createdAt: Date;
+    sectionChanges: {
+      sectionId: number;
+      sectionName: string;
+      currentContent: string;
+      proposedContent: string;
+    }[];
+  }[];
+  /**
+   * The current non-admin user's most recent suggestion for this page.
+   * Passed through to PageReadView to show per-page status feedback.
+   */
+  myPageSuggestion?: {
+    id: number;
+    status: "pending" | "approved" | "rejected";
+    reviewNote: string | null;
+    createdAt: Date;
+  } | null;
 }
 
 /**
@@ -188,6 +228,10 @@ export function PageEditor(props: Props) {
     isHomePage = false,
     editModeHeader,
     isAdmin = false,
+    isAuthenticated = false,
+    pendingSuggestionCount = 0,
+    pendingSuggestions = [],
+    myPageSuggestion = null,
   } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -322,18 +366,33 @@ export function PageEditor(props: Props) {
 
   if (!isAdmin || !isEditing) {
     return (
-      <PageReadView
-        serialSlug={serialSlug}
-        sections={sections}
-        hasInfobox={hasInfobox}
-        floaterImageUrl={floaterImageUrl}
-        floaterRows={floaterRows}
-        childPages={childPages}
-        pageId={pageId}
-        pageTitles={pageTitles}
-        wikiChapters={wikiChaptersByName}
-        chapterType={chapterType}
-      />
+      <Box col className="gap-6">
+        <PageReadView
+          serialSlug={serialSlug}
+          sections={sections}
+          hasInfobox={hasInfobox}
+          floaterImageUrl={floaterImageUrl}
+          floaterRows={floaterRows}
+          childPages={childPages}
+          pageId={pageId}
+          pageTitles={pageTitles}
+          wikiChapters={wikiChaptersByName}
+          chapterType={chapterType}
+          isAuthenticated={isAuthenticated}
+          isAdmin={isAdmin}
+          allChapters={allChapters}
+          readingChapterId={readingChapterId}
+          wikiPagesList={wikiPages}
+          wikiChaptersList={wikiChapters}
+          myPageSuggestion={myPageSuggestion}
+        />
+        {isAdmin && pendingSuggestions.length > 0 && (
+          <SuggestionReviewPanel
+            suggestions={pendingSuggestions}
+            serialSlug={serialSlug}
+          />
+        )}
+      </Box>
     );
   }
 
@@ -371,6 +430,13 @@ export function PageEditor(props: Props) {
   return (
     <Box col className="gap-6">
       {editModeHeader}
+
+      {isAdmin && pendingSuggestionCount > 0 && (
+        <div className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          <span className="font-medium">{pendingSuggestionCount}</span>
+          {pendingSuggestionCount === 1 ? "pending suggestion" : "pending suggestions"} — see below
+        </div>
+      )}
 
       {allChapters.length > 0 && (
         <Box className="items-center gap-3">
@@ -437,6 +503,13 @@ export function PageEditor(props: Props) {
         setDraftFloaterRowContent={setDraftFloaterRowContent}
         isPending={isPending}
       />
+
+      {pendingSuggestions.length > 0 && (
+        <SuggestionReviewPanel
+          suggestions={pendingSuggestions}
+          serialSlug={serialSlug}
+        />
+      )}
     </Box>
   );
 }
