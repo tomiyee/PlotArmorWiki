@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   type ReactElement,
+  type RefObject,
 } from "react";
 import type {
   MDXEditorMethods,
@@ -42,6 +43,7 @@ import {
   DiffSourceToggleWrapper,
   CodeToggle,
   Separator,
+  ButtonWithTooltip,
 } from "@mdxeditor/editor";
 import {
   DecoratorNode,
@@ -57,6 +59,7 @@ import {
   type SerializedLexicalNode,
   type LexicalNode,
 } from "lexical";
+import { Link2 } from "lucide-react";
 import type * as Mdast from "mdast";
 import { MDXEditorClient } from "@/components/MDEditor";
 
@@ -67,14 +70,28 @@ interface SerializedWikiLinkNode extends SerializedLexicalNode {
 }
 
 /**
- * Context that feeds wiki page and chapter data into WikiLinkChip decorators.
- * Wrapped around MDXEditorClient so decorator elements rendered inside Lexical
- * can look up display names from page slugs without prop-drilling.
+ * Context that feeds wiki page and chapter data into WikiLinkChip decorators
+ * and the InsertWikiLinkButton toolbar component.
+ *
+ * Wrapped around MDXEditorClient so decorator elements and toolbar buttons
+ * rendered inside Lexical can look up data without closure staleness — the
+ * Provider re-renders on every wikiPages/wikiChapters change, so consumers
+ * always see fresh data regardless of the plugins useMemo deps.
  */
 const WikiLinkContext = createContext<{
   wikiPages: { name: string; slug: string }[];
+  wikiChapters: { name: string; idx: number }[];
   chapterType?: string;
-}>({ wikiPages: [] });
+  /** Inserts a [[token]] WikiLinkNode at the current Lexical cursor position. */
+  insertWikiLink: (token: string) => void;
+  /** Focuses the editor's contenteditable after a toolbar interaction. */
+  focusEditor: () => void;
+}>({
+  wikiPages: [],
+  wikiChapters: [],
+  insertWikiLink: () => {},
+  focusEditor: () => {},
+});
 
 /**
  * Inline chip rendered inside the WYSIWYG editor for a resolved wiki link.
@@ -257,6 +274,202 @@ const wikiLinkToMarkdownExtension = {
   },
 } as unknown as ToMarkdownExtension;
 
+// ── InsertWikiLinkButton ──────────────────────────────────────────────────────
+
+/**
+ * Inserts a WikiLinkNode at the current cursor selection in the given Lexical
+ * editor without replacing any `[[` fragment — suitable for toolbar-triggered
+ * insertion where there is no autocomplete fragment to replace.
+ */
+function insertWikiLinkAtCursor(token: string, lexEditor: LexicalEditor) {
+  lexEditor.update(() => {
+    const sel = $getSelection();
+    if ($isRangeSelection(sel)) {
+      sel.insertNodes([new WikiLinkNode(token)]);
+    }
+  });
+}
+
+type InsertWikiLinkButtonProps = {
+  /** Ref attached to the button element, used to anchor the search popover below it. */
+  buttonRef: RefObject<HTMLButtonElement | null>;
+  /** Whether the popover is currently open. */
+  isOpen: boolean;
+  /** Called when the popover open state should change. */
+  onOpenChange: (open: boolean) => void;
+};
+
+/**
+ * Toolbar button that opens a searchable popover of wiki pages and chapters.
+ * Reads suggestion data and editor callbacks from `WikiLinkContext` (always
+ * fresh), avoiding the closure staleness of the `plugins` useMemo.
+ *
+ * @example
+ * toolbarContents: () => (
+ *   <DiffSourceToggleWrapper>
+ *     ...
+ *     <InsertWikiLinkButton buttonRef={ref} isOpen={open} onOpenChange={setOpen} />
+ *   </DiffSourceToggleWrapper>
+ * )
+ */
+function InsertWikiLinkButton(props: InsertWikiLinkButtonProps) {
+  const { buttonRef, isOpen, onOpenChange } = props;
+  const { wikiPages, wikiChapters, chapterType, insertWikiLink, focusEditor } =
+    useContext(WikiLinkContext);
+  const [query, setQuery] = useState("");
+  // Popover position captured at click-time (outside render) to avoid the
+  // react-hooks/refs lint error from reading buttonRef.current during render.
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
+
+  const filteredPages = useMemo(() => {
+    const q = query.toLowerCase();
+    return wikiPages.filter((p) => p.name.toLowerCase().includes(q));
+  }, [wikiPages, query]);
+
+  const filteredChapters = useMemo(() => {
+    const q = query.toLowerCase();
+    return wikiChapters.filter((c) => c.name.toLowerCase().includes(q));
+  }, [wikiChapters, query]);
+
+  const hasSuggestions =
+    filteredPages.length > 0 || filteredChapters.length > 0;
+
+  function handleButtonClick() {
+    if (!isOpen) {
+      // Compute position from the DOM now (in an event handler, not render).
+      const rect = buttonRef.current?.getBoundingClientRect();
+      setPopoverPos({
+        top: rect ? rect.bottom + 4 : 0,
+        left: rect ? rect.left : 0,
+      });
+      setQuery("");
+    }
+    onOpenChange(!isOpen);
+  }
+
+  function handleSelect(token: string) {
+    onOpenChange(false);
+    setQuery("");
+    insertWikiLink(token);
+    // Return focus to the editor after closing the popover.
+    requestAnimationFrame(() => focusEditor());
+  }
+
+  function handlePageSelect(page: { name: string; slug: string }) {
+    handleSelect(`page:${page.slug}`);
+  }
+
+  function handleChapterSelect(chapter: { name: string }) {
+    if (chapterType) {
+      handleSelect(`${chapterType}:${chapter.name}`);
+    }
+  }
+
+  return (
+    <>
+      <ButtonWithTooltip
+        title="Insert wiki link"
+        ref={buttonRef}
+        onClick={handleButtonClick}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+      >
+        <Link2 className="size-4" />
+      </ButtonWithTooltip>
+
+      {isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 9999,
+            top: popoverPos.top,
+            left: popoverPos.left,
+          }}
+          className="w-72 rounded-lg border border-border bg-popover shadow-md"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <div className="border-b border-border p-2">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search pages or chapters…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  onOpenChange(false);
+                  setQuery("");
+                  focusEditor();
+                }
+              }}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+          <ul
+            role="listbox"
+            aria-label="Wiki link suggestions"
+            className="max-h-52 overflow-y-auto py-1"
+          >
+            {!hasSuggestions && (
+              <li className="px-3 py-2 text-sm text-muted-foreground">
+                No results
+              </li>
+            )}
+            {filteredPages.length > 0 && (
+              <>
+                {wikiChapters.length > 0 && (
+                  <li className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Pages
+                  </li>
+                )}
+                {filteredPages.map((page) => (
+                  <li
+                    key={`page:${page.slug}`}
+                    role="option"
+                    aria-selected={false}
+                    className="flex cursor-pointer select-none items-baseline gap-1.5 px-3 py-2 text-sm hover:bg-accent"
+                    onClick={() => handlePageSelect(page)}
+                  >
+                    <span className="font-medium text-foreground">
+                      {page.name}
+                    </span>
+                  </li>
+                ))}
+              </>
+            )}
+            {filteredChapters.length > 0 && chapterType && (
+              <>
+                <li className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {chapterType}s
+                </li>
+                {filteredChapters.map((chapter) => (
+                  <li
+                    key={`chapter:${chapter.name}`}
+                    role="option"
+                    aria-selected={false}
+                    className="flex cursor-pointer select-none items-baseline gap-1.5 px-3 py-2 text-sm hover:bg-accent"
+                    onClick={() => handleChapterSelect(chapter)}
+                  >
+                    <span className="font-medium text-foreground">
+                      {chapter.name}
+                    </span>
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                      {chapterType}
+                    </span>
+                  </li>
+                ))}
+              </>
+            )}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface WikiPage {
@@ -371,6 +584,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const [initialValue] = useState(() => normalizeMarkdown(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
+  // Ref for the toolbar "Insert wiki link" button — used to anchor the popover.
+  const toolbarButtonRef = useRef<HTMLButtonElement>(null);
 
   // Tracks the last NORMALIZED markdown we emitted so applySuggestion can read it.
   const lastEmittedRef = useRef<string>(normalizeMarkdown(value));
@@ -388,6 +603,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     top: number;
     left: number;
   } | null>(null);
+  // Open state for the toolbar "Insert wiki link" button popover.
+  const [isToolbarOpen, setIsToolbarOpen] = useState(false);
 
   // Sync external value changes (e.g. chapter switch pre-fills draft) into the editor.
   useEffect(() => {
@@ -642,6 +859,58 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   );
 
   /**
+   * Focuses the Lexical contenteditable element via DOM traversal.
+   * Exposed via WikiLinkContext so toolbar components can return focus to the
+   * editor after a popover interaction without holding a Lexical editor ref.
+   */
+  const focusEditor = useCallback(() => {
+    const editorEl = containerRef.current?.querySelector<HTMLElement>(
+      '[contenteditable="true"]',
+    );
+    const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+    lexEditor?.focus();
+  }, []);
+
+  /**
+   * Inserts a `[[token]]` WikiLinkNode at the current Lexical cursor position.
+   * Exposed via WikiLinkContext so InsertWikiLinkButton (inside the MDXEditor
+   * plugin subtree) can trigger an insertion without DOM traversal.
+   *
+   * Falls back to appending to the end of the document via setMarkdown when the
+   * Lexical editor is not reachable from the DOM.
+   */
+  const insertWikiLink = useCallback(
+    (token: string) => {
+      const editorEl = containerRef.current?.querySelector<HTMLElement>(
+        '[contenteditable="true"]',
+      );
+      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+
+      if (lexEditor) {
+        isApplyingRef.current = true;
+        insertWikiLinkAtCursor(token, lexEditor);
+        requestAnimationFrame(() => {
+          isApplyingRef.current = false;
+        });
+        return;
+      }
+
+      // Fallback: append at end of document via setMarkdown.
+      const current = lastEmittedRef.current;
+      const newMarkdown = current ? `${current}\n[[${token}]]` : `[[${token}]]`;
+      isApplyingRef.current = true;
+      editorRef.current?.setMarkdown(newMarkdown);
+      lastEmittedRef.current = newMarkdown;
+      prevValueRef.current = newMarkdown;
+      onChange(newMarkdown);
+      requestAnimationFrame(() => {
+        isApplyingRef.current = false;
+      });
+    },
+    [onChange],
+  );
+
+  /**
    * Intercepts dropdown navigation keys in the capture phase on the wrapper div.
    * Capture fires before MDXEditor's Lexical key handlers, so our handler always
    * wins when the dropdown is open.
@@ -703,6 +972,12 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
             <Separator />
             <InsertTable />
             <InsertThematicBreak />
+            <Separator />
+            <InsertWikiLinkButton
+              buttonRef={toolbarButtonRef}
+              isOpen={isToolbarOpen}
+              onOpenChange={setIsToolbarOpen}
+            />
           </DiffSourceToggleWrapper>
         ),
       }),
@@ -717,6 +992,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       codeBlockPlugin(),
       diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: initialValue }),
     ];
+    // InsertWikiLinkButton reads wikiPages/wikiChapters/chapterType from
+    // WikiLinkContext (always fresh), so those deps are intentionally omitted here.
+    // toolbarButtonRef and isToolbarOpen/setIsToolbarOpen are stable refs/setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValue]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
@@ -729,7 +1008,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       onCompositionStart={() => setIsComposing(true)}
       onCompositionEnd={() => setIsComposing(false)}
     >
-      <WikiLinkContext.Provider value={{ wikiPages, chapterType }}>
+      <WikiLinkContext.Provider
+        value={{ wikiPages, wikiChapters, chapterType, insertWikiLink, focusEditor }}
+      >
         <MDXEditorClient
           ref={editorRef}
           markdown={initialValue}
