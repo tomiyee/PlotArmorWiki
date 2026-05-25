@@ -11,8 +11,6 @@ import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 type ChapterSynopsisEditorProps = {
   /** URL slug of the serial, used for markdown preview links. */
   serialSlug: string;
-  /** Global ordering index of the chapter being edited. */
-  chapterIdx: number;
   /** Saved synopsis content loaded from the server. */
   initialContent: string;
   /** Wiki pages visible at the reader's cutoff, used for `[[` autocomplete. */
@@ -27,12 +25,12 @@ type ChapterSynopsisEditorProps = {
    * Required alongside `wikiChapters` to enable chapter link autocomplete.
    */
   chapterType?: string;
-  /** Server action that persists the synopsis. */
-  saveAction: (
-    serialSlug: string,
-    chapterIdx: number,
-    content: string,
-  ) => Promise<void>;
+  /**
+   * Server action that persists the synopsis. Pre-bound with `serialSlug` and
+   * `chapterIdx` by the parent server component — accepts only the markdown
+   * content string.
+   */
+  saveAction: (content: string) => Promise<void>;
 };
 
 /**
@@ -45,18 +43,18 @@ type ChapterSynopsisEditorProps = {
  * keeping this component consistent with the rest of the edit-mode pattern.
  *
  * @example
+ * // In the server component, pre-bind serialSlug + chapterIdx before passing:
+ * const boundSave = saveChapterSynopsis.bind(null, serialSlug, chapterIdx);
  * <ChapterSynopsisEditor
  *   serialSlug="one-piece"
- *   chapterIdx={42}
  *   initialContent=""
  *   wikiPages={wikiPages}
- *   saveAction={saveChapterSynopsis}
+ *   saveAction={boundSave}
  * />
  */
 export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
   const {
     serialSlug,
-    chapterIdx,
     initialContent,
     wikiPages,
     wikiChapters,
@@ -72,11 +70,11 @@ export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
 
   const handleSave = useCallback(() => {
     startTransition(async () => {
-      await saveAction(serialSlug, chapterIdx, draft);
+      await saveAction(draft);
       setCommitted(draft);
       router.refresh();
     });
-  }, [saveAction, serialSlug, chapterIdx, draft, router]);
+  }, [saveAction, draft, router]);
 
   const handleDiscard = useCallback(() => {
     setDraft(committed);

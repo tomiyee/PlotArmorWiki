@@ -143,7 +143,7 @@ export default async function ChapterPage({ params }: Props) {
     categoryName: string;
     pages: { id: number; name: string; slug: string }[];
   }[] = [];
-  let boundSaveAction: typeof saveChapterSynopsis | null = null;
+  let boundSaveAction: ((content: string) => Promise<void>) | null = null;
 
   if (!spoilered) {
     // Fetch synopsis
@@ -273,7 +273,6 @@ export default async function ChapterPage({ params }: Props) {
                 <Box col className="gap-2">
                   <ChapterSynopsisEditor
                     serialSlug={serialSlug}
-                    chapterIdx={chapterIdx}
                     initialContent={synopsisContent}
                     wikiPages={wikiPages}
                     wikiChapters={chapterList.map((c) => ({
