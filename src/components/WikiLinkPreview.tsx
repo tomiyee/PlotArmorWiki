@@ -137,7 +137,9 @@ function PreviewContent({
         </Text>
         {preview.introChapterName && (
           <Text muted as="span" className="text-xs block">
-            <span className="text-muted-foreground">{preview.introChapterName}</span>
+            <span className="text-muted-foreground">
+              {preview.introChapterName}
+            </span>
           </Text>
         )}
       </div>

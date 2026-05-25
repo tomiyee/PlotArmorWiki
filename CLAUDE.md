@@ -53,7 +53,7 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 | ORM           | Drizzle ORM                                                  |
 | Auth          | Auth.js (NextAuth v5) — Google OAuth, Drizzle adapter        |
 | Search        | PostgreSQL full-text search (tsvector) — not yet implemented |
-| Markdown      | `@uiw/react-md-editor` (edit) + `react-markdown` (render)    |
+| Markdown      | `@mdxeditor/editor` (WYSIWYG edit) + `react-markdown` (render) |
 | Styling       | Tailwind CSS v4                                              |
 | UI components | Shadcn UI (Button, Input, Select, Dialog) + custom Text      |
 | Hosting       | Vercel                                                       |
@@ -104,7 +104,8 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/components/SerialEditor.tsx`         | Volume/chapter edit UI with drag-and-drop reorder (`@dnd-kit`). Uses serial's type names (e.g. "Episode"/"Season").                                                   |
 | `src/components/SerialMetadataEditor.tsx` | Inline serial title/description/authors/art edit. Redirects on slug change.                                                                                           |
 | `src/components/ChapterSelector.tsx`      | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. Grouped volume dropdown with collapsible headers (collapse state persisted). On first visit shows a `<Popover>` spoiler callout anchored below the trigger button. |
-| `src/components/WikiLinkMDEditor.tsx`     | `<MDEditor>` + `[[Category:Page]]` autocomplete. Uses `MarkdownRenderer` as preview so edit preview matches final render.                                             |
+| `src/components/WikiLinkMDEditor.tsx`     | MDXEditor WYSIWYG + `[[Category:Page]]` autocomplete with cursor-aware suggestions. Custom Lexical node handles wiki-link syntax end-to-end.                          |
+| `src/components/ForwardRefEditor.tsx`     | Non-SSR entry point for `@mdxeditor/editor`; imported via `dynamic()` with `{ ssr: false }` to keep browser-only editor code off the server.                         |
 | `src/components/SerialNavInjector.tsx`    | Client Component (renders null); injects serial data into navbar via `useLayoutEffect`.                                                                               |
 | `src/components/ui/MarkdownRenderer.tsx`  | Single source of truth for markdown styling. No `@tailwindcss/typography` — explicit Tailwind classes. Accepts `serialSlug` for wiki links, `sm` for compact mode.    |
 | `src/components/ui/Text.tsx`              | `<Text variant>` typography. Variants: `h1`–`h4`, `body`, `label`. `as` overrides element. `muted` prop applies `text-gray-500`.                                      |
@@ -121,8 +122,10 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/proxy.ts`                            | Next.js middleware (exported as default). Redirects authenticated users with `username === null` to `/onboarding`; skips `/api/auth/**` to avoid loops.               |
 | `src/app/onboarding/page.tsx`             | Username-pick page shown after first sign-in. Redirects to `/` once username is saved.                                                                                |
 | `src/app/onboarding/actions.ts`           | `setUsername` Server Action: validates uniqueness, writes to `users.username`, invalidates the session cache.                                                         |
-| `src/components/navbar/AuthControls.tsx`  | Server Component: renders `<UserMenu>` when authenticated, or a sign-in button when not.                                                                              |
+| `src/components/navbar/AuthControls.tsx`  | Server Component: renders `<UserMenu>` when authenticated, or a sign-in button + `<UnauthMenu>` when not. Sign-in button hidden on mobile (`hidden sm:block`).        |
 | `src/components/navbar/UserMenu.tsx`      | Client Component: avatar dropdown with username display and `<SignOutButton>`.                                                                                        |
+| `src/components/navbar/UnauthMenu.tsx`    | Client Component: user-icon button always visible on mobile; opens a dropdown with a sign-in link and theme toggle.                                                   |
+| `src/components/navbar/MobileMenuDrawer.tsx` | Client Component: hamburger button (mobile only) that opens a left-side drawer with serial title, page-category links, and the full TOC.                           |
 | `src/components/navbar/SignOutButton.tsx` | Thin Client Component wrapping `signOut()` as a form action (required by Auth.js for CSRF safety).                                                                    |
 
 ### React import conventions

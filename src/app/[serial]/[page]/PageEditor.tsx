@@ -197,12 +197,6 @@ export function PageEditor(props: Props) {
     Record<number, string>
   >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
 
-  // The "current value" shown as a reference beside each editor field. Starts
-  // as the reader's chapter content (same as initial draft) and updates whenever
-  // the chapter selector changes to reflect what readers at that chapter see.
-  const [currentSectionContent, setCurrentSectionContent] = useState<
-    Record<number, string>
-  >(() => Object.fromEntries(sections.map((s) => [s.id, s.content])));
   const [currentSectionLastUpdatedIdx, setCurrentSectionLastUpdatedIdx] =
     useState<Record<number, number | null>>(() =>
       Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
@@ -242,9 +236,6 @@ export function PageEditor(props: Props) {
 
   const handleDiscard = useCallback(() => {
     setDraftSectionContent(
-      Object.fromEntries(sections.map((s) => [s.id, s.content])),
-    );
-    setCurrentSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
     );
     setCurrentSectionLastUpdatedIdx(
@@ -308,7 +299,6 @@ export function PageEditor(props: Props) {
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
-      setCurrentSectionContent(newContent);
       setDraftSectionContent(newContent);
       setCurrentSectionLastUpdatedIdx(
         Object.fromEntries(
@@ -424,7 +414,6 @@ export function PageEditor(props: Props) {
           key={section.id}
           section={section}
           isFirst={i === 0}
-          currentContent={currentSectionContent[section.id] ?? ""}
           draftContent={draftSectionContent[section.id] ?? ""}
           lastUpdatedIdx={currentSectionLastUpdatedIdx[section.id] ?? null}
           selectedChapterIdx={selectedChapterIdx}
@@ -433,7 +422,6 @@ export function PageEditor(props: Props) {
           }
           serialSlug={serialSlug}
           wikiPages={wikiPages}
-          pageTitles={pageTitles}
           wikiChapters={wikiChapters}
           chapterType={chapterType}
         />
