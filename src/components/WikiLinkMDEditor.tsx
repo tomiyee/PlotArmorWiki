@@ -15,6 +15,7 @@ import type {
   RealmPlugin,
   MdastImportVisitor,
   LexicalExportVisitor,
+  ToMarkdownExtension,
 } from "@mdxeditor/editor";
 import {
   headingsPlugin,
@@ -228,17 +229,33 @@ const WikiLinkTextVisitor: MdastImportVisitor<Mdast.Text> = {
   },
 };
 
-// ── MDXEditor export visitor: WikiLinkNode → text ────────────────────────────
+// ── MDXEditor export visitor: WikiLinkNode → wikiLink mdast node ─────────────
+
+// Custom mdast node — not part of the standard Mdast.Nodes union.
+interface MdastWikiLinkNode {
+  type: "wikiLink";
+  value: string;
+}
 
 const WikiLinkExportVisitor: LexicalExportVisitor<WikiLinkNode, Mdast.Text> = {
   testLexicalNode: $isWikiLinkNode,
   visitLexicalNode({ lexicalNode, mdastParent, actions }) {
-    actions.appendToParent(mdastParent as Mdast.Parent, {
-      type: "text",
-      value: `[[${lexicalNode.__token}]]`,
-    });
+    // Produce a custom "wikiLink" node so the toMarkdown handler below can
+    // emit [[token]] without mdast-util-to-markdown escaping the [ character.
+    actions.appendToParent(mdastParent, {
+      type: "wikiLink",
+      value: lexicalNode.__token,
+    } as unknown as Mdast.Text);
   },
 };
+
+// Passed to MDXEditorClient.toMarkdownOptions — emits [[token]] verbatim.
+// mdast-util-to-markdown escapes [ in text nodes; a custom handler bypasses that.
+const wikiLinkToMarkdownExtension = {
+  handlers: {
+    wikiLink: (node: MdastWikiLinkNode) => `[[${node.value}]]`,
+  },
+} as unknown as ToMarkdownExtension;
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -459,7 +476,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           const anchorNode = anchor.getNode();
           if (!$isTextNode(anchorNode)) return;
 
-          const textBefore = anchorNode.getTextContent().slice(0, anchor.offset);
+          const textBefore = anchorNode
+            .getTextContent()
+            .slice(0, anchor.offset);
           const lastOpen = textBefore.lastIndexOf("[[");
           if (lastOpen === -1) return;
           const fragment = textBefore.slice(lastOpen + 2);
@@ -716,6 +735,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           markdown={initialValue}
           onChange={handleChange}
           plugins={plugins}
+          toMarkdownOptions={{ extensions: [wikiLinkToMarkdownExtension] }}
           className="mdx-editor-wiki"
           contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
         />

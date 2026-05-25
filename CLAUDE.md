@@ -17,7 +17,7 @@ Always prefix these shell commands with `rtk` to compress output:
 ```bash
 rtk git <args>        # instead of: git <args>
 rtk grep <args>       # instead of: grep <args>
-rtk find <args>       # instead of: find <args>
+rtk find <args>       # instead of: find <args>  (simple paths/names only — no -not, -exec, or other compound predicates; use plain `find` for those)
 rtk ls <args>         # instead of: ls <args>
 rtk gh <args>         # instead of: gh <args>
 rtk read <file>       # instead of: cat <file>
