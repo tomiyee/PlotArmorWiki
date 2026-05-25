@@ -1,61 +1,63 @@
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { SectionData } from "./types";
 
-interface Props {
+type SectionContentEditorProps = {
+  /** The section data including name, id, and saved content. */
   section: SectionData;
+  /** When true, hides the section heading and shows a preview-tooltip info icon instead. */
   isFirst: boolean;
-  currentContent: string;
+  /** The current unsaved draft content for this section. */
   draftContent: string;
+  /** Chapter index of the last saved revision, or null if never saved. */
   lastUpdatedIdx: number | null;
+  /** The currently selected chapter index for the "writing as of" context. */
   selectedChapterIdx: number | null;
+  /** Called with the new markdown string whenever the draft changes. */
   onChange: (val: string) => void;
+  /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
+  /** All wiki pages in this serial for `[[Page]]` autocomplete. */
   wikiPages: { name: string; slug: string }[];
-  /** slug → title map for resolving `[[slug]]` display text in the current-value panel. */
-  pageTitles?: Record<string, string>;
   /** Chapters for `[[Chapter:Name]]` autocomplete in the editor. */
   wikiChapters?: { name: string; idx: number }[];
   /** The serial's chapter type label (e.g. `"Chapter"`). */
   chapterType?: string;
-}
+};
 
 /**
- * Two-column editor for a single wiki page section: current saved content on the left,
- * MDEditor draft on the right. The first section omits its heading and shows a tooltip
- * explaining it powers hover previews.
+ * Two-column editor for a single wiki page section: saved content on the left,
+ * MDEditor draft on the right. The first section omits its heading and shows a
+ * tooltip explaining it powers hover previews.
  *
  * @example
  * <SectionContentEditor
- *   section={{ id: 1, name: "Summary", content: "...", lastUpdatedChapterIdx: 1 }}
+ *   section={section}
  *   isFirst={true}
- *   currentContent="..."
  *   draftContent="..."
  *   lastUpdatedIdx={1}
  *   selectedChapterIdx={3}
  *   onChange={(val) => setDraft(val)}
  *   serialSlug="one-piece"
- *   wikiPages={[{ name: "Luffy" }]}
+ *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  * />
  */
-export function SectionContentEditor({
-  section,
-  isFirst,
-  currentContent,
-  draftContent,
-  lastUpdatedIdx,
-  selectedChapterIdx,
-  onChange,
-  serialSlug,
-  wikiPages,
-  pageTitles,
-  wikiChapters,
-  chapterType,
-}: Props) {
+export function SectionContentEditor(props: SectionContentEditorProps) {
+  const {
+    section,
+    isFirst,
+    draftContent,
+    lastUpdatedIdx,
+    selectedChapterIdx,
+    onChange,
+    serialSlug,
+    wikiPages,
+    wikiChapters,
+    chapterType,
+  } = props;
   return (
     <Box col className="gap-2">
       <Box className="items-center gap-2">
@@ -63,51 +65,21 @@ export function SectionContentEditor({
         {isFirst && (
           <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
         )}
-      </Box>
-      <div className="grid grid-cols-2 gap-4 items-start">
-        <div className="rounded-lg border border-border bg-muted/40 p-4 h-full">
-          <div className="mb-2 flex items-center gap-2">
-            <Text
-              variant="label"
-              className="block text-xs text-muted-foreground uppercase tracking-wide"
-            >
-              Current value
-            </Text>
-            <LastUpdatedTag
-              lastUpdatedIdx={lastUpdatedIdx}
-              selectedChapterIdx={selectedChapterIdx}
-            />
-          </div>
-          {currentContent ? (
-            <MarkdownRenderer
-              serialSlug={serialSlug}
-              pageTitles={pageTitles}
-              chapterType={chapterType}
-              wikiChapters={
-                wikiChapters
-                  ? Object.fromEntries(wikiChapters.map((c) => [c.name, c.idx]))
-                  : undefined
-              }
-            >
-              {currentContent}
-            </MarkdownRenderer>
-          ) : (
-            <Text muted className="text-sm">
-              No content at this chapter.
-            </Text>
-          )}
-        </div>
-        <WikiLinkMDEditor
-          value={draftContent}
-          onChange={(val) => onChange(val ?? "")}
-          height={300}
-          preview="edit"
-          wikiPages={wikiPages}
-          serialSlug={serialSlug}
-          wikiChapters={wikiChapters}
-          chapterType={chapterType}
+        <LastUpdatedTag
+          lastUpdatedIdx={lastUpdatedIdx}
+          selectedChapterIdx={selectedChapterIdx}
         />
-      </div>
+      </Box>
+      <WikiLinkMDEditor
+        value={draftContent}
+        onChange={(val) => onChange(val ?? "")}
+        height={300}
+        preview="edit"
+        wikiPages={wikiPages}
+        serialSlug={serialSlug}
+        wikiChapters={wikiChapters}
+        chapterType={chapterType}
+      />
     </Box>
   );
 }

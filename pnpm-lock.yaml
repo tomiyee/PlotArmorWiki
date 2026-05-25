@@ -47,6 +47,9 @@ dependencies:
   drizzle-orm:
     specifier: ^0.45.2
     version: 0.45.2(postgres@3.4.9)
+  lexical:
+    specifier: ^0.35.0
+    version: 0.35.0
   lucide-react:
     specifier: ^1.11.0
     version: 1.14.0(react@19.2.4)

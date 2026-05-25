@@ -12,10 +12,14 @@ import { InfoIcon } from "@/components/ui/InfoIcon";
 import { addPageTitle, deletePageTitle } from "./actions";
 import type { PageTitleEntry, ChapterGroupOption } from "./types";
 
-interface Props {
+interface PageTitlesPanelProps {
+  /** The serial's URL slug, forwarded to server actions. */
   serialSlug: string;
+  /** The page's URL slug, forwarded to server actions. */
   pageSlug: string;
+  /** Existing chapter-versioned title revisions to display. */
   pageTitleEntries: PageTitleEntry[];
+  /** Options for the chapter select when adding a new title revision. */
   chapterSelectOptions: ChapterGroupOption[];
   /** Whether the parent editor is pending a transition (disables inputs). */
   isPending: boolean;
@@ -34,18 +38,19 @@ interface Props {
  *   isPending={false}
  * />
  */
-export function PageTitlesPanel({
-  serialSlug,
-  pageSlug,
-  pageTitleEntries,
-  chapterSelectOptions,
-  isPending: externalIsPending,
-}: Props) {
+export function PageTitlesPanel(props: PageTitlesPanelProps) {
+  const {
+    serialSlug,
+    pageSlug,
+    pageTitleEntries,
+    chapterSelectOptions,
+    isPending: externalIsPending,
+  } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [newTitleChapterId, setNewTitleChapterId] = useState<
     number | undefined
-  >(undefined);
+  >();
   const [newTitleText, setNewTitleText] = useState<string>("");
 
   const disabled = isPending || externalIsPending;
@@ -135,7 +140,7 @@ export function PageTitlesPanel({
               className="w-full"
             />
           </Box>
-          <Box col className="gap-1 flex-[2] min-w-48">
+          <Box col className="gap-1 flex-2 min-w-48">
             <Label htmlFor="new-title-text" className="text-xs">
               Title
             </Label>

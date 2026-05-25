@@ -147,3 +147,26 @@
     @apply font-sans;
     }
 }
+
+/* MDX editor WYSIWYG content styles — mirrors MarkdownRenderer element styles exactly */
+.mdx-editor-wiki .mdxeditor-root-contenteditable h1 { @apply text-2xl font-bold mt-6 mb-4; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable h2 { @apply text-xl font-semibold mt-5 mb-3; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable h3 { @apply text-lg font-semibold mt-4 mb-2; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable h4 { @apply text-base font-semibold mt-3 mb-2; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable p { @apply text-base text-foreground/80 mb-4 leading-relaxed; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable ul { @apply list-disc list-outside pl-6 mb-4 space-y-1 text-foreground/80; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable ol { @apply list-decimal list-outside pl-6 mb-4 space-y-1 text-foreground/80; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable li { @apply leading-relaxed; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable blockquote { @apply border-l-4 border-border pl-4 italic text-muted-foreground my-4; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable :not(pre) > code { @apply bg-muted text-foreground rounded px-1 py-0.5 text-sm font-mono; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable pre { @apply bg-muted rounded-md p-4 overflow-x-auto mb-4 text-sm font-mono text-foreground; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable pre code { @apply bg-transparent p-0 rounded-none; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable hr { @apply border-border my-6; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable a { @apply text-primary underline hover:text-primary/80; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable strong { @apply font-semibold text-foreground; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable em { @apply italic; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable table { @apply min-w-full border border-border text-sm overflow-x-auto mb-4; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable thead { @apply bg-muted/50; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable tbody { @apply divide-y divide-border; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable th { @apply px-3 py-2 text-left font-semibold text-foreground/80 border-b border-border; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable td { @apply px-3 py-2 text-foreground/80; }
