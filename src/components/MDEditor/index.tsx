@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-  useEffect,
-} from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import type { CSSProperties } from "react";
 import type { MDXEditorMethods, RealmPlugin } from "@mdxeditor/editor";
 import {
@@ -186,35 +180,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     setDropdownPos(null);
   }
 
-  /**
-   * Reads the cursor's pixel position from the DOM Selection API and returns
-   * coordinates relative to `containerRef` so the autocomplete dropdown
-   * appears just below the current insertion point.
-   */
-  function getCursorPos(): { top: number; left: number } | null {
-    const container = containerRef.current;
-    if (!container) return null;
-
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-
-    if (rect.width === 0 && rect.height === 0) return null;
-
-    const lineH = 24;
-    return {
-      top: rect.bottom - containerRect.top + lineH / 4,
-      // Keep w-72 (288 px) dropdown horizontally inside the container
-      left: Math.max(
-        0,
-        Math.min(rect.left - containerRect.left, containerRect.width - 288),
-      ),
-    };
-  }
-
   const { applySuggestion, isApplyingRef, lastEmittedRef, prevValueRef } =
     useApplySuggestion({
       containerRef,
@@ -329,7 +294,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       setSuggestions(next);
       setActiveIndex(0);
       setIsOpen(true);
-      setDropdownPos(getCursorPos());
+      setDropdownPos(getCursorPos(containerRef.current));
     },
     [
       lastEmittedRef,
@@ -531,3 +496,32 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   );
 }
 
+/**
+ * Reads the cursor's pixel position from the DOM Selection API and returns
+ * coordinates relative to `containerRef` so the autocomplete dropdown
+ * appears just below the current insertion point.
+ */
+function getCursorPos(
+  container: HTMLDivElement | null,
+): { top: number; left: number } | null {
+  if (!container) return null;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  if (rect.width === 0 && rect.height === 0) return null;
+
+  const lineH = 24;
+  return {
+    top: rect.bottom - containerRect.top + lineH / 4,
+    // Keep w-72 (288 px) dropdown horizontally inside the container
+    left: Math.max(
+      0,
+      Math.min(rect.left - containerRect.left, containerRect.width - 288),
+    ),
+  };
+}
