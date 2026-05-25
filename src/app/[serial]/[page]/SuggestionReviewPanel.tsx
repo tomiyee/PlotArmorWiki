@@ -9,28 +9,50 @@ import { Textarea } from "@/components/ui/Textarea";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { approveSuggestion, rejectSuggestion } from "./suggestionActions";
 
+/** A proposed change to a single body section of the wiki page. */
 type SectionChange = {
+  /** Database ID of the `page_sections` row being changed. */
   sectionId: number;
+  /** Display name of the section, shown as a diff heading. */
   sectionName: string;
+  /** Markdown content currently stored at the target chapter. */
   currentContent: string;
+  /** Markdown content the suggester wants to apply. */
   proposedContent: string;
 };
 
+/** A proposed change to a single infobox field of the wiki page. */
 type InfoboxChange = {
+  /** Database ID of the `page_infobox_sections` row being changed. */
   infoboxSectionId: number;
+  /** Human-readable label for the infobox field (e.g. "Affiliation"). */
   infoboxSectionLabel: string;
+  /** Markdown content currently stored at the target chapter. */
   currentContent: string;
+  /** Markdown content the suggester wants to apply. */
   proposedContent: string;
 };
 
+/**
+ * A reader-submitted edit suggestion awaiting moderator review.
+ * Groups all body and infobox diffs for a single submission under one record.
+ */
 type PendingSuggestion = {
+  /** Database ID of the suggestion row. */
   id: number;
+  /** Username of the reader who submitted the suggestion, or null if anonymous. */
   proposerUsername: string | null;
+  /** ID of the chapter the suggestion targets for content versioning. */
   targetChapterId: number;
+  /** Display name of the target chapter shown in the review UI. */
   targetChapterName: string;
+  /** Source quote or reference the suggester provided to justify the change. */
   citation: string;
+  /** Wall-clock timestamp of submission. */
   createdAt: Date;
+  /** One entry per body section that differs from the current version. */
   sectionChanges: SectionChange[];
+  /** One entry per infobox field that differs from the current version. */
   infoboxChanges: InfoboxChange[];
 };
 
@@ -54,7 +76,10 @@ export function SuggestionReviewPanel(props: SuggestionReviewPanelProps) {
 
   if (suggestions.length === 0) {
     return (
-      <Box col className="gap-2 rounded-lg border border-border bg-muted/20 p-4">
+      <Box
+        col
+        className="gap-2 rounded-lg border border-border bg-muted/20 p-4"
+      >
         <Text variant="h3">Pending suggestions</Text>
         <Text muted className="text-sm">
           No pending suggestions for this page.
@@ -93,16 +118,22 @@ function SuggestionCard(props: SuggestionCardProps) {
 
   if (resolved) return null;
 
-  const submittedAt = new Date(suggestion.createdAt).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const submittedAt = new Date(suggestion.createdAt).toLocaleDateString(
+    "en-US",
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    },
+  );
 
   function handleApprove() {
     setActionError(null);
     startTransition(async () => {
-      const result = await approveSuggestion(suggestion.id, reviewNote || undefined);
+      const result = await approveSuggestion(
+        suggestion.id,
+        reviewNote || undefined,
+      );
       if (result.error) {
         setActionError(result.error);
       } else {
@@ -115,7 +146,10 @@ function SuggestionCard(props: SuggestionCardProps) {
   function handleReject() {
     setActionError(null);
     startTransition(async () => {
-      const result = await rejectSuggestion(suggestion.id, reviewNote || undefined);
+      const result = await rejectSuggestion(
+        suggestion.id,
+        reviewNote || undefined,
+      );
       if (result.error) {
         setActionError(result.error);
       } else {
@@ -126,7 +160,10 @@ function SuggestionCard(props: SuggestionCardProps) {
   }
 
   return (
-    <Box col className="gap-4 rounded-lg border border-border bg-background p-4">
+    <Box
+      col
+      className="gap-4 rounded-lg border border-border bg-background p-4"
+    >
       {/* Header */}
       <Box className="items-start justify-between gap-2 flex-wrap">
         <Box col className="gap-1">
@@ -141,7 +178,9 @@ function SuggestionCard(props: SuggestionCardProps) {
 
       {/* Citation */}
       <Box col className="gap-1">
-        <Text className="text-sm font-medium text-muted-foreground">Citation</Text>
+        <Text className="text-sm font-medium text-muted-foreground">
+          Citation
+        </Text>
         <Text className="text-sm italic">{suggestion.citation}</Text>
       </Box>
 
@@ -152,10 +191,13 @@ function SuggestionCard(props: SuggestionCardProps) {
           <Box className="gap-3 items-start flex-col sm:flex-row">
             {/* Current */}
             <Box col className="flex-1 gap-1 min-w-0">
-              <Text muted className="text-xs font-medium uppercase tracking-wide">
+              <Text
+                muted
+                className="text-xs font-medium uppercase tracking-wide"
+              >
                 Current
               </Text>
-              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-[60px] overflow-auto">
+              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-60px overflow-auto">
                 {change.currentContent ? (
                   <MarkdownRenderer serialSlug={serialSlug} sm>
                     {change.currentContent}
@@ -175,7 +217,7 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Proposed
               </Text>
-              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-[60px] overflow-auto">
+              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-60px overflow-auto">
                 <MarkdownRenderer serialSlug={serialSlug} sm>
                   {change.proposedContent}
                 </MarkdownRenderer>
@@ -191,11 +233,18 @@ function SuggestionCard(props: SuggestionCardProps) {
           <Text variant="h4">Infobox: {change.infoboxSectionLabel}</Text>
           <Box className="gap-3 items-start flex-col sm:flex-row">
             <Box col className="flex-1 gap-1 min-w-0">
-              <Text muted className="text-xs font-medium uppercase tracking-wide">
+              <Text
+                muted
+                className="text-xs font-medium uppercase tracking-wide"
+              >
                 Current
               </Text>
-              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-[40px]">
-                {change.currentContent || <Text muted className="text-sm">(empty)</Text>}
+              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px]">
+                {change.currentContent || (
+                  <Text muted className="text-sm">
+                    (empty)
+                  </Text>
+                )}
               </Box>
             </Box>
             <Box col className="flex-1 gap-1 min-w-0">
@@ -205,7 +254,7 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Proposed
               </Text>
-              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-[40px]">
+              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px">
                 {change.proposedContent}
               </Box>
             </Box>
@@ -235,10 +284,7 @@ function SuggestionCard(props: SuggestionCardProps) {
 
       {/* Actions */}
       <Box className="gap-2 flex-wrap">
-        <Button
-          onClick={handleApprove}
-          disabled={isPending}
-        >
+        <Button onClick={handleApprove} disabled={isPending}>
           Approve
         </Button>
         {!showRejectForm ? (
@@ -260,7 +306,10 @@ function SuggestionCard(props: SuggestionCardProps) {
             </Button>
             <Button
               variant="ghost"
-              onClick={() => { setShowRejectForm(false); setReviewNote(""); }}
+              onClick={() => {
+                setShowRejectForm(false);
+                setReviewNote("");
+              }}
               disabled={isPending}
             >
               Cancel

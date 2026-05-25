@@ -16,6 +16,26 @@ type MyPageSuggestion = {
   createdAt: Date;
 } | null;
 
+/**
+ * All data needed to render the suggestion form and status banner for
+ * authenticated non-admin users. Grouped to avoid a sprawling flat props list.
+ * Omit this prop entirely for anonymous or admin users.
+ */
+type SuggestionContext = {
+  /** True when the viewer is an admin — hides the suggest button and status banner. */
+  isAdmin: boolean;
+  /** All chapters for the "Writing as of:" selector. */
+  allChapters: ChapterData[];
+  /** The chapter the user is currently reading up to. */
+  readingChapterId: number | null;
+  /** Wiki pages for `[[Page]]` autocomplete in the editor. */
+  wikiPagesList: { name: string; slug: string }[];
+  /** Chapters for `[[Chapter:Name]]` autocomplete. */
+  wikiChaptersList: { name: string; idx: number }[];
+  /** The current user's most recent suggestion for this page, or null. */
+  myPageSuggestion: MyPageSuggestion;
+};
+
 type PageReadViewProps = {
   /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
@@ -38,28 +58,11 @@ type PageReadViewProps = {
   /** The serial's chapter type (e.g. `"Chapter"`, `"Episode"`). */
   chapterType?: string;
   /**
-   * When true, shows a "Suggest an Edit" button to allow authenticated
-   * non-admins to submit a content suggestion.
+   * When provided, the authenticated non-admin suggestion flow is enabled —
+   * shows the "Suggest an edit" button, status banner, and inline form.
+   * Omit for anonymous users or when the page is rendered in edit mode.
    */
-  isAuthenticated?: boolean;
-  /**
-   * When true, hides the "Suggest an Edit" button — admins use the edit mode
-   * instead. Also hides user-facing suggestion status UI.
-   */
-  isAdmin?: boolean;
-  /** All chapters for this serial — passed through to SuggestionForm. */
-  allChapters?: ChapterData[];
-  /** The chapter the user is currently reading up to. */
-  readingChapterId?: number | null;
-  /** Wiki pages for suggestion form autocomplete. */
-  wikiPagesList?: { name: string; slug: string }[];
-  /** Chapters for suggestion form chapter-link autocomplete. */
-  wikiChaptersList?: { name: string; idx: number }[];
-  /**
-   * The current user's most recent suggestion for this page, or null.
-   * Used to render per-page status feedback (pending / approved / rejected).
-   */
-  myPageSuggestion?: MyPageSuggestion;
+  suggestionContext?: SuggestionContext;
 };
 
 /**
@@ -92,13 +95,7 @@ export function PageReadView(props: PageReadViewProps) {
     pageTitles,
     wikiChapters,
     chapterType,
-    isAuthenticated = false,
-    isAdmin = false,
-    allChapters = [],
-    readingChapterId = null,
-    wikiPagesList = [],
-    wikiChaptersList = [],
-    myPageSuggestion = null,
+    suggestionContext,
   } = props;
 
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
@@ -106,7 +103,8 @@ export function PageReadView(props: PageReadViewProps) {
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
 
-  const showSuggestButton = isAuthenticated && !isAdmin && !showSuggestionForm;
+  const showSuggestButton =
+    !!suggestionContext && !suggestionContext.isAdmin && !showSuggestionForm;
 
   // Map sections to the flat format expected by SuggestionForm as initialSections.
   const initialSections = sections.map((s) => ({
@@ -124,8 +122,9 @@ export function PageReadView(props: PageReadViewProps) {
 
   // Status banner for pending/approved/rejected suggestions.
   const suggestionStatusBanner = (() => {
-    if (!myPageSuggestion || isAdmin) return null;
-    const { status, reviewNote } = myPageSuggestion;
+    const suggestion = suggestionContext?.myPageSuggestion;
+    if (!suggestion || suggestionContext?.isAdmin) return null;
+    const { status, reviewNote } = suggestion;
     if (status === "pending") {
       return (
         <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
@@ -174,9 +173,13 @@ export function PageReadView(props: PageReadViewProps) {
             <dl className="flex flex-col gap-2 text-sm">
               {floaterRows.map((row) => (
                 <div key={row.id}>
-                  <dt className="font-medium text-muted-foreground">{row.label}</dt>
+                  <dt className="font-medium text-muted-foreground">
+                    {row.label}
+                  </dt>
                   <dd className="text-foreground whitespace-pre-wrap">
-                    {row.content || <span className="text-muted-foreground">—</span>}
+                    {row.content || (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </dd>
                 </div>
               ))}
@@ -222,13 +225,13 @@ export function PageReadView(props: PageReadViewProps) {
           </div>
         )}
 
-        {showSuggestionForm && (
+        {showSuggestionForm && suggestionContext && (
           <SuggestionForm
             pageId={pageId}
-            allChapters={allChapters}
-            readingChapterId={readingChapterId}
-            wikiPages={wikiPagesList}
-            wikiChapters={wikiChaptersList}
+            allChapters={suggestionContext.allChapters}
+            readingChapterId={suggestionContext.readingChapterId}
+            wikiPages={suggestionContext.wikiPagesList}
+            wikiChapters={suggestionContext.wikiChaptersList}
             chapterType={chapterType}
             serialSlug={serialSlug}
             initialSections={initialSections}

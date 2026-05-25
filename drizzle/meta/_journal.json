@@ -19,15 +19,8 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1779690473170,
-      "tag": "0002_furry_blackheart",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1779693081275,
-      "tag": "0003_public_paibok",
+      "when": 1779693894249,
+      "tag": "0002_charming_black_queen",
       "breakpoints": true
     }
   ]

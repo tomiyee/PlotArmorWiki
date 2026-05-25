@@ -10,7 +10,10 @@ import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
 import { Text } from "@/components/ui/Text";
 import { Textarea } from "@/components/ui/Textarea";
-import { submitPageSuggestion, getSectionsAtChapter } from "./suggestionActions";
+import {
+  submitPageSuggestion,
+  getSectionsAtChapter,
+} from "./suggestionActions";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { ChapterData, ChapterGroupOption } from "./types";
@@ -39,7 +42,12 @@ type SuggestionFormProps = {
   /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
   /** Pre-loaded sections at the reader's current cutoff (avoids an extra round-trip). */
-  initialSections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[];
+  initialSections: {
+    id: number;
+    name: string;
+    content: string;
+    lastUpdatedChapterIdx: number | null;
+  }[];
   /** Pre-loaded infobox rows at the reader's current cutoff. Empty when page has no infobox. */
   initialInfoboxSections: { id: number; label: string; content: string }[];
   /** Called when the user cancels or successfully submits the suggestion. */
@@ -87,13 +95,15 @@ export function SuggestionForm(props: SuggestionFormProps) {
   const selectedChapterIdx =
     allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
   const [sections, setSections] = useState(initialSections);
-  const [infoboxSections, setInfoboxSections] = useState(initialInfoboxSections);
+  const [infoboxSections, setInfoboxSections] = useState(
+    initialInfoboxSections,
+  );
   const [draftContent, setDraftContent] = useState<Record<number, string>>(
     Object.fromEntries(initialSections.map((s) => [s.id, s.content])),
   );
-  const [infoboxDraftContent, setInfoboxDraftContent] = useState<Record<number, string>>(
-    Object.fromEntries(initialInfoboxSections.map((s) => [s.id, s.content])),
-  );
+  const [infoboxDraftContent, setInfoboxDraftContent] = useState<
+    Record<number, string>
+  >(Object.fromEntries(initialInfoboxSections.map((s) => [s.id, s.content])));
   const [citation, setCitation] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -120,11 +130,16 @@ export function SuggestionForm(props: SuggestionFormProps) {
     (chapterId: number) => {
       setSelectedChapterId(chapterId);
       startTransition(async () => {
-        const { sections: newSections, infoboxSections: newIbSections } = await getSectionsAtChapter(pageId, chapterId);
+        const { sections: newSections, infoboxSections: newIbSections } =
+          await getSectionsAtChapter(pageId, chapterId);
         setSections(newSections);
-        setDraftContent(Object.fromEntries(newSections.map((s) => [s.id, s.content])));
+        setDraftContent(
+          Object.fromEntries(newSections.map((s) => [s.id, s.content])),
+        );
         setInfoboxSections(newIbSections);
-        setInfoboxDraftContent(Object.fromEntries(newIbSections.map((s) => [s.id, s.content])));
+        setInfoboxDraftContent(
+          Object.fromEntries(newIbSections.map((s) => [s.id, s.content])),
+        );
       });
     },
     [pageId],
@@ -140,11 +155,20 @@ export function SuggestionForm(props: SuggestionFormProps) {
       return;
     }
     const changes = sections
-      .filter((s) => draftContent[s.id] !== s.content && draftContent[s.id]?.trim())
+      .filter(
+        (s) => draftContent[s.id] !== s.content && draftContent[s.id]?.trim(),
+      )
       .map((s) => ({ sectionId: s.id, proposedContent: draftContent[s.id] }));
     const infoboxChanges = infoboxSections
-      .filter((s) => infoboxDraftContent[s.id] !== s.content && infoboxDraftContent[s.id]?.trim())
-      .map((s) => ({ infoboxSectionId: s.id, proposedContent: infoboxDraftContent[s.id] }));
+      .filter(
+        (s) =>
+          infoboxDraftContent[s.id] !== s.content &&
+          infoboxDraftContent[s.id]?.trim(),
+      )
+      .map((s) => ({
+        infoboxSectionId: s.id,
+        proposedContent: infoboxDraftContent[s.id],
+      }));
     if (changes.length === 0 && infoboxChanges.length === 0) {
       setSubmitError("Make at least one change before submitting.");
       return;
@@ -165,7 +189,16 @@ export function SuggestionForm(props: SuggestionFormProps) {
         router.refresh();
       }
     });
-  }, [pageId, selectedChapterId, citation, sections, draftContent, router]);
+  }, [
+    selectedChapterId,
+    citation,
+    sections,
+    infoboxSections,
+    draftContent,
+    infoboxDraftContent,
+    pageId,
+    router,
+  ]);
 
   // Build chapter selector options (all chapters enabled — admin review is the spoiler gate).
   const chapterSelectOptions: ChapterGroupOption[] = (() => {
@@ -178,20 +211,29 @@ export function SuggestionForm(props: SuggestionFormProps) {
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
       label: volumeName,
       value: -1 as number,
-      children: chaps.map((c) => ({ label: c.label, value: c.value, disabled: false })),
+      children: chaps.map((c) => ({
+        label: c.label,
+        value: c.value,
+        disabled: false,
+      })),
     }));
   })();
 
-  const selectedChapterName = allChapters.find((c) => c.id === selectedChapterId)?.displayName;
+  const selectedChapterName = allChapters.find(
+    (c) => c.id === selectedChapterId,
+  )?.displayName;
   const chapterLabel = chapterType ?? "Chapter";
 
   if (submitted) {
     return (
-      <Box col className="gap-4 rounded-lg border border-border bg-muted/30 p-6">
+      <Box
+        col
+        className="gap-4 rounded-lg border border-border bg-muted/30 p-6"
+      >
         <Text variant="h3">Suggestion submitted</Text>
         <Text variant="body">
-          Your suggestion has been submitted for admin review. You can check the status on
-          this page after it is reviewed.
+          Your suggestion has been submitted for admin review. You can check the
+          status on this page after it is reviewed.
         </Text>
         <Button variant="outline" onClick={onClose}>
           Back to page
@@ -212,7 +254,9 @@ export function SuggestionForm(props: SuggestionFormProps) {
       {/* Chapter selector */}
       {allChapters.length > 0 && (
         <Box col className="gap-2">
-          <Label htmlFor="suggestion-target-chapter">Writing as of {chapterLabel}:</Label>
+          <Label htmlFor="suggestion-target-chapter">
+            Writing as of {chapterLabel}:
+          </Label>
           <Select<number>
             id="suggestion-target-chapter"
             options={chapterSelectOptions}
@@ -224,7 +268,8 @@ export function SuggestionForm(props: SuggestionFormProps) {
           {selectedChapterName && (
             <Text className="text-sm text-amber-600 dark:text-amber-400">
               Write for readers up to {chapterLabel} {selectedChapterName}.
-              Avoid referencing later events — an admin will review your suggestion.
+              Avoid referencing later events — an admin will review your
+              suggestion.
             </Text>
           )}
         </Box>
@@ -269,7 +314,10 @@ export function SuggestionForm(props: SuggestionFormProps) {
                 id={`ib-suggestion-${row.id}`}
                 value={infoboxDraftContent[row.id] ?? ""}
                 onChange={(e) =>
-                  setInfoboxDraftContent((prev) => ({ ...prev, [row.id]: e.target.value }))
+                  setInfoboxDraftContent((prev) => ({
+                    ...prev,
+                    [row.id]: e.target.value,
+                  }))
                 }
                 rows={2}
                 disabled={isPending}
@@ -290,7 +338,8 @@ export function SuggestionForm(props: SuggestionFormProps) {
           disabled={isPending}
         />
         <Text className="text-sm text-muted-foreground">
-          Provide a quote, page number, or episode timestamp supporting your changes.
+          Provide a quote, page number, or episode timestamp supporting your
+          changes.
         </Text>
       </Box>
 

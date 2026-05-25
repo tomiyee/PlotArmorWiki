@@ -1,5 +1,5 @@
 {
-  "id": "4514e882-39e6-446c-910a-a2b287847ffb",
+  "id": "81038f3c-37f8-448d-b088-fe7f963c86b7",
   "prevId": "a06b5bcd-5708-42a1-9204-60234c08e225",
   "version": "7",
   "dialect": "postgresql",
@@ -138,6 +138,140 @@
           "tableTo": "chapters",
           "columnsFrom": [
             "chapter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.chapter_synopsis_suggestions": {
+      "name": "chapter_synopsis_suggestions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chapter_id": {
+          "name": "chapter_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "serial_id": {
+          "name": "serial_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposed_by_user_id": {
+          "name": "proposed_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposed_content": {
+          "name": "proposed_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "citation": {
+          "name": "citation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_by_user_id": {
+          "name": "reviewed_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_note": {
+          "name": "review_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "chapter_synopsis_suggestions_chapter_id_chapters_id_fk": {
+          "name": "chapter_synopsis_suggestions_chapter_id_chapters_id_fk",
+          "tableFrom": "chapter_synopsis_suggestions",
+          "tableTo": "chapters",
+          "columnsFrom": [
+            "chapter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "chapter_synopsis_suggestions_serial_id_serials_id_fk": {
+          "name": "chapter_synopsis_suggestions_serial_id_serials_id_fk",
+          "tableFrom": "chapter_synopsis_suggestions",
+          "tableTo": "serials",
+          "columnsFrom": [
+            "serial_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "chapter_synopsis_suggestions_proposed_by_user_id_users_id_fk": {
+          "name": "chapter_synopsis_suggestions_proposed_by_user_id_users_id_fk",
+          "tableFrom": "chapter_synopsis_suggestions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "proposed_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "chapter_synopsis_suggestions_reviewed_by_user_id_users_id_fk": {
+          "name": "chapter_synopsis_suggestions_reviewed_by_user_id_users_id_fk",
+          "tableFrom": "chapter_synopsis_suggestions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by_user_id"
           ],
           "columnsTo": [
             "id"
@@ -641,6 +775,92 @@
           "tableTo": "pages",
           "columnsFrom": [
             "page_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.page_suggestion_infobox_changes": {
+      "name": "page_suggestion_infobox_changes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "suggestion_id": {
+          "name": "suggestion_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "infobox_section_id": {
+          "name": "infobox_section_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposed_content": {
+          "name": "proposed_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "page_suggestion_infobox_changes_suggestion_id_infobox_section_id_index": {
+          "name": "page_suggestion_infobox_changes_suggestion_id_infobox_section_id_index",
+          "columns": [
+            {
+              "expression": "suggestion_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "infobox_section_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "page_suggestion_infobox_changes_suggestion_id_page_suggestions_id_fk": {
+          "name": "page_suggestion_infobox_changes_suggestion_id_page_suggestions_id_fk",
+          "tableFrom": "page_suggestion_infobox_changes",
+          "tableTo": "page_suggestions",
+          "columnsFrom": [
+            "suggestion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "page_suggestion_infobox_changes_infobox_section_id_page_infobox_sections_id_fk": {
+          "name": "page_suggestion_infobox_changes_infobox_section_id_page_infobox_sections_id_fk",
+          "tableFrom": "page_suggestion_infobox_changes",
+          "tableTo": "page_infobox_sections",
+          "columnsFrom": [
+            "infobox_section_id"
           ],
           "columnsTo": [
             "id"

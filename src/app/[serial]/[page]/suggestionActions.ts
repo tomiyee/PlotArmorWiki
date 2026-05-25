@@ -78,7 +78,10 @@ export async function submitPageSuggestion(
   // Admins should use savePageContent directly.
   const serialId = await getSerialIdByPageId(pageId);
   const isAdmin = await isSerialAdmin(serialId);
-  if (isAdmin) return { error: "Admins should use the edit mode to save content directly." };
+  if (isAdmin)
+    return {
+      error: "Admins should use the edit mode to save content directly.",
+    };
 
   await db.transaction(async (tx) => {
     const [suggestion] = await tx
@@ -93,24 +96,20 @@ export async function submitPageSuggestion(
       .returning({ id: pageSuggestions.id });
 
     for (const change of sectionChanges) {
-      await tx
-        .insert(pageSuggestionSectionChanges)
-        .values({
-          suggestionId: suggestion.id,
-          sectionId: change.sectionId,
-          proposedContent: change.proposedContent,
-        });
+      await tx.insert(pageSuggestionSectionChanges).values({
+        suggestionId: suggestion.id,
+        sectionId: change.sectionId,
+        proposedContent: change.proposedContent,
+      });
     }
 
     for (const change of infoboxChanges) {
       if (!change.proposedContent.trim()) continue;
-      await tx
-        .insert(pageSuggestionInfoboxChanges)
-        .values({
-          suggestionId: suggestion.id,
-          infoboxSectionId: change.infoboxSectionId,
-          proposedContent: change.proposedContent,
-        });
+      await tx.insert(pageSuggestionInfoboxChanges).values({
+        suggestionId: suggestion.id,
+        infoboxSectionId: change.infoboxSectionId,
+        proposedContent: change.proposedContent,
+      });
     }
   });
 
@@ -169,7 +168,9 @@ export async function getMyPageSuggestion(pageId: number): Promise<{
  * @example
  * const count = await getPendingSuggestionCount(42);
  */
-export async function getPendingSuggestionCount(pageId: number): Promise<number> {
+export async function getPendingSuggestionCount(
+  pageId: number,
+): Promise<number> {
   const serialId = await getSerialIdByPageId(pageId);
   const isAdmin = await isSerialAdmin(serialId);
   if (!isAdmin) return 0;
@@ -256,7 +257,10 @@ export async function getPendingSuggestions(pageId: number): Promise<
         proposedContent: pageSuggestionSectionChanges.proposedContent,
       })
       .from(pageSuggestionSectionChanges)
-      .innerJoin(pageSections, eq(pageSuggestionSectionChanges.sectionId, pageSections.id))
+      .innerJoin(
+        pageSections,
+        eq(pageSuggestionSectionChanges.sectionId, pageSections.id),
+      )
       .where(inArray(pageSuggestionSectionChanges.suggestionId, suggestionIds)),
     db
       .select({
@@ -266,7 +270,13 @@ export async function getPendingSuggestions(pageId: number): Promise<
         proposedContent: pageSuggestionInfoboxChanges.proposedContent,
       })
       .from(pageSuggestionInfoboxChanges)
-      .innerJoin(pageInfoboxSections, eq(pageSuggestionInfoboxChanges.infoboxSectionId, pageInfoboxSections.id))
+      .innerJoin(
+        pageInfoboxSections,
+        eq(
+          pageSuggestionInfoboxChanges.infoboxSectionId,
+          pageInfoboxSections.id,
+        ),
+      )
       .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
   ]);
 
@@ -276,89 +286,113 @@ export async function getPendingSuggestions(pageId: number): Promise<
     suggestionRows.map(async (suggestion) => {
       const cutoffIdx = suggestion.targetChapterIdx;
 
-      const changes = changeRows.filter((c) => c.suggestionId === suggestion.id);
-      const ibChanges = infoboxChangeRows.filter((c) => c.suggestionId === suggestion.id);
+      const changes = changeRows.filter(
+        (c) => c.suggestionId === suggestion.id,
+      );
+      const ibChanges = infoboxChangeRows.filter(
+        (c) => c.suggestionId === suggestion.id,
+      );
       const sectionIds = changes.map((c) => c.sectionId);
       const ibSectionIds = ibChanges.map((c) => c.infoboxSectionId);
 
-      const [currentContentBySectionId, currentContentByInfoboxSectionId] = await Promise.all([
-        (async () => {
-          const m = new Map<number, string>();
-          if (sectionIds.length === 0) return m;
-          const sectionMaxIdxSq = db
-            .select({
-              sectionId: pageSectionRevisions.sectionId,
-              maxIdx: max(chapters.idx).as("max_idx"),
-            })
-            .from(pageSectionRevisions)
-            .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-            .where(
-              and(
-                eq(pageSectionRevisions.pageId, pageId),
-                lte(chapters.idx, cutoffIdx),
-              ),
-            )
-            .groupBy(pageSectionRevisions.sectionId)
-            .as("section_max_idx_sq");
+      const [currentContentBySectionId, currentContentByInfoboxSectionId] =
+        await Promise.all([
+          (async () => {
+            const m = new Map<number, string>();
+            if (sectionIds.length === 0) return m;
+            const sectionMaxIdxSq = db
+              .select({
+                sectionId: pageSectionRevisions.sectionId,
+                maxIdx: max(chapters.idx).as("max_idx"),
+              })
+              .from(pageSectionRevisions)
+              .innerJoin(
+                chapters,
+                eq(pageSectionRevisions.chapterId, chapters.id),
+              )
+              .where(
+                and(
+                  eq(pageSectionRevisions.pageId, pageId),
+                  lte(chapters.idx, cutoffIdx),
+                ),
+              )
+              .groupBy(pageSectionRevisions.sectionId)
+              .as("section_max_idx_sq");
 
-          const currentRevisions = await db
-            .select({
-              sectionId: pageSectionRevisions.sectionId,
-              content: pageSectionRevisions.content,
-            })
-            .from(pageSectionRevisions)
-            .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-            .innerJoin(
-              sectionMaxIdxSq,
-              and(
-                eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
-                eq(chapters.idx, sectionMaxIdxSq.maxIdx),
-              ),
-            )
-            .where(eq(pageSectionRevisions.pageId, pageId));
+            const currentRevisions = await db
+              .select({
+                sectionId: pageSectionRevisions.sectionId,
+                content: pageSectionRevisions.content,
+              })
+              .from(pageSectionRevisions)
+              .innerJoin(
+                chapters,
+                eq(pageSectionRevisions.chapterId, chapters.id),
+              )
+              .innerJoin(
+                sectionMaxIdxSq,
+                and(
+                  eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+                  eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+                ),
+              )
+              .where(eq(pageSectionRevisions.pageId, pageId));
 
-          currentRevisions.forEach((r) => m.set(r.sectionId, r.content ?? ""));
-          return m;
-        })(),
-        (async () => {
-          const m = new Map<number, string>();
-          if (ibSectionIds.length === 0) return m;
-          const ibMaxIdxSq = db
-            .select({
-              infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-              maxIdx: max(chapters.idx).as("max_idx"),
-            })
-            .from(pageInfoboxRevisions)
-            .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-            .where(
-              and(
-                eq(pageInfoboxRevisions.pageId, pageId),
-                lte(chapters.idx, cutoffIdx),
-              ),
-            )
-            .groupBy(pageInfoboxRevisions.infoboxSectionId)
-            .as("ib_max_idx_sq");
+            currentRevisions.forEach((r) =>
+              m.set(r.sectionId, r.content ?? ""),
+            );
+            return m;
+          })(),
+          (async () => {
+            const m = new Map<number, string>();
+            if (ibSectionIds.length === 0) return m;
+            const ibMaxIdxSq = db
+              .select({
+                infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+                maxIdx: max(chapters.idx).as("max_idx"),
+              })
+              .from(pageInfoboxRevisions)
+              .innerJoin(
+                chapters,
+                eq(pageInfoboxRevisions.chapterId, chapters.id),
+              )
+              .where(
+                and(
+                  eq(pageInfoboxRevisions.pageId, pageId),
+                  lte(chapters.idx, cutoffIdx),
+                ),
+              )
+              .groupBy(pageInfoboxRevisions.infoboxSectionId)
+              .as("ib_max_idx_sq");
 
-          const currentRevisions = await db
-            .select({
-              infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-              content: pageInfoboxRevisions.content,
-            })
-            .from(pageInfoboxRevisions)
-            .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-            .innerJoin(
-              ibMaxIdxSq,
-              and(
-                eq(pageInfoboxRevisions.infoboxSectionId, ibMaxIdxSq.infoboxSectionId),
-                eq(chapters.idx, ibMaxIdxSq.maxIdx),
-              ),
-            )
-            .where(eq(pageInfoboxRevisions.pageId, pageId));
+            const currentRevisions = await db
+              .select({
+                infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+                content: pageInfoboxRevisions.content,
+              })
+              .from(pageInfoboxRevisions)
+              .innerJoin(
+                chapters,
+                eq(pageInfoboxRevisions.chapterId, chapters.id),
+              )
+              .innerJoin(
+                ibMaxIdxSq,
+                and(
+                  eq(
+                    pageInfoboxRevisions.infoboxSectionId,
+                    ibMaxIdxSq.infoboxSectionId,
+                  ),
+                  eq(chapters.idx, ibMaxIdxSq.maxIdx),
+                ),
+              )
+              .where(eq(pageInfoboxRevisions.pageId, pageId));
 
-          currentRevisions.forEach((r) => m.set(r.infoboxSectionId, r.content ?? ""));
-          return m;
-        })(),
-      ]);
+            currentRevisions.forEach((r) =>
+              m.set(r.infoboxSectionId, r.content ?? ""),
+            );
+            return m;
+          })(),
+        ]);
 
       return {
         id: suggestion.id,
@@ -376,7 +410,8 @@ export async function getPendingSuggestions(pageId: number): Promise<
         infoboxChanges: ibChanges.map((c) => ({
           infoboxSectionId: c.infoboxSectionId,
           infoboxSectionLabel: c.infoboxSectionLabel,
-          currentContent: currentContentByInfoboxSectionId.get(c.infoboxSectionId) ?? "",
+          currentContent:
+            currentContentByInfoboxSectionId.get(c.infoboxSectionId) ?? "",
           proposedContent: c.proposedContent,
         })),
       };
@@ -411,7 +446,8 @@ export async function approveSuggestion(
     .limit(1);
 
   if (!suggestion) return { error: "Suggestion not found." };
-  if (suggestion.status !== "pending") return { error: "Suggestion is not pending." };
+  if (suggestion.status !== "pending")
+    return { error: "Suggestion is not pending." };
 
   const adminUserId = await requireSerialAdminByPageId(suggestion.pageId);
 
@@ -512,7 +548,8 @@ export async function rejectSuggestion(
     .limit(1);
 
   if (!suggestion) return { error: "Suggestion not found." };
-  if (suggestion.status !== "pending") return { error: "Suggestion is not pending." };
+  if (suggestion.status !== "pending")
+    return { error: "Suggestion is not pending." };
 
   const adminUserId = await requireSerialAdminByPageId(suggestion.pageId);
 
@@ -537,7 +574,9 @@ export async function rejectSuggestion(
  * @example
  * const total = await getTotalPendingSuggestions(serial.id);
  */
-export async function getTotalPendingSuggestions(serialId: number): Promise<number> {
+export async function getTotalPendingSuggestions(
+  serialId: number,
+): Promise<number> {
   const isAdmin = await isSerialAdmin(serialId);
   if (!isAdmin) return 0;
 
@@ -546,10 +585,7 @@ export async function getTotalPendingSuggestions(serialId: number): Promise<numb
     .from(pageSuggestions)
     .innerJoin(pages, eq(pageSuggestions.pageId, pages.id))
     .where(
-      and(
-        eq(pages.serialId, serialId),
-        eq(pageSuggestions.status, "pending"),
-      ),
+      and(eq(pages.serialId, serialId), eq(pageSuggestions.status, "pending")),
     );
 
   return Number(cnt);
@@ -564,7 +600,9 @@ export async function getTotalPendingSuggestions(serialId: number): Promise<numb
  */
 export async function getPendingSuggestionsByPage(
   serialId: number,
-): Promise<{ pageId: number; pageSlug: string; pageName: string; count: number }[]> {
+): Promise<
+  { pageId: number; pageSlug: string; pageName: string; count: number }[]
+> {
   const isAdmin = await isSerialAdmin(serialId);
   if (!isAdmin) return [];
 
@@ -578,10 +616,7 @@ export async function getPendingSuggestionsByPage(
     .from(pageSuggestions)
     .innerJoin(pages, eq(pageSuggestions.pageId, pages.id))
     .where(
-      and(
-        eq(pages.serialId, serialId),
-        eq(pageSuggestions.status, "pending"),
-      ),
+      and(eq(pages.serialId, serialId), eq(pageSuggestions.status, "pending")),
     )
     .groupBy(pages.id, pages.slug, pages.name)
     .orderBy(desc(count()), asc(pages.name));
@@ -603,7 +638,12 @@ export async function getSectionsAtChapter(
   pageId: number,
   chapterId: number,
 ): Promise<{
-  sections: { id: number; name: string; content: string; lastUpdatedChapterIdx: number | null }[];
+  sections: {
+    id: number;
+    name: string;
+    content: string;
+    lastUpdatedChapterIdx: number | null;
+  }[];
   infoboxSections: { id: number; label: string; content: string }[];
 }> {
   const [targetChapter] = await db
@@ -647,61 +687,84 @@ export async function getSectionsAtChapter(
     .groupBy(pageInfoboxRevisions.infoboxSectionId)
     .as("ib_max_idx_sq");
 
-  const [activeSections, sectionVersions, activeInfoboxSections, ibVersions] = await Promise.all([
-    db
-      .select({ id: pageSections.id, name: pageSections.name })
-      .from(pageSections)
-      .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)))
-      .orderBy(asc(pageSections.displayOrder)),
-    db
-      .select({
-        sectionId: pageSectionRevisions.sectionId,
-        content: pageSectionRevisions.content,
-        lastUpdatedChapterIdx: sectionMaxIdxSq.maxIdx,
-      })
-      .from(pageSectionRevisions)
-      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-      .innerJoin(
-        sectionMaxIdxSq,
-        and(
-          eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
-          eq(chapters.idx, sectionMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageSectionRevisions.pageId, pageId)),
-    db
-      .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
-      .from(pageInfoboxSections)
-      .where(and(eq(pageInfoboxSections.pageId, pageId), isNull(pageInfoboxSections.deletedAt)))
-      .orderBy(asc(pageInfoboxSections.displayOrder)),
-    db
-      .select({
-        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-        content: pageInfoboxRevisions.content,
-      })
-      .from(pageInfoboxRevisions)
-      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-      .innerJoin(
-        ibMaxIdxSq,
-        and(
-          eq(pageInfoboxRevisions.infoboxSectionId, ibMaxIdxSq.infoboxSectionId),
-          eq(chapters.idx, ibMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageInfoboxRevisions.pageId, pageId)),
-  ]);
+  const [activeSections, sectionVersions, activeInfoboxSections, ibVersions] =
+    await Promise.all([
+      db
+        .select({ id: pageSections.id, name: pageSections.name })
+        .from(pageSections)
+        .where(
+          and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
+        )
+        .orderBy(asc(pageSections.displayOrder)),
+      db
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          content: pageSectionRevisions.content,
+          lastUpdatedChapterIdx: sectionMaxIdxSq.maxIdx,
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .innerJoin(
+          sectionMaxIdxSq,
+          and(
+            eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+            eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageSectionRevisions.pageId, pageId)),
+      db
+        .select({
+          id: pageInfoboxSections.id,
+          label: pageInfoboxSections.label,
+        })
+        .from(pageInfoboxSections)
+        .where(
+          and(
+            eq(pageInfoboxSections.pageId, pageId),
+            isNull(pageInfoboxSections.deletedAt),
+          ),
+        )
+        .orderBy(asc(pageInfoboxSections.displayOrder)),
+      db
+        .select({
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          content: pageInfoboxRevisions.content,
+        })
+        .from(pageInfoboxRevisions)
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+        .innerJoin(
+          ibMaxIdxSq,
+          and(
+            eq(
+              pageInfoboxRevisions.infoboxSectionId,
+              ibMaxIdxSq.infoboxSectionId,
+            ),
+            eq(chapters.idx, ibMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageInfoboxRevisions.pageId, pageId)),
+    ]);
 
   const versionBySectionId = new Map(
-    sectionVersions.map((v) => [v.sectionId, { content: v.content ?? "", lastUpdatedChapterIdx: v.lastUpdatedChapterIdx ?? null }]),
+    sectionVersions.map((v) => [
+      v.sectionId,
+      {
+        content: v.content ?? "",
+        lastUpdatedChapterIdx: v.lastUpdatedChapterIdx ?? null,
+      },
+    ]),
   );
-  const ibContentById = new Map(ibVersions.map((v) => [v.infoboxSectionId, v.content ?? ""]));
+  const ibContentById = new Map(
+    ibVersions.map((v) => [v.infoboxSectionId, v.content ?? ""]),
+  );
 
   return {
     sections: activeSections.map((s) => ({
       id: s.id,
       name: s.name,
       content: versionBySectionId.get(s.id)?.content ?? "",
-      lastUpdatedChapterIdx: versionBySectionId.get(s.id)?.lastUpdatedChapterIdx ?? null,
+      lastUpdatedChapterIdx:
+        versionBySectionId.get(s.id)?.lastUpdatedChapterIdx ?? null,
     })),
     infoboxSections: activeInfoboxSections.map((s) => ({
       id: s.id,

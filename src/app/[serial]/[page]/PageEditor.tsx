@@ -270,6 +270,22 @@ export function PageEditor(props: Props) {
 
   const hasInfobox = infoboxSectionStructure.length > 0;
 
+  // Filter pending suggestions to those whose target chapter is within the admin's
+  // reading cutoff. Suggestions targeting chapters beyond the cutoff could reveal
+  // spoilers (the content being proposed may reference future events).
+  const readingCutoffIdx =
+    allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
+  const visibleSuggestions = pendingSuggestions.filter((s) => {
+    const targetIdx = allChapters.find((c) => c.id === s.targetChapterId)?.idx;
+    return (
+      readingCutoffIdx === null ||
+      targetIdx === undefined ||
+      targetIdx <= readingCutoffIdx
+    );
+  });
+  const hiddenSuggestionCount =
+    pendingSuggestions.length - visibleSuggestions.length;
+
   // Compute dirty state: true when any draft differs from the server-provided value.
   const isDirty =
     sections.some((s) => draftSectionContent[s.id] !== s.content) ||
@@ -384,19 +400,32 @@ export function PageEditor(props: Props) {
           pageTitles={pageTitles}
           wikiChapters={wikiChaptersByName}
           chapterType={chapterType}
-          isAuthenticated={isAuthenticated}
-          isAdmin={isAdmin}
-          allChapters={allChapters}
-          readingChapterId={readingChapterId}
-          wikiPagesList={wikiPages}
-          wikiChaptersList={wikiChapters}
-          myPageSuggestion={myPageSuggestion}
+          suggestionContext={
+            isAuthenticated
+              ? {
+                  isAdmin,
+                  allChapters,
+                  readingChapterId: readingChapterId ?? null,
+                  wikiPagesList: wikiPages,
+                  wikiChaptersList: wikiChapters ?? [],
+                  myPageSuggestion: myPageSuggestion ?? null,
+                }
+              : undefined
+          }
         />
-        {isAdmin && pendingSuggestions.length > 0 && (
+        {isAdmin && visibleSuggestions.length > 0 && (
           <SuggestionReviewPanel
-            suggestions={pendingSuggestions}
+            suggestions={visibleSuggestions}
             serialSlug={serialSlug}
           />
+        )}
+        {isAdmin && hiddenSuggestionCount > 0 && (
+          <div className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            {hiddenSuggestionCount} pending{" "}
+            {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+            {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
+            current reading progress — advance your chapter to review them.
+          </div>
         )}
       </Box>
     );
@@ -408,8 +437,6 @@ export function PageEditor(props: Props) {
 
   // Chapters before the page's intro chapter are disabled — content can't predate the page.
   // Chapters beyond the reader's cutoff are also disabled — editors can't write spoilers.
-  const readingCutoffIdx =
-    allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
   const chapterSelectOptions: ChapterGroupOption[] = (() => {
     const volumeMap = new Map<
       string,
@@ -440,7 +467,10 @@ export function PageEditor(props: Props) {
       {isAdmin && pendingSuggestionCount > 0 && (
         <div className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
           <span className="font-medium">{pendingSuggestionCount}</span>
-          {pendingSuggestionCount === 1 ? "pending suggestion" : "pending suggestions"} — see below
+          {pendingSuggestionCount === 1
+            ? "pending suggestion"
+            : "pending suggestions"}{" "}
+          — see below
         </div>
       )}
 
@@ -510,11 +540,19 @@ export function PageEditor(props: Props) {
         isPending={isPending}
       />
 
-      {pendingSuggestions.length > 0 && (
+      {visibleSuggestions.length > 0 && (
         <SuggestionReviewPanel
-          suggestions={pendingSuggestions}
+          suggestions={visibleSuggestions}
           serialSlug={serialSlug}
         />
+      )}
+      {hiddenSuggestionCount > 0 && (
+        <div className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          {hiddenSuggestionCount} pending{" "}
+          {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+          {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
+          reading progress — advance your chapter to review them.
+        </div>
       )}
     </Box>
   );
