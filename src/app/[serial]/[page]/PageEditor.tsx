@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
+import { Text } from "@/components/ui/Text";
 import { Select } from "@/components/ui/Select";
 import {
   savePageContent,
@@ -163,10 +164,10 @@ interface Props {
     }[];
   }[];
   /**
-   * The current non-admin user's most recent suggestion for this page.
-   * Passed through to PageReadView to show per-page status feedback.
+   * All suggestions the current non-admin user has submitted for this page,
+   * most recent first. Passed through to PageReadView for per-page status feedback.
    */
-  myPageSuggestion?: {
+  myPageSuggestions?: {
     id: number;
     status: "pending" | "approved" | "rejected";
     reviewNote: string | null;
@@ -174,7 +175,7 @@ interface Props {
     targetChapterName: string;
     sectionChanges: { sectionName: string; proposedContent: string }[];
     infoboxChanges: { label: string; proposedContent: string }[];
-  } | null;
+  }[];
 }
 
 /**
@@ -240,7 +241,7 @@ export function PageEditor(props: Props) {
     isAuthenticated = false,
     pendingSuggestionCount = 0,
     pendingSuggestions = [],
-    myPageSuggestion = null,
+    myPageSuggestions = [],
   } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -411,7 +412,7 @@ export function PageEditor(props: Props) {
                   readingChapterId: readingChapterId ?? null,
                   wikiPagesList: wikiPages,
                   wikiChaptersList: wikiChapters ?? [],
-                  myPageSuggestion: myPageSuggestion ?? null,
+                  myPageSuggestions: myPageSuggestions,
                 }
               : undefined
           }
@@ -423,12 +424,12 @@ export function PageEditor(props: Props) {
           />
         )}
         {isAdmin && hiddenSuggestionCount > 0 && (
-          <div className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          <Text as="div" className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
             {hiddenSuggestionCount} pending{" "}
             {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
             {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
             current reading progress — advance your chapter to review them.
-          </div>
+          </Text>
         )}
       </Box>
     );
@@ -468,13 +469,13 @@ export function PageEditor(props: Props) {
       {editModeHeader}
 
       {isAdmin && pendingSuggestionCount > 0 && (
-        <div className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-          <span className="font-medium">{pendingSuggestionCount}</span>
+        <Text as="div" className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          <Text as="span" className="font-medium">{pendingSuggestionCount}</Text>
           {pendingSuggestionCount === 1
             ? "pending suggestion"
             : "pending suggestions"}{" "}
           — see below
-        </div>
+        </Text>
       )}
 
       {allChapters.length > 0 && (
@@ -550,12 +551,12 @@ export function PageEditor(props: Props) {
         />
       )}
       {hiddenSuggestionCount > 0 && (
-        <div className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+        <Text as="div" className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           {hiddenSuggestionCount} pending{" "}
           {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
           {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
           reading progress — advance your chapter to review them.
-        </div>
+        </Text>
       )}
     </Box>
   );

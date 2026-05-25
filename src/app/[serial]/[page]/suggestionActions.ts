@@ -117,14 +117,14 @@ export async function submitPageSuggestion(
 }
 
 /**
- * Returns the most recent suggestion submitted by the current user for a given
- * page, or null if none exists. Used to show per-page status feedback.
+ * Returns all suggestions submitted by the current user for a given page,
+ * ordered most-recent first. Used to show per-page status feedback.
  *
  * @example
- * const suggestion = await getMyPageSuggestion(42);
- * // → { status: 'pending', reviewNote: null } | null
+ * const suggestions = await getMyPageSuggestions(42);
+ * // → [{ status: 'pending', reviewNote: null }, ...]
  */
-export async function getMyPageSuggestion(pageId: number): Promise<{
+export async function getMyPageSuggestions(pageId: number): Promise<{
   id: number;
   status: "pending" | "approved" | "rejected";
   reviewNote: string | null;
@@ -132,11 +132,11 @@ export async function getMyPageSuggestion(pageId: number): Promise<{
   targetChapterName: string;
   sectionChanges: { sectionName: string; proposedContent: string }[];
   infoboxChanges: { label: string; proposedContent: string }[];
-} | null> {
+}[]> {
   const userId = await requireAuthenticated().catch(() => null);
-  if (!userId) return null;
+  if (!userId) return [];
 
-  const [row] = await db
+  const rows = await db
     .select({
       id: pageSuggestions.id,
       status: pageSuggestions.status,
@@ -152,39 +152,46 @@ export async function getMyPageSuggestion(pageId: number): Promise<{
         eq(pageSuggestions.proposedByUserId, userId),
       ),
     )
-    .orderBy(desc(pageSuggestions.createdAt))
-    .limit(1);
+    .orderBy(desc(pageSuggestions.createdAt));
 
-  if (!row) return null;
+  if (rows.length === 0) return [];
+
+  const suggestionIds = rows.map((r) => r.id);
 
   const [sectionChangeRows, infoboxChangeRows] = await Promise.all([
     db
       .select({
+        suggestionId: pageSuggestionSectionChanges.suggestionId,
         sectionName: pageSections.name,
         proposedContent: pageSuggestionSectionChanges.proposedContent,
       })
       .from(pageSuggestionSectionChanges)
       .innerJoin(pageSections, eq(pageSuggestionSectionChanges.sectionId, pageSections.id))
-      .where(eq(pageSuggestionSectionChanges.suggestionId, row.id)),
+      .where(inArray(pageSuggestionSectionChanges.suggestionId, suggestionIds)),
     db
       .select({
+        suggestionId: pageSuggestionInfoboxChanges.suggestionId,
         label: pageInfoboxSections.label,
         proposedContent: pageSuggestionInfoboxChanges.proposedContent,
       })
       .from(pageSuggestionInfoboxChanges)
       .innerJoin(pageInfoboxSections, eq(pageSuggestionInfoboxChanges.infoboxSectionId, pageInfoboxSections.id))
-      .where(eq(pageSuggestionInfoboxChanges.suggestionId, row.id)),
+      .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
   ]);
 
-  return {
+  return rows.map((row) => ({
     id: row.id,
     status: row.status as "pending" | "approved" | "rejected",
     reviewNote: row.reviewNote,
     createdAt: row.createdAt,
     targetChapterName: row.targetChapterName,
-    sectionChanges: sectionChangeRows,
-    infoboxChanges: infoboxChangeRows,
-  };
+    sectionChanges: sectionChangeRows
+      .filter((c) => c.suggestionId === row.id)
+      .map((c) => ({ sectionName: c.sectionName, proposedContent: c.proposedContent })),
+    infoboxChanges: infoboxChangeRows
+      .filter((c) => c.suggestionId === row.id)
+      .map((c) => ({ label: c.label, proposedContent: c.proposedContent })),
+  }));
 }
 
 // ── Admin-facing actions ──────────────────────────────────────────────────────

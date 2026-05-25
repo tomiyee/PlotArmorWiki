@@ -25,7 +25,7 @@ import { isSerialAdmin, isAuthenticated } from "@/lib/auth-guard";
 import {
   getPendingSuggestionCount,
   getPendingSuggestions,
-  getMyPageSuggestion,
+  getMyPageSuggestions,
 } from "./suggestionActions";
 
 interface Props {
@@ -604,10 +604,10 @@ export default async function PageView({ params }: Props) {
   // ── Suggestion data ───────────────────────────────────────────────────────
   // Fetch in parallel: pending count + full list for admins, user status for
   // non-admins. Both functions are no-ops when the user lacks permission.
-  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestion] = await Promise.all([
+  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] = await Promise.all([
     isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
     isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
-    !isAdmin && isUserAuthenticated ? getMyPageSuggestion(page.id) : Promise.resolve(null),
+    !isAdmin && isUserAuthenticated ? getMyPageSuggestions(page.id) : Promise.resolve([]),
   ]);
 
   return (
@@ -672,7 +672,7 @@ export default async function PageView({ params }: Props) {
             isAuthenticated={isUserAuthenticated}
             pendingSuggestionCount={pendingSuggestionCount}
             pendingSuggestions={pendingSuggestions}
-            myPageSuggestion={myPageSuggestion}
+            myPageSuggestions={myPageSuggestions}
           />
         </Box>
       </PageContainer>
