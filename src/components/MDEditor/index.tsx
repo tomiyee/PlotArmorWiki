@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
 } from "react";
+import type { CSSProperties } from "react";
 import type { MDXEditorMethods, RealmPlugin } from "@mdxeditor/editor";
 import {
   headingsPlugin,
@@ -471,6 +472,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   return (
     <div
       ref={containerRef}
+      style={{ "--editor-min-height": `${height}px` } as CSSProperties}
       className="relative rounded border border-border"
       onKeyDownCapture={handleKeyDownCapture}
       onCompositionStart={() => setIsComposing(true)}
@@ -495,9 +497,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
         />
       </WikiLinkContext.Provider>
-      {/* Apply the height constraint to MDXEditor's content-editable area */}
-      <style>{`.mdx-editor-wiki .mdxeditor-root-contenteditable { min-height: ${height}px; }`}</style>
-
       {isOpen && suggestions.length > 0 && (
         <ul
           ref={listboxRef}
