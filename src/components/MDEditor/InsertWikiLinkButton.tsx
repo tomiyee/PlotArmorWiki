@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ButtonWithTooltip } from "@mdxeditor/editor";
 import { Link2 } from "lucide-react";
 import { WikiLinkContext } from "./WikiLinkContext";
@@ -8,67 +8,15 @@ import { Select, type Option } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
-// ── WikiLinkChip ──────────────────────────────────────────────────────────────
-
-/**
- * Inline chip rendered inside the WYSIWYG editor for a resolved wiki link.
- * Reads page names from WikiLinkContext so slugs show as human-readable titles.
- * When an explicit `alias` is provided it is displayed directly, bypassing the lookup.
- */
-export function WikiLinkChip({ token, alias }: { token: string; alias?: string }) {
-  const { wikiPages, chapterType } = useContext(WikiLinkContext);
-
-  const colonIdx = token.indexOf(":");
-  const category = colonIdx !== -1 ? token.slice(0, colonIdx) : "page";
-  const value = colonIdx !== -1 ? token.slice(colonIdx + 1) : token;
-
-  let actualName: string;
-  if (category === "page") {
-    const page = wikiPages.find((p) => p.slug === value);
-    // Fall back to slug with dashes replaced by spaces and title-cased
-    actualName =
-      page?.name ??
-      value
-        .split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-  } else {
-    actualName = value; // chapter display name is already human-readable
-  }
-
-  const label = alias ?? actualName;
-  const showActualName = alias && alias !== actualName;
-  const isChapter = !alias && chapterType && category === chapterType;
-
-  return (
-    <span
-      contentEditable={false}
-      className="inline-flex select-none items-baseline gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-    >
-      {label}
-      {showActualName && (
-        <span className="text-xs font-normal opacity-70">({actualName})</span>
-      )}
-      {isChapter && (
-        <span className="ml-0.5 shrink-0 text-xs text-blue-500 dark:text-blue-400">
-          {chapterType}
-        </span>
-      )}
-    </span>
-  );
-}
-
-// ── InsertWikiLinkButton ──────────────────────────────────────────────────────
-
 /**
  * Toolbar button that opens a form popover for inserting a wiki link with an
  * optional alias. Reads data and callbacks from `WikiLinkContext` (always
- * fresh), keeping the plugins useMemo closure dep-free.
+ * fresh), keeping the plugins useMemo closure dep-free. The popover tracks
+ * the button's position during scroll and resize.
  *
  * @example
  * toolbarContents: () => (
  *   <DiffSourceToggleWrapper>
- *     ...
  *     <InsertWikiLinkButton />
  *   </DiffSourceToggleWrapper>
  * )
@@ -78,16 +26,30 @@ export function InsertWikiLinkButton() {
     useContext(WikiLinkContext);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState<string | undefined>(
-    undefined,
-  );
+  const [selectedToken, setSelectedToken] = useState<string | undefined>(undefined);
   const [alias, setAlias] = useState("");
-  // Popover position captured at click-time (outside render) to avoid the
-  // react-hooks/refs lint error from reading buttonRef.current during render.
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({
     top: 0,
     left: 0,
   });
+
+  const updatePosition = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPopoverPos({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, []);
+
+  // Reposition the fixed popover whenever the user scrolls or resizes.
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [isOpen, updatePosition]);
 
   const selectOptions = useMemo((): Option<string>[] => {
     const hasChapters = wikiChapters.length > 0 && !!chapterType;
@@ -122,11 +84,7 @@ export function InsertWikiLinkButton() {
 
   function handleButtonClick() {
     if (!isOpen) {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      setPopoverPos({
-        top: rect ? rect.bottom + 4 : 0,
-        left: rect ? rect.left : 0,
-      });
+      updatePosition();
       setSelectedToken(undefined);
       setAlias("");
     }

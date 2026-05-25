@@ -9,7 +9,7 @@ import {
   type SerializedLexicalNode,
   type LexicalNode,
 } from "lexical";
-import { WikiLinkChip } from "./WikiLinkComponents";
+import { WikiLinkChip } from "./WikiLinkChip";
 
 // ── WikiLinkNode ─────────────────────────────────────────────────────────────
 

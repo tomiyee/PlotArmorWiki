@@ -6,6 +6,8 @@ import {
   useState,
   useCallback,
   useEffect,
+  type RefObject,
+  type MutableRefObject,
 } from "react";
 import type { MDXEditorMethods, RealmPlugin } from "@mdxeditor/editor";
 import {
@@ -38,7 +40,7 @@ import {
 } from "lexical";
 import { MDXEditorClient } from "./MDXEditor";
 import { WikiLinkContext } from "./WikiLinkContext";
-import { InsertWikiLinkButton } from "./WikiLinkComponents";
+import { InsertWikiLinkButton } from "./InsertWikiLinkButton";
 import { WikiLinkNode } from "./WikiLinkNode";
 import { wikiPlugin, wikiLinkToMarkdownExtension } from "./WikiLinkVisitors";
 
@@ -353,97 +355,16 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     [onChange, wikiPages, wikiChapters, chapterType],
   );
 
-  /**
-   * Inserts a WikiLinkNode at the cursor, replacing the open `[[query` fragment.
-   *
-   * Uses Lexical's `editor.update()` + `selection.setTextNodeRange` +
-   * `selection.insertNodes` so the cursor lands immediately after the chip
-   * rather than jumping to end-of-document (which happened with `setMarkdown`).
-   *
-   * Falls back to the `setMarkdown` path when the Lexical editor ref is not yet
-   * available (e.g. component just mounted).
-   */
-  const applySuggestion = useCallback(
-    (suggestion: Suggestion) => {
-      const token =
-        suggestion.kind === "chapter" && chapterType
-          ? `${chapterType}:${suggestion.name}`
-          : `page:${suggestion.slug}`;
-
-      closeSuggestions();
-
-      // Access the Lexical editor from the DOM at call time rather than storing
-      // a ref during render (avoids react-hooks/refs lint violation).
-      const editorEl = containerRef.current?.querySelector<HTMLElement>(
-        '[contenteditable="true"]',
-      );
-      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
-
-      if (lexEditor) {
-        isApplyingRef.current = true;
-        lexEditor.update(() => {
-          const sel = $getSelection();
-          if (!$isRangeSelection(sel)) {
-            isApplyingRef.current = false;
-            return;
-          }
-
-          const anchor = sel.anchor;
-          const anchorNode = anchor.getNode();
-          if (!$isTextNode(anchorNode)) {
-            isApplyingRef.current = false;
-            return;
-          }
-
-          const text = anchorNode.getTextContent();
-          const offset = anchor.offset;
-          const lastOpen = text.slice(0, offset).lastIndexOf("[[");
-
-          if (lastOpen === -1) {
-            isApplyingRef.current = false;
-            return;
-          }
-
-          // Select the [[query fragment and replace it with the chip node.
-          sel.setTextNodeRange(anchorNode, lastOpen, anchorNode, offset);
-          sel.insertNodes([new WikiLinkNode(token)]);
-        });
-
-        requestAnimationFrame(() => {
-          isApplyingRef.current = false;
-          lexEditor.focus();
-        });
-        return;
-      }
-
-      // ── Fallback: setMarkdown (cursor goes to end of document) ──
-      const current = lastEmittedRef.current;
-      const lastOpen = current.lastIndexOf("[[");
-      if (lastOpen === -1) return;
-
-      const afterOpen = current.slice(lastOpen + 2);
-      const closingIdx = afterOpen.indexOf("]]");
-      const endOfTrigger =
-        lastOpen + 2 + (closingIdx !== -1 ? closingIdx + 2 : afterOpen.length);
-
-      const newMarkdown =
-        current.slice(0, lastOpen) +
-        `[[${token}]]` +
-        current.slice(endOfTrigger);
-
-      isApplyingRef.current = true;
-      editorRef.current?.setMarkdown(newMarkdown);
-      lastEmittedRef.current = newMarkdown;
-      prevValueRef.current = newMarkdown;
-      onChange(newMarkdown);
-
-      requestAnimationFrame(() => {
-        isApplyingRef.current = false;
-        editorRef.current?.focus();
-      });
-    },
-    [chapterType, onChange],
-  );
+  const applySuggestion = useApplySuggestion({
+    containerRef,
+    editorRef,
+    isApplyingRef,
+    lastEmittedRef,
+    prevValueRef,
+    closeSuggestions,
+    chapterType,
+    onChange,
+  });
 
   /**
    * Focuses the Lexical contenteditable element via DOM traversal.
@@ -633,5 +554,135 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
         </ul>
       )}
     </div>
+  );
+}
+
+// ── useApplySuggestion ────────────────────────────────────────────────────────
+
+type UseApplySuggestionParams = {
+  /** Ref to the editor wrapper div, used to locate the Lexical contenteditable. */
+  containerRef: RefObject<HTMLDivElement | null>;
+  /** Ref to MDXEditorMethods, used as fallback to call setMarkdown. */
+  editorRef: RefObject<MDXEditorMethods | null>;
+  /** Mutable flag set true while a node insertion is in flight, suppressing onChange re-entry. */
+  isApplyingRef: MutableRefObject<boolean>;
+  /** Mutable cache of the last markdown string emitted to onChange. */
+  lastEmittedRef: MutableRefObject<string>;
+  /** Mutable mirror of the value prop, used to detect externally driven updates. */
+  prevValueRef: MutableRefObject<string>;
+  /** Closes the autocomplete dropdown and resets its state. */
+  closeSuggestions: () => void;
+  /** Chapter type label (e.g. `"Chapter"`) used to build `Chapter:Name` tokens. */
+  chapterType: string | undefined;
+  /** Parent onChange handler; called with the new markdown after a fallback insertion. */
+  onChange: (val: string | undefined) => void;
+};
+
+/**
+ * Inserts a WikiLinkNode at the cursor, replacing the open `[[query` fragment.
+ *
+ * Uses Lexical's `editor.update()` + `selection.setTextNodeRange` +
+ * `selection.insertNodes` so the cursor lands immediately after the chip
+ * rather than jumping to end-of-document (which happened with `setMarkdown`).
+ *
+ * Falls back to the `setMarkdown` path when the Lexical editor is not
+ * reachable from the DOM (e.g. component just mounted).
+ *
+ * @example
+ * const applySuggestion = useApplySuggestion({ containerRef, editorRef, ... });
+ * applySuggestion({ kind: "page", name: "Luffy", slug: "luffy" });
+ */
+function useApplySuggestion(params: UseApplySuggestionParams) {
+  const {
+    containerRef,
+    editorRef,
+    isApplyingRef,
+    lastEmittedRef,
+    prevValueRef,
+    closeSuggestions,
+    chapterType,
+    onChange,
+  } = params;
+
+  return useCallback(
+    (suggestion: Suggestion) => {
+      const token =
+        suggestion.kind === "chapter" && chapterType
+          ? `${chapterType}:${suggestion.name}`
+          : `page:${suggestion.slug}`;
+
+      closeSuggestions();
+
+      // Access the Lexical editor from the DOM at call time rather than storing
+      // a ref during render (avoids react-hooks/refs lint violation).
+      const editorEl = containerRef.current?.querySelector<HTMLElement>(
+        '[contenteditable="true"]',
+      );
+      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+
+      if (lexEditor) {
+        isApplyingRef.current = true;
+        lexEditor.update(() => {
+          const sel = $getSelection();
+          if (!$isRangeSelection(sel)) {
+            isApplyingRef.current = false;
+            return;
+          }
+
+          const anchor = sel.anchor;
+          const anchorNode = anchor.getNode();
+          if (!$isTextNode(anchorNode)) {
+            isApplyingRef.current = false;
+            return;
+          }
+
+          const text = anchorNode.getTextContent();
+          const offset = anchor.offset;
+          const lastOpen = text.slice(0, offset).lastIndexOf("[[");
+
+          if (lastOpen === -1) {
+            isApplyingRef.current = false;
+            return;
+          }
+
+          // Select the [[query fragment and replace it with the chip node.
+          sel.setTextNodeRange(anchorNode, lastOpen, anchorNode, offset);
+          sel.insertNodes([new WikiLinkNode(token)]);
+        });
+
+        requestAnimationFrame(() => {
+          isApplyingRef.current = false;
+          lexEditor.focus();
+        });
+        return;
+      }
+
+      // ── Fallback: setMarkdown (cursor goes to end of document) ──
+      const current = lastEmittedRef.current;
+      const lastOpen = current.lastIndexOf("[[");
+      if (lastOpen === -1) return;
+
+      const afterOpen = current.slice(lastOpen + 2);
+      const closingIdx = afterOpen.indexOf("]]");
+      const endOfTrigger =
+        lastOpen + 2 + (closingIdx !== -1 ? closingIdx + 2 : afterOpen.length);
+
+      const newMarkdown =
+        current.slice(0, lastOpen) +
+        `[[${token}]]` +
+        current.slice(endOfTrigger);
+
+      isApplyingRef.current = true;
+      editorRef.current?.setMarkdown(newMarkdown);
+      lastEmittedRef.current = newMarkdown;
+      prevValueRef.current = newMarkdown;
+      onChange(newMarkdown);
+
+      requestAnimationFrame(() => {
+        isApplyingRef.current = false;
+        editorRef.current?.focus();
+      });
+    },
+    [chapterType, onChange],
   );
 }
