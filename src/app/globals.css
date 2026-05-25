@@ -149,6 +149,7 @@
 }
 
 /* MDX editor WYSIWYG content styles — mirrors MarkdownRenderer element styles exactly */
+.mdx-editor-wiki .mdxeditor-root-contenteditable { min-height: var(--editor-min-height, 300px); }
 .mdx-editor-wiki .mdxeditor-root-contenteditable h1 { @apply text-2xl font-bold mt-6 mb-4; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable h2 { @apply text-xl font-semibold mt-5 mb-3; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable h3 { @apply text-lg font-semibold mt-4 mb-2; }

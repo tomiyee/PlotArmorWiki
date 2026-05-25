@@ -8,8 +8,9 @@ import {
   chapters,
   chapterSynopses,
   pages,
+  pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -155,18 +156,57 @@ export default async function ChapterPage({ params }: Props) {
 
     synopsisContent = synopsisRow?.content ?? "";
 
-    // Fetch wiki pages visible at the reader's cutoff for autocomplete
-    wikiPages = await db
-      .select({ name: pages.name, slug: pages.slug })
+    // Fetch wiki pages introduced at or before this chapter, then resolve their
+    // chapter-versioned titles (same pattern as the page editor).
+    const rawWikiPages = await db
+      .select({ id: pages.id, name: pages.name, slug: pages.slug })
       .from(pages)
       .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
       .where(
         and(
           eq(pages.serialId, serial.id),
-          or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+          or(isNull(pages.introChapterId), lte(chapters.idx, chapter.idx)),
         ),
       )
       .orderBy(asc(pages.name));
+
+    const wikiPageIds = rawWikiPages.map((p) => p.id);
+    let wikiTitleByPageId = new Map<number, string>();
+    if (wikiPageIds.length > 0) {
+      const wikiTitleMaxIdxSq = db
+        .select({
+          pageId: pageTitles.pageId,
+          maxIdx: max(chapters.idx).as("max_idx"),
+        })
+        .from(pageTitles)
+        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+        .where(
+          and(
+            inArray(pageTitles.pageId, wikiPageIds),
+            lte(chapters.idx, chapter.idx),
+          ),
+        )
+        .groupBy(pageTitles.pageId)
+        .as("wiki_title_max_idx_sq");
+
+      const wikiTitleRows = await db
+        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+        .from(pageTitles)
+        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+        .innerJoin(
+          wikiTitleMaxIdxSq,
+          and(
+            eq(pageTitles.pageId, wikiTitleMaxIdxSq.pageId),
+            eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
+          ),
+        );
+      wikiTitleByPageId = new Map(wikiTitleRows.map((r) => [r.pageId, r.title]));
+    }
+
+    wikiPages = rawWikiPages.map((p) => ({
+      name: wikiTitleByPageId.get(p.id) ?? p.name,
+      slug: p.slug,
+    }));
 
     // Fetch all pages introduced in this chapter
     const introducedPages = await db

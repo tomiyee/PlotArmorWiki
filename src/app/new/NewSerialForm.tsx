@@ -15,7 +15,7 @@ import {
   type ChapterType,
   type VolumeType,
 } from "@/lib/serial-types";
-import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
+import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 
 type Props = {
   /** Pre-filled title value, e.g. from a search-to-create redirect. When non-empty the input is focused automatically. */

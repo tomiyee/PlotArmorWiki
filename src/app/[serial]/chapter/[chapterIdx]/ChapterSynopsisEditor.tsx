@@ -6,14 +6,14 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { Box } from "@/components/ui/Box";
 import { Text } from "@/components/ui/Text";
 import { useEditMode } from "@/contexts/EditModeContext";
-import { WikiLinkMDEditor } from "@/components/WikiLinkMDEditor";
+import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 
 type ChapterSynopsisEditorProps = {
   /** URL slug of the serial, used for markdown preview links. */
   serialSlug: string;
   /** Saved synopsis content loaded from the server. */
   initialContent: string;
-  /** Wiki pages visible at the reader's cutoff, used for `[[` autocomplete. */
+  /** Wiki pages introduced at or before this chapter's idx, used for `[[` autocomplete. */
   wikiPages: { name: string; slug: string }[];
   /**
    * All chapters in the serial, used for `[[Chapter:Name]]` autocomplete and
@@ -106,11 +106,16 @@ export function ChapterSynopsisEditor(props: ChapterSynopsisEditorProps) {
     );
   }
 
+  const pageTitleMap = Object.fromEntries(
+    wikiPages.map((p) => [p.slug, p.name]),
+  );
+
   return (
     <Box col className="gap-2">
       {committed ? (
         <MarkdownRenderer
           serialSlug={serialSlug}
+          pageTitles={pageTitleMap}
           chapterType={chapterType}
           wikiChapters={
             wikiChapters

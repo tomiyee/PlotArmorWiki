@@ -1,21 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-  useEffect,
-  type ReactElement,
-} from "react";
-import type {
-  MDXEditorMethods,
-  RealmPlugin,
-  MdastImportVisitor,
-  LexicalExportVisitor,
-} from "@mdxeditor/editor";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import type { CSSProperties } from "react";
+import type { MDXEditorMethods, RealmPlugin } from "@mdxeditor/editor";
 import {
   headingsPlugin,
   listsPlugin,
@@ -28,10 +15,6 @@ import {
   codeBlockPlugin,
   toolbarPlugin,
   diffSourcePlugin,
-  realmPlugin,
-  addLexicalNode$,
-  addImportVisitor$,
-  addExportVisitor$,
   BoldItalicUnderlineToggles,
   BlockTypeSelect,
   UndoRedo,
@@ -43,202 +26,22 @@ import {
   Separator,
 } from "@mdxeditor/editor";
 import {
-  DecoratorNode,
-  ElementNode,
-  $createTextNode,
-  $isTextNode,
   $getSelection,
   $isRangeSelection,
+  $isTextNode,
   getNearestEditorFromDOMNode,
-  type LexicalEditor,
-  type EditorConfig,
-  type NodeKey,
-  type SerializedLexicalNode,
-  type LexicalNode,
 } from "lexical";
-import type * as Mdast from "mdast";
-import { MDXEditorClient } from "@/components/MDEditor";
-
-// ── WikiLinkNode ─────────────────────────────────────────────────────────────
-
-interface SerializedWikiLinkNode extends SerializedLexicalNode {
-  token: string;
-}
-
-/**
- * Context that feeds wiki page and chapter data into WikiLinkChip decorators.
- * Wrapped around MDXEditorClient so decorator elements rendered inside Lexical
- * can look up display names from page slugs without prop-drilling.
- */
-const WikiLinkContext = createContext<{
-  wikiPages: { name: string; slug: string }[];
-  chapterType?: string;
-}>({ wikiPages: [] });
-
-/**
- * Inline chip rendered inside the WYSIWYG editor for a resolved wiki link.
- * Reads page names from WikiLinkContext so slugs show as human-readable titles.
- */
-function WikiLinkChip({ token }: { token: string }) {
-  const { wikiPages, chapterType } = useContext(WikiLinkContext);
-
-  const colonIdx = token.indexOf(":");
-  const category = colonIdx !== -1 ? token.slice(0, colonIdx) : "page";
-  const value = colonIdx !== -1 ? token.slice(colonIdx + 1) : token;
-
-  let label: string;
-  if (category === "page") {
-    const page = wikiPages.find((p) => p.slug === value);
-    // Fall back to slug with dashes replaced by spaces and title-cased
-    label =
-      page?.name ??
-      value
-        .split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-  } else {
-    label = value; // chapter display name is already human-readable
-  }
-
-  const isChapter = chapterType && category === chapterType;
-
-  return (
-    <span
-      contentEditable={false}
-      className="inline-flex select-none items-baseline gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-    >
-      {label}
-      {isChapter && (
-        <span className="ml-0.5 shrink-0 text-xs text-blue-500 dark:text-blue-400">
-          {chapterType}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/**
- * Custom Lexical DecoratorNode for wiki links.
- *
- * Stores the raw token string (e.g. `page:luffy` or `Chapter:Chapter 5`) and
- * renders as a styled chip in the WYSIWYG editor. On export, produces a plain
- * mdast text node with value `[[token]]` so the markdown stored in the DB
- * is unchanged from the previous format.
- */
-class WikiLinkNode extends DecoratorNode<ReactElement> {
-  __token: string;
-
-  static getType(): string {
-    return "wiki-link";
-  }
-
-  static clone(node: WikiLinkNode): WikiLinkNode {
-    return new WikiLinkNode(node.__token, node.__key);
-  }
-
-  static importJSON(serialized: SerializedWikiLinkNode): WikiLinkNode {
-    return new WikiLinkNode(serialized.token);
-  }
-
-  constructor(token: string, key?: NodeKey) {
-    super(key);
-    this.__token = token;
-  }
-
-  exportJSON(): SerializedWikiLinkNode {
-    return {
-      ...super.exportJSON(),
-      type: "wiki-link",
-      token: this.__token,
-      version: 1,
-    };
-  }
-
-  createDOM(_config: EditorConfig): HTMLElement {
-    const span = document.createElement("span");
-    span.style.display = "inline";
-    return span;
-  }
-
-  updateDOM(): false {
-    return false;
-  }
-
-  isInline(): boolean {
-    return true;
-  }
-
-  getTextContent(): string {
-    return `[[${this.__token}]]`;
-  }
-
-  decorate(_editor: LexicalEditor, _config: EditorConfig): ReactElement {
-    return <WikiLinkChip token={this.__token} />;
-  }
-}
-
-function $isWikiLinkNode(
-  node: LexicalNode | null | undefined,
-): node is WikiLinkNode {
-  return node instanceof WikiLinkNode;
-}
-
-// ── MDXEditor import visitor: text → WikiLinkNode ────────────────────────────
-
-const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g;
-
-/**
- * Intercepts mdast text nodes that contain `[[token]]` patterns and splits
- * them into a mix of plain TextNodes and WikiLinkNodes.
- *
- * Priority 1 ensures this runs before MDXEditor's built-in text visitor
- * (priority 0). For text nodes with no wiki links, `actions.nextVisitor()`
- * delegates back to the default handler.
- */
-const WikiLinkTextVisitor: MdastImportVisitor<Mdast.Text> = {
-  testNode: "text",
-  priority: 1,
-  visitNode({ mdastNode, lexicalParent, actions }) {
-    const text = mdastNode.value;
-    if (!text.includes("[[")) {
-      actions.nextVisitor();
-      return;
-    }
-
-    const formatting = actions.getParentFormatting();
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    WIKI_LINK_RE.lastIndex = 0;
-
-    while ((match = WIKI_LINK_RE.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        const before = $createTextNode(text.slice(lastIndex, match.index));
-        before.setFormat(formatting);
-        (lexicalParent as ElementNode).append(before);
-      }
-      (lexicalParent as ElementNode).append(new WikiLinkNode(match[1]));
-      lastIndex = match.index + match[0].length;
-    }
-
-    if (lastIndex < text.length) {
-      const after = $createTextNode(text.slice(lastIndex));
-      after.setFormat(formatting);
-      (lexicalParent as ElementNode).append(after);
-    }
-  },
-};
-
-// ── MDXEditor export visitor: WikiLinkNode → text ────────────────────────────
-
-const WikiLinkExportVisitor: LexicalExportVisitor<WikiLinkNode, Mdast.Text> = {
-  testLexicalNode: $isWikiLinkNode,
-  visitLexicalNode({ lexicalNode, mdastParent, actions }) {
-    actions.appendToParent(mdastParent as Mdast.Parent, {
-      type: "text",
-      value: `[[${lexicalNode.__token}]]`,
-    });
-  },
-};
+import { MDXEditorClient } from "./MDXEditor";
+import { WikiLinkContext } from "./WikiLinkContext";
+import { InsertWikiLinkButton } from "./InsertWikiLinkButton";
+import { WikiLinkNode } from "./WikiLinkNode";
+import { wikiPlugin, wikiLinkToMarkdownExtension } from "./WikiLinkVisitors";
+import { normalizeMarkdown } from "./normalizeMarkdown";
+import {
+  useApplySuggestion,
+  type Suggestion,
+  type SuggestionKind,
+} from "./useApplySuggestion";
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -286,25 +89,24 @@ type WikiLinkMDEditorProps = {
   chapterType?: string;
 };
 
-type SuggestionKind = "page" | "chapter";
-
-interface Suggestion {
-  kind: SuggestionKind;
-  name: string;
-  /** For page suggestions: the slug. For chapter suggestions: the display name. */
-  slug: string;
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * MDXEditor's markdown serializer (mdast-util-to-markdown) escapes `[` to `\[`,
- * turning `[[wiki-link]]` into `\[\[wiki-link]]` in the string emitted by
- * onChange. This reversal is applied before trigger detection so `[[` is always
- * found correctly.
+ * Inserts a WikiLinkNode at the current cursor selection in the given Lexical
+ * editor without replacing any `[[` fragment — suitable for toolbar-triggered
+ * insertion where there is no autocomplete fragment to replace.
  */
-function normalizeMarkdown(md: string): string {
-  return md.replace(/\\\[\\\[/g, "[[");
+function insertWikiLinkAtCursor(
+  token: string,
+  alias: string | undefined,
+  lexEditor: ReturnType<typeof getNearestEditorFromDOMNode>,
+) {
+  lexEditor!.update(() => {
+    const sel = $getSelection();
+    if ($isRangeSelection(sel)) {
+      sel.insertNodes([new WikiLinkNode(token, alias)]);
+    }
+  });
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -318,8 +120,9 @@ function normalizeMarkdown(md: string): string {
  * positioned at the cursor's pixel location via the DOM Selection API.
  *
  * Selecting a suggestion replaces the open `[[…` fragment with a `WikiLinkNode`
- * chip via Lexical's `editor.update()` + `selection.insertNodes`, placing the
- * cursor immediately after the chip rather than at end-of-document.
+ * chip via Lexical's `editor.update()` + `selection.setTextNodeRange` +
+ * `selection.insertNodes`, placing the cursor immediately after the chip
+ * rather than at end-of-document.
  *
  * Existing `[[token]]` patterns in loaded markdown are automatically converted
  * to chips by the `WikiLinkTextVisitor` import visitor (priority 1).
@@ -355,14 +158,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
 
-  // Tracks the last NORMALIZED markdown we emitted so applySuggestion can read it.
-  const lastEmittedRef = useRef<string>(normalizeMarkdown(value));
-  // True while we are programmatically inserting a WikiLinkNode, so the onChange
-  // handler does not re-open the dropdown.
-  const isApplyingRef = useRef(false);
-  // Track the previous `value` prop so we can sync external changes into the editor.
-  const prevValueRef = useRef<string>(value);
-
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -371,15 +166,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     top: number;
     left: number;
   } | null>(null);
-
-  // Sync external value changes (e.g. chapter switch pre-fills draft) into the editor.
-  useEffect(() => {
-    if (value !== prevValueRef.current) {
-      prevValueRef.current = value;
-      lastEmittedRef.current = normalizeMarkdown(value);
-      editorRef.current?.setMarkdown(normalizeMarkdown(value));
-    }
-  }, [value]);
 
   useEffect(() => {
     listboxRef.current
@@ -394,34 +180,15 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     setDropdownPos(null);
   }
 
-  /**
-   * Reads the cursor's pixel position from the DOM Selection API and returns
-   * coordinates relative to `containerRef` so the autocomplete dropdown
-   * appears just below the current insertion point.
-   */
-  function getCursorPos(): { top: number; left: number } | null {
-    const container = containerRef.current;
-    if (!container) return null;
-
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-
-    if (rect.width === 0 && rect.height === 0) return null;
-
-    const lineH = 24;
-    return {
-      top: rect.bottom - containerRect.top + lineH / 4,
-      // Keep w-72 (288 px) dropdown horizontally inside the container
-      left: Math.max(
-        0,
-        Math.min(rect.left - containerRect.left, containerRect.width - 288),
-      ),
-    };
-  }
+  const { applySuggestion, isApplyingRef, lastEmittedRef, prevValueRef } =
+    useApplySuggestion({
+      containerRef,
+      editorRef,
+      value,
+      closeSuggestions,
+      chapterType,
+      onChange,
+    });
 
   /**
    * Called on every MDXEditor onChange event. Normalizes the escaped `\[\[`
@@ -459,7 +226,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           const anchorNode = anchor.getNode();
           if (!$isTextNode(anchorNode)) return;
 
-          const textBefore = anchorNode.getTextContent().slice(0, anchor.offset);
+          const textBefore = anchorNode
+            .getTextContent()
+            .slice(0, anchor.offset);
           const lastOpen = textBefore.lastIndexOf("[[");
           if (lastOpen === -1) return;
           const fragment = textBefore.slice(lastOpen + 2);
@@ -525,32 +294,42 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       setSuggestions(next);
       setActiveIndex(0);
       setIsOpen(true);
-      setDropdownPos(getCursorPos());
+      setDropdownPos(getCursorPos(containerRef.current));
     },
-    [onChange, wikiPages, wikiChapters, chapterType],
+    [
+      lastEmittedRef,
+      prevValueRef,
+      onChange,
+      isApplyingRef,
+      chapterType,
+      wikiPages,
+      wikiChapters,
+    ],
   );
 
   /**
-   * Inserts a WikiLinkNode at the cursor, replacing the open `[[query` fragment.
-   *
-   * Uses Lexical's `editor.update()` + `selection.setTextNodeRange` +
-   * `selection.insertNodes` so the cursor lands immediately after the chip
-   * rather than jumping to end-of-document (which happened with `setMarkdown`).
-   *
-   * Falls back to the `setMarkdown` path when the Lexical editor ref is not yet
-   * available (e.g. component just mounted).
+   * Focuses the Lexical contenteditable element via DOM traversal.
+   * Exposed via WikiLinkContext so toolbar components can return focus to the
+   * editor after a popover interaction without holding a Lexical editor ref.
    */
-  const applySuggestion = useCallback(
-    (suggestion: Suggestion) => {
-      const token =
-        suggestion.kind === "chapter" && chapterType
-          ? `${chapterType}:${suggestion.name}`
-          : `page:${suggestion.slug}`;
+  const focusEditor = useCallback(() => {
+    const editorEl = containerRef.current?.querySelector<HTMLElement>(
+      '[contenteditable="true"]',
+    );
+    const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+    lexEditor?.focus();
+  }, []);
 
-      closeSuggestions();
-
-      // Access the Lexical editor from the DOM at call time rather than storing
-      // a ref during render (avoids react-hooks/refs lint violation).
+  /**
+   * Inserts a `[[token]]` WikiLinkNode at the current Lexical cursor position.
+   * Exposed via WikiLinkContext so InsertWikiLinkButton (inside the MDXEditor
+   * plugin subtree) can trigger an insertion without DOM traversal.
+   *
+   * Falls back to appending to the end of the document via setMarkdown when the
+   * Lexical editor is not reachable from the DOM.
+   */
+  const insertWikiLink = useCallback(
+    (token: string, alias?: string) => {
       const editorEl = containerRef.current?.querySelector<HTMLElement>(
         '[contenteditable="true"]',
       );
@@ -558,68 +337,27 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
 
       if (lexEditor) {
         isApplyingRef.current = true;
-        lexEditor.update(() => {
-          const sel = $getSelection();
-          if (!$isRangeSelection(sel)) {
-            isApplyingRef.current = false;
-            return;
-          }
-
-          const anchor = sel.anchor;
-          const anchorNode = anchor.getNode();
-          if (!$isTextNode(anchorNode)) {
-            isApplyingRef.current = false;
-            return;
-          }
-
-          const text = anchorNode.getTextContent();
-          const offset = anchor.offset;
-          const lastOpen = text.slice(0, offset).lastIndexOf("[[");
-
-          if (lastOpen === -1) {
-            isApplyingRef.current = false;
-            return;
-          }
-
-          // Select the [[query fragment and replace it with the chip node.
-          sel.setTextNodeRange(anchorNode, lastOpen, anchorNode, offset);
-          sel.insertNodes([new WikiLinkNode(token)]);
-        });
-
+        insertWikiLinkAtCursor(token, alias, lexEditor);
         requestAnimationFrame(() => {
           isApplyingRef.current = false;
-          lexEditor.focus();
         });
         return;
       }
 
-      // ── Fallback: setMarkdown (cursor goes to end of document) ──
+      // Fallback: append at end of document via setMarkdown.
       const current = lastEmittedRef.current;
-      const lastOpen = current.lastIndexOf("[[");
-      if (lastOpen === -1) return;
-
-      const afterOpen = current.slice(lastOpen + 2);
-      const closingIdx = afterOpen.indexOf("]]");
-      const endOfTrigger =
-        lastOpen + 2 + (closingIdx !== -1 ? closingIdx + 2 : afterOpen.length);
-
-      const newMarkdown =
-        current.slice(0, lastOpen) +
-        `[[${token}]]` +
-        current.slice(endOfTrigger);
-
+      const linkText = alias ? `[[${token}|${alias}]]` : `[[${token}]]`;
+      const newMarkdown = current ? `${current}\n${linkText}` : linkText;
       isApplyingRef.current = true;
       editorRef.current?.setMarkdown(newMarkdown);
       lastEmittedRef.current = newMarkdown;
       prevValueRef.current = newMarkdown;
       onChange(newMarkdown);
-
       requestAnimationFrame(() => {
         isApplyingRef.current = false;
-        editorRef.current?.focus();
       });
     },
-    [chapterType, onChange],
+    [isApplyingRef, lastEmittedRef, onChange, prevValueRef],
   );
 
   /**
@@ -658,16 +396,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
 
   // Plugin array — memoised so identity is stable across re-renders.
   const plugins = useMemo((): RealmPlugin[] => {
-    const wikiPlugin = realmPlugin({
-      init(realm) {
-        realm.pubIn({
-          [addLexicalNode$]: WikiLinkNode,
-          [addImportVisitor$]: WikiLinkTextVisitor,
-          [addExportVisitor$]: WikiLinkExportVisitor,
-        });
-      },
-    })();
-
     return [
       wikiPlugin,
       toolbarPlugin({
@@ -684,6 +412,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
             <Separator />
             <InsertTable />
             <InsertThematicBreak />
+            <Separator />
+            <InsertWikiLinkButton />
           </DiffSourceToggleWrapper>
         ),
       }),
@@ -698,6 +428,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       codeBlockPlugin(),
       diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: initialValue }),
     ];
+    // InsertWikiLinkButton is self-contained and reads all mutable data from
+    // WikiLinkContext, so only initialValue (the diff baseline) is a real dep.
   }, [initialValue]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
@@ -705,24 +437,31 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   return (
     <div
       ref={containerRef}
+      style={{ "--editor-min-height": `${height}px` } as CSSProperties}
       className="relative rounded border border-border"
       onKeyDownCapture={handleKeyDownCapture}
       onCompositionStart={() => setIsComposing(true)}
       onCompositionEnd={() => setIsComposing(false)}
     >
-      <WikiLinkContext.Provider value={{ wikiPages, chapterType }}>
+      <WikiLinkContext.Provider
+        value={{
+          wikiPages,
+          wikiChapters,
+          chapterType,
+          insertWikiLink,
+          focusEditor,
+        }}
+      >
         <MDXEditorClient
           ref={editorRef}
           markdown={initialValue}
           onChange={handleChange}
           plugins={plugins}
+          toMarkdownOptions={{ extensions: [wikiLinkToMarkdownExtension] }}
           className="mdx-editor-wiki"
           contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
         />
       </WikiLinkContext.Provider>
-      {/* Apply the height constraint to MDXEditor's content-editable area */}
-      <style>{`.mdx-editor-wiki .mdxeditor-root-contenteditable { min-height: ${height}px; }`}</style>
-
       {isOpen && suggestions.length > 0 && (
         <ul
           ref={listboxRef}
@@ -755,4 +494,34 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       )}
     </div>
   );
+}
+
+/**
+ * Reads the cursor's pixel position from the DOM Selection API and returns
+ * coordinates relative to `containerRef` so the autocomplete dropdown
+ * appears just below the current insertion point.
+ */
+function getCursorPos(
+  container: HTMLDivElement | null,
+): { top: number; left: number } | null {
+  if (!container) return null;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  if (rect.width === 0 && rect.height === 0) return null;
+
+  const lineH = 24;
+  return {
+    top: rect.bottom - containerRect.top + lineH / 4,
+    // Keep w-72 (288 px) dropdown horizontally inside the container
+    left: Math.max(
+      0,
+      Math.min(rect.left - containerRect.left, containerRect.width - 288),
+    ),
+  };
 }
