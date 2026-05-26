@@ -12,6 +12,7 @@ import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
 import { Text } from "@/components/ui/Text";
 import { Select } from "@/components/ui/Select";
+import Link from "next/link";
 import {
   savePageContent,
   getPageContentAtChapter,
@@ -479,18 +480,35 @@ export function PageEditor(props: Props) {
       )}
 
       {allChapters.length > 0 && (
-        <Box className="items-center gap-3">
-          <Label htmlFor="target-chapter" className="shrink-0 text-sm">
-            Writing as of:
-          </Label>
-          <Select<number>
-            id="target-chapter"
-            options={chapterSelectOptions}
-            value={selectedChapterId ?? undefined}
-            onChange={handleChapterChange}
-            disabled={isPending}
-            className="w-52"
-          />
+        <Box col className="gap-1.5">
+          <Box className="items-center gap-3">
+            <Label htmlFor="target-chapter" className="shrink-0 text-sm">
+              Writing as of:
+            </Label>
+            <Select<number>
+              id="target-chapter"
+              options={chapterSelectOptions}
+              value={selectedChapterId ?? undefined}
+              onChange={handleChapterChange}
+              disabled={isPending}
+              className="w-52"
+            />
+          </Box>
+          <Text className="text-xs text-muted-foreground">
+            Markdown and{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">
+              [[wiki links]]
+            </code>{" "}
+            are supported.{" "}
+            <Link
+              href="/help#editing-content"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              See the guide.
+            </Link>
+          </Text>
         </Box>
       )}
 
