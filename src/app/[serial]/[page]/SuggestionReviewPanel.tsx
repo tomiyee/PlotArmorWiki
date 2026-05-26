@@ -239,8 +239,12 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Current
               </Text>
-              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px]">
-                {change.currentContent || (
+              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px overflow-auto">
+                {change.currentContent ? (
+                  <MarkdownRenderer serialSlug={serialSlug} sm>
+                    {change.currentContent}
+                  </MarkdownRenderer>
+                ) : (
                   <Text muted className="text-sm">
                     (empty)
                   </Text>
@@ -254,8 +258,10 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Proposed
               </Text>
-              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px">
-                {change.proposedContent}
+              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px overflow-auto">
+                <MarkdownRenderer serialSlug={serialSlug} sm>
+                  {change.proposedContent}
+                </MarkdownRenderer>
               </Box>
             </Box>
           </Box>

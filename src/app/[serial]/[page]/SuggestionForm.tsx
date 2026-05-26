@@ -7,8 +7,8 @@ import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
-import { Text } from "@/components/ui/Text";
 import { Textarea } from "@/components/ui/Textarea";
+import { Text } from "@/components/ui/Text";
 import {
   Dialog,
   DialogBody,
@@ -124,6 +124,11 @@ export function SuggestionForm(props: SuggestionFormProps) {
   const [citation, setCitation] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  // Tracks which chapter's content is actually loaded in the editors — lags behind
+  // selectedChapterId during async fetches. Used as editor key so MDXEditor remounts
+  // with the correct diffMarkdown baseline whenever the displayed chapter changes.
+  // (diffSourcePlugin captures diffMarkdown once at init; remount is the only reset path.)
+  const [contentChapterId, setContentChapterId] = useState(selectedChapterId);
 
   // Dirty state: true when any draft differs from the section content or citation is non-empty.
   const isDirty =
@@ -157,6 +162,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
         setInfoboxDraftContent(
           Object.fromEntries(newIbSections.map((s) => [s.id, s.content])),
         );
+        setContentChapterId(chapterId);
       });
     },
     [pageId],
@@ -304,6 +310,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
               />
             </Box>
             <WikiLinkMDEditor
+              key={`${contentChapterId}-${section.id}`}
               value={draftContent[section.id] ?? ""}
               onChange={(val) =>
                 setDraftContent((prev) => ({ ...prev, [section.id]: val ?? "" }))
@@ -324,18 +331,22 @@ export function SuggestionForm(props: SuggestionFormProps) {
             <Text variant="h3">Infobox</Text>
             {infoboxSections.map((row) => (
               <Box col key={row.id} className="gap-1.5">
-                <Label htmlFor={`ib-suggestion-${row.id}`}>{row.label}</Label>
-                <Textarea
-                  id={`ib-suggestion-${row.id}`}
+                <Label>{row.label}</Label>
+                <WikiLinkMDEditor
+                  key={`${contentChapterId}-ib-${row.id}`}
                   value={infoboxDraftContent[row.id] ?? ""}
-                  onChange={(e) =>
+                  onChange={(val) =>
                     setInfoboxDraftContent((prev) => ({
                       ...prev,
-                      [row.id]: e.target.value,
+                      [row.id]: val ?? "",
                     }))
                   }
-                  rows={2}
-                  disabled={isPending}
+                  height={120}
+                  preview="edit"
+                  wikiPages={wikiPages}
+                  serialSlug={serialSlug}
+                  wikiChapters={wikiChapters}
+                  chapterType={chapterType}
                 />
               </Box>
             ))}
