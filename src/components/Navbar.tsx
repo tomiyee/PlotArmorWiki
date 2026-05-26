@@ -29,7 +29,7 @@ type NavbarProps = {
  * server-side auth state.
  *
  * The left-side container uses `suppressHydrationWarning` because serial data
- * is injected client-side via `useLayoutEffect` — the server renders it empty
+ * is injected client-side via `useLayoutEffect` -the server renders it empty
  * and the client fills it in before the first paint.
  *
  * @example
@@ -94,13 +94,6 @@ export default function Navbar(props: NavbarProps) {
       <Box className="gap-2 items-center">
         {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
         {chapterSelectorSlot}
-        {/* Help link — desktop only; mobile surfaces it in the hamburger drawer */}
-        <Link
-          href="/help"
-          className="hidden md:inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Help
-        </Link>
         {authSlot}
       </Box>
     </nav>

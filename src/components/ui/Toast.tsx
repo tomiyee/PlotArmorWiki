@@ -14,7 +14,7 @@ import { Text } from "@/components/ui/Text";
 type ToastVariant = "default" | "error" | "success";
 
 type ToastData = {
-  /** Unique identifier — assigned automatically by `toast()`. */
+  /** Unique identifier -assigned automatically by `toast()`. */
   id: string;
   /** Primary message text shown in bold. */
   title: string;
@@ -45,7 +45,7 @@ type ToastProviderProps = {
 /**
  * Provides the `useToast()` hook to the component tree and renders a portal
  * with active toasts fixed to the bottom-right of the viewport. Mount once in
- * the root layout — no need to place `<Toaster>` separately.
+ * the root layout -no need to place `<Toaster>` separately.
  *
  * @example
  * // In layout.tsx:
@@ -154,7 +154,7 @@ function ToastItem(props: ToastItemProps) {
 // ── useToast ──────────────────────────────────────────────────────────────────
 
 /**
- * Returns `{ toast }` — call `toast({ title, variant })` to show a
+ * Returns `{ toast }` -call `toast({ title, variant })` to show a
  * self-dismissing notification. Must be used inside `<ToastProvider>`.
  *
  * @example

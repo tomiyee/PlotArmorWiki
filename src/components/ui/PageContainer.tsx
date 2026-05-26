@@ -6,7 +6,7 @@ type PageContainerProps = ComponentProps<"div">;
 /**
  * Standard page-level content container. Constrains width to `max-w-5xl`,
  * centers horizontally, and applies consistent horizontal padding and
- * vertical spacing. Override via `className` — e.g. pass `max-w-6xl` for
+ * vertical spacing. Override via `className` -e.g. pass `max-w-6xl` for
  * wiki pages with a floater sidebar, or `max-w-lg` for narrow forms.
  *
  * @example

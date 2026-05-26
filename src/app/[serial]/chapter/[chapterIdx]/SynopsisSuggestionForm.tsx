@@ -39,7 +39,15 @@ type SynopsisSuggestionFormProps = {
  * />
  */
 export function SynopsisSuggestionForm(props: SynopsisSuggestionFormProps) {
-  const { chapterId, currentContent, onClose, wikiPages, serialSlug, wikiChapters, chapterType } = props;
+  const {
+    chapterId,
+    currentContent,
+    onClose,
+    wikiPages,
+    serialSlug,
+    wikiChapters,
+    chapterType,
+  } = props;
 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -77,7 +85,10 @@ export function SynopsisSuggestionForm(props: SynopsisSuggestionFormProps) {
 
   if (submitted) {
     return (
-      <Box col className="gap-4 rounded-lg border border-border bg-muted/30 p-6">
+      <Box
+        col
+        className="gap-4 rounded-lg border border-border bg-muted/30 p-6"
+      >
         <Text variant="h3">Suggestion submitted</Text>
         <Text variant="body">
           Your synopsis suggestion has been submitted for admin review.
@@ -116,7 +127,7 @@ export function SynopsisSuggestionForm(props: SynopsisSuggestionFormProps) {
         <Label htmlFor="synopsis-citation">Citation (required)</Label>
         <Input
           id="synopsis-citation"
-          placeholder="e.g. Chapter 12, page 4 — 'Luffy said…'"
+          placeholder="e.g. Chapter 12, page 4 -'Luffy said…'"
           value={citation}
           onChange={(e) => setCitation(e.target.value)}
           disabled={isPending}

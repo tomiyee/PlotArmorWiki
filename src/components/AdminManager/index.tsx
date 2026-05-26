@@ -35,7 +35,9 @@ type AdminManagerProps = {
   /** Server Action: remove a user from `serial_admins` by userId. */
   removeAdminAction: (formData: FormData) => Promise<void>;
   /** Server Action: search for users by query, excluding current admins. */
-  searchUsersAction: (query: string) => Promise<{ userId: string; username: string }[]>;
+  searchUsersAction: (
+    query: string,
+  ) => Promise<{ userId: string; username: string }[]>;
 };
 
 /**
@@ -43,7 +45,7 @@ type AdminManagerProps = {
  * or removing them. Only renders when the user is in edit mode (admin-only).
  *
  * Removal is disabled when the target admin is the sole remaining admin to
- * prevent lockout — this is enforced on both client (disabled button) and
+ * prevent lockout -this is enforced on both client (disabled button) and
  * server (server action guard).
  *
  * @example
@@ -116,12 +118,16 @@ export function AdminManager(props: AdminManagerProps) {
                 const isSelf = admin.userId === currentUserId;
                 const canRemove = !isSoleAdmin;
                 return (
-                  <Box key={admin.userId} className="items-center justify-between gap-2 py-1">
+                  <Box
+                    key={admin.userId}
+                    className="items-center justify-between gap-2 py-1"
+                  >
                     <Text variant="body">
                       {admin.username ?? "(no username)"}
                       {isSelf && (
                         <Text as="span" variant="label" muted>
-                          {" "}(you)
+                          {" "}
+                          (you)
                         </Text>
                       )}
                     </Text>

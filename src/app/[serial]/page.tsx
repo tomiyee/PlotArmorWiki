@@ -588,7 +588,7 @@ export default async function SerialPage({ params }: Props) {
 
     homePageTitleEntries = allTitleRows.map((r) => ({
       chapterId: r.chapterId,
-      chapterLabel: `${r.volumeName} — ${r.chapterDisplayName}`,
+      chapterLabel: `${r.volumeName} -${r.chapterDisplayName}`,
       title: r.title,
     }));
   }
@@ -597,7 +597,7 @@ export default async function SerialPage({ params }: Props) {
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
-        {/* Left sidebar — sticky, independent scroll, desktop only */}
+        {/* Left sidebar -sticky, independent scroll, desktop only */}
         <aside className="hidden md:block w-56 shrink-0">
           <div className="sticky top-6 overflow-y-auto max-h-[calc(100vh-5rem)] pr-1">
             <SerialTOCSidebar
@@ -633,40 +633,56 @@ export default async function SerialPage({ params }: Props) {
               isAdmin={isAdmin}
             />
 
-            {isAdmin && pendingSuggestionsByPage.length > 0 && (() => {
-              const total = pendingSuggestionsByPage.reduce((s, p) => s + p.count, 0);
-              return (
-                <Accordion className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 text-amber-700 dark:text-amber-400">
-                  <AccordionItem value="pending-suggestions" className="border-none">
-                    <AccordionTrigger className="text-sm font-medium hover:no-underline">
-                      <span>
-                        <span className="font-semibold">{total}</span>
-                        {" "}pending {total === 1 ? "suggestion" : "suggestions"} across{" "}
-                        <span className="font-semibold">{pendingSuggestionsByPage.length}</span>
-                        {" "}{pendingSuggestionsByPage.length === 1 ? "page" : "pages"}
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="flex flex-col gap-1 pt-1">
-                        {pendingSuggestionsByPage.map((p) => (
-                          <li key={p.pageId} className="flex items-center justify-between text-sm">
-                            <a
-                              href={`/${serialSlug}/${p.pageSlug}`}
-                              className="hover:underline font-medium"
+            {isAdmin &&
+              pendingSuggestionsByPage.length > 0 &&
+              (() => {
+                const total = pendingSuggestionsByPage.reduce(
+                  (s, p) => s + p.count,
+                  0,
+                );
+                return (
+                  <Accordion className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 text-amber-700 dark:text-amber-400">
+                    <AccordionItem
+                      value="pending-suggestions"
+                      className="border-none"
+                    >
+                      <AccordionTrigger className="text-sm font-medium hover:no-underline">
+                        <span>
+                          <span className="font-semibold">{total}</span> pending{" "}
+                          {total === 1 ? "suggestion" : "suggestions"} across{" "}
+                          <span className="font-semibold">
+                            {pendingSuggestionsByPage.length}
+                          </span>{" "}
+                          {pendingSuggestionsByPage.length === 1
+                            ? "page"
+                            : "pages"}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="flex flex-col gap-1 pt-1">
+                          {pendingSuggestionsByPage.map((p) => (
+                            <li
+                              key={p.pageId}
+                              className="flex items-center justify-between text-sm"
                             >
-                              {p.pageName}
-                            </a>
-                            <span className="text-xs text-amber-600 dark:text-amber-500">
-                              {p.count} {p.count === 1 ? "suggestion" : "suggestions"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              );
-            })()}
+                              <a
+                                href={`/${serialSlug}/${p.pageSlug}`}
+                                className="hover:underline font-medium"
+                              >
+                                {p.pageName}
+                              </a>
+                              <span className="text-xs text-amber-600 dark:text-amber-500">
+                                {p.count}{" "}
+                                {p.count === 1 ? "suggestion" : "suggestions"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                );
+              })()}
 
             {homePage ? (
               <PageEditor
@@ -684,7 +700,10 @@ export default async function SerialPage({ params }: Props) {
                 readingChapterId={readingChapterId}
                 wikiPages={wikiPages}
                 pageTitles={wikiPageTitles}
-                wikiChapters={allChapters.map((c) => ({ name: c.displayName, idx: c.idx }))}
+                wikiChapters={allChapters.map((c) => ({
+                  name: c.displayName,
+                  idx: c.idx,
+                }))}
                 chapterType={serial.chapterType}
                 introChapterIdx={null}
                 childPages={childPages}
@@ -707,9 +726,13 @@ export default async function SerialPage({ params }: Props) {
                       createTemplateAction={createTemplateForSerial}
                       deleteTemplateAction={deleteTemplateForSerial}
                       renameTemplateAction={renameTemplateForSerial}
-                      toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
+                      toggleTemplateInfoboxAction={
+                        toggleTemplateInfoboxForSerial
+                      }
                       addTemplateSectionAction={addTemplateSectionForSerial}
-                      deleteTemplateSectionAction={deleteTemplateSectionForSerial}
+                      deleteTemplateSectionAction={
+                        deleteTemplateSectionForSerial
+                      }
                       addTemplateInfoboxSectionAction={
                         addTemplateInfoboxSectionForSerial
                       }

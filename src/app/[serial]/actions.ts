@@ -194,7 +194,7 @@ export async function updateSerialTypes(serialId: number, formData: FormData) {
 
 /**
  * Reorders volumes for a serial by reassigning `idx` values in a single transaction.
- * `orderedVolumeIds` must contain every volume ID for the serial — no partial reorders.
+ * `orderedVolumeIds` must contain every volume ID for the serial -no partial reorders.
  *
  * @example
  * await reorderVolumes(serialId, [3, 1, 2]);
@@ -244,7 +244,7 @@ export async function reorderVolumes(
  * serial-level linear order stays strictly increasing (chapters in earlier volumes always
  * precede those in later volumes). All affected rows are updated in a single transaction.
  *
- * `orderedChapterIds` must contain every chapter ID for the target volume — no partial reorders.
+ * `orderedChapterIds` must contain every chapter ID for the target volume -no partial reorders.
  *
  * @example
  * await reorderChapters(serialId, volumeId, [5, 3, 4]);
@@ -315,7 +315,7 @@ export async function reorderChapters(
  * Covers both within-volume reordering and cross-volume chapter moves.
  *
  * `volumeOrder` defines the global chapter sequence (earlier volumes → lower idx).
- * `chaptersByVolumeId` must include every chapter in the serial — no partial updates.
+ * `chaptersByVolumeId` must include every chapter in the serial -no partial updates.
  *
  * @example
  * await reorderAllChapters(serialId, [1, 2], { 1: [10, 11], 2: [12] });
@@ -548,7 +548,7 @@ export async function bulkApplyToc(
   const existingVolumeIds = new Set(existingVolumes.map((v) => v.id));
   const existingChapterIds = new Set(existingChapters.map((c) => c.id));
 
-  // ── 2. Validate — no implicit deletes ────────────────────────────────────
+  // ── 2. Validate -no implicit deletes ────────────────────────────────────
   const payloadVolumeIds = new Set<number>();
   const payloadChapterIds = new Set<number>();
 
@@ -851,7 +851,7 @@ export async function deleteTemplateSection(
 
 /**
  * Reorders sections within a template. `orderedSectionIds` must include every
- * section for the template — no partial reorders.
+ * section for the template -no partial reorders.
  *
  * @example
  * await reorderTemplateSections(42, [3, 1, 2]);
@@ -1073,7 +1073,7 @@ export async function searchUsersForSerial(
  * chapter progress is persisted in the database across devices and sessions.
  *
  * Silently no-ops when the caller is not authenticated (anonymous users rely
- * on cookie/localStorage only). Does NOT require serial admin privileges — any
+ * on cookie/localStorage only). Does NOT require serial admin privileges -any
  * logged-in user can save their own reading progress.
  *
  * @example

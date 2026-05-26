@@ -6,11 +6,11 @@
  * this module.
  *
  * Wiki link syntax:
- *   `[[PageName]]`           — links to a wiki page (no category = page link)
- *   `[[page:PageName]]`      — explicit page link (same behaviour, clearer)
- *   `[[Chapter:Chapter 5]]`  — chapter link; category must match the serial's
+ *   `[[PageName]]`           -links to a wiki page (no category = page link)
+ *   `[[page:PageName]]`      -explicit page link (same behaviour, clearer)
+ *   `[[Chapter:Chapter 5]]`  -chapter link; category must match the serial's
  *                              chapterType (Chapter/Episode/Issue/Part)
- *   `[[Page Name|alias]]`    — alias overrides the display text
+ *   `[[Page Name|alias]]`    -alias overrides the display text
  *
  * @example
  * const parts = parseWikiLink("Harry Potter");
@@ -26,7 +26,7 @@
  */
 
 export interface WikiLinkParts {
-  /** The target name — a page slug/name or a chapter display name. */
+  /** The target name -a page slug/name or a chapter display name. */
   page: string;
   /**
    * The namespace prefix before the first `:`, if present.
@@ -64,7 +64,10 @@ export const WIKI_LINK_RE = /\[\[([^|\]]+)(?:\|([^\]]*))?\]\]/g;
  * parseWikiLink("Chapter:Chapter 5")     // → { page: "Chapter 5", category: "Chapter" }
  * parseWikiLink("Harry Potter|Harry")    // → { page: "Harry Potter", alias: "Harry" }
  */
-export function parseWikiLink(raw: string, alias?: string): WikiLinkParts | null {
+export function parseWikiLink(
+  raw: string,
+  alias?: string,
+): WikiLinkParts | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
@@ -91,7 +94,7 @@ export function parseWikiLink(raw: string, alias?: string): WikiLinkParts | null
 /**
  * Canonical URL slug for a wiki page name.
  *
- * Starting simple with `encodeURIComponent` — centralising the call site
+ * Starting simple with `encodeURIComponent` -centralising the call site
  * means it can evolve (e.g. case-normalisation, whitespace collapsing) without
  * touching every caller.
  *
@@ -103,7 +106,7 @@ export function slugifyWikiName(name: string): string {
 }
 
 /**
- * Returns `true` when `category` identifies a chapter link — i.e. when it
+ * Returns `true` when `category` identifies a chapter link -i.e. when it
  * case-insensitively matches one of the serial's chapter type values.
  *
  * Used by both the remark plugin and the autocomplete component so the check

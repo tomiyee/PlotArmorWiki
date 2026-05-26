@@ -21,7 +21,7 @@ export interface ChapterData {
 
 export interface PageTitleEntry {
   chapterId: number;
-  /** Human-readable label, e.g. "Volume 1 — Chapter 3". */
+  /** Human-readable label, e.g. "Volume 1 -Chapter 3". */
   chapterLabel: string;
   title: string;
 }

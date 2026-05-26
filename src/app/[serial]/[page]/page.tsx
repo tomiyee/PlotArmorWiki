@@ -38,7 +38,7 @@ interface Props {
  * and idx (global ordering integer) so callers can pass the id to
  * PageEditor as the default "Writing as of" selection.
  *
- * Falls back to idx=0 / id=null when no cookie is present — the subquery
+ * Falls back to idx=0 / id=null when no cookie is present -the subquery
  * finds no revision with idx ≤ 0, so all sections render empty.
  *
  * @example
@@ -79,27 +79,28 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [chapterCutoff, volumeList, chapterList, adminStatus, authUserId] = await Promise.all([
-    getChapterCutoff(serial.id),
-    db
-      .select({ id: volumes.id, displayName: volumes.displayName })
-      .from(volumes)
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(asc(volumes.idx)),
-    db
-      .select({
-        id: chapters.id,
-        displayName: chapters.displayName,
-        idx: chapters.idx,
-        volumeId: chapters.volumeId,
-      })
-      .from(chapters)
-      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(asc(chapters.idx)),
-    isSerialAdmin(serial.id),
-    isAuthenticated(),
-  ]);
+  const [chapterCutoff, volumeList, chapterList, adminStatus, authUserId] =
+    await Promise.all([
+      getChapterCutoff(serial.id),
+      db
+        .select({ id: volumes.id, displayName: volumes.displayName })
+        .from(volumes)
+        .where(eq(volumes.serialId, serial.id))
+        .orderBy(asc(volumes.idx)),
+      db
+        .select({
+          id: chapters.id,
+          displayName: chapters.displayName,
+          idx: chapters.idx,
+          volumeId: chapters.volumeId,
+        })
+        .from(chapters)
+        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+        .where(eq(volumes.serialId, serial.id))
+        .orderBy(asc(chapters.idx)),
+      isSerialAdmin(serial.id),
+      isAuthenticated(),
+    ]);
   const isAdmin = adminStatus;
   const isUserAuthenticated = !!authUserId;
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -272,7 +273,7 @@ export default async function PageView({ params }: Props) {
     ]),
   );
 
-  // pageSectionStructure — wall-clock-versioned rows for the section manager panel.
+  // pageSectionStructure -wall-clock-versioned rows for the section manager panel.
   const pageSectionStructure = activeSections.map((s) => ({
     id: s.id,
     name: s.name,
@@ -597,18 +598,21 @@ export default async function PageView({ params }: Props) {
 
   const pageTitleEntries = allPageTitleRows.map((r) => ({
     chapterId: r.chapterId,
-    chapterLabel: `${r.volumeName} — ${r.chapterDisplayName}`,
+    chapterLabel: `${r.volumeName} -${r.chapterDisplayName}`,
     title: r.title,
   }));
 
   // ── Suggestion data ───────────────────────────────────────────────────────
   // Fetch in parallel: pending count + full list for admins, user status for
   // non-admins. Both functions are no-ops when the user lacks permission.
-  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] = await Promise.all([
-    isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
-    isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
-    !isAdmin && isUserAuthenticated ? getMyPageSuggestions(page.id) : Promise.resolve([]),
-  ]);
+  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] =
+    await Promise.all([
+      isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
+      isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
+      !isAdmin && isUserAuthenticated
+        ? getMyPageSuggestions(page.id)
+        : Promise.resolve([]),
+    ]);
 
   return (
     <main>
@@ -662,7 +666,10 @@ export default async function PageView({ params }: Props) {
             readingChapterId={readingChapterId}
             wikiPages={wikiPages}
             pageTitles={wikiPageTitles}
-            wikiChapters={allChapters.map((c) => ({ name: c.displayName, idx: c.idx }))}
+            wikiChapters={allChapters.map((c) => ({
+              name: c.displayName,
+              idx: c.idx,
+            }))}
             chapterType={serial.chapterType}
             introChapterIdx={introChapter?.idx ?? null}
             childPages={childPages}

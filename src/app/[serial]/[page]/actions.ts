@@ -14,8 +14,22 @@ import {
   pageRelationships,
   pageTitles,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, inArray, isNull, lte, max, ne } from "drizzle-orm";
-import { requireSerialAdminBySlug, requireSerialAdminByPageId } from "@/lib/auth-guard";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  max,
+  ne,
+} from "drizzle-orm";
+import {
+  requireSerialAdminBySlug,
+  requireSerialAdminByPageId,
+} from "@/lib/auth-guard";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -31,7 +45,7 @@ async function getHeadChapterId(serialId: number): Promise<number> {
     .orderBy(desc(chapters.idx))
     .limit(1);
 
-  if (!row) throw new Error("Serial has no chapters — cannot save content.");
+  if (!row) throw new Error("Serial has no chapters -cannot save content.");
   return row.id;
 }
 
@@ -71,7 +85,7 @@ async function resolvePageIds(serialSlug: string, pageSlug: string) {
  * max-idx subquery read path.
  *
  * @example
- * // Write at head (default behaviour — UI passes undefined)
+ * // Write at head (default behaviour -UI passes undefined)
  * await savePageContent(serialSlug, pageName, summaryContent, sectionContent, floaterImageUrl, floaterRowContent);
  *
  * @example
@@ -113,16 +127,26 @@ export async function savePageContent(
         .insert(pageInfoboxImageRevisions)
         .values({ pageId, chapterId: headChapterId, imageUrl: floaterImageUrl })
         .onConflictDoUpdate({
-          target: [pageInfoboxImageRevisions.pageId, pageInfoboxImageRevisions.chapterId],
+          target: [
+            pageInfoboxImageRevisions.pageId,
+            pageInfoboxImageRevisions.chapterId,
+          ],
           set: { imageUrl: floaterImageUrl },
         });
 
-      for (const [infoboxSectionIdStr, content] of Object.entries(floaterRowContent)) {
+      for (const [infoboxSectionIdStr, content] of Object.entries(
+        floaterRowContent,
+      )) {
         if (!content.trim()) continue; // never write empty revisions
         const infoboxSectionId = parseInt(infoboxSectionIdStr, 10);
         await tx
           .insert(pageInfoboxRevisions)
-          .values({ pageId, infoboxSectionId, chapterId: headChapterId, content })
+          .values({
+            pageId,
+            infoboxSectionId,
+            chapterId: headChapterId,
+            content,
+          })
           .onConflictDoUpdate({
             target: [
               pageInfoboxRevisions.pageId,
@@ -143,7 +167,7 @@ export async function savePageContent(
  * can see (and then overwrite) what readers at that chapter currently see.
  *
  * Returns empty arrays / null when no content exists at or before the given
- * chapter — the caller should treat these as blank-slate values.
+ * chapter -the caller should treat these as blank-slate values.
  *
  * @example
  * const data = await getPageContentAtChapter('my-serial', 'anya', 42);
@@ -158,7 +182,11 @@ export async function getPageContentAtChapter(
 ): Promise<{
   summaryContent: string;
   summaryLastUpdatedChapterIdx: number | null;
-  sections: { id: number; content: string; lastUpdatedChapterIdx: number | null }[];
+  sections: {
+    id: number;
+    content: string;
+    lastUpdatedChapterIdx: number | null;
+  }[];
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
@@ -182,7 +210,10 @@ export async function getPageContentAtChapter(
     .from(pageSectionRevisions)
     .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
     .where(
-      and(eq(pageSectionRevisions.pageId, pageId), lte(chapters.idx, cutoffIdx)),
+      and(
+        eq(pageSectionRevisions.pageId, pageId),
+        lte(chapters.idx, cutoffIdx),
+      ),
     )
     .groupBy(pageSectionRevisions.sectionId)
     .as("section_max_idx_sq");
@@ -192,10 +223,7 @@ export async function getPageContentAtChapter(
       .select({ id: pageSections.id })
       .from(pageSections)
       .where(
-        and(
-          eq(pageSections.pageId, pageId),
-          isNull(pageSections.deletedAt),
-        ),
+        and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
       )
       .orderBy(asc(pageSections.displayOrder)),
     db
@@ -217,7 +245,10 @@ export async function getPageContentAtChapter(
   ]);
 
   const versionBySectionId = new Map(
-    sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
+    sectionVersions.map((v) => [
+      v.sectionId,
+      { content: v.content, chapterIdx: v.chapterIdx },
+    ]),
   );
   const sections = activeSections.map((s) => {
     const v = versionBySectionId.get(s.id);
@@ -233,7 +264,10 @@ export async function getPageContentAtChapter(
     .from(pageInfoboxImageRevisions)
     .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
     .where(
-      and(eq(pageInfoboxImageRevisions.pageId, pageId), lte(chapters.idx, cutoffIdx)),
+      and(
+        eq(pageInfoboxImageRevisions.pageId, pageId),
+        lte(chapters.idx, cutoffIdx),
+      ),
     )
     .as("floater_max_idx_sq");
 
@@ -258,7 +292,10 @@ export async function getPageContentAtChapter(
       db
         .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
         .from(pageInfoboxImageRevisions)
-        .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
+        .innerJoin(
+          chapters,
+          eq(pageInfoboxImageRevisions.chapterId, chapters.id),
+        )
         .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
         .where(eq(pageInfoboxImageRevisions.pageId, pageId))
         .limit(1),
@@ -334,7 +371,7 @@ export async function addPageTitle(
 
 /**
  * Deletes the page title revision for a specific (page, chapter) pair.
- * Guards against deleting the last remaining title — a page must always
+ * Guards against deleting the last remaining title -a page must always
  * have at least one title revision.
  *
  * @example
@@ -391,7 +428,9 @@ export async function addPageSection(formData: FormData): Promise<void> {
   const [{ cnt }] = await db
     .select({ cnt: count() })
     .from(pageSections)
-    .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)));
+    .where(
+      and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
+    );
 
   await db.insert(pageSections).values({
     pageId,
@@ -525,7 +564,12 @@ export async function addInfoboxSection(formData: FormData): Promise<void> {
   const [{ cnt }] = await db
     .select({ cnt: count() })
     .from(pageInfoboxSections)
-    .where(and(eq(pageInfoboxSections.pageId, pageId), isNull(pageInfoboxSections.deletedAt)));
+    .where(
+      and(
+        eq(pageInfoboxSections.pageId, pageId),
+        isNull(pageInfoboxSections.deletedAt),
+      ),
+    );
 
   await db.insert(pageInfoboxSections).values({
     pageId,
@@ -546,7 +590,10 @@ export async function addInfoboxSection(formData: FormData): Promise<void> {
 export async function deleteInfoboxSection(
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const infoboxSectionId = parseInt(formData.get("infoboxSectionId") as string, 10);
+  const infoboxSectionId = parseInt(
+    formData.get("infoboxSectionId") as string,
+    10,
+  );
   if (!infoboxSectionId) return { error: "infoboxSectionId is required" };
 
   const [infoboxRow] = await db
@@ -586,9 +633,13 @@ export async function deleteInfoboxSection(
  * await renameInfoboxSection(fd);
  */
 export async function renameInfoboxSection(formData: FormData): Promise<void> {
-  const infoboxSectionId = parseInt(formData.get("infoboxSectionId") as string, 10);
+  const infoboxSectionId = parseInt(
+    formData.get("infoboxSectionId") as string,
+    10,
+  );
   const label = (formData.get("label") as string)?.trim();
-  if (!infoboxSectionId || !label) throw new Error("infoboxSectionId and label are required");
+  if (!infoboxSectionId || !label)
+    throw new Error("infoboxSectionId and label are required");
 
   const [infoboxRow] = await db
     .select({ pageId: pageInfoboxSections.pageId })
@@ -612,7 +663,9 @@ export async function renameInfoboxSection(formData: FormData): Promise<void> {
  * fd.set('orderedIds', JSON.stringify([3, 1, 2]));
  * await reorderInfoboxSections(fd);
  */
-export async function reorderInfoboxSections(formData: FormData): Promise<void> {
+export async function reorderInfoboxSections(
+  formData: FormData,
+): Promise<void> {
   const raw = formData.get("orderedIds") as string;
   const orderedIds: number[] = JSON.parse(raw);
 
@@ -641,13 +694,16 @@ export async function reorderInfoboxSections(formData: FormData): Promise<void> 
 
 /**
  * Performs a DFS from `startId` following currently-active parent edges in
- * `page_relationships` (using all rows in the DB — not chapter-filtered — so
+ * `page_relationships` (using all rows in the DB -not chapter-filtered -so
  * the cycle check is conservative). Returns true if `targetId` is reachable.
  *
  * This is called before inserting an `is_active = true` edge to ensure the
  * resulting graph remains a DAG.
  */
-async function isReachable(startId: number, targetId: number): Promise<boolean> {
+async function isReachable(
+  startId: number,
+  targetId: number,
+): Promise<boolean> {
   // Build the full parent map for the serial in a single query.
   // We only care about the *most recent* row per (parent, child) pair and
   // whether that row is active. To keep the query simple we fetch all rows
@@ -662,12 +718,18 @@ async function isReachable(startId: number, targetId: number): Promise<boolean> 
     .from(pageRelationships);
 
   // Latest row per (parent, child) keyed by `${parent}:${child}`.
-  const latestByEdge = new Map<string, { chapterId: number; isActive: boolean }>();
+  const latestByEdge = new Map<
+    string,
+    { chapterId: number; isActive: boolean }
+  >();
   for (const row of allRows) {
     const key = `${row.parentPageId}:${row.childPageId}`;
     const existing = latestByEdge.get(key);
     if (!existing || row.chapterId > existing.chapterId) {
-      latestByEdge.set(key, { chapterId: row.chapterId, isActive: row.isActive });
+      latestByEdge.set(key, {
+        chapterId: row.chapterId,
+        isActive: row.isActive,
+      });
     }
   }
 
@@ -773,7 +835,10 @@ export async function getParentPagesAtChapter(
     .from(pageTitles)
     .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
     .where(
-      and(inArray(pageTitles.pageId, parentPageIds), lte(chapters.idx, cutoffIdx)),
+      and(
+        inArray(pageTitles.pageId, parentPageIds),
+        lte(chapters.idx, cutoffIdx),
+      ),
     )
     .groupBy(pageTitles.pageId)
     .as("title_max_idx_sq");
@@ -822,7 +887,9 @@ export async function addPageRelationship(
   // edges, adding childPageId → parentPageId would create a cycle.
   const wouldCycle = await isReachable(parentPageId, childPageId);
   if (wouldCycle) {
-    return { error: "Adding this parent would create a cycle in the page graph." };
+    return {
+      error: "Adding this parent would create a cycle in the page graph.",
+    };
   }
 
   await db
@@ -859,7 +926,7 @@ export async function removePageRelationship(
 ): Promise<{ error?: string }> {
   await requireSerialAdminByPageId(childPageId);
 
-  // Count OTHER active parents for this child (conservative — unfiltered).
+  // Count OTHER active parents for this child (conservative -unfiltered).
   const allRows = await db
     .select({
       parentPageId: pageRelationships.parentPageId,
@@ -875,18 +942,26 @@ export async function removePageRelationship(
     );
 
   // Compute latest row per other parent.
-  const latestByParent = new Map<number, { chapterId: number; isActive: boolean }>();
+  const latestByParent = new Map<
+    number,
+    { chapterId: number; isActive: boolean }
+  >();
   for (const row of allRows) {
     const existing = latestByParent.get(row.parentPageId);
     if (!existing || row.chapterId > existing.chapterId) {
-      latestByParent.set(row.parentPageId, { chapterId: row.chapterId, isActive: row.isActive });
+      latestByParent.set(row.parentPageId, {
+        chapterId: row.chapterId,
+        isActive: row.isActive,
+      });
     }
   }
 
-  const activeOtherParents = [...latestByParent.values()].filter((v) => v.isActive);
+  const activeOtherParents = [...latestByParent.values()].filter(
+    (v) => v.isActive,
+  );
 
   if (activeOtherParents.length === 0) {
-    // Check if the page is a home page (home pages are root nodes — no parent needed).
+    // Check if the page is a home page (home pages are root nodes -no parent needed).
     const [pageRow] = await db
       .select({ isHomePage: pages.isHomePage })
       .from(pages)

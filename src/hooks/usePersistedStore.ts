@@ -25,7 +25,7 @@ import {
  * @param key          The localStorage key. Use a unique, namespaced string
  *                     (e.g. `"plotarmor:progress:42"`).
  * @param defaultValue The value to use when no stored value exists yet.
- * @returns            `[value, setValue]` — same shape as `React.useState`.
+ * @returns            `[value, setValue]` -same shape as `React.useState`.
  *
  * @example
  * const [count, setCount] = usePersistedStore("demo:counter", 0);

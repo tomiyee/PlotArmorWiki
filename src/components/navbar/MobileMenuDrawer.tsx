@@ -98,16 +98,6 @@ export function MobileMenuDrawer(props: MobileMenuDrawerProps) {
               {tocContent}
             </div>
           )}
-          {/* Help link — always shown at the bottom of the drawer */}
-          <div className="flex flex-col gap-0.5 border-t pt-3 mt-1">
-            <Link
-              href="/help"
-              onClick={() => setOpen(false)}
-              className="block rounded px-2 py-1.5 text-sm hover:bg-muted"
-            >
-              Help &amp; Documentation
-            </Link>
-          </div>
         </div>
       </Drawer>
     </>

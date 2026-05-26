@@ -166,7 +166,7 @@ function RenameChapterForm(props: RenameChapterFormProps) {
   );
 }
 
-// Non-interactive clone of a volume rendered by DragOverlay — layout-isolated from flex container.
+// Non-interactive clone of a volume rendered by DragOverlay -layout-isolated from flex container.
 function VolumeDragPreview({
   volume,
   chapters: vChapters,
@@ -483,7 +483,7 @@ function SortableVolumeItem({
         )}
       </Box>
 
-      {/* Chapter list — SortableContext only; DndContext lives in the parent SerialEditor */}
+      {/* Chapter list -SortableContext only; DndContext lives in the parent SerialEditor */}
       {/* Hidden when collapsed in read mode; always shown in edit mode. */}
       {(editing || !isCollapsed) &&
         (vChapters.length > 0 ? (
@@ -516,7 +516,7 @@ function SortableVolumeItem({
           </Text>
         ))}
 
-      {/* Add chapter — toggle between button and inline form */}
+      {/* Add chapter -toggle between button and inline form */}
       {editing &&
         (isAddingChapterHere ? (
           <form
@@ -765,7 +765,7 @@ function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
       <DialogBody className="max-h-[60vh]">
         {!hasChanges ? (
           <Text muted>
-            No changes detected — the uploaded TOC matches the current one.
+            No changes detected -the uploaded TOC matches the current one.
           </Text>
         ) : (
           <Box col className="gap-4">
@@ -975,7 +975,7 @@ export function SerialEditor(props: SerialEditorProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  // Local optimistic ordering — updated immediately on drag, server-confirmed on refresh.
+  // Local optimistic ordering -updated immediately on drag, server-confirmed on refresh.
   const [volumes, setVolumes] = useState<Volume[]>(initialVolumes);
   const [chaptersByVolume, setChaptersByVolume] = useState<
     Record<number, Chapter[]>
@@ -1380,7 +1380,7 @@ export function SerialEditor(props: SerialEditorProps) {
         </DragOverlay>
       </DndContext>
 
-      {/* Add volume — toggle between button and inline form */}
+      {/* Add volume -toggle between button and inline form */}
       {editing && (
         <div className="mt-2 pt-4 border-t border-border">
           {addingVolume ? (

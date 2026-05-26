@@ -18,7 +18,7 @@ interface SerialNavInjectorProps {
  * default navbar appearance.
  *
  * Uses `useLayoutEffect` so data is injected synchronously before the browser
- * paints — no flash of empty navbar on navigation.
+ * paints -no flash of empty navbar on navigation.
  *
  * Mount this as a sibling of the serial page content inside the serial layout
  * (a Server Component). This component itself renders nothing to the DOM.
@@ -36,7 +36,7 @@ export function SerialNavInjector(props: SerialNavInjectorProps) {
 
   // Update navbar context whenever props change (e.g. after router.refresh() adds chapters).
   // RSC serialisation always produces new object references, so this fires on every
-  // RSC re-render — that's intentional and keeps the navbar in sync.
+  // RSC re-render -that's intentional and keeps the navbar in sync.
   useLayoutEffect(() => {
     setSerial(data, chapterSelectorSlot, tocSlot, tocContent);
     // eslint-disable-next-line react-hooks/exhaustive-deps

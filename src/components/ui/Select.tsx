@@ -28,7 +28,7 @@ export type Option<T> = {
   disabled?: boolean;
   /**
    * The value emitted to `onChange` when this option is selected.
-   * For structural nodes this value is never emitted — use a sentinel like `null`.
+   * For structural nodes this value is never emitted -use a sentinel like `null`.
    */
   value: T;
   /**
@@ -50,7 +50,7 @@ type FlatRow<T> = {
   expanded: boolean;
   /** Whether this row is a selectable option (not structural, not disabled). */
   selectable: boolean;
-  /** Sequential index among selectable rows only — used for keyboard navigation. */
+  /** Sequential index among selectable rows only -used for keyboard navigation. */
   selectableIdx: number;
 };
 
@@ -97,7 +97,7 @@ type SelectProps<T> = {
  * Manages expand/collapse state for grouped accordion sections.
  *
  * Uses `Set<string> | null` as a sentinel: `null` means "not yet
- * initialized — treat every section as expanded." On the first toggle the
+ * initialized -treat every section as expanded." On the first toggle the
  * set is seeded from `allRowIds` and the clicked ID is removed (collapse)
  * or added (expand). This avoids a separate initialization render.
  *
@@ -277,7 +277,7 @@ type GroupRowProps = {
  * `isAccordion` is true (i.e. the option has children).
  *
  * The chevron direction reflects expanded state; clicking calls `onToggle`.
- * When `isAccordion` is false the row is a visual label only — no chevron,
+ * When `isAccordion` is false the row is a visual label only -no chevron,
  * no click handler.
  *
  * @example
@@ -342,7 +342,7 @@ type LeafRowProps = {
  * Selectable leaf option inside the dropdown.
  *
  * Receives `isActive` and `isSelected` as pre-computed booleans so this
- * component stays free of generic type `T` — value comparisons happen in
+ * component stays free of generic type `T` -value comparisons happen in
  * `renderRow` inside `Select`. `activeRowRef` is passed conditionally (only
  * when active) so the parent's scroll-into-view effect targets the right DOM
  * node without iterating the list itself.
@@ -421,7 +421,7 @@ type DropdownContentProps = {
  * Owns its `searchRef` and focuses the input whenever `isOpen` transitions
  * to `true`, keeping focus management self-contained and out of `Select`.
  * The rendered rows are passed as `children`; this component never inspects
- * them — it only uses `hasOptions` to choose between the tree view and the
+ * them -it only uses `hasOptions` to choose between the tree view and the
  * empty-state message.
  *
  * @example
@@ -552,7 +552,7 @@ function DropdownContent(props: DropdownContentProps) {
  * />
  *
  * @example
- * // Custom trigger — any element as the dropdown button
+ * // Custom trigger -any element as the dropdown button
  * <Select options={opts} value={v} onChange={setV}>
  *   <Button variant="ghost" size="icon"><BookmarkIcon /></Button>
  * </Select>
@@ -780,7 +780,7 @@ export { Select };
  * accordion expansion state and the active search query.
  *
  * Row IDs are path-based (e.g. `"0"`, `"0-1"`, `"0-1-2"`) so they remain
- * stable when siblings are filtered out — keyboard-navigation indices never
+ * stable when siblings are filtered out -keyboard-navigation indices never
  * jump unexpectedly.
  *
  * When a query is active every ancestor accordion is force-expanded so

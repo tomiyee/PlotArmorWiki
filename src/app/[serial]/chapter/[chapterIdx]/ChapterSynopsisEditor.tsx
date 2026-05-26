@@ -27,7 +27,7 @@ type ChapterSynopsisEditorProps = {
   chapterType?: string;
   /**
    * Server action that persists the synopsis. Pre-bound with `serialSlug` and
-   * `chapterIdx` by the parent server component — accepts only the markdown
+   * `chapterIdx` by the parent server component -accepts only the markdown
    * content string.
    */
   saveAction: (content: string) => Promise<void>;
