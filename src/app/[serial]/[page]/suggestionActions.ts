@@ -124,15 +124,17 @@ export async function submitPageSuggestion(
  * const suggestions = await getMyPageSuggestions(42);
  * // → [{ status: 'pending', reviewNote: null }, ...]
  */
-export async function getMyPageSuggestions(pageId: number): Promise<{
-  id: number;
-  status: "pending" | "approved" | "rejected";
-  reviewNote: string | null;
-  createdAt: Date;
-  targetChapterName: string;
-  sectionChanges: { sectionName: string; proposedContent: string }[];
-  infoboxChanges: { label: string; proposedContent: string }[];
-}[]> {
+export async function getMyPageSuggestions(pageId: number): Promise<
+  {
+    id: number;
+    status: "pending" | "approved" | "rejected";
+    reviewNote: string | null;
+    createdAt: Date;
+    targetChapterName: string;
+    sectionChanges: { sectionName: string; proposedContent: string }[];
+    infoboxChanges: { label: string; proposedContent: string }[];
+  }[]
+> {
   const userId = await requireAuthenticated().catch(() => null);
   if (!userId) return [];
 
@@ -166,7 +168,10 @@ export async function getMyPageSuggestions(pageId: number): Promise<{
         proposedContent: pageSuggestionSectionChanges.proposedContent,
       })
       .from(pageSuggestionSectionChanges)
-      .innerJoin(pageSections, eq(pageSuggestionSectionChanges.sectionId, pageSections.id))
+      .innerJoin(
+        pageSections,
+        eq(pageSuggestionSectionChanges.sectionId, pageSections.id),
+      )
       .where(inArray(pageSuggestionSectionChanges.suggestionId, suggestionIds)),
     db
       .select({
@@ -175,7 +180,13 @@ export async function getMyPageSuggestions(pageId: number): Promise<{
         proposedContent: pageSuggestionInfoboxChanges.proposedContent,
       })
       .from(pageSuggestionInfoboxChanges)
-      .innerJoin(pageInfoboxSections, eq(pageSuggestionInfoboxChanges.infoboxSectionId, pageInfoboxSections.id))
+      .innerJoin(
+        pageInfoboxSections,
+        eq(
+          pageSuggestionInfoboxChanges.infoboxSectionId,
+          pageInfoboxSections.id,
+        ),
+      )
       .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
   ]);
 
@@ -187,7 +198,10 @@ export async function getMyPageSuggestions(pageId: number): Promise<{
     targetChapterName: row.targetChapterName,
     sectionChanges: sectionChangeRows
       .filter((c) => c.suggestionId === row.id)
-      .map((c) => ({ sectionName: c.sectionName, proposedContent: c.proposedContent })),
+      .map((c) => ({
+        sectionName: c.sectionName,
+        proposedContent: c.proposedContent,
+      })),
     infoboxChanges: infoboxChangeRows
       .filter((c) => c.suggestionId === row.id)
       .map((c) => ({ label: c.label, proposedContent: c.proposedContent })),

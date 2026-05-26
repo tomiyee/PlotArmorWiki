@@ -193,9 +193,7 @@ export function PageReadView(props: PageReadViewProps) {
               </Text>
               {currentSuggestion.sectionChanges.map((change, i) => (
                 <div key={i} className="flex flex-col gap-1">
-                  {currentSuggestion.sectionChanges.length > 1 && (
-                    <Text className="text-xs font-medium">{change.sectionName}</Text>
-                  )}
+                  <Text className="text-xs font-medium">{change.sectionName}</Text>
                   <div className="rounded border border-border bg-background p-3 text-xs overflow-auto">
                     <MarkdownRenderer serialSlug={serialSlug} sm>
                       {change.proposedContent}
