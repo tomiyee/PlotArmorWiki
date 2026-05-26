@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Text } from "@/components/ui/Text";
-import { Textarea } from "@/components/ui/Textarea";
+import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 import { submitSynopsisSuggestion } from "./synopsisSuggestionActions";
 
 type SynopsisSuggestionFormProps = {
@@ -17,6 +17,14 @@ type SynopsisSuggestionFormProps = {
   currentContent: string;
   /** Called when the user cancels or successfully submits. */
   onClose: () => void;
+  /** Wiki pages for `[[Page]]` autocomplete in the editor. */
+  wikiPages: { name: string; slug: string }[];
+  /** Slug of the parent serial, used to resolve wiki links in preview. */
+  serialSlug: string;
+  /** All chapters for `[[Chapter:Name]]` autocomplete. */
+  wikiChapters?: { name: string; idx: number }[];
+  /** The serial's chapter type label (e.g. "Chapter", "Episode"). */
+  chapterType?: string;
 };
 
 /**
@@ -31,7 +39,7 @@ type SynopsisSuggestionFormProps = {
  * />
  */
 export function SynopsisSuggestionForm(props: SynopsisSuggestionFormProps) {
-  const { chapterId, currentContent, onClose } = props;
+  const { chapterId, currentContent, onClose, wikiPages, serialSlug, wikiChapters, chapterType } = props;
 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -91,14 +99,16 @@ export function SynopsisSuggestionForm(props: SynopsisSuggestionFormProps) {
       </Box>
 
       <Box col className="gap-2">
-        <Label htmlFor="synopsis-draft">Proposed synopsis</Label>
-        <Textarea
-          id="synopsis-draft"
+        <Label>Proposed synopsis</Label>
+        <WikiLinkMDEditor
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={8}
-          disabled={isPending}
-          placeholder="Write the chapter synopsis here…"
+          onChange={(val) => setDraft(val ?? "")}
+          height={260}
+          preview="edit"
+          wikiPages={wikiPages}
+          serialSlug={serialSlug}
+          wikiChapters={wikiChapters}
+          chapterType={chapterType}
         />
       </Box>
 

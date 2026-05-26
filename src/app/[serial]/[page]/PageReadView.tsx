@@ -141,7 +141,6 @@ export function PageReadView(props: PageReadViewProps) {
           size="icon-xs"
           onClick={() => {
             setSelectedSuggestionIdx((i) => i - 1);
-            setShowSuggestionDetail(false);
           }}
           disabled={selectedSuggestionIdx === 0}
         >
@@ -153,7 +152,6 @@ export function PageReadView(props: PageReadViewProps) {
           size="icon-xs"
           onClick={() => {
             setSelectedSuggestionIdx((i) => i + 1);
-            setShowSuggestionDetail(false);
           }}
           disabled={selectedSuggestionIdx === totalSuggestions - 1}
         >
@@ -360,12 +358,14 @@ export function PageReadView(props: PageReadViewProps) {
             No child pages yet.
           </Text>
         )}
-        <Link
-          href={`/${serialSlug}/new?parentPageId=${pageId}`}
-          className="mt-3 text-sm text-primary hover:underline inline-block"
-        >
-          + New page
-        </Link>
+        {suggestionContext?.isAdmin && (
+          <Link
+            href={`/${serialSlug}/new?parentPageId=${pageId}`}
+            className="mt-3 text-sm text-primary hover:underline inline-block"
+          >
+            + New page
+          </Link>
+        )}
       </div>
     </div>
   );

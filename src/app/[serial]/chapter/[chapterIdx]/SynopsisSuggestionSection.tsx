@@ -20,6 +20,14 @@ type SynopsisSuggestionSectionProps = {
   currentContent: string;
   /** The current user's most recent synopsis suggestion for this chapter, or null. */
   mySuggestion: MySuggestion;
+  /** Wiki pages for editor autocomplete. */
+  wikiPages: { name: string; slug: string }[];
+  /** Slug of the parent serial. */
+  serialSlug: string;
+  /** All chapters for `[[Chapter:Name]]` autocomplete. */
+  wikiChapters?: { name: string; idx: number }[];
+  /** The serial's chapter type label. */
+  chapterType?: string;
 };
 
 /**
@@ -30,7 +38,7 @@ type SynopsisSuggestionSectionProps = {
  * <SynopsisSuggestionSection chapterId={7} currentContent="..." mySuggestion={null} />
  */
 export function SynopsisSuggestionSection(props: SynopsisSuggestionSectionProps) {
-  const { chapterId, currentContent, mySuggestion } = props;
+  const { chapterId, currentContent, mySuggestion, wikiPages, serialSlug, wikiChapters, chapterType } = props;
   const [showForm, setShowForm] = useState(false);
 
   const statusBanner = (() => {
@@ -80,6 +88,10 @@ export function SynopsisSuggestionSection(props: SynopsisSuggestionSectionProps)
           chapterId={chapterId}
           currentContent={currentContent}
           onClose={() => setShowForm(false)}
+          wikiPages={wikiPages}
+          serialSlug={serialSlug}
+          wikiChapters={wikiChapters}
+          chapterType={chapterType}
         />
       )}
     </Box>

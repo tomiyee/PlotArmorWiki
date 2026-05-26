@@ -353,6 +353,10 @@ export default async function ChapterPage({ params }: Props) {
                       chapterId={chapter.id}
                       currentContent={synopsisContent}
                       mySuggestion={mySynopsisSuggestion}
+                      wikiPages={wikiPages}
+                      serialSlug={serialSlug}
+                      wikiChapters={chapterList.map((c) => ({ name: c.displayName, idx: c.idx }))}
+                      chapterType={serial.chapterType}
                     />
                   )}
                 </Box>

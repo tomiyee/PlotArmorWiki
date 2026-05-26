@@ -14,6 +14,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { isSerialAdmin } from "@/lib/auth-guard";
 import { NewPageForm } from "./NewPageForm";
 
 interface Props {
@@ -35,6 +36,11 @@ export default async function NewPagePage({ params, searchParams }: Props) {
     .limit(1);
 
   if (!serial) {
+    notFound();
+  }
+
+  const adminStatus = await isSerialAdmin(serial.id);
+  if (!adminStatus) {
     notFound();
   }
 
