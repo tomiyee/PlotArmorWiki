@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -22,8 +23,17 @@ export default async function OnboardingPage() {
         <Text variant="h1" className="text-2xl mb-2">
           Welcome to PlotArmor Wiki!
         </Text>
-        <Text variant="body" muted className="mb-8">
+        <Text variant="body" muted className="mb-2">
           Choose a username to complete your profile.
+        </Text>
+        <Text variant="body" muted className="mb-8 text-sm">
+          New to PlotArmor?{" "}
+          <Link
+            href="/help#what-is-plotarmor"
+            className="text-primary hover:underline"
+          >
+            See how it works.
+          </Link>
         </Text>
         <UsernameForm />
       </PageContainer>
