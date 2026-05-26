@@ -21,7 +21,12 @@ import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageEditor } from "./PageEditor";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
-import { isSerialAdmin } from "@/lib/auth-guard";
+import { isSerialAdmin, isAuthenticated } from "@/lib/auth-guard";
+import {
+  getPendingSuggestionCount,
+  getPendingSuggestions,
+  getMyPageSuggestions,
+} from "./suggestionActions";
 
 interface Props {
   params: Promise<{ serial: string; page: string }>;
@@ -74,7 +79,7 @@ export default async function PageView({ params }: Props) {
     notFound();
   }
 
-  const [chapterCutoff, volumeList, chapterList, adminStatus] = await Promise.all([
+  const [chapterCutoff, volumeList, chapterList, adminStatus, authUserId] = await Promise.all([
     getChapterCutoff(serial.id),
     db
       .select({ id: volumes.id, displayName: volumes.displayName })
@@ -93,8 +98,10 @@ export default async function PageView({ params }: Props) {
       .where(eq(volumes.serialId, serial.id))
       .orderBy(asc(chapters.idx)),
     isSerialAdmin(serial.id),
+    isAuthenticated(),
   ]);
   const isAdmin = adminStatus;
+  const isUserAuthenticated = !!authUserId;
   const { cutoffIdx, readingChapterId } = chapterCutoff;
 
   // Build a structured chapter list for the chapter selector in edit mode.
@@ -594,6 +601,15 @@ export default async function PageView({ params }: Props) {
     title: r.title,
   }));
 
+  // ── Suggestion data ───────────────────────────────────────────────────────
+  // Fetch in parallel: pending count + full list for admins, user status for
+  // non-admins. Both functions are no-ops when the user lacks permission.
+  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] = await Promise.all([
+    isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
+    isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
+    !isAdmin && isUserAuthenticated ? getMyPageSuggestions(page.id) : Promise.resolve([]),
+  ]);
+
   return (
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
@@ -653,6 +669,10 @@ export default async function PageView({ params }: Props) {
             parentPages={parentPages}
             allSerialPages={allSerialPagesRaw}
             isAdmin={isAdmin}
+            isAuthenticated={isUserAuthenticated}
+            pendingSuggestionCount={pendingSuggestionCount}
+            pendingSuggestions={pendingSuggestions}
+            myPageSuggestions={myPageSuggestions}
           />
         </Box>
       </PageContainer>

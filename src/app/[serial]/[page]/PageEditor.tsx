@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
+import { Text } from "@/components/ui/Text";
 import { Select } from "@/components/ui/Select";
 import {
   savePageContent,
@@ -27,6 +28,7 @@ import {
   PageRelationshipsPanel,
   type ParentPageEntry,
 } from "./PageRelationshipsPanel";
+import { SuggestionReviewPanel } from "./SuggestionReviewPanel";
 import type {
   SectionData,
   FloaterRowData,
@@ -126,6 +128,54 @@ interface Props {
    * for resolving this value via `isSerialAdmin`.
    */
   isAdmin?: boolean;
+  /**
+   * Whether the current user is authenticated (but not necessarily an admin).
+   * When `true` and `isAdmin` is false, shows the "Suggest an Edit" button in
+   * read mode. Resolved by the parent via `isAuthenticated()` from auth-guard.
+   */
+  isAuthenticated?: boolean;
+  /**
+   * Number of pending suggestions for this page. Shown as a badge next to the
+   * edit mode controls when `isAdmin` is true and value > 0.
+   */
+  pendingSuggestionCount?: number;
+  /**
+   * Pre-fetched pending suggestions for this page, passed to `SuggestionReviewPanel`.
+   * Only populated when `isAdmin` is true.
+   */
+  pendingSuggestions?: {
+    id: number;
+    proposerUsername: string | null;
+    targetChapterId: number;
+    targetChapterName: string;
+    citation: string;
+    createdAt: Date;
+    sectionChanges: {
+      sectionId: number;
+      sectionName: string;
+      currentContent: string;
+      proposedContent: string;
+    }[];
+    infoboxChanges: {
+      infoboxSectionId: number;
+      infoboxSectionLabel: string;
+      currentContent: string;
+      proposedContent: string;
+    }[];
+  }[];
+  /**
+   * All suggestions the current non-admin user has submitted for this page,
+   * most recent first. Passed through to PageReadView for per-page status feedback.
+   */
+  myPageSuggestions?: {
+    id: number;
+    status: "pending" | "approved" | "rejected";
+    reviewNote: string | null;
+    createdAt: Date;
+    targetChapterName: string;
+    sectionChanges: { sectionName: string; proposedContent: string }[];
+    infoboxChanges: { label: string; proposedContent: string }[];
+  }[];
 }
 
 /**
@@ -188,6 +238,10 @@ export function PageEditor(props: Props) {
     isHomePage = false,
     editModeHeader,
     isAdmin = false,
+    isAuthenticated = false,
+    pendingSuggestionCount = 0,
+    pendingSuggestions = [],
+    myPageSuggestions = [],
   } = props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -219,6 +273,22 @@ export function PageEditor(props: Props) {
   );
 
   const hasInfobox = infoboxSectionStructure.length > 0;
+
+  // Filter pending suggestions to those whose target chapter is within the admin's
+  // reading cutoff. Suggestions targeting chapters beyond the cutoff could reveal
+  // spoilers (the content being proposed may reference future events).
+  const readingCutoffIdx =
+    allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
+  const visibleSuggestions = pendingSuggestions.filter((s) => {
+    const targetIdx = allChapters.find((c) => c.id === s.targetChapterId)?.idx;
+    return (
+      readingCutoffIdx === null ||
+      targetIdx === undefined ||
+      targetIdx <= readingCutoffIdx
+    );
+  });
+  const hiddenSuggestionCount =
+    pendingSuggestions.length - visibleSuggestions.length;
 
   // Compute dirty state: true when any draft differs from the server-provided value.
   const isDirty =
@@ -322,18 +392,46 @@ export function PageEditor(props: Props) {
 
   if (!isAdmin || !isEditing) {
     return (
-      <PageReadView
-        serialSlug={serialSlug}
-        sections={sections}
-        hasInfobox={hasInfobox}
-        floaterImageUrl={floaterImageUrl}
-        floaterRows={floaterRows}
-        childPages={childPages}
-        pageId={pageId}
-        pageTitles={pageTitles}
-        wikiChapters={wikiChaptersByName}
-        chapterType={chapterType}
-      />
+      <Box col className="gap-6">
+        <PageReadView
+          serialSlug={serialSlug}
+          sections={sections}
+          hasInfobox={hasInfobox}
+          floaterImageUrl={floaterImageUrl}
+          floaterRows={floaterRows}
+          childPages={childPages}
+          pageId={pageId}
+          pageTitles={pageTitles}
+          wikiChapters={wikiChaptersByName}
+          chapterType={chapterType}
+          suggestionContext={
+            isAuthenticated
+              ? {
+                  isAdmin,
+                  allChapters,
+                  readingChapterId: readingChapterId ?? null,
+                  wikiPagesList: wikiPages,
+                  wikiChaptersList: wikiChapters ?? [],
+                  myPageSuggestions: myPageSuggestions,
+                }
+              : undefined
+          }
+        />
+        {isAdmin && visibleSuggestions.length > 0 && (
+          <SuggestionReviewPanel
+            suggestions={visibleSuggestions}
+            serialSlug={serialSlug}
+          />
+        )}
+        {isAdmin && hiddenSuggestionCount > 0 && (
+          <Text as="div" className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            {hiddenSuggestionCount} pending{" "}
+            {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+            {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
+            current reading progress — advance your chapter to review them.
+          </Text>
+        )}
+      </Box>
     );
   }
 
@@ -343,8 +441,6 @@ export function PageEditor(props: Props) {
 
   // Chapters before the page's intro chapter are disabled — content can't predate the page.
   // Chapters beyond the reader's cutoff are also disabled — editors can't write spoilers.
-  const readingCutoffIdx =
-    allChapters.find((c) => c.id === readingChapterId)?.idx ?? null;
   const chapterSelectOptions: ChapterGroupOption[] = (() => {
     const volumeMap = new Map<
       string,
@@ -371,6 +467,16 @@ export function PageEditor(props: Props) {
   return (
     <Box col className="gap-6">
       {editModeHeader}
+
+      {isAdmin && pendingSuggestionCount > 0 && (
+        <Text as="div" className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          <Text as="span" className="font-medium">{pendingSuggestionCount}</Text>
+          {pendingSuggestionCount === 1
+            ? "pending suggestion"
+            : "pending suggestions"}{" "}
+          — see below
+        </Text>
+      )}
 
       {allChapters.length > 0 && (
         <Box className="items-center gap-3">
@@ -437,6 +543,21 @@ export function PageEditor(props: Props) {
         setDraftFloaterRowContent={setDraftFloaterRowContent}
         isPending={isPending}
       />
+
+      {visibleSuggestions.length > 0 && (
+        <SuggestionReviewPanel
+          suggestions={visibleSuggestions}
+          serialSlug={serialSlug}
+        />
+      )}
+      {hiddenSuggestionCount > 0 && (
+        <Text as="div" className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          {hiddenSuggestionCount} pending{" "}
+          {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+          {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
+          reading progress — advance your chapter to review them.
+        </Text>
+      )}
     </Box>
   );
 }

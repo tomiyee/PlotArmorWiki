@@ -18,7 +18,13 @@ import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { ChapterSynopsisEditor } from "./ChapterSynopsisEditor";
 import { saveChapterSynopsis } from "./actions";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
-import { isSerialAdmin } from "@/lib/auth-guard";
+import { isSerialAdmin, isAuthenticated } from "@/lib/auth-guard";
+import { SynopsisSuggestionSection } from "./SynopsisSuggestionSection";
+import { SynopsisReviewPanel } from "./SynopsisReviewPanel";
+import {
+  getMySynopsisSuggestion,
+  getPendingSynopsisSuggestions,
+} from "./synopsisSuggestionActions";
 import {
   addChapter,
   addVolume,
@@ -54,8 +60,9 @@ export default async function ChapterPage({ params }: Props) {
     notFound();
   }
 
-  const [isAdmin, [volumeList, chapterList]] = await Promise.all([
+  const [isAdmin, authenticatedUserId, [volumeList, chapterList]] = await Promise.all([
     isSerialAdmin(serial.id),
+    isAuthenticated(),
     Promise.all([
       db
         .select()
@@ -145,6 +152,8 @@ export default async function ChapterPage({ params }: Props) {
     pages: { id: number; name: string; slug: string }[];
   }[] = [];
   let boundSaveAction: ((content: string) => Promise<void>) | null = null;
+  let mySynopsisSuggestion: { id: number; status: "pending" | "approved" | "rejected"; reviewNote: string | null; createdAt: Date } | null = null;
+  let pendingSynopsisSuggestions: { id: number; proposerUsername: string | null; proposedContent: string; citation: string; createdAt: Date }[] = [];
 
   if (!spoilered) {
     // Fetch synopsis
@@ -238,6 +247,12 @@ export default async function ChapterPage({ params }: Props) {
     }
 
     boundSaveAction = saveChapterSynopsis.bind(null, serialSlug, chapterIdx);
+
+    // Fetch suggestion data in parallel.
+    [mySynopsisSuggestion, pendingSynopsisSuggestions] = await Promise.all([
+      getMySynopsisSuggestion(chapter.id),
+      getPendingSynopsisSuggestions(chapter.id),
+    ]);
   }
 
   return (
@@ -322,6 +337,28 @@ export default async function ChapterPage({ params }: Props) {
                     chapterType={serial.chapterType}
                     saveAction={boundSaveAction!}
                   />
+
+                  {/* Admin: pending synopsis suggestions */}
+                  {isAdmin && (
+                    <SynopsisReviewPanel
+                      suggestions={pendingSynopsisSuggestions}
+                      currentContent={synopsisContent}
+                      serialSlug={serialSlug}
+                    />
+                  )}
+
+                  {/* Non-admin authenticated users: suggestion form */}
+                  {authenticatedUserId && !isAdmin && (
+                    <SynopsisSuggestionSection
+                      chapterId={chapter.id}
+                      currentContent={synopsisContent}
+                      mySuggestion={mySynopsisSuggestion}
+                      wikiPages={wikiPages}
+                      serialSlug={serialSlug}
+                      wikiChapters={chapterList.map((c) => ({ name: c.displayName, idx: c.idx }))}
+                      chapterType={serial.chapterType}
+                    />
+                  )}
                 </Box>
 
                 {/* Introduced content */}

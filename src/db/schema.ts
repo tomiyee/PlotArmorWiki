@@ -359,3 +359,70 @@ export const serialAdmins = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.serialId] })],
 );
+
+/**
+ * A user-submitted suggestion to change section content on a wiki page.
+ * One suggestion can cover multiple sections via `page_suggestion_section_changes`.
+ * Admin review is the only spoiler gate — no server-side content filtering.
+ */
+export const pageSuggestions = pgTable('page_suggestions', {
+  id: serial('id').primaryKey(),
+  pageId: integer('page_id').notNull().references(() => pages.id),
+  proposedByUserId: text('proposed_by_user_id').notNull().references(() => users.id),
+  targetChapterId: integer('target_chapter_id').notNull().references(() => chapters.id),
+  status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
+  /** A quote, timestamp, or chapter reference supporting all proposed changes in this suggestion. */
+  citation: text('citation').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewedByUserId: text('reviewed_by_user_id').references(() => users.id),
+  reviewNote: text('review_note'),
+});
+
+/**
+ * One row per section changed in a suggestion.
+ * Unique per (suggestion, section) — a suggestion can only propose one change per section.
+ */
+export const pageSuggestionSectionChanges = pgTable(
+  'page_suggestion_section_changes',
+  {
+    id: serial('id').primaryKey(),
+    suggestionId: integer('suggestion_id').notNull().references(() => pageSuggestions.id, { onDelete: 'cascade' }),
+    sectionId: integer('section_id').notNull().references(() => pageSections.id),
+    proposedContent: text('proposed_content').notNull(),
+  },
+  (t) => [uniqueIndex().on(t.suggestionId, t.sectionId)],
+);
+
+/**
+ * One row per infobox row changed in a suggestion.
+ * Unique per (suggestion, infobox_section) — one proposed value per row.
+ */
+export const pageSuggestionInfoboxChanges = pgTable(
+  'page_suggestion_infobox_changes',
+  {
+    id: serial('id').primaryKey(),
+    suggestionId: integer('suggestion_id').notNull().references(() => pageSuggestions.id, { onDelete: 'cascade' }),
+    infoboxSectionId: integer('infobox_section_id').notNull().references(() => pageInfoboxSections.id),
+    proposedContent: text('proposed_content').notNull(),
+  },
+  (t) => [uniqueIndex().on(t.suggestionId, t.infoboxSectionId)],
+);
+
+/**
+ * A user-submitted suggestion to update a chapter's synopsis text.
+ * One pending suggestion per (user, chapter) — submitting again replaces the previous pending one.
+ */
+export const chapterSynopsisSuggestions = pgTable('chapter_synopsis_suggestions', {
+  id: serial('id').primaryKey(),
+  chapterId: integer('chapter_id').notNull().references(() => chapters.id),
+  serialId: integer('serial_id').notNull().references(() => serials.id),
+  proposedByUserId: text('proposed_by_user_id').notNull().references(() => users.id),
+  proposedContent: text('proposed_content').notNull(),
+  citation: text('citation').notNull(),
+  status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewedByUserId: text('reviewed_by_user_id').references(() => users.id),
+  reviewNote: text('review_note'),
+});

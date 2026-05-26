@@ -15,6 +15,13 @@
       "when": 1778813867067,
       "tag": "0001_big_post",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779693894249,
+      "tag": "0002_charming_black_queen",
+      "breakpoints": true
     }
   ]
 }

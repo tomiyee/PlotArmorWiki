@@ -56,6 +56,13 @@ import { AdminManager } from "@/components/AdminManager";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { auth } from "@/auth";
+import { getPendingSuggestionsByPage } from "./[page]/suggestionActions";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/Accordion";
 
 interface Props {
   params: Promise<{ serial: string }>;
@@ -104,6 +111,7 @@ export default async function SerialPage({ params }: Props) {
     isAdmin,
     serialAdminList,
     session,
+    pendingSuggestionsByPage,
   ] = await Promise.all([
     getChapterCutoff(serial.id),
     db
@@ -175,6 +183,7 @@ export default async function SerialPage({ params }: Props) {
       .where(eq(serialAdmins.serialId, serial.id))
       .orderBy(asc(serialAdmins.grantedAt)),
     auth(),
+    getPendingSuggestionsByPage(serial.id),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -623,6 +632,41 @@ export default async function SerialPage({ params }: Props) {
               updateMetadataAction={updateMetadataForSerial}
               isAdmin={isAdmin}
             />
+
+            {isAdmin && pendingSuggestionsByPage.length > 0 && (() => {
+              const total = pendingSuggestionsByPage.reduce((s, p) => s + p.count, 0);
+              return (
+                <Accordion className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 text-amber-700 dark:text-amber-400">
+                  <AccordionItem value="pending-suggestions" className="border-none">
+                    <AccordionTrigger className="text-sm font-medium hover:no-underline">
+                      <span>
+                        <span className="font-semibold">{total}</span>
+                        {" "}pending {total === 1 ? "suggestion" : "suggestions"} across{" "}
+                        <span className="font-semibold">{pendingSuggestionsByPage.length}</span>
+                        {" "}{pendingSuggestionsByPage.length === 1 ? "page" : "pages"}
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="flex flex-col gap-1 pt-1">
+                        {pendingSuggestionsByPage.map((p) => (
+                          <li key={p.pageId} className="flex items-center justify-between text-sm">
+                            <a
+                              href={`/${serialSlug}/${p.pageSlug}`}
+                              className="hover:underline font-medium"
+                            >
+                              {p.pageName}
+                            </a>
+                            <span className="text-xs text-amber-600 dark:text-amber-500">
+                              {p.count} {p.count === 1 ? "suggestion" : "suggestions"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              );
+            })()}
 
             {homePage ? (
               <PageEditor
