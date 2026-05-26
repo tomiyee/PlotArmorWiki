@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
@@ -271,6 +272,18 @@ export function SuggestionForm(props: SuggestionFormProps) {
             Cancel
           </Button>
         </Box>
+
+        <Text className="text-sm text-muted-foreground">
+          Suggestions are reviewed by a wiki admin before going live.{" "}
+          <Link
+            href="/help#suggesting-edits"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            How does this work?
+          </Link>
+        </Text>
 
         {/* Chapter selector */}
         {availableChapters.length > 0 && (
