@@ -12,7 +12,7 @@ export default async function OnboardingPage() {
     redirect("/api/auth/signin");
   }
 
-  // Already has a username -nothing to do here
+  // Already has a username — nothing to do here
   if (session.user.username !== null) {
     redirect("/");
   }

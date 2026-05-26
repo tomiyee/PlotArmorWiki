@@ -26,7 +26,7 @@ type MyPageSuggestion = {
  * Omit this prop entirely for anonymous or admin users.
  */
 type SuggestionContext = {
-  /** True when the viewer is an admin -hides the suggest button and status banner. */
+  /** True when the viewer is an admin — hides the suggest button and status banner. */
   isAdmin: boolean;
   /** All chapters for the "Writing as of:" selector. */
   allChapters: ChapterData[];
@@ -127,9 +127,7 @@ export function PageReadView(props: PageReadViewProps) {
   const allSuggestions = suggestionContext?.myPageSuggestions ?? [];
   const totalSuggestions = allSuggestions.length;
   const currentSuggestion =
-    totalSuggestions > 0
-      ? (allSuggestions[selectedSuggestionIdx] ?? null)
-      : null;
+    totalSuggestions > 0 ? (allSuggestions[selectedSuggestionIdx] ?? null) : null;
 
   // Prev/next pager shown when the user has submitted multiple suggestions.
   const suggestionPager =
@@ -172,10 +170,7 @@ export function PageReadView(props: PageReadViewProps) {
         currentSuggestion.sectionChanges.length > 0 ||
         currentSuggestion.infoboxChanges.length > 0;
       return (
-        <Text
-          as="div"
-          className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
-        >
+        <Text as="div" className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Text as="span">Your suggestion is pending admin review.</Text>
@@ -198,9 +193,7 @@ export function PageReadView(props: PageReadViewProps) {
               </Text>
               {currentSuggestion.sectionChanges.map((change, i) => (
                 <div key={i} className="flex flex-col gap-1">
-                  <Text className="text-xs font-medium">
-                    {change.sectionName}
-                  </Text>
+                  <Text className="text-xs font-medium">{change.sectionName}</Text>
                   <div className="rounded border border-border bg-background p-3 text-xs overflow-auto">
                     <MarkdownRenderer serialSlug={serialSlug} sm>
                       {change.proposedContent}
@@ -213,15 +206,8 @@ export function PageReadView(props: PageReadViewProps) {
                   <Text className="text-xs font-medium">Infobox changes</Text>
                   {currentSuggestion.infoboxChanges.map((change, i) => (
                     <div key={i} className="flex gap-2 text-xs">
-                      <Text
-                        as="span"
-                        className="font-medium text-muted-foreground shrink-0"
-                      >
-                        {change.label}:
-                      </Text>
-                      <span className="whitespace-pre-wrap">
-                        {change.proposedContent}
-                      </span>
+                      <Text as="span" className="font-medium text-muted-foreground shrink-0">{change.label}:</Text>
+                      <span className="whitespace-pre-wrap">{change.proposedContent}</span>
                     </div>
                   ))}
                 </div>
@@ -233,14 +219,9 @@ export function PageReadView(props: PageReadViewProps) {
     }
     if (status === "approved") {
       return (
-        <Text
-          as="div"
-          className="rounded-md border border-green-500/30 bg-green-50/50 dark:bg-green-950/20 px-4 py-3 text-sm text-green-700 dark:text-green-400"
-        >
+        <Text as="div" className="rounded-md border border-green-500/30 bg-green-50/50 dark:bg-green-950/20 px-4 py-3 text-sm text-green-700 dark:text-green-400">
           <div className="flex items-center justify-between gap-2">
-            <Text as="span">
-              Your suggestion was approved and applied to the page.
-            </Text>
+            <Text as="span">Your suggestion was approved and applied to the page.</Text>
             {suggestionPager}
           </div>
         </Text>
@@ -248,10 +229,7 @@ export function PageReadView(props: PageReadViewProps) {
     }
     if (status === "rejected") {
       return (
-        <Text
-          as="div"
-          className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-        >
+        <Text as="div" className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <div className="flex items-center justify-between gap-2">
             <Text as="span">Your suggestion was not accepted.</Text>
             {suggestionPager}
@@ -291,9 +269,7 @@ export function PageReadView(props: PageReadViewProps) {
                   </dt>
                   <dd className="text-foreground whitespace-pre-wrap">
                     {row.content || (
-                      <Text as="span" muted>
-                        —
-                      </Text>
+                      <Text as="span" muted>—</Text>
                     )}
                   </dd>
                 </div>

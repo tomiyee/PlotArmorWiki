@@ -7,7 +7,7 @@ import { createContext } from "react";
  * and the InsertWikiLinkButton toolbar component.
  *
  * Wrapped around MDXEditorClient so decorator elements and toolbar buttons
- * rendered inside Lexical can look up data without closure staleness -the
+ * rendered inside Lexical can look up data without closure staleness — the
  * Provider re-renders on every wikiPages/wikiChapters change, so consumers
  * always see fresh data regardless of the plugins useMemo deps.
  */

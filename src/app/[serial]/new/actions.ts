@@ -1,22 +1,15 @@
-"use server";
+'use server';
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { db } from "@/db/index";
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { db } from '@/db/index';
 import {
-  serials,
-  pages,
-  pageTitles,
-  pageRelationships,
-  pageSections,
-  pageInfoboxSections,
-  templates,
-  templateSections,
-  templateInfoboxSections,
-} from "@/db/schema";
-import { and, asc, eq, like } from "drizzle-orm";
-import { titleToSlug } from "@/lib/slug";
-import { requireSerialAdminBySlug } from "@/lib/auth-guard";
+  serials, pages, pageTitles, pageRelationships, pageSections, pageInfoboxSections,
+  templates, templateSections, templateInfoboxSections,
+} from '@/db/schema';
+import { and, asc, eq, like } from 'drizzle-orm';
+import { titleToSlug } from '@/lib/slug';
+import { requireSerialAdminBySlug } from '@/lib/auth-guard';
 
 /**
  * Generates a slug unique within the serial. If `titleToSlug(name)` already
@@ -26,10 +19,7 @@ import { requireSerialAdminBySlug } from "@/lib/auth-guard";
  * const slug = await generateUniqueSlug(42, 'Monkey D. Luffy');
  * // → 'monkey-d-luffy' (or 'monkey-d-luffy-2' on collision)
  */
-async function generateUniqueSlug(
-  serialId: number,
-  name: string,
-): Promise<string> {
+async function generateUniqueSlug(serialId: number, name: string): Promise<string> {
   const base = titleToSlug(name);
 
   // Fetch all existing slugs that start with base to check for collisions.
@@ -59,36 +49,30 @@ async function generateUniqueSlug(
  */
 export async function createPage(serialSlug: string, formData: FormData) {
   await requireSerialAdminBySlug(serialSlug);
-  const name = formData.get("name");
-  const introChapterIdRaw = formData.get("introChapterId");
-  const parentPageIdRaw = formData.get("parentPageId");
-  const templateIdRaw = formData.get("templateId");
+  const name = formData.get('name');
+  const introChapterIdRaw = formData.get('introChapterId');
+  const parentPageIdRaw = formData.get('parentPageId');
+  const templateIdRaw = formData.get('templateId');
 
-  if (!name || typeof name !== "string" || name.trim() === "") {
-    throw new Error("Page name is required");
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    throw new Error('Page name is required');
   }
-  if (!introChapterIdRaw || typeof introChapterIdRaw !== "string") {
-    throw new Error("Intro chapter is required");
+  if (!introChapterIdRaw || typeof introChapterIdRaw !== 'string') {
+    throw new Error('Intro chapter is required');
   }
 
   const introChapterId = parseInt(introChapterIdRaw, 10);
-  if (isNaN(introChapterId) || introChapterId <= 0)
-    throw new Error("Intro chapter is required");
+  if (isNaN(introChapterId) || introChapterId <= 0) throw new Error('Intro chapter is required');
 
-  if (
-    !parentPageIdRaw ||
-    typeof parentPageIdRaw !== "string" ||
-    parentPageIdRaw === ""
-  ) {
-    throw new Error("Parent page is required");
+  if (!parentPageIdRaw || typeof parentPageIdRaw !== 'string' || parentPageIdRaw === '') {
+    throw new Error('Parent page is required');
   }
   const parentPageId = parseInt(parentPageIdRaw, 10);
-  if (isNaN(parentPageId) || parentPageId <= 0)
-    throw new Error("Invalid parent page ID");
+  if (isNaN(parentPageId) || parentPageId <= 0) throw new Error('Invalid parent page ID');
 
-  // Optional template -empty string or missing means no template.
+  // Optional template — empty string or missing means no template.
   const templateId =
-    templateIdRaw && typeof templateIdRaw === "string" && templateIdRaw !== ""
+    templateIdRaw && typeof templateIdRaw === 'string' && templateIdRaw !== ''
       ? parseInt(templateIdRaw, 10)
       : null;
 
@@ -97,7 +81,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
     .from(serials)
     .where(eq(serials.slug, serialSlug))
     .limit(1);
-  if (!serial) throw new Error("Serial not found");
+  if (!serial) throw new Error('Serial not found');
 
   // Pre-fetch the template definition outside the transaction (read-only).
   let templateDef: {
@@ -110,26 +94,18 @@ export async function createPage(serialSlug: string, formData: FormData) {
     const [tmpl] = await db
       .select({ id: templates.id, hasInfobox: templates.hasInfobox })
       .from(templates)
-      .where(
-        and(eq(templates.id, templateId), eq(templates.serialId, serial.id)),
-      );
+      .where(and(eq(templates.id, templateId), eq(templates.serialId, serial.id)));
 
     if (tmpl) {
       const [tmplSections, tmplInfoboxSections] = await Promise.all([
         db
-          .select({
-            name: templateSections.name,
-            displayOrder: templateSections.displayOrder,
-          })
+          .select({ name: templateSections.name, displayOrder: templateSections.displayOrder })
           .from(templateSections)
           .where(eq(templateSections.templateId, tmpl.id))
           .orderBy(asc(templateSections.displayOrder)),
         tmpl.hasInfobox
           ? db
-              .select({
-                label: templateInfoboxSections.label,
-                displayOrder: templateInfoboxSections.displayOrder,
-              })
+              .select({ label: templateInfoboxSections.label, displayOrder: templateInfoboxSections.displayOrder })
               .from(templateInfoboxSections)
               .where(eq(templateInfoboxSections.templateId, tmpl.id))
               .orderBy(asc(templateInfoboxSections.displayOrder))
@@ -158,7 +134,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
       })
       .returning({ id: pages.id });
 
-    if (!newPage) throw new Error("Failed to insert page");
+    if (!newPage) throw new Error('Failed to insert page');
 
     // 2. Insert the initial title into page_titles.
     await tx.insert(pageTitles).values({
@@ -188,7 +164,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
     } else {
       await tx.insert(pageSections).values({
         pageId: newPage.id,
-        name: "Summary",
+        name: 'Summary',
         displayOrder: 0,
       });
     }
@@ -205,6 +181,6 @@ export async function createPage(serialSlug: string, formData: FormData) {
     }
   });
 
-  revalidatePath(`/${serialSlug}`, "layout");
+  revalidatePath(`/${serialSlug}`, 'layout');
   redirect(`/${serialSlug}/${encodeURIComponent(slug)}`);
 }

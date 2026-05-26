@@ -93,14 +93,14 @@ function Menu(props: MenuProps) {
 // ---------------------------------------------------------------------------
 
 interface MenuItemBaseProps extends React.ComponentProps<"button"> {
-  /** Discriminant -omit or set `false` for a regular item. */
+  /** Discriminant — omit or set `false` for a regular item. */
   group?: false;
   /** Highlights the item as the currently active selection. */
   selected?: boolean;
 }
 
 interface MenuItemGroupProps {
-  /** Discriminant -must be `true` to render as a collapsible group header row. */
+  /** Discriminant — must be `true` to render as a collapsible group header row. */
   group: true;
   /** Header text rendered on the collapsible group row. */
   label: React.ReactNode;

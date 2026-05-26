@@ -37,7 +37,7 @@ interface EditModeContextValue {
   toggle: () => void;
   /**
    * Register save/discard callbacks for the currently mounted editable component.
-   * Returns a deregister function -call it in a useEffect cleanup.
+   * Returns a deregister function — call it in a useEffect cleanup.
    */
   registerHandlers: (handlers: EditHandlers) => () => void;
   /** Calls all registered onSave handlers then exits edit mode. */
@@ -61,7 +61,7 @@ const EditModeContext = createContext<EditModeContextValue | null>(null);
  * components register save/discard callbacks via `registerHandlers`; the
  * `<EditModeFAB>` calls `save()` or `discard()` to invoke them.
  *
- * Also tracks `isAdmin` -set by `<EditModeAdminSetter>` from each page —
+ * Also tracks `isAdmin` — set by `<EditModeAdminSetter>` from each page —
  * so the FAB and edit controls are hidden for non-admin visitors.
  *
  * Intercepts in-app `<a>` clicks when `isEditing && isDirty` and shows a
@@ -216,7 +216,7 @@ export function useEditMode(): EditModeContextValue {
  * `EditModeContext`. Render it inside any Server Component that knows the
  * admin status; it syncs on mount and whenever the value changes.
  *
- * Renders nothing -it exists purely for the side-effect of calling `setIsAdmin`.
+ * Renders nothing — it exists purely for the side-effect of calling `setIsAdmin`.
  * The cleanup also resets `isEditing` so edit mode does not leak across page
  * navigations when an admin clicks a wiki link or the TOC.
  *

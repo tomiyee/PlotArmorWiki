@@ -31,7 +31,7 @@ export interface WikiLinkPreviewData {
 
 /**
  * Fetches a compact preview of a wiki page for use in hover cards.
- * Respects the user's chapter cutoff cookie -hidden pages return `hidden: true`
+ * Respects the user's chapter cutoff cookie — hidden pages return `hidden: true`
  * so the UI can display a spoiler-safe placeholder instead.
  *
  * Returns `null` when the serial/page cannot be resolved (e.g. a wiki link
@@ -71,11 +71,7 @@ export async function getWikiLinkPreview(
 
   // Resolve page by slug within the serial
   const [page] = await db
-    .select({
-      id: pages.id,
-      name: pages.name,
-      introChapterId: pages.introChapterId,
-    })
+    .select({ id: pages.id, name: pages.name, introChapterId: pages.introChapterId })
     .from(pages)
     .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
     .limit(1);
@@ -198,10 +194,7 @@ export async function getWikiLinkPreview(
       db
         .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
         .from(pageInfoboxImageRevisions)
-        .innerJoin(
-          chapters,
-          eq(pageInfoboxImageRevisions.chapterId, chapters.id),
-        )
+        .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
         .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
         .where(eq(pageInfoboxImageRevisions.pageId, page.id))
         .limit(1),
@@ -260,7 +253,7 @@ export interface ChapterLinkPreviewData {
 
 /**
  * Fetches a compact preview for a chapter link (`/{serial}/chapter/{idx}`).
- * Respects the user's chapter cutoff -chapters beyond the cutoff return
+ * Respects the user's chapter cutoff — chapters beyond the cutoff return
  * `hidden: true` so the UI can show a spoiler-safe placeholder.
  *
  * Returns `null` when the serial or chapter cannot be resolved.

@@ -1,53 +1,46 @@
-"use server";
+'use server';
 
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { db } from "@/db/index";
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { db } from '@/db/index';
 import {
-  serials,
-  serialAuthors,
-  pages,
-  pageSections,
-  pageSectionRevisions,
-  volumes,
-  chapters,
-  serialAdmins,
-} from "@/db/schema";
-import { titleToSlug } from "@/lib/slug";
-import { parseChapterType, parseVolumeType } from "@/lib/serial-types";
-import { auth } from "@/auth";
+  serials, serialAuthors, pages, pageSections, pageSectionRevisions,
+  volumes, chapters, serialAdmins,
+} from '@/db/schema';
+import { titleToSlug } from '@/lib/slug';
+import { parseChapterType, parseVolumeType } from '@/lib/serial-types';
+import { auth } from '@/auth';
 
 /**
  * Creates a new serial and its home page, seeding a "Description" section.
  * If the user provides description text, a first volume + chapter are
  * auto-created (e.g. "Volume 1" / "Chapter 1") so the content revision can be
- * stored immediately -section revisions require a chapter_id.
+ * stored immediately — section revisions require a chapter_id.
  *
  * @example
  * <form action={createSerial}>…</form>
  */
 export async function createSerial(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id)
-    throw new Error("Unauthorized: sign in to create a serial.");
+  if (!session?.user?.id) throw new Error('Unauthorized: sign in to create a serial.');
 
-  const title = formData.get("title");
-  if (!title || typeof title !== "string" || title.trim() === "") {
-    throw new Error("Title is required");
+  const title = formData.get('title');
+  if (!title || typeof title !== 'string' || title.trim() === '') {
+    throw new Error('Title is required');
   }
 
-  const splashArtUrl = formData.get("splashArtUrl");
-  const chapterType = parseChapterType(formData.get("chapterType"));
-  const volumeType = parseVolumeType(formData.get("volumeType"));
+  const splashArtUrl = formData.get('splashArtUrl');
+  const chapterType = parseChapterType(formData.get('chapterType'));
+  const volumeType = parseVolumeType(formData.get('volumeType'));
 
-  const descriptionRaw = formData.get("description");
+  const descriptionRaw = formData.get('description');
   const description =
-    descriptionRaw && typeof descriptionRaw === "string"
+    descriptionRaw && typeof descriptionRaw === 'string'
       ? descriptionRaw.trim()
-      : "";
+      : '';
 
-  // authors is a multi-value field -filter out blank entries
-  const authorValues = formData.getAll("authors") as string[];
+  // authors is a multi-value field — filter out blank entries
+  const authorValues = formData.getAll('authors') as string[];
   const filteredAuthors = authorValues
     .map((a) => a.trim())
     .filter((a) => a.length > 0);
@@ -60,7 +53,9 @@ export async function createSerial(formData: FormData) {
       title: title.trim(),
       slug,
       splashArtUrl:
-        splashArtUrl && typeof splashArtUrl === "string" && splashArtUrl.trim()
+        splashArtUrl &&
+        typeof splashArtUrl === 'string' &&
+        splashArtUrl.trim()
           ? splashArtUrl.trim()
           : null,
       chapterType,
@@ -80,7 +75,7 @@ export async function createSerial(formData: FormData) {
         serialId: inserted.id,
         name,
         displayOrder: i + 1,
-      })),
+      }))
     );
   }
 
@@ -90,8 +85,8 @@ export async function createSerial(formData: FormData) {
     .insert(pages)
     .values({
       serialId: inserted.id,
-      name: "Home",
-      slug: "home",
+      name: 'Home',
+      slug: 'home',
       introChapterId: null,
       isHomePage: true,
     })
@@ -100,7 +95,7 @@ export async function createSerial(formData: FormData) {
   // Seed the home page with a "Description" section.
   const [descriptionSection] = await db
     .insert(pageSections)
-    .values({ pageId: homePage.id, name: "Description", displayOrder: 0 })
+    .values({ pageId: homePage.id, name: 'Description', displayOrder: 0 })
     .returning({ id: pageSections.id });
 
   // If description text was provided, auto-create the first volume + chapter
@@ -124,12 +119,12 @@ export async function createSerial(formData: FormData) {
     });
 
     // Pre-set the progress cookie so the SSR render after redirect uses cutoffIdx=1
-    // and shows the description immediately -without this, no cookie exists on first
+    // and shows the description immediately — without this, no cookie exists on first
     // visit and cutoffIdx defaults to 0, which is below ch1.idx=1.
     const cookieStore = await cookies();
     cookieStore.set(`plotarmor_chapter_${inserted.id}`, String(ch1.id), {
-      path: "/",
-      sameSite: "lax",
+      path: '/',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 365,
     });
   }

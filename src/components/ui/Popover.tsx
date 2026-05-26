@@ -67,9 +67,9 @@ export type PopoverProps = BasePopoverProps &
 /**
  * Composable popover with two usage modes:
  *
- * **Trigger mode** -wraps `children` as the click trigger; manages its own open state.
+ * **Trigger mode** — wraps `children` as the click trigger; manages its own open state.
  *
- * **Anchor mode** -anchors to an existing DOM ref and delegates open state to the
+ * **Anchor mode** — anchors to an existing DOM ref and delegates open state to the
  * caller. Used by `Combobox` to position a dropdown under an input without a
  * separate trigger element.
  *

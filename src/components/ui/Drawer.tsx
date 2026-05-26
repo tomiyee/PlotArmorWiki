@@ -17,7 +17,7 @@ interface DrawerProps {
 
 /**
  * Directional sheet drawer built on Base UI's Drawer primitive.
- * Handles the portal, backdrop, and popup chrome -pass inner content as children.
+ * Handles the portal, backdrop, and popup chrome — pass inner content as children.
  * Fully controlled: manage open state externally and trigger open via any button.
  *
  * @example

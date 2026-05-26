@@ -49,7 +49,7 @@ async function getSerialIdByPageId(pageId: number): Promise<number> {
 
 /**
  * Submits a suggestion to change one or more sections or infobox rows on a wiki page.
- * Requires the caller to be authenticated but NOT an admin -admins use
+ * Requires the caller to be authenticated but NOT an admin — admins use
  * `savePageContent` directly.
  *
  * @example
@@ -240,7 +240,7 @@ export async function getPendingSuggestionCount(
 /**
  * Returns all pending suggestions for a page, with proposer username,
  * per-section proposed changes, and per-infobox-row proposed changes.
- * Admin-only -returns empty array otherwise.
+ * Admin-only — returns empty array otherwise.
  *
  * @example
  * const suggestions = await getPendingSuggestions(42);
@@ -477,7 +477,7 @@ export async function getPendingSuggestions(pageId: number): Promise<
  * Requires admin access to the page's serial.
  *
  * @example
- * await approveSuggestion(5, "Looks accurate -verified against ch. 5 text.");
+ * await approveSuggestion(5, "Looks accurate — verified against ch. 5 text.");
  */
 export async function approveSuggestion(
   suggestionId: number,
@@ -678,7 +678,7 @@ export async function getPendingSuggestionsByPage(
 /**
  * Resolves the active sections and infobox rows with their current content at a
  * given chapter cutoff, for pre-filling the suggestion form. Does not require
- * auth -any authenticated user can read existing section content.
+ * auth — any authenticated user can read existing section content.
  *
  * @example
  * const { sections, infoboxSections } = await getSectionsAtChapter(42, chapterId);

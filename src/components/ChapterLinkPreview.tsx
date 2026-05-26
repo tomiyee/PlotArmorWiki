@@ -12,7 +12,7 @@ type ChapterLinkPreviewProps = {
   href: string;
   /** Link label text. */
   children: React.ReactNode;
-  /** Serial slug -used to fetch the preview. */
+  /** Serial slug — used to fetch the preview. */
   serialSlug: string;
   /** Numeric chapter idx from the URL path segment. */
   chapterIdx: number;
@@ -22,7 +22,7 @@ type ChapterLinkPreviewProps = {
  * Wraps a chapter wiki-link anchor with a hover card that lazily fetches and
  * displays a compact chapter preview (display name, volume, synopsis snippet).
  *
- * Respects the user's chapter cutoff -chapters beyond the cutoff show a
+ * Respects the user's chapter cutoff — chapters beyond the cutoff show a
  * spoiler-safe placeholder. Non-existent chapters show a "not found" message.
  *
  * @example

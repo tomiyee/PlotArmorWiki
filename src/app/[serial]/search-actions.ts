@@ -18,7 +18,7 @@ export interface PageSearchResult {
  * Returns all non-home wiki pages in the given serial that are visible at the
  * user's current chapter cutoff (read from the progress cookie set by
  * ChapterSelector). Pages whose intro chapter is beyond the cutoff are
- * excluded -the same spoiler rule used by page rendering.
+ * excluded — the same spoiler rule used by page rendering.
  *
  * Cutoff falls back to idx=0 when no progress cookie exists, so only pages
  * with no intro chapter (impossible in practice) would appear on first visit.
@@ -61,7 +61,7 @@ export async function getVisiblePages(
     .where(
       and(
         eq(pages.serialId, serial.id),
-        // Exclude the home page -users navigate to it via the serial breadcrumb.
+        // Exclude the home page — users navigate to it via the serial breadcrumb.
         eq(pages.isHomePage, false),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
       ),
@@ -80,9 +80,7 @@ export async function getVisiblePages(
     })
     .from(pageTitles)
     .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .where(
-      and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)),
-    )
+    .where(and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)))
     .groupBy(pageTitles.pageId)
     .as("title_max_idx_sq");
 

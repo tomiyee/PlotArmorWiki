@@ -15,10 +15,10 @@ import {
  * serial.
  *
  * Supported syntaxes:
- * - `[[PageName]]` or `[[page:PageName]]` -wiki page link (`/{serial}/{slug}`)
- * - `[[Chapter:Chapter 5]]` -chapter link (`/{serial}/chapter/{idx}`); the
+ * - `[[PageName]]` or `[[page:PageName]]` — wiki page link (`/{serial}/{slug}`)
+ * - `[[Chapter:Chapter 5]]` — chapter link (`/{serial}/chapter/{idx}`); the
  *   category keyword must match the serial's `chapterType` value.
- * - `[[Target|alias]]` -alias overrides the display text for any form above.
+ * - `[[Target|alias]]` — alias overrides the display text for any form above.
  *
  * When `pageTitles` is supplied, a page link with no explicit alias resolves
  * its display text from the map (slug → chapter-versioned title at the current
@@ -62,7 +62,7 @@ export function remarkWikiLinks(
         // Chapter link: category matches the serial's chapterType.
         if (chapterType && isChapterCategory(parts.category, chapterType)) {
           const idx = chapters?.[parts.page];
-          if (idx === undefined) return false; // unknown chapter -leave as text
+          if (idx === undefined) return false; // unknown chapter — leave as text
           const displayText = parts.alias ?? parts.page;
           return {
             type: "link",

@@ -2,11 +2,11 @@
 
 A wiki platform for serial entertainment (books, TV shows, etc.) that protects readers from spoilers by only surfacing information up to a chapter they choose.
 
-Standard wikis always show the latest state of any character, location, or other entry -a problem for readers mid-series. PlotArmor solves this by treating every piece of wiki content as a time series tied to specific chapters, so the wiki renders a snapshot of the world as of any point in the story.
+Standard wikis always show the latest state of any character, location, or other entry — a problem for readers mid-series. PlotArmor solves this by treating every piece of wiki content as a time series tied to specific chapters, so the wiki renders a snapshot of the world as of any point in the story.
 
 ## How it works
 
-Users set a **progress cutoff** -the chapter they are currently on. All wiki content, search results, and links are then filtered to that point:
+Users set a **progress cutoff** — the chapter they are currently on. All wiki content, search results, and links are then filtered to that point:
 
 - Pages whose subject hasn't been introduced yet are hidden entirely (title included).
 - Search results exclude pages beyond the user's current chapter.
@@ -16,11 +16,11 @@ Progress is stored in `localStorage` for anonymous users and synced to their acc
 
 ## Key concepts
 
-| Term        | Definition                                                |
-| ----------- | --------------------------------------------------------- |
-| **Serial**  | The story a wiki covers (a book series, TV show, etc.)    |
-| **Chapter** | A single installment -episode, book chapter, volume, etc. |
-| **Page**    | A single wiki entry within a serial                       |
+| Term | Definition |
+|------|------------|
+| **Serial** | The story a wiki covers (a book series, TV show, etc.) |
+| **Chapter** | A single installment — episode, book chapter, volume, etc. |
+| **Page** | A single wiki entry within a serial |
 
 ### Pages
 
@@ -28,8 +28,8 @@ Each serial has a home page (the root of the wiki DAG) and any number of child p
 
 Pages contain two optional layout components:
 
-- **Sections** -an ordered list of named sections, each storing Markdown text.
-- **Infobox** _(optional)_ -a sidebar panel with an image and labeled rows.
+- **Sections** — an ordered list of named sections, each storing Markdown text.
+- **Infobox** *(optional)* — a sidebar panel with an image and labeled rows.
 
 ### URL structure
 
@@ -42,7 +42,7 @@ Pages contain two optional layout components:
 
 ## Data model
 
-Content versioning uses **single-timestamp versioning**: every content row carries a single `chapter_id` -the chapter when that value was introduced or last changed. At most one revision per `(page, section, chapter)` tuple (enforced by PK). To read a value at chapter N, find the revision with the highest `chapter.idx` ≤ N:
+Content versioning uses **single-timestamp versioning**: every content row carries a single `chapter_id` — the chapter when that value was introduced or last changed. At most one revision per `(page, section, chapter)` tuple (enforced by PK). To read a value at chapter N, find the revision with the highest `chapter.idx` ≤ N:
 
 ```sql
 SELECT ... GROUP BY section_id HAVING chapters.idx = MAX(chapters.idx)
@@ -90,16 +90,16 @@ For the full design spec, see [spec.md](spec.md).
 
 ## Tech stack
 
-| Layer         | Choice                                                |
-| ------------- | ----------------------------------------------------- |
-| Framework     | Next.js 16 (App Router)                               |
-| Database      | PostgreSQL                                            |
-| ORM           | Drizzle ORM                                           |
-| Auth          | Auth.js (NextAuth v5)                                 |
-| Search        | PostgreSQL full-text search                           |
-| Styling       | Tailwind CSS v4                                       |
+| Layer | Choice |
+|-------|--------|
+| Framework | Next.js 16 (App Router) |
+| Database | PostgreSQL |
+| ORM | Drizzle ORM |
+| Auth | Auth.js (NextAuth v5) |
+| Search | PostgreSQL full-text search |
+| Styling | Tailwind CSS v4 |
 | UI components | Base UI + custom design system (`src/components/ui/`) |
-| Hosting       | Vercel                                                |
+| Hosting | Vercel |
 
 Rationale for each decision is in [spec.md § Tech Stack](spec.md#tech-stack).
 
@@ -112,7 +112,6 @@ npm install
 Create `.env.local` with your database connection string and Auth.js secrets.
 
 **Production/staging:**
-
 ```
 DATABASE_URL=postgres://<user>:<password>@<host>/<db>?sslmode=require
 AUTH_SECRET=<random-secret>
@@ -122,7 +121,6 @@ AUTH_URL=https://<your-domain>
 ```
 
 **Local Docker (development):**
-
 ```
 DATABASE_URL=postgres://postgres:secret@localhost:5432/plotarmor
 AUTH_SECRET=<random-secret>
@@ -168,14 +166,12 @@ Two pairs of scripts let you snapshot and restore the local Docker database for 
 Dumps the running container's database to a plain-SQL file under `db-snapshots/` (the directory is git-ignored).
 
 **Linux / macOS / WSL (bash):**
-
 ```bash
 ./scripts/save-db.sh                          # auto-named: db-snapshots/2024-01-15_14-30-00.sql
 ./scripts/save-db.sh db-snapshots/my-seed.sql # custom path
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
 .\scripts\save-db.ps1                                      # auto-named
 .\scripts\save-db.ps1 -OutputFile db-snapshots\my-seed.sql  # custom path
@@ -186,7 +182,6 @@ Dumps the running container's database to a plain-SQL file under `db-snapshots/`
 Drops and recreates the database, then loads the specified dump. Prompts for confirmation unless `--force` / `-Force` is passed.
 
 **Linux / macOS / WSL (bash):**
-
 ```bash
 ./scripts/load-db.sh                                   # interactive picker from db-snapshots/
 ./scripts/load-db.sh db-snapshots/my-seed.sql          # load a specific file
@@ -194,7 +189,6 @@ Drops and recreates the database, then loads the specified dump. Prompts for con
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
 .\scripts\load-db.ps1                                              # interactive picker from db-snapshots\
 .\scripts\load-db.ps1 -InputFile db-snapshots\my-seed.sql          # load a specific file

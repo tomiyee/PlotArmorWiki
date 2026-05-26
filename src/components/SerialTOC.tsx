@@ -59,7 +59,7 @@ export function SerialTOC(props: SerialTOCProps) {
   if (visibleVolumes.length === 0) {
     return (
       <Text muted className="text-sm">
-        No {chapterType.toLowerCase()}s yet -add your first one below.
+        No {chapterType.toLowerCase()}s yet — add your first one below.
       </Text>
     );
   }
