@@ -26,7 +26,7 @@ type Props = {
 /**
  * Form for creating a new serial wiki.
  *
- * Accepts an optional `defaultTitle` to pre-fill and focus the title field —
+ * Accepts an optional `defaultTitle` to pre-fill and focus the title field -
  * used when the user is redirected here after a no-results search.
  *
  * @example

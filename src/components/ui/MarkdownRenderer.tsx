@@ -131,7 +131,9 @@ const COMPONENTS: Components = {
       {children}
     </th>
   ),
-  td: ({ children }) => <td className="px-3 py-2 text-foreground/80">{children}</td>,
+  td: ({ children }) => (
+    <td className="px-3 py-2 text-foreground/80">{children}</td>
+  ),
 };
 
 const SM_COMPONENTS: Components = {
@@ -158,7 +160,9 @@ const SM_COMPONENTS: Components = {
     </h4>
   ),
   p: ({ children }) => (
-    <p className="mb-3 text-sm leading-relaxed text-foreground/80">{children}</p>
+    <p className="mb-3 text-sm leading-relaxed text-foreground/80">
+      {children}
+    </p>
   ),
   ul: ({ children }) => (
     <ul className="list-disc list-outside pl-5 mb-3 space-y-0.5 text-sm text-foreground/80">
@@ -217,7 +221,7 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
       }
     }
 
-    // Page link: /{serial}/{encodedPage} — no further slash
+    // Page link: /{serial}/{encodedPage} - no further slash
     const rest = href.slice(prefix.length);
     if (rest && !rest.includes("/")) {
       const pageName = decodeURIComponent(rest);
@@ -242,7 +246,7 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
 
 /**
  * Renders a markdown string as styled HTML using explicit Tailwind utility
- * classes on each element — does not depend on @tailwindcss/typography so
+ * classes on each element - does not depend on @tailwindcss/typography so
  * heading sizes and weights are always correct.
  *
  * When `serialSlug` is provided, wiki link syntax is converted to clickable
@@ -273,7 +277,10 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
   const remarkPlugins: PluggableList = [remarkGfm];
   if (serialSlug) {
     remarkPlugins.push(
-      remarkWikiLinks(serialSlug, pageTitles, { chapterType, chapters: wikiChapters }),
+      remarkWikiLinks(serialSlug, pageTitles, {
+        chapterType,
+        chapters: wikiChapters,
+      }),
     );
   }
 

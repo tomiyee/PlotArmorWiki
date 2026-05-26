@@ -14,9 +14,9 @@ Traditional wikis always display the latest known state of characters, locations
 
 ### Definitions
 
-- **Serial** — a complete story or franchise.
-- **Volume** — a collection of chapters.
-- **Chapter** — the smallest progression unit in a serial.
+- **Serial** - a complete story or franchise.
+- **Volume** - a collection of chapters.
+- **Chapter** - the smallest progression unit in a serial.
 
 The exact terminology for Chapter and Volume can change per Serial. For example, for a TV show, it could be Seasons and Episodes. For a book series, it could be Books and Chapters.
 
@@ -179,8 +179,8 @@ All other pages:
 
 The home page has two permanent constraints that restrict its edit UI:
 
-- **No title renaming** — The home page slug is fixed and canonical (`/{serial}`). Its name cannot be changed, so the Titles panel is hidden in edit mode.
-- **No parent relationships** — The home page is the DAG root and can never have a parent. The Relationships panel is hidden in edit mode.
+- **No title renaming** - The home page slug is fixed and canonical (`/{serial}`). Its name cannot be changed, so the Titles panel is hidden in edit mode.
+- **No parent relationships** - The home page is the DAG root and can never have a parent. The Relationships panel is hidden in edit mode.
 
 In edit mode on the serial index page, Page Templates are shown above the "Writing as of:" selector so administrators can manage templates before editing content.
 
@@ -265,20 +265,20 @@ Templates are manageable from the serial index page by administrators in edit mo
 
 # Contributor Suggestions
 
-Authenticated non-admin users can propose content changes for admin review. Suggestions never go live without an explicit admin approval — admin review is the sole spoiler gate.
+Authenticated non-admin users can propose content changes for admin review. Suggestions never go live without an explicit admin approval - admin review is the sole spoiler gate.
 
 ## What can be suggested
 
-- **Wiki page sections** — one or more body section edits per suggestion.
-- **Infobox rows** — proposed values for any row on the page's infobox.
-- **Chapter synopses** — a proposed replacement for the synopsis text on a chapter page.
+- **Wiki page sections** - one or more body section edits per suggestion.
+- **Infobox rows** - proposed values for any row on the page's infobox.
+- **Chapter synopses** - a proposed replacement for the synopsis text on a chapter page.
 
 ## Suggestion workflow
 
 1. A logged-in non-admin clicks "Suggest an edit" on a wiki page or "Suggest an edit to the synopsis" on a chapter page.
 2. They edit the content (using the same WYSIWYG editor as admins for body sections; plain text for infobox rows and synopses), select a "Writing as of:" target chapter, and provide a required citation.
 3. On submit, a pending suggestion record is created. The contributor sees a status banner indicating their suggestion is under review.
-4. The admin reviews suggestions inline — on the wiki page itself (in the admin review panel below the page body) or on the chapter page (in the synopsis review panel). The panel shows a before/after diff for each changed field.
+4. The admin reviews suggestions inline - on the wiki page itself (in the admin review panel below the page body) or on the chapter page (in the synopsis review panel). The panel shows a before/after diff for each changed field.
 5. Approving a suggestion writes the proposed content directly into the appropriate revision table at the target chapter (same upsert as a direct admin save). Rejecting accepts an optional review note shown to the contributor.
 
 ## Data model
@@ -343,7 +343,7 @@ This behavior is intentional.
 
 # Technical Stack
 
-## Frontend Framework — Next.js (App Router)
+## Frontend Framework - Next.js (App Router)
 
 Reasons:
 
@@ -359,7 +359,7 @@ Example route:
 
 ---
 
-## Database — PostgreSQL
+## Database - PostgreSQL
 
 Chosen for:
 
@@ -370,7 +370,7 @@ Chosen for:
 
 ---
 
-## ORM — Drizzle ORM
+## ORM - Drizzle ORM
 
 Chosen because:
 
@@ -380,7 +380,7 @@ Chosen because:
 
 ---
 
-## Authentication — Auth.js (NextAuth v5)
+## Authentication - Auth.js (NextAuth v5)
 
 Responsibilities:
 
@@ -390,7 +390,7 @@ Responsibilities:
 
 ---
 
-## Search — PostgreSQL Full-Text Search
+## Search - PostgreSQL Full-Text Search
 
 Chosen because:
 

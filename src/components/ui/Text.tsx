@@ -26,7 +26,7 @@ type TextProps<C extends React.ElementType> = {
   variant?: TextVariant;
   /** Override the rendered HTML element. Defaults to the element for the chosen variant. */
   as?: C;
-  /** Apply `text-muted-foreground` — useful for secondary or helper text. */
+  /** Apply `text-muted-foreground` - useful for secondary or helper text. */
   muted?: boolean;
   /** Extra classes merged onto the rendered element. */
   className?: string;

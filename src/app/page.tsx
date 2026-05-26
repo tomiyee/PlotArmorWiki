@@ -15,9 +15,12 @@ export default async function Home() {
       <PageContainer className="flex flex-col items-center gap-6 py-16">
         <Text variant="h1">Find a wiki</Text>
         <Text muted className="text-center max-w-md">
-          PlotArmor is a spoiler-safe wiki — every reader sets a chapter cutoff
+          PlotArmor is a spoiler-safe wiki - every reader sets a chapter cutoff
           and sees only content up to that point.{" "}
-          <Link href="/help#what-is-plotarmor" className="text-primary hover:underline">
+          <Link
+            href="/help#what-is-plotarmor"
+            className="text-primary hover:underline"
+          >
             What does that mean?
           </Link>
         </Text>

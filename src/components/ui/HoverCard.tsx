@@ -21,7 +21,7 @@ interface HoverCardProps {
  * Unlike `<Tooltip>`, the popup can receive pointer events and display
  * interactive content.
  *
- * Delay is 400 ms open / 300 ms close — long enough to avoid noise when
+ * Delay is 400 ms open / 300 ms close - long enough to avoid noise when
  * mousing past links, short enough to feel responsive when intentional.
  *
  * @example

@@ -12,7 +12,7 @@ interface Props {
   href: string;
   /** Link label text. */
   children: React.ReactNode;
-  /** Serial slug — used to fetch the preview. */
+  /** Serial slug - used to fetch the preview. */
   serialSlug: string;
   /** Page name (slug) of the linked page. */
   pageName: string;
@@ -26,7 +26,7 @@ const PREVIEW_CHARS = 200;
  * a compact page preview. The fetch fires once on first hover and the result
  * is cached in component state for subsequent hovers.
  *
- * Respects the user's chapter cutoff — hidden pages show a spoiler-safe
+ * Respects the user's chapter cutoff - hidden pages show a spoiler-safe
  * placeholder rather than content. Non-existent pages show a "not yet created"
  * message.
  *

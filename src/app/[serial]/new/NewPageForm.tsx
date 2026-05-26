@@ -145,7 +145,7 @@ export function NewPageForm({
       ? selectedParentPageId
       : (visibleParentDefault ?? parentPageOptions[0]?.value);
 
-  // Template options — 0 means "no template".
+  // Template options - 0 means "no template".
   const templateOptions = [
     { label: "None (default sections)", value: 0 },
     ...templates.map((t) => ({ label: t.name, value: t.id })),
@@ -275,7 +275,7 @@ export function NewPageForm({
                 </div>
               ) : (
                 <Text muted className="text-xs">
-                  No sections defined — will use default Summary section.
+                  No sections defined - will use default Summary section.
                 </Text>
               )}
 
