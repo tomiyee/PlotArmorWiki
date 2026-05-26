@@ -35,6 +35,7 @@ Pages contain two optional layout components:
 
 ```
 /                    # home
+/help                # static help & documentation page
 /{serial}            # serial home (metadata + home wiki page)
 /{serial}/new        # new wiki page form
 /{serial}/{slug}     # wiki page

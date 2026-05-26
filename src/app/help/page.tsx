@@ -142,11 +142,16 @@ export default function HelpPage() {
           <div className="flex flex-col gap-2">
             <Text variant="h3">Wiki links</Text>
             <Text>
-              Inside page content you can link to other wiki pages using the{" "}
+              Inside page content you can link to other wiki pages or chapters
+              using the{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
-                [[Page Name]]
+                [[page:Name]]
               </code>{" "}
-              syntax. These are resolved to the correct page automatically. See{" "}
+              /{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                [[chapter:Name]]
+              </code>{" "}
+              syntax. See{" "}
               <Link
                 href="#editing-content"
                 className="text-primary hover:underline"
@@ -248,18 +253,31 @@ export default function HelpPage() {
           <div className="flex flex-col gap-2">
             <Text variant="h3">Wiki link syntax</Text>
             <Text>
-              To link to another wiki page, wrap the page name in double
-              brackets:
+              To link to another wiki page or chapter, wrap the target in double
+              brackets. Two prefixes are supported:
             </Text>
             <pre className="rounded-md bg-muted px-4 py-3 text-sm font-mono overflow-x-auto">
-              {`[[Luffy]]              → links to the "Luffy" page\n[[Characters:Luffy]]   → links to the "Luffy" page in the Characters category\n[[Chapter:Water 7]]    → links to the chapter named "Water 7"`}
+              {`[[Luffy]]              → page link (no prefix)\n[[page:Luffy]]         → explicit page link (same result)\n[[chapter:Water 7]]    → chapter link (use the serial's chapter type)\n[[Luffy|The Straw Hat]] → any form with a display-text alias`}
             </pre>
             <Text>
-              The editor provides autocomplete suggestions as you type inside{" "}
+              The valid prefixes are{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                page:
+              </code>{" "}
+              for wiki pages and the serial&rsquo;s chapter type (e.g.{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                chapter:
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                episode:
+              </code>
+              ) for chapter links. The editor provides autocomplete suggestions
+              as you type inside{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
                 [[
               </code>
-              . Select the desired page from the list to insert the link.
+              .
             </Text>
           </div>
 
