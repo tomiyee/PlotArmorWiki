@@ -90,10 +90,17 @@ export default function Navbar(props: NavbarProps) {
           </>
         )}
       </div>
-      {/* Right: search + chapter selector + auth */}
+      {/* Right: help + search + chapter selector + auth */}
       <Box className="gap-2 items-center">
         {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
         {chapterSelectorSlot}
+        {/* Help link — desktop only; mobile surfaces it in the hamburger drawer */}
+        <Link
+          href="/help"
+          className="hidden md:inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Help
+        </Link>
         {authSlot}
       </Box>
     </nav>
