@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
@@ -77,11 +78,24 @@ export function SynopsisSuggestionSection(props: SynopsisSuggestionSectionProps)
     <Box col className="gap-3 mt-2">
       {statusBanner}
       {!showForm && (
-        <div>
-          <Button variant="outline" onClick={() => setShowForm(true)}>
-            Suggest an edit to the synopsis
-          </Button>
-        </div>
+        <Box col className="gap-1.5">
+          <div>
+            <Button variant="outline" onClick={() => setShowForm(true)}>
+              Suggest an edit to the synopsis
+            </Button>
+          </div>
+          <Text className="text-xs text-muted-foreground">
+            Suggestions are reviewed by a wiki admin before going live.{" "}
+            <Link
+              href="/help#suggesting-edits"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              How does this work?
+            </Link>
+          </Text>
+        </Box>
       )}
       {showForm && (
         <SynopsisSuggestionForm
