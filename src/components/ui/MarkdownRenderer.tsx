@@ -109,7 +109,7 @@ const COMPONENTS: Components = {
   ),
   hr: () => <hr className="border-border my-6" />,
   a: ({ href, children }) => (
-    <a href={href} className="text-primary underline hover:text-primary/80">
+    <a href={href} className="text-wiki-link underline hover:text-wiki-link-hover visited:text-wiki-visited">
       {children}
     </a>
   ),
@@ -202,7 +202,7 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
   return function WikiAnchor({ href, children }) {
     if (!href?.startsWith(prefix)) {
       return (
-        <a href={href} className="text-primary underline hover:text-primary/80">
+        <a href={href} className="text-wiki-link underline hover:text-wiki-link-hover visited:text-wiki-visited">
           {children}
         </a>
       );
@@ -241,7 +241,7 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
     }
 
     return (
-      <a href={href} className="text-primary underline hover:text-primary/80">
+      <a href={href} className="text-wiki-link underline hover:text-wiki-link-hover visited:text-wiki-visited">
         {children}
       </a>
     );

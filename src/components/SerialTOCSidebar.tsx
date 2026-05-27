@@ -89,38 +89,40 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
-        <Text
-          variant="label"
-          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-        >
-          Contents
-        </Text>
-        {isAdmin && (
-          <Tooltip
-            content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
-            side="right"
+      <div className="rounded-lg border border-toc-border bg-toc-bg p-3">
+        <div className="flex items-center justify-between mb-3">
+          <Text
+            variant="label"
+            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
           >
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setEditOpen(true)}
-              aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
-              className="text-muted-foreground hover:text-foreground hover:bg-transparent"
+            Contents
+          </Text>
+          {isAdmin && (
+            <Tooltip
+              content={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
+              side="right"
             >
-              <PenIcon className="h-3 w-3" />
-            </Button>
-          </Tooltip>
-        )}
-      </div>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setEditOpen(true)}
+                aria-label={`Edit ${volumeType.toLowerCase()}s and ${chapterType.toLowerCase()}s`}
+                className="text-muted-foreground hover:text-foreground hover:bg-transparent"
+              >
+                <PenIcon className="h-3 w-3" />
+              </Button>
+            </Tooltip>
+          )}
+        </div>
 
-      <SerialTOC
-        serialId={serialId}
-        serialSlug={serialSlug}
-        volumes={volumes}
-        chaptersByVolume={chaptersByVolume}
-        chapterType={chapterType}
-      />
+        <SerialTOC
+          serialId={serialId}
+          serialSlug={serialSlug}
+          volumes={volumes}
+          chaptersByVolume={chaptersByVolume}
+          chapterType={chapterType}
+        />
+      </div>
 
       <Dialog isOpen={editOpen} onClose={() => setEditOpen(false)}>
         <DialogHeader>
