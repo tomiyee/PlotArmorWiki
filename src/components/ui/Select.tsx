@@ -726,7 +726,7 @@ function Select<T>(props: SelectProps<T>) {
           variant="outline"
           size="lg"
           className={cn(
-            "w-full justify-between px-3 border-input shadow-xs",
+            "w-full justify-between px-3 border-border shadow-xs",
             !selectedLabel && "text-muted-foreground",
           )}
         >

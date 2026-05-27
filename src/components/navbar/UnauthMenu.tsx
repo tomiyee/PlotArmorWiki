@@ -24,15 +24,15 @@ export function UnauthMenu() {
       align="right"
       contents={
         <div className="py-1 min-w-40">
-          <MenuItem href="/api/auth/signin" onClick={() => setOpen(false)}>
-            <LogInIcon className="size-4" />
-            Sign in
-          </MenuItem>
           <MenuItem href="/help" onClick={() => setOpen(false)}>
             <HelpCircleIcon className="size-4" />
             Help
           </MenuItem>
           <ThemeMenuItem />
+          <MenuItem href="/api/auth/signin" onClick={() => setOpen(false)}>
+            <LogInIcon className="size-4" />
+            Sign in
+          </MenuItem>
         </div>
       }
     >

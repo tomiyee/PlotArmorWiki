@@ -1,139 +1,157 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-/* Light mode - earth-tone / parchment palette
- * Palette:
- *   #A98B76 - primary warm brown    → oklch(0.613 0.066 52.6)
- *   #BFA28C - secondary beige/clay  → oklch(0.690 0.057 52.6)
- *   #F3E4C9 - parchment secondary   → oklch(0.916 0.045 79.3)
- *   #BABF94 - sage accent           → oklch(0.758 0.060 113.5)
- *   #FAFAF9 - off-white background  → oklch(0.985 0.004 85.7)
- *   #FFFFFF - white card surface    → oklch(1 0 0)
- *   #2F241D - dark text             → oklch(0.196 0.038 52.6)
- */
 :root {
-  --background: oklch(0.985 0.004 85.7);
-  --foreground: oklch(0.196 0.038 52.6);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.196 0.038 52.6);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.196 0.038 52.6);
-  --primary: oklch(0.613 0.066 52.6);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.916 0.045 79.3);
-  --secondary-foreground: oklch(0.196 0.038 52.6);
-  --muted: oklch(0.916 0.045 79.3);
-  --muted-foreground: oklch(0.49 0.042 52.6);
-  --accent: oklch(0.758 0.06 113.5);
-  --accent-foreground: oklch(0.196 0.038 52.6);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.69 0.057 52.6);
-  --input: oklch(0.69 0.057 52.6);
-  --ring: oklch(0.613 0.066 52.6);
-  --chart-1: oklch(0.613 0.066 52.6);
-  --chart-2: oklch(0.69 0.057 52.6);
-  --chart-3: oklch(0.758 0.06 113.5);
-  --chart-4: oklch(0.916 0.045 79.3);
-  --chart-5: oklch(0.247 0.034 52.6);
+  --font-size: 16px;
+  /* Light earth tone colors */
+  --background: #f5ede0;
+  --foreground: #2a1f16;
+  --card: #faf6f0;
+  --card-foreground: #2a1f16;
+  --popover: #ffffff;
+  --popover-foreground: #2a1f16;
+  --primary: #8b6914;
+  --primary-foreground: #faf6f0;
+  --secondary: #d4c4a8;
+  --secondary-foreground: #2a1f16;
+  --muted: #e8dcc8;
+  --muted-foreground: #5d4e37;
+  --accent: #c9a871;
+  --accent-foreground: #2a1f16;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: #d4c4a8;
+  --input: transparent;
+  --input-background: #faf6f0;
+  --switch-background: #d4c4a8;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #8b6914;
+  --chart-1: #8b6914;
+  --chart-2: #a0826d;
+  --chart-3: #5d4e37;
+  --chart-4: #c9a871;
+  --chart-5: #d2b48c;
   --radius: 0.625rem;
-  --sidebar: oklch(0.916 0.045 79.3);
-  --sidebar-foreground: oklch(0.196 0.038 52.6);
-  --sidebar-primary: oklch(0.613 0.066 52.6);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.758 0.06 113.5);
-  --sidebar-accent-foreground: oklch(0.196 0.038 52.6);
-  --sidebar-border: oklch(0.69 0.057 52.6);
-  --sidebar-ring: oklch(0.613 0.066 52.6);
+  --sidebar: #f5ede0;
+  --sidebar-foreground: #2a1f16;
+  --sidebar-primary: #8b6914;
+  --sidebar-primary-foreground: #faf6f0;
+  --sidebar-accent: #faf6f0;
+  --sidebar-accent-foreground: #2a1f16;
+  --sidebar-border: #d4c4a8;
+  --sidebar-ring: #8b6914;
+  /* Wiki-specific colors - Light mode */
+  --wiki-link: #8b6914;
+  --wiki-link-hover: #6b5010;
+  --wiki-visited: #5d4e37;
+  --infobox-bg: #faf6f0;
+  --infobox-border: #c9a871;
+  --toc-bg: #faf6f0;
+  --toc-border: #d4c4a8;
+  /* Layout */
+  --content-width: 64rem; /* 5xl = 64rem */
 }
 
-/* Dark mode - warm dark parchment / brown tones
- * Palette:
- *   #2F241D - darkest bg            → oklch(0.196 0.038 52.6)
- *   #3E332B - dark card surface     → oklch(0.247 0.034 52.6)
- *   #4A3C32 - slightly lighter dark → oklch(0.298 0.036 52.6)
- *   #BFA28C - secondary beige/clay  → oklch(0.690 0.057 52.6)
- *   #BABF94 - sage accent           → oklch(0.758 0.060 113.5)
- *   #F3E4C9 - parchment foreground  → oklch(0.916 0.045 79.3)
- */
 .dark {
-  --background: oklch(0.196 0.038 52.6);
-  --foreground: oklch(0.916 0.045 79.3);
-  --card: oklch(0.247 0.034 52.6);
-  --card-foreground: oklch(0.916 0.045 79.3);
-  --popover: oklch(0.247 0.034 52.6);
-  --popover-foreground: oklch(0.916 0.045 79.3);
-  --primary: oklch(0.69 0.057 52.6);
-  --primary-foreground: oklch(0.196 0.038 52.6);
-  --secondary: oklch(0.298 0.036 52.6);
-  --secondary-foreground: oklch(0.916 0.045 79.3);
-  --muted: oklch(0.298 0.036 52.6);
-  --muted-foreground: oklch(0.69 0.057 52.6);
-  --accent: oklch(0.6 0.055 113.5);
-  --accent-foreground: oklch(0.196 0.038 52.6);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 18%);
-  --ring: oklch(0.69 0.057 52.6);
-  --chart-1: oklch(0.69 0.057 52.6);
-  --chart-2: oklch(0.613 0.066 52.6);
-  --chart-3: oklch(0.6 0.055 113.5);
-  --chart-4: oklch(0.916 0.045 79.3);
-  --chart-5: oklch(0.247 0.034 52.6);
-  --sidebar: oklch(0.247 0.034 52.6);
-  --sidebar-foreground: oklch(0.916 0.045 79.3);
-  --sidebar-primary: oklch(0.69 0.057 52.6);
-  --sidebar-primary-foreground: oklch(0.196 0.038 52.6);
-  --sidebar-accent: oklch(0.6 0.055 113.5);
-  --sidebar-accent-foreground: oklch(0.196 0.038 52.6);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.69 0.057 52.6);
+  /* Dark earth tone colors */
+  --background: #1a1612;
+  --foreground: #e8dcc8;
+  --card: #241f1a;
+  --card-foreground: #e8dcc8;
+  --popover: #2a241e;
+  --popover-foreground: #e8dcc8;
+  --primary: #c9a871;
+  --primary-foreground: #1a1612;
+  --secondary: #3d3428;
+  --secondary-foreground: #e8dcc8;
+  --muted: #2f2820;
+  --muted-foreground: #a89984;
+  --accent: #4a3f2f;
+  --accent-foreground: #e8dcc8;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: #3d3428;
+  --input: transparent;
+  --input-background: #2a241e;
+  --switch-background: #4a3f2f;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #c9a871;
+  --chart-1: #c9a871;
+  --chart-2: #8b7355;
+  --chart-3: #5d4e37;
+  --chart-4: #d2b48c;
+  --chart-5: #a0826d;
+  --radius: 0.625rem;
+  --sidebar: #1a1612;
+  --sidebar-foreground: #e8dcc8;
+  --sidebar-primary: #c9a871;
+  --sidebar-primary-foreground: #1a1612;
+  --sidebar-accent: #2a241e;
+  --sidebar-accent-foreground: #e8dcc8;
+  --sidebar-border: #3d3428;
+  --sidebar-ring: #c9a871;
+  /* Wiki-specific colors - Dark mode */
+  --wiki-link: #c9a871;
+  --wiki-link-hover: #d4b983;
+  --wiki-visited: #a89984;
+  --infobox-bg: #2a241e;
+  --infobox-border: #4a3f2f;
+  --toc-bg: #241f1a;
+  --toc-border: #3d3428;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Wiki-specific */
+  --color-wiki-link: var(--wiki-link);
+  --color-wiki-link-hover: var(--wiki-link-hover);
+  --color-wiki-visited: var(--wiki-visited);
+  --color-infobox-bg: var(--infobox-bg);
+  --color-infobox-border: var(--infobox-border);
+  --color-toc-bg: var(--toc-bg);
+  --color-toc-border: var(--toc-border);
 }
 
 @layer base {
@@ -143,9 +161,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  /**
+   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+   * These are in @layer base, so Tailwind utility classes override them automatically.
+   */
   html {
+    font-size: var(--font-size);
     @apply font-sans;
   }
+  h1 { font-size: var(--text-2xl); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  h2 { font-size: var(--text-xl);  font-weight: var(--font-weight-medium); line-height: 1.5; }
+  h3 { font-size: var(--text-lg);  font-weight: var(--font-weight-medium); line-height: 1.5; }
+  h4 { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  label  { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  button { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  input  { font-size: var(--text-base); font-weight: var(--font-weight-normal); line-height: 1.5; }
 }
 
 /* MDX editor WYSIWYG content styles — mirrors MarkdownRenderer element styles exactly */
@@ -163,7 +193,7 @@
 .mdx-editor-wiki .mdxeditor-root-contenteditable pre { @apply bg-muted rounded-md p-4 overflow-x-auto mb-4 text-sm font-mono text-foreground; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable pre code { @apply bg-transparent p-0 rounded-none; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable hr { @apply border-border my-6; }
-.mdx-editor-wiki .mdxeditor-root-contenteditable a { @apply text-primary underline hover:text-primary/80; }
+.mdx-editor-wiki .mdxeditor-root-contenteditable a { @apply text-wiki-link underline hover:text-wiki-link-hover visited:text-wiki-visited; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable strong { @apply font-semibold text-foreground; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable em { @apply italic; }
 .mdx-editor-wiki .mdxeditor-root-contenteditable table { @apply min-w-full border border-border text-sm overflow-x-auto mb-4; }
