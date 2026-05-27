@@ -42,60 +42,62 @@ export default function Navbar(props: NavbarProps) {
     useNavbarSerialContext();
 
   return (
-    <nav className="sticky top-0 z-10 border-b bg-background px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
-      {/* Left: hamburger (mobile) or logo (desktop) + serial breadcrumb + Pages + TOC */}
-      <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
-        {/* Mobile: hamburger replaces the logo */}
-        <div className="md:hidden shrink-0">
-          {serialData ? (
-            <MobileMenuDrawer
-              serialTitle={serialData.serialTitle}
-              serialSlug={serialData.serialSlug}
-              categories={serialData.categories}
-              tocContent={tocContent}
-            />
-          ) : (
-            <Link
-              href="/"
-              className="flex items-center text-xl font-bold tracking-tight"
-            >
-              <ShieldHalfIcon className="size-5" />
-            </Link>
-          )}
-        </div>
-        {/* Desktop: full logo with wordmark */}
-        <Link
-          href="/"
-          className="hidden md:flex items-center gap-2 text-xl font-bold tracking-tight shrink-0"
-        >
-          <ShieldHalfIcon className="size-5" />
-          <span>PlotArmor</span>
-        </Link>
-        {serialData && (
-          <>
-            <Link
-              href={`/${serialData.serialSlug}`}
-              className="truncate min-w-0 text-sm font-medium text-foreground/70 hover:text-foreground max-w-40"
-            >
-              {serialData.serialTitle}
-            </Link>
-            {/* Pages dropdown + TOC button: desktop only (mobile lives in hamburger drawer) */}
-            <div className="hidden md:flex items-center gap-1">
-              <PagesDropdown
+    <nav className="sticky top-0 z-10 border-b bg-background">
+      <div className="mx-auto max-w-[--content-width] w-full px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
+        {/* Left: hamburger (mobile) or logo (desktop) + serial breadcrumb + Pages + TOC */}
+        <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
+          {/* Mobile: hamburger replaces the logo */}
+          <div className="md:hidden shrink-0">
+            {serialData ? (
+              <MobileMenuDrawer
+                serialTitle={serialData.serialTitle}
                 serialSlug={serialData.serialSlug}
                 categories={serialData.categories}
+                tocContent={tocContent}
               />
-              {tocSlot}
-            </div>
-          </>
-        )}
+            ) : (
+              <Link
+                href="/"
+                className="flex items-center text-xl font-bold tracking-tight"
+              >
+                <ShieldHalfIcon className="size-5" />
+              </Link>
+            )}
+          </div>
+          {/* Desktop: full logo with wordmark. Hide wordmark when a serial is active. */}
+          <Link
+            href="/"
+            className="hidden md:flex items-center gap-2 text-xl font-bold tracking-tight shrink-0"
+          >
+            <ShieldHalfIcon className="size-5" />
+            {!serialData && <span>PlotArmor</span>}
+          </Link>
+          {serialData && (
+            <>
+              <Link
+                href={`/${serialData.serialSlug}`}
+                className="truncate min-w-0 text-sm font-medium text-foreground/70 hover:text-foreground max-w-40"
+              >
+                {serialData.serialTitle}
+              </Link>
+              {/* Pages dropdown + TOC button: desktop only (mobile lives in hamburger drawer) */}
+              <div className="hidden md:flex items-center gap-1">
+                <PagesDropdown
+                  serialSlug={serialData.serialSlug}
+                  categories={serialData.categories}
+                />
+                {tocSlot}
+              </div>
+            </>
+          )}
+        </div>
+        {/* Right: search + chapter selector + auth */}
+        <Box className="gap-2 items-center">
+          {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
+          {chapterSelectorSlot}
+          {authSlot}
+        </Box>
       </div>
-      {/* Right: search + chapter selector + auth */}
-      <Box className="gap-2 items-center">
-        {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
-        {chapterSelectorSlot}
-        {authSlot}
-      </Box>
     </nav>
   );
 }
