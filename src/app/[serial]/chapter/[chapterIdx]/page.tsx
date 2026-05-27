@@ -380,9 +380,12 @@ export default async function ChapterPage({ params }: Props) {
 
                 {/* Introduced content */}
                 <Box col className="gap-4">
-                  <Text variant="h2">
-                    Introduced in this {serial.chapterType.toLowerCase()}
-                  </Text>
+                  <div>
+                    <Text variant="h2" className="mb-1">
+                      Introduced in this {serial.chapterType.toLowerCase()}
+                    </Text>
+                    <hr className="border-border" />
+                  </div>
                   {groupedIntroductions.length > 0 ? (
                     <Box col className="gap-4">
                       {groupedIntroductions.map(

@@ -42,23 +42,26 @@ type MarkdownRendererProps = {
 };
 
 const COMPONENTS: Components = {
+  // Headings are intentionally downscaled so all in-content heading levels
+  // remain strictly smaller than the `text-xl` section headers rendered by
+  // PageReadView, preserving a clear structural hierarchy.
   h1: ({ children }) => (
-    <Text variant="h1" className="mt-6 mb-4 text-2xl">
+    <Text variant="h1" className="mt-6 mb-4 text-lg">
       {children}
     </Text>
   ),
   h2: ({ children }) => (
-    <Text variant="h2" className="mt-5 mb-3">
+    <Text variant="h2" className="mt-5 mb-3 text-base">
       {children}
     </Text>
   ),
   h3: ({ children }) => (
-    <Text variant="h3" className="mt-4 mb-2">
+    <Text variant="h3" className="mt-4 mb-2 text-sm">
       {children}
     </Text>
   ),
   h4: ({ children }) => (
-    <Text variant="h4" className="mt-3 mb-2">
+    <Text variant="h4" className="mt-3 mb-2 text-sm font-normal">
       {children}
     </Text>
   ),
@@ -138,24 +141,25 @@ const COMPONENTS: Components = {
 
 const SM_COMPONENTS: Components = {
   ...COMPONENTS,
-  // One step down the Text scale for each heading level in sm mode.
+  // One step down from the already-downscaled COMPONENTS headings so sm mode
+  // stays subordinate to any surrounding structural headers.
   h1: ({ children }) => (
-    <Text as="h1" variant="h2" className="mt-4 mb-3">
+    <Text as="h1" variant="h2" className="mt-4 mb-3 text-base">
       {children}
     </Text>
   ),
   h2: ({ children }) => (
-    <Text as="h2" variant="h3" className="mt-3 mb-2">
+    <Text as="h2" variant="h3" className="mt-3 mb-2 text-sm">
       {children}
     </Text>
   ),
   h3: ({ children }) => (
-    <Text as="h3" variant="h4" className="mt-3 mb-1">
+    <Text as="h3" variant="h4" className="mt-3 mb-1 text-sm font-normal">
       {children}
     </Text>
   ),
   h4: ({ children }) => (
-    <h4 className="text-sm font-semibold mt-2 mb-1 text-foreground">
+    <h4 className="text-xs mt-2 mb-1 text-foreground">
       {children}
     </h4>
   ),
