@@ -53,7 +53,7 @@
   --toc-bg: #faf6f0;
   --toc-border: #d4c4a8;
   /* Layout */
-  --content-width: 72rem; /* 6xl = 72rem */
+  --content-width: 64rem; /* 5xl = 64rem */
 }
 
 .dark {
