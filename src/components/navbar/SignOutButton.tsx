@@ -1,9 +1,8 @@
 "use client";
 
-import { MenuItem } from "../ui/Menu";
 import { LogOutIcon } from "lucide-react";
-import { Box } from "../ui/Box";
 import { signOut } from "next-auth/react";
+import { MenuItem } from "@/components/ui/Menu";
 
 /**
  * Client-side sign-out button. Uses next-auth/react's `signOut` (not the
@@ -12,10 +11,8 @@ import { signOut } from "next-auth/react";
 export function SignOutButton() {
   return (
     <MenuItem onClick={() => signOut()}>
-      <Box className="items-center gap-2">
-        <LogOutIcon className="size-4" />
-        Sign out
-      </Box>
+      <LogOutIcon className="size-4" />
+      Sign out
     </MenuItem>
   );
 }

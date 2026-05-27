@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
@@ -97,6 +98,8 @@ interface MenuItemBaseProps extends React.ComponentProps<"button"> {
   group?: false;
   /** Highlights the item as the currently active selection. */
   selected?: boolean;
+  /** When provided, renders as a Next.js Link instead of a button. */
+  href?: string;
 }
 
 interface MenuItemGroupProps {
@@ -156,19 +159,34 @@ function MenuItem(props: MenuItemProps) {
     );
   }
 
-  const { selected, className, ...rest } = props;
+  const { selected, className, href, onClick, children, ...rest } = props;
+  const itemClass = cn(
+    "flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted cursor-pointer",
+    selected ? "bg-primary/10 font-medium text-primary" : "text-foreground",
+    className,
+  );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={itemClass}
+        onClick={onClick ? () => onClick({} as never) : undefined}
+      >
+        {children}
+      </Link>
+    );
+  }
   return (
     <button
       type="button"
       role="option"
       aria-selected={selected}
-      className={cn(
-        "w-full px-3 py-1.5 text-left text-sm hover:bg-muted",
-        selected ? "bg-primary/10 font-medium text-primary" : "text-foreground",
-        className,
-      )}
+      className={itemClass}
+      onClick={onClick}
       {...rest}
-    />
+    >
+      {children}
+    </button>
   );
 }
 
