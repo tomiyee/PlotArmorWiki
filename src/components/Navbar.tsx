@@ -29,7 +29,7 @@ type NavbarProps = {
  * server-side auth state.
  *
  * The left-side container uses `suppressHydrationWarning` because serial data
- * is injected client-side via `useLayoutEffect` — the server renders it empty
+ * is injected client-side via `useLayoutEffect` - the server renders it empty
  * and the client fills it in before the first paint.
  *
  * @example

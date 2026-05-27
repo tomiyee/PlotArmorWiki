@@ -62,7 +62,7 @@ export const WikiLinkTextVisitor: MdastImportVisitor<Mdast.Text> = {
 
 // ── MDXEditor export visitor: WikiLinkNode → wikiLink mdast node ─────────────
 
-// Custom mdast node — not part of the standard Mdast.Nodes union.
+// Custom mdast node - not part of the standard Mdast.Nodes union.
 interface MdastWikiLinkNode {
   type: "wikiLink";
   value: string;
@@ -85,7 +85,7 @@ export const WikiLinkExportVisitor: LexicalExportVisitor<
   },
 };
 
-// Passed to MDXEditorClient.toMarkdownOptions — emits [[token]] or [[token|alias]] verbatim.
+// Passed to MDXEditorClient.toMarkdownOptions - emits [[token]] or [[token|alias]] verbatim.
 // mdast-util-to-markdown escapes [ in text nodes; a custom handler bypasses that.
 export const wikiLinkToMarkdownExtension = {
   handlers: {

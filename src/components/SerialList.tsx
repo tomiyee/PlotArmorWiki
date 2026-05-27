@@ -64,7 +64,7 @@ export default function SerialList({ serials }: Props) {
             "No serials match your search."
           ) : (
             <>
-              No wikis yet —{" "}
+              No wikis yet -{" "}
               <Link href="/new" className="text-primary hover:underline">
                 create one
               </Link>

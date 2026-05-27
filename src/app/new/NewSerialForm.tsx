@@ -15,6 +15,7 @@ import {
   type ChapterType,
   type VolumeType,
 } from "@/lib/serial-types";
+import Link from "next/link";
 import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 
 type Props = {
@@ -25,7 +26,7 @@ type Props = {
 /**
  * Form for creating a new serial wiki.
  *
- * Accepts an optional `defaultTitle` to pre-fill and focus the title field —
+ * Accepts an optional `defaultTitle` to pre-fill and focus the title field -
  * used when the user is redirected here after a no-results search.
  *
  * @example
@@ -135,27 +136,39 @@ export default function NewSerialForm({ defaultTitle }: Props) {
           {/* Hidden inputs carry the selected values into FormData for the server action */}
           <input type="hidden" name="volumeType" value={volumeType} />
           <input type="hidden" name="chapterType" value={chapterType} />
-          <Box className="gap-4">
-            <Box col className="gap-1 flex-1">
-              <Label htmlFor="volumeType">Volume type</Label>
-              <Select<VolumeType>
-                id="volumeType"
-                options={VOLUME_TYPE_OPTIONS}
-                value={volumeType}
-                onChange={setVolumeType}
-                placeholder="Volume type"
-              />
+          <Box col className="gap-2">
+            <Box className="gap-4">
+              <Box col className="gap-1 flex-1">
+                <Label htmlFor="volumeType">Volume type</Label>
+                <Select<VolumeType>
+                  id="volumeType"
+                  options={VOLUME_TYPE_OPTIONS}
+                  value={volumeType}
+                  onChange={setVolumeType}
+                  placeholder="Volume type"
+                />
+              </Box>
+              <Box col className="gap-1 flex-1">
+                <Label htmlFor="chapterType">Chapter type</Label>
+                <Select<ChapterType>
+                  id="chapterType"
+                  options={CHAPTER_TYPE_OPTIONS}
+                  value={chapterType}
+                  onChange={setChapterType}
+                  placeholder="Chapter type"
+                />
+              </Box>
             </Box>
-            <Box col className="gap-1 flex-1">
-              <Label htmlFor="chapterType">Chapter type</Label>
-              <Select<ChapterType>
-                id="chapterType"
-                options={CHAPTER_TYPE_OPTIONS}
-                value={chapterType}
-                onChange={setChapterType}
-                placeholder="Chapter type"
-              />
-            </Box>
+            <Text className="text-sm text-muted-foreground">
+              These set the vocabulary used across your wiki (e.g.
+              &ldquo;Season&rdquo; / &ldquo;Episode&rdquo; for a TV show).{" "}
+              <Link
+                href="/help#creating-a-wiki"
+                className="text-primary hover:underline"
+              >
+                Learn more.
+              </Link>
+            </Text>
           </Box>
 
           {/* Splash art URL */}

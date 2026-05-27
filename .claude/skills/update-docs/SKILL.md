@@ -17,6 +17,8 @@ Update project documentation to reflect the current state of the branch.
 
 5. **Update `todo.md`** — for each step in the todo list, check whether the branch fully completes it. If a step is complete, strike it out with `~~` and append `✓` (matching the style of the already-completed Step 1). Do not mark a step complete if it is only partially done. Do not add new steps unless the user asks.
 
+6. **Update `src/app/help/page.tsx`** if the branch changes any user-facing feature covered by the help page (wiki-link syntax, suggestion workflow, editing model, core concepts, serial creation). Read the file first, then check the git diff for relevant changes. Fix any content that is now stale or incorrect — but do not add documentation for features not yet implemented.
+
 ## Rules
 
 - Edit only what is inaccurate or missing — do not rewrite sections that are still correct.

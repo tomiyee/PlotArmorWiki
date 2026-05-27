@@ -12,6 +12,7 @@ import { Box } from "@/components/ui/Box";
 import { Label } from "@/components/ui/Label";
 import { Text } from "@/components/ui/Text";
 import { Select } from "@/components/ui/Select";
+import Link from "next/link";
 import {
   savePageContent,
   getPageContentAtChapter,
@@ -67,7 +68,7 @@ interface Props {
   /** The id of the head chapter (highest idx). Used as the fallback default target for saves. */
   headChapterId: number | null;
   /**
-   * The chapter the reader is currently "reading up to" — set by ChapterSelector
+   * The chapter the reader is currently "reading up to" - set by ChapterSelector
    * and stored in a cookie. When present, this is used as the initial default for
    * the "Writing as of:" selector so editors write content that matches what they
    * just read. Falls back to headChapterId when null (no cookie present).
@@ -123,7 +124,7 @@ interface Props {
   editModeHeader?: ReactNode;
   /**
    * Whether the current user is an admin of this serial. When `false`, the
-   * component always renders in read mode — edit controls and the edit FAB
+   * component always renders in read mode - edit controls and the edit FAB
    * are invisible to non-admins. The parent Server Component is responsible
    * for resolving this value via `isSerialAdmin`.
    */
@@ -424,11 +425,14 @@ export function PageEditor(props: Props) {
           />
         )}
         {isAdmin && hiddenSuggestionCount > 0 && (
-          <Text as="div" className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          <Text
+            as="div"
+            className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+          >
             {hiddenSuggestionCount} pending{" "}
             {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
             {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
-            current reading progress — advance your chapter to review them.
+            current reading progress - advance your chapter to review them.
           </Text>
         )}
       </Box>
@@ -439,8 +443,8 @@ export function PageEditor(props: Props) {
   const selectedChapterIdx =
     allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
-  // Chapters before the page's intro chapter are disabled — content can't predate the page.
-  // Chapters beyond the reader's cutoff are also disabled — editors can't write spoilers.
+  // Chapters before the page's intro chapter are disabled - content can't predate the page.
+  // Chapters beyond the reader's cutoff are also disabled - editors can't write spoilers.
   const chapterSelectOptions: ChapterGroupOption[] = (() => {
     const volumeMap = new Map<
       string,
@@ -469,28 +473,50 @@ export function PageEditor(props: Props) {
       {editModeHeader}
 
       {isAdmin && pendingSuggestionCount > 0 && (
-        <Text as="div" className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-          <Text as="span" className="font-medium">{pendingSuggestionCount}</Text>
+        <Text
+          as="div"
+          className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
+        >
+          <Text as="span" className="font-medium">
+            {pendingSuggestionCount}
+          </Text>
           {pendingSuggestionCount === 1
             ? "pending suggestion"
             : "pending suggestions"}{" "}
-          — see below
+          - see below
         </Text>
       )}
 
       {allChapters.length > 0 && (
-        <Box className="items-center gap-3">
-          <Label htmlFor="target-chapter" className="shrink-0 text-sm">
-            Writing as of:
-          </Label>
-          <Select<number>
-            id="target-chapter"
-            options={chapterSelectOptions}
-            value={selectedChapterId ?? undefined}
-            onChange={handleChapterChange}
-            disabled={isPending}
-            className="w-52"
-          />
+        <Box col className="gap-1.5">
+          <Box className="items-center gap-3">
+            <Label htmlFor="target-chapter" className="shrink-0 text-sm">
+              Writing as of:
+            </Label>
+            <Select<number>
+              id="target-chapter"
+              options={chapterSelectOptions}
+              value={selectedChapterId ?? undefined}
+              onChange={handleChapterChange}
+              disabled={isPending}
+              className="w-52"
+            />
+          </Box>
+          <Text className="text-xs text-muted-foreground">
+            Markdown and{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">
+              [[wiki links]]
+            </code>{" "}
+            are supported.{" "}
+            <Link
+              href="/help#editing-content"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              See the guide.
+            </Link>
+          </Text>
         </Box>
       )}
 
@@ -551,11 +577,14 @@ export function PageEditor(props: Props) {
         />
       )}
       {hiddenSuggestionCount > 0 && (
-        <Text as="div" className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+        <Text
+          as="div"
+          className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+        >
           {hiddenSuggestionCount} pending{" "}
           {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
           {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
-          reading progress — advance your chapter to review them.
+          reading progress - advance your chapter to review them.
         </Text>
       )}
     </Box>

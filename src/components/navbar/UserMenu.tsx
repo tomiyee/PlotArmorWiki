@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { HelpCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Box } from "@/components/ui/Box";
 import { SignOutButton } from "@/components/navbar/SignOutButton";
-import { Menu } from "../ui/Menu";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeMenuItem } from "@/components/navbar/ThemeMenuItem";
+import { Menu, MenuItem } from "../ui/Menu";
 
 type UserMenuProps = {
   /** Display name of the authenticated user. */
@@ -33,10 +33,11 @@ export function UserMenu(props: UserMenuProps) {
       align="right"
       contents={
         <>
-          <Box className="items-center justify-between gap-4 px-3 py-1.5 border-b border-border">
-            <span className="text-sm text-muted-foreground">Theme</span>
-            <ThemeToggle />
-          </Box>
+          <MenuItem href="/help" onClick={() => setIsOpen(false)}>
+            <HelpCircleIcon className="size-4" />
+            Help
+          </MenuItem>
+          <ThemeMenuItem />
           <SignOutButton />
         </>
       }

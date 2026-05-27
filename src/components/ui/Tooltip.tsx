@@ -21,7 +21,7 @@ interface TooltipProps {
   content: ReactNode;
   /** Which side of the trigger to render the tooltip on. Defaults to `"top"`. */
   side?: "top" | "right" | "bottom" | "left";
-  /** The trigger element — must be a single focusable element. */
+  /** The trigger element - must be a single focusable element. */
   children: ReactNode;
   /** Extra classes merged onto the tooltip popup. */
   className?: string;

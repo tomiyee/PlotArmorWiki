@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db/index";
-import { chapters, chapterSynopsisSuggestions, serials, users, volumes } from "@/db/schema";
+import { chapters, chapterSynopsisSuggestions, users, volumes } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import {
   requireAuthenticated,

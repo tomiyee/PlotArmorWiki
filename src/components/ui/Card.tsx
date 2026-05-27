@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ComponentProps } from "react";
 
 type CardProps = ComponentProps<"div"> & {
-  /** Visual density — `"sm"` reduces gap and padding. Defaults to `"default"`. */
+  /** Visual density - `"sm"` reduces gap and padding. Defaults to `"default"`. */
   size?: "default" | "sm";
 };
 

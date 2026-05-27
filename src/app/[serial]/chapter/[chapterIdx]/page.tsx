@@ -60,28 +60,29 @@ export default async function ChapterPage({ params }: Props) {
     notFound();
   }
 
-  const [isAdmin, authenticatedUserId, [volumeList, chapterList]] = await Promise.all([
-    isSerialAdmin(serial.id),
-    isAuthenticated(),
-    Promise.all([
-      db
-        .select()
-        .from(volumes)
-        .where(eq(volumes.serialId, serial.id))
-        .orderBy(volumes.idx),
-      db
-        .select({
-          id: chapters.id,
-          displayName: chapters.displayName,
-          idx: chapters.idx,
-          volumeId: chapters.volumeId,
-        })
-        .from(chapters)
-        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-        .where(eq(volumes.serialId, serial.id))
-        .orderBy(chapters.idx),
-    ]),
-  ]);
+  const [isAdmin, authenticatedUserId, [volumeList, chapterList]] =
+    await Promise.all([
+      isSerialAdmin(serial.id),
+      isAuthenticated(),
+      Promise.all([
+        db
+          .select()
+          .from(volumes)
+          .where(eq(volumes.serialId, serial.id))
+          .orderBy(volumes.idx),
+        db
+          .select({
+            id: chapters.id,
+            displayName: chapters.displayName,
+            idx: chapters.idx,
+            volumeId: chapters.volumeId,
+          })
+          .from(chapters)
+          .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+          .where(eq(volumes.serialId, serial.id))
+          .orderBy(chapters.idx),
+      ]),
+    ]);
 
   const chaptersByVolume: Record<
     number,
@@ -152,8 +153,19 @@ export default async function ChapterPage({ params }: Props) {
     pages: { id: number; name: string; slug: string }[];
   }[] = [];
   let boundSaveAction: ((content: string) => Promise<void>) | null = null;
-  let mySynopsisSuggestion: { id: number; status: "pending" | "approved" | "rejected"; reviewNote: string | null; createdAt: Date } | null = null;
-  let pendingSynopsisSuggestions: { id: number; proposerUsername: string | null; proposedContent: string; citation: string; createdAt: Date }[] = [];
+  let mySynopsisSuggestion: {
+    id: number;
+    status: "pending" | "approved" | "rejected";
+    reviewNote: string | null;
+    createdAt: Date;
+  } | null = null;
+  let pendingSynopsisSuggestions: {
+    id: number;
+    proposerUsername: string | null;
+    proposedContent: string;
+    citation: string;
+    createdAt: Date;
+  }[] = [];
 
   if (!spoilered) {
     // Fetch synopsis
@@ -209,7 +221,9 @@ export default async function ChapterPage({ params }: Props) {
             eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
           ),
         );
-      wikiTitleByPageId = new Map(wikiTitleRows.map((r) => [r.pageId, r.title]));
+      wikiTitleByPageId = new Map(
+        wikiTitleRows.map((r) => [r.pageId, r.title]),
+      );
     }
 
     wikiPages = rawWikiPages.map((p) => ({
@@ -259,7 +273,7 @@ export default async function ChapterPage({ params }: Props) {
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
-        {/* Left sidebar — sticky, independent scroll, desktop only */}
+        {/* Left sidebar - sticky, independent scroll, desktop only */}
         <aside className="hidden md:block w-56 shrink-0">
           <div className="sticky top-6 overflow-y-auto max-h-[calc(100vh-5rem)] pr-1">
             <SerialTOCSidebar
@@ -355,7 +369,10 @@ export default async function ChapterPage({ params }: Props) {
                       mySuggestion={mySynopsisSuggestion}
                       wikiPages={wikiPages}
                       serialSlug={serialSlug}
-                      wikiChapters={chapterList.map((c) => ({ name: c.displayName, idx: c.idx }))}
+                      wikiChapters={chapterList.map((c) => ({
+                        name: c.displayName,
+                        idx: c.idx,
+                      }))}
                       chapterType={serial.chapterType}
                     />
                   )}

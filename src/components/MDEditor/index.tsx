@@ -73,7 +73,7 @@ type WikiLinkMDEditorProps = {
   preview?: "edit" | "live" | "preview";
   /** All wiki pages visible to the reader at their current chapter cutoff. */
   wikiPages: WikiPage[];
-  /** Slug of the serial being edited — used to build preview links. */
+  /** Slug of the serial being edited - used to build preview links. */
   serialSlug: string;
   /**
    * All chapters for this serial. When provided, typing `[[` also shows chapter
@@ -93,7 +93,7 @@ type WikiLinkMDEditorProps = {
 
 /**
  * Inserts a WikiLinkNode at the current cursor selection in the given Lexical
- * editor without replacing any `[[` fragment — suitable for toolbar-triggered
+ * editor without replacing any `[[` fragment - suitable for toolbar-triggered
  * insertion where there is no autocomplete fragment to replace.
  */
 function insertWikiLinkAtCursor(
@@ -152,7 +152,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   } = props;
 
   const editorRef = useRef<MDXEditorMethods>(null);
-  // Snapshot of value on mount — used as the diff baseline so "Diff" mode shows
+  // Snapshot of value on mount - used as the diff baseline so "Diff" mode shows
   // changes made in this editing session relative to what was loaded from the server.
   const [initialValue] = useState(() => normalizeMarkdown(value));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -394,7 +394,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     }
   }
 
-  // Plugin array — memoised so identity is stable across re-renders.
+  // Plugin array - memoised so identity is stable across re-renders.
   const plugins = useMemo((): RealmPlugin[] => {
     return [
       wikiPlugin,

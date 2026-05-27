@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { UserIcon, LogInIcon } from "lucide-react";
+import { UserIcon, LogInIcon, HelpCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Box } from "@/components/ui/Box";
-import { Menu } from "@/components/ui/Menu";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeMenuItem } from "@/components/navbar/ThemeMenuItem";
+import { Menu, MenuItem } from "@/components/ui/Menu";
 
 /**
  * User icon button for unauthenticated visitors. Opens a dropdown with a
@@ -26,18 +24,15 @@ export function UnauthMenu() {
       align="right"
       contents={
         <div className="py-1 min-w-40">
-          <Link
-            href="/api/auth/signin"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted w-full"
-          >
+          <MenuItem href="/api/auth/signin" onClick={() => setOpen(false)}>
             <LogInIcon className="size-4" />
             Sign in
-          </Link>
-          <Box className="items-center justify-between gap-4 px-3 py-1.5 border-t border-border">
-            <span className="text-sm text-muted-foreground">Theme</span>
-            <ThemeToggle />
-          </Box>
+          </MenuItem>
+          <MenuItem href="/help" onClick={() => setOpen(false)}>
+            <HelpCircleIcon className="size-4" />
+            Help
+          </MenuItem>
+          <ThemeMenuItem />
         </div>
       }
     >

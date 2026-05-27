@@ -39,6 +39,7 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 
 ```
 /                    # home
+/help                # static help & documentation page
 /{serial}            # serial home (metadata + home wiki page)
 /{serial}/new        # new wiki page form
 /{serial}/{slug}     # wiki page
@@ -101,6 +102,7 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/app/[serial]/[page]/page.tsx`        | Wiki page view. Reads cutoff from cookie, fetches chapter-filtered content, delegates to `<PageEditor>`.                                                              |
 | `src/app/[serial]/[page]/PageEditor.tsx`  | Client Component owning page body. Edit mode: `<WikiLinkMDEditor>` per section, "Writing as of:" chapter selector, calls `getPageContentAtChapter` on chapter change. |
 | `src/app/[serial]/[page]/actions.ts`      | `savePageContent` (upserts at target chapter) + `getPageContentAtChapter` (pre-fills edit drafts).                                                                    |
+| `src/app/help/page.tsx`                       | Static server-rendered help & documentation page. Covers core concepts, wiki creation, editing (including wiki-link syntax), and the suggestion workflow. Linked from the Navbar and contextual hints throughout the app. |
 | `src/app/[serial]/[page]/suggestionActions.ts` | Server Actions for the user suggestion workflow: submit, approve, reject, query (by page/serial). Also contains `getSectionsAtChapter` (pre-fills suggestion form when target chapter changes). |
 | `src/app/[serial]/[page]/SuggestionForm.tsx` | Inline suggestion form for authenticated non-admins. Edits body sections (MDEditor) + infobox rows (Textarea); fetches content at the chosen target chapter on change. |
 | `src/app/[serial]/[page]/SuggestionReviewPanel.tsx` | Admin review panel: lists pending suggestions with before/after diffs for sections and infobox rows; approve/reject with optional review note. |
@@ -111,7 +113,7 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/components/SerialEditor.tsx`         | Volume/chapter edit UI with drag-and-drop reorder (`@dnd-kit`). Uses serial's type names (e.g. "Episode"/"Season").                                                   |
 | `src/components/SerialMetadataEditor.tsx` | Inline serial title/description/authors/art edit. Redirects on slug change.                                                                                           |
 | `src/components/ChapterSelector.tsx`      | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. Grouped volume dropdown with collapsible headers (collapse state persisted). On first visit shows a `<Popover>` spoiler callout anchored below the trigger button. |
-| `src/components/WikiLinkMDEditor.tsx`     | MDXEditor WYSIWYG + `[[Category:Page]]` autocomplete with cursor-aware suggestions. Custom Lexical node handles wiki-link syntax end-to-end.                          |
+| `src/components/WikiLinkMDEditor.tsx`     | MDXEditor WYSIWYG + `[[page:Name]]` / `[[chapter:Name]]` autocomplete with cursor-aware suggestions. Custom Lexical node handles wiki-link syntax end-to-end.          |
 | `src/components/ForwardRefEditor.tsx`     | Non-SSR entry point for `@mdxeditor/editor`; imported via `dynamic()` with `{ ssr: false }` to keep browser-only editor code off the server.                         |
 | `src/components/SerialNavInjector.tsx`    | Client Component (renders null); injects serial data into navbar via `useLayoutEffect`.                                                                               |
 | `src/components/ui/MarkdownRenderer.tsx`  | Single source of truth for markdown styling. No `@tailwindcss/typography` — explicit Tailwind classes. Accepts `serialSlug` for wiki links, `sm` for compact mode.    |
@@ -123,7 +125,7 @@ First-time visitors default to chapter 1 with a callout to update.
 | `src/hooks/usePersistedStore.ts`          | `useState`-compatible, backed by `localStorage`. SSR-safe via `useSyncExternalStore`, cross-tab via `storage` event.                                                  |
 | `src/lib/serial-types.ts`                 | `ChapterType`/`VolumeType` types, arrays, parsers, Select options. Single source of truth — don't duplicate.                                                          |
 | `src/lib/wiki-links.ts`                   | `WIKI_LINK_RE`, `parseWikiLink()`, `slugifyWikiName()`. Shared by remark plugin + editor autocomplete.                                                                |
-| `src/lib/remark-wiki-links.ts`            | Remark plugin: `[[Category:Page]]` → markdown links. Skips code blocks.                                                                                               |
+| `src/lib/remark-wiki-links.ts`            | Remark plugin: `[[page:Name]]` / `[[chapter:Name]]` → markdown links. Skips code blocks.                                                                              |
 | `src/lib/slug.ts`                         | `titleToSlug`; computed at creation and stored in `serials.slug`.                                                                                                     |
 | `src/auth.ts`                             | Auth.js v5 config: Google provider, Drizzle adapter (database sessions), session callback exposing `user.id` + `user.username`.                                       |
 | `src/proxy.ts`                            | Next.js middleware (exported as default). Redirects authenticated users with `username === null` to `/onboarding`; skips `/api/auth/**` to avoid loops.               |

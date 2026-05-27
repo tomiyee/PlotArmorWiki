@@ -87,7 +87,7 @@ export default async function SerialLayout({ children, params }: Props) {
 
   // Navbar "Pages" dropdown: immediate children of the Home page.
   // Uses the max-idx pattern to get each child's latest relationship state
-  // with no chapter cutoff applied — navigation shows all current children.
+  // with no chapter cutoff applied - navigation shows all current children.
   const [homePage] = await db
     .select({ id: pages.id })
     .from(pages)

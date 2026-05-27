@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
@@ -35,7 +36,7 @@ type SuggestionFormProps = {
   /** All chapters for this serial, used to build the "Writing as of:" selector. */
   allChapters: ChapterData[];
   /**
-   * The chapter the user is currently reading up to — used as the default
+   * The chapter the user is currently reading up to - used as the default
    * for the "Writing as of:" selector and caps the available choices to prevent
    * exposing the suggester to content beyond their progress.
    */
@@ -124,7 +125,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
   const [citation, setCitation] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  // Tracks which chapter's content is actually loaded in the editors — lags behind
+  // Tracks which chapter's content is actually loaded in the editors - lags behind
   // selectedChapterId during async fetches. Used as editor key so MDXEditor remounts
   // with the correct diffMarkdown baseline whenever the displayed chapter changes.
   // (diffSourcePlugin captures diffMarkdown once at init; remount is the only reset path.)
@@ -264,13 +265,28 @@ export function SuggestionForm(props: SuggestionFormProps) {
         </DialogFooter>
       </Dialog>
 
-      <Box col className="gap-6 rounded-lg border border-border bg-muted/30 p-6">
+      <Box
+        col
+        className="gap-6 rounded-lg border border-border bg-muted/30 p-6"
+      >
         <Box className="items-center justify-between">
           <Text variant="h3">Suggest an edit</Text>
           <Button variant="ghost" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
         </Box>
+
+        <Text className="text-sm text-muted-foreground">
+          Suggestions are reviewed by a wiki admin before going live.{" "}
+          <Link
+            href="/help#suggesting-edits"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            How does this work?
+          </Link>
+        </Text>
 
         {/* Chapter selector */}
         {availableChapters.length > 0 && (
@@ -289,7 +305,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
             {selectedChapterName && (
               <Text className="text-sm text-amber-600 dark:text-amber-400">
                 Write for readers up to {chapterLabel} {selectedChapterName}.
-                Avoid referencing later events — an admin will review your
+                Avoid referencing later events - an admin will review your
                 suggestion.
               </Text>
             )}
@@ -313,7 +329,10 @@ export function SuggestionForm(props: SuggestionFormProps) {
               key={`${contentChapterId}-${section.id}`}
               value={draftContent[section.id] ?? ""}
               onChange={(val) =>
-                setDraftContent((prev) => ({ ...prev, [section.id]: val ?? "" }))
+                setDraftContent((prev) => ({
+                  ...prev,
+                  [section.id]: val ?? "",
+                }))
               }
               height={260}
               preview="edit"
@@ -364,7 +383,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
           </Text>
           <Textarea
             id="suggestion-citation"
-            placeholder="e.g. Chapter 12, page 4 — 'Luffy said…'"
+            placeholder="e.g. Chapter 12, page 4 - 'Luffy said…'"
             value={citation}
             onChange={(e) => setCitation(e.target.value)}
             disabled={isPending}

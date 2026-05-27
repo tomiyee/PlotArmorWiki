@@ -89,7 +89,7 @@ export function ChapterSelector(props: Props) {
   >(`plotarmor:progress:${serialId}`, defaultChapterId);
 
   // suppressHydrationWarning: server renders open (default=false); client may
-  // have dismissed=true in localStorage — intentional mismatch accepted.
+  // have dismissed=true in localStorage - intentional mismatch accepted.
   const [popoverDismissed, setPopoverDismissed] = usePersistedStore<boolean>(
     GLOBAL_POPOVER_DISMISSED_KEY,
     false,
