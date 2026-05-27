@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
+import { HelpCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Box } from "@/components/ui/Box";
 import { SignOutButton } from "@/components/navbar/SignOutButton";
@@ -33,7 +35,15 @@ export function UserMenu(props: UserMenuProps) {
       align="right"
       contents={
         <>
-          <Box className="items-center justify-between gap-4 px-3 py-1.5 border-b border-border">
+          <Link
+            href="/help"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted w-full"
+          >
+            <HelpCircleIcon className="size-4" />
+            Help
+          </Link>
+          <Box className="items-center justify-between gap-4 px-3 py-1.5 border-y border-border">
             <span className="text-sm text-muted-foreground">Theme</span>
             <ThemeToggle />
           </Box>
