@@ -20,7 +20,7 @@ function PageContainer(props: PageContainerProps) {
   const { className, children, ...rest } = props;
   return (
     <div
-      className={cn("max-w-[--content-width] mx-auto w-full px-4 py-6", className)}
+      className={cn("max-w-(--content-width) mx-auto w-full px-4 py-6", className)}
       {...rest}
     >
       {children}

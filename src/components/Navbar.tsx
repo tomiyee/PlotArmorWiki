@@ -43,7 +43,7 @@ export default function Navbar(props: NavbarProps) {
 
   return (
     <nav className="sticky top-0 z-10 border-b bg-background">
-      <div className="mx-auto max-w-[--content-width] w-full px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
+      <div className="mx-auto max-w-(--content-width) w-full px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
         {/* Left: hamburger (mobile) or logo (desktop) + serial breadcrumb + Pages + TOC */}
         <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
           {/* Mobile: hamburger replaces the logo */}
@@ -58,6 +58,7 @@ export default function Navbar(props: NavbarProps) {
             ) : (
               <Link
                 href="/"
+                aria-label="PlotArmor home"
                 className="flex items-center text-xl font-bold tracking-tight"
               >
                 <ShieldHalfIcon className="size-5" />
@@ -67,6 +68,7 @@ export default function Navbar(props: NavbarProps) {
           {/* Desktop: full logo with wordmark. Hide wordmark when a serial is active. */}
           <Link
             href="/"
+            aria-label="PlotArmor home"
             className="hidden md:flex items-center gap-2 text-xl font-bold tracking-tight shrink-0"
           >
             <ShieldHalfIcon className="size-5" />
