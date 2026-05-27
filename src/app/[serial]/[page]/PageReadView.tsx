@@ -282,20 +282,23 @@ export function PageReadView(props: PageReadViewProps) {
       {sections.map((section, i) => (
         <div key={section.id} className="group mb-6 last:mb-0">
           {i > 0 && (
-            <div className="flex items-center gap-2 mb-2">
-              <Text variant="h2">{section.name}</Text>
-              {showSuggestButton && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => setShowSuggestionForm(true)}
-                >
-                  <FilePenLine />
-                  <span className="sr-only">Suggest an edit</span>
-                </Button>
-              )}
-            </div>
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <Text variant="h2">{section.name}</Text>
+                {showSuggestButton && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setShowSuggestionForm(true)}
+                  >
+                    <FilePenLine />
+                    <span className="sr-only">Suggest an edit</span>
+                  </Button>
+                )}
+              </div>
+              <hr className="border-border mb-3" />
+            </>
           )}
           {section.content ? (
             <MarkdownRenderer
