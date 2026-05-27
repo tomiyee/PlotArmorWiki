@@ -71,9 +71,6 @@ export async function submitPageSuggestion(
   if (sectionChanges.length === 0 && infoboxChanges.length === 0) {
     return { error: "At least one section change is required." };
   }
-  if (sectionChanges.some((c) => !c.proposedContent.trim())) {
-    return { error: "Proposed content cannot be empty for any section." };
-  }
 
   // Admins should use savePageContent directly.
   const serialId = await getSerialIdByPageId(pageId);
@@ -104,7 +101,6 @@ export async function submitPageSuggestion(
     }
 
     for (const change of infoboxChanges) {
-      if (!change.proposedContent.trim()) continue;
       await tx.insert(pageSuggestionInfoboxChanges).values({
         suggestionId: suggestion.id,
         infoboxSectionId: change.infoboxSectionId,
@@ -519,8 +515,20 @@ export async function approveSuggestion(
 
   await db.transaction(async (tx) => {
     // Write each section change as a new revision at the target chapter.
+    // Empty proposed content deletes the revision at that chapter.
     for (const change of changes) {
-      if (!change.proposedContent.trim()) continue;
+      if (!change.proposedContent.trim()) {
+        await tx
+          .delete(pageSectionRevisions)
+          .where(
+            and(
+              eq(pageSectionRevisions.pageId, suggestion.pageId),
+              eq(pageSectionRevisions.sectionId, change.sectionId),
+              eq(pageSectionRevisions.chapterId, suggestion.targetChapterId),
+            ),
+          );
+        continue;
+      }
       await tx
         .insert(pageSectionRevisions)
         .values({
@@ -540,8 +548,20 @@ export async function approveSuggestion(
     }
 
     // Write each infobox change as a new infobox revision at the target chapter.
+    // Empty proposed content deletes the revision at that chapter.
     for (const change of ibChanges) {
-      if (!change.proposedContent.trim()) continue;
+      if (!change.proposedContent.trim()) {
+        await tx
+          .delete(pageInfoboxRevisions)
+          .where(
+            and(
+              eq(pageInfoboxRevisions.pageId, suggestion.pageId),
+              eq(pageInfoboxRevisions.infoboxSectionId, change.infoboxSectionId),
+              eq(pageInfoboxRevisions.chapterId, suggestion.targetChapterId),
+            ),
+          );
+        continue;
+      }
       await tx
         .insert(pageInfoboxRevisions)
         .values({

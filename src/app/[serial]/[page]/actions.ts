@@ -107,8 +107,21 @@ export async function savePageContent(
 
   await db.transaction(async (tx) => {
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
-      if (!content.trim()) continue; // never write empty revisions
       const sectionId = parseInt(sectionIdStr, 10);
+      if (!content.trim()) {
+        // Saving empty content deletes the revision at this chapter so editors
+        // can remove a specific chapter entry from the time series.
+        await tx
+          .delete(pageSectionRevisions)
+          .where(
+            and(
+              eq(pageSectionRevisions.pageId, pageId),
+              eq(pageSectionRevisions.sectionId, sectionId),
+              eq(pageSectionRevisions.chapterId, headChapterId),
+            ),
+          );
+        continue;
+      }
       await tx
         .insert(pageSectionRevisions)
         .values({ pageId, sectionId, chapterId: headChapterId, content })
@@ -137,8 +150,20 @@ export async function savePageContent(
       for (const [infoboxSectionIdStr, content] of Object.entries(
         floaterRowContent,
       )) {
-        if (!content.trim()) continue; // never write empty revisions
         const infoboxSectionId = parseInt(infoboxSectionIdStr, 10);
+        if (!content.trim()) {
+          // Saving empty content deletes the infobox revision at this chapter.
+          await tx
+            .delete(pageInfoboxRevisions)
+            .where(
+              and(
+                eq(pageInfoboxRevisions.pageId, pageId),
+                eq(pageInfoboxRevisions.infoboxSectionId, infoboxSectionId),
+                eq(pageInfoboxRevisions.chapterId, headChapterId),
+              ),
+            );
+          continue;
+        }
         await tx
           .insert(pageInfoboxRevisions)
           .values({
