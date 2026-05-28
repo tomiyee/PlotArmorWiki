@@ -394,6 +394,23 @@ export function PageEditor(props: Props) {
   if (!isAdmin || !isEditing) {
     return (
       <Box col className="gap-6">
+        {isAdmin && visibleSuggestions.length > 0 && (
+          <SuggestionReviewPanel
+            suggestions={visibleSuggestions}
+            serialSlug={serialSlug}
+          />
+        )}
+        {isAdmin && hiddenSuggestionCount > 0 && (
+          <Text
+            as="div"
+            className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+          >
+            {hiddenSuggestionCount} pending{" "}
+            {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+            {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
+            current reading progress - advance your chapter to review them.
+          </Text>
+        )}
         <PageReadView
           serialSlug={serialSlug}
           sections={sections}
@@ -418,23 +435,6 @@ export function PageEditor(props: Props) {
               : undefined
           }
         />
-        {isAdmin && visibleSuggestions.length > 0 && (
-          <SuggestionReviewPanel
-            suggestions={visibleSuggestions}
-            serialSlug={serialSlug}
-          />
-        )}
-        {isAdmin && hiddenSuggestionCount > 0 && (
-          <Text
-            as="div"
-            className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
-          >
-            {hiddenSuggestionCount} pending{" "}
-            {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
-            {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
-            current reading progress - advance your chapter to review them.
-          </Text>
-        )}
       </Box>
     );
   }
@@ -472,18 +472,21 @@ export function PageEditor(props: Props) {
     <Box col className="gap-6">
       {editModeHeader}
 
-      {isAdmin && pendingSuggestionCount > 0 && (
+      {visibleSuggestions.length > 0 && (
+        <SuggestionReviewPanel
+          suggestions={visibleSuggestions}
+          serialSlug={serialSlug}
+        />
+      )}
+      {hiddenSuggestionCount > 0 && (
         <Text
           as="div"
-          className="inline-flex items-center gap-2 rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
+          className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
         >
-          <Text as="span" className="font-medium">
-            {pendingSuggestionCount}
-          </Text>
-          {pendingSuggestionCount === 1
-            ? "pending suggestion"
-            : "pending suggestions"}{" "}
-          - see below
+          {hiddenSuggestionCount} pending{" "}
+          {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+          {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
+          reading progress - advance your chapter to review them.
         </Text>
       )}
 
@@ -570,23 +573,6 @@ export function PageEditor(props: Props) {
         isPending={isPending}
       />
 
-      {visibleSuggestions.length > 0 && (
-        <SuggestionReviewPanel
-          suggestions={visibleSuggestions}
-          serialSlug={serialSlug}
-        />
-      )}
-      {hiddenSuggestionCount > 0 && (
-        <Text
-          as="div"
-          className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
-        >
-          {hiddenSuggestionCount} pending{" "}
-          {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
-          {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
-          reading progress - advance your chapter to review them.
-        </Text>
-      )}
     </Box>
   );
 }
