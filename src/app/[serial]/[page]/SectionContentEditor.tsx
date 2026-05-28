@@ -160,7 +160,7 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
         onClose={() => setIsDialogOpen(false)}
         onConfirm={handleConfirmRemove}
         sectionName={isFirst ? "Summary" : section.name}
-        currentContent={draftContent}
+        currentContent={section.content}
         previousContent={previousRevisionContent}
         previousRevisionChapterIdx={previousRevisionChapterIdx}
         allChapters={allChapters}

@@ -133,16 +133,19 @@ function DiffCell(props: DiffCellProps) {
 
 // ── RevisionTimeline ───────────────────────────────────────────────────────
 
-type DotVariant = "edge" | "revision" | "target" | "next-revision";
+type DotVariant = "edge" | "revision" | "target" | "next-revision" | "ghost";
 
-type TimelineDotData = {
+type TimelineSlot = {
   key: string;
   topLabel: string;
-  bottomLabel?: string;
-  variant: DotVariant;
+  currentBottomLabel?: string;
+  afterBottomLabel?: string;
+  currentVariant: DotVariant;
+  afterVariant: DotVariant;
 };
 
 type DotNodeProps = {
+  /** Visual style for this node; "ghost" reserves space without rendering a dot. */
   variant: DotVariant;
 };
 
@@ -163,27 +166,35 @@ function DotNode(props: DotNodeProps) {
       <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/50 bg-background shrink-0" />
     );
   }
+  if (variant === "ghost") {
+    // Invisible placeholder keeps the column width consistent with the current row.
+    return <div className="w-3.5 h-3.5 shrink-0" />;
+  }
   return (
     <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/60 shrink-0" />
   );
 }
 
+type SegmentState = "normal" | "affected" | "healed";
+
 type SegmentLineProps = {
-  affected: boolean;
+  /** Visual state: normal = gray, affected = amber dashed, healed = solid green. */
+  state: SegmentState;
 };
 
 function SegmentLine(props: SegmentLineProps) {
-  const { affected } = props;
-  return (
-    <div
-      className={cn(
-        "flex-1 self-center min-w-4",
-        affected
-          ? "border-t-2 border-dashed border-amber-400/80 dark:border-amber-500/60"
-          : "h-px bg-muted-foreground/30",
-      )}
-    />
-  );
+  const { state } = props;
+  if (state === "affected") {
+    return (
+      <div className="flex-1 self-center min-w-4 border-t-2 border-dashed border-amber-400/80 dark:border-amber-500/60" />
+    );
+  }
+  if (state === "healed") {
+    return (
+      <div className="flex-1 self-center min-w-4 border-t-2 border-green-500 dark:border-green-400" />
+    );
+  }
+  return <div className="flex-1 self-center min-w-4 h-px bg-muted-foreground/30" />;
 }
 
 type RevisionTimelineProps = {
@@ -193,49 +204,64 @@ type RevisionTimelineProps = {
   nextRevisionChapterIdx: number | null;
 };
 
-function buildTimelineDots(
+function buildTimelineSlots(
   allChapters: ChapterData[],
   selectedChapterIdx: number | null,
   previousRevisionChapterIdx: number | null,
   nextRevisionChapterIdx: number | null,
-): TimelineDotData[] {
+): TimelineSlot[] {
   const toLabel = (idx: number): string => {
     const ch = allChapters.find((c) => c.idx === idx);
     return ch ? `${ch.volumeName} · ${ch.displayName}` : `Chapter ${idx}`;
   };
 
-  const dots: TimelineDotData[] = [];
-  dots.push({ key: "start", topLabel: "Start", variant: "edge" });
+  const slots: TimelineSlot[] = [];
+  slots.push({
+    key: "start",
+    topLabel: "Start",
+    currentVariant: "edge",
+    afterVariant: "edge",
+  });
 
   if (previousRevisionChapterIdx !== null) {
-    dots.push({
+    slots.push({
       key: "prev",
       topLabel: toLabel(previousRevisionChapterIdx),
-      bottomLabel: "Previous revision",
-      variant: "revision",
+      currentBottomLabel: "Previous revision",
+      afterBottomLabel: "Previous revision",
+      currentVariant: "revision",
+      afterVariant: "revision",
     });
   }
 
   if (selectedChapterIdx !== null) {
-    dots.push({
+    slots.push({
       key: "current",
       topLabel: toLabel(selectedChapterIdx),
-      bottomLabel: "Removing",
-      variant: "target",
+      currentBottomLabel: "Removing",
+      currentVariant: "target",
+      afterVariant: "ghost",
     });
   }
 
   if (nextRevisionChapterIdx !== null) {
-    dots.push({
+    slots.push({
       key: "next",
       topLabel: toLabel(nextRevisionChapterIdx),
-      bottomLabel: "Next revision",
-      variant: "next-revision",
+      currentBottomLabel: "Next revision",
+      afterBottomLabel: "Next revision",
+      currentVariant: "next-revision",
+      afterVariant: "next-revision",
     });
   }
 
-  dots.push({ key: "end", topLabel: "End", variant: "edge" });
-  return dots;
+  slots.push({
+    key: "end",
+    topLabel: "End",
+    currentVariant: "edge",
+    afterVariant: "edge",
+  });
+  return slots;
 }
 
 function RevisionTimeline(props: RevisionTimelineProps) {
@@ -245,44 +271,93 @@ function RevisionTimeline(props: RevisionTimelineProps) {
     previousRevisionChapterIdx,
     nextRevisionChapterIdx,
   } = props;
-  const dots = buildTimelineDots(
+
+  const slots = buildTimelineSlots(
     allChapters,
     selectedChapterIdx,
     previousRevisionChapterIdx,
     nextRevisionChapterIdx,
   );
 
-  const currentDotIdx = dots.findIndex((d) => d.key === "current");
-  const nextRevDotIdx = dots.findIndex((d) => d.key === "next");
-  const endDotIdx = dots.findIndex((d) => d.key === "end");
-  // Segments between dot[i] and dot[i+1] are "affected" from the current dot
-  // up to (but not including) the next revision dot, or to the end if none.
-  const affectedUntilDotIdx = nextRevDotIdx !== -1 ? nextRevDotIdx : endDotIdx;
+  const currentSlotIdx = slots.findIndex((s) => s.key === "current");
+  const prevSlotIdx = slots.findIndex((s) => s.key === "prev");
+  const nextSlotIdx = slots.findIndex((s) => s.key === "next");
+  const endSlotIdx = slots.findIndex((s) => s.key === "end");
+
+  // Upper boundary shared by both rows: up to (not including) next revision, or end.
+  const affectedTo = nextSlotIdx !== -1 ? nextSlotIdx : endSlotIdx;
+
+  // Green range: from "prev" through the ghost to the same upper boundary.
+  // -1 when no prior revision exists (nothing to heal back to → no green segments).
+  const healedFrom = prevSlotIdx;
+
+  function getSegmentState(i: number, mode: "current" | "after"): SegmentState {
+    if (mode === "current") {
+      if (currentSlotIdx !== -1 && i >= currentSlotIdx && i < affectedTo)
+        return "affected";
+    } else {
+      if (
+        currentSlotIdx !== -1 &&
+        healedFrom !== -1 &&
+        i >= healedFrom &&
+        i < affectedTo
+      )
+        return "healed";
+    }
+    return "normal";
+  }
+
+  function renderRow(mode: "current" | "after") {
+    return (
+      <Box className="w-full items-center">
+        {slots.map((slot, i) => {
+          const variant =
+            mode === "current" ? slot.currentVariant : slot.afterVariant;
+          const bottomLabel =
+            mode === "current"
+              ? slot.currentBottomLabel
+              : slot.afterBottomLabel;
+          return (
+            <Fragment key={slot.key}>
+              <Box col className="items-center shrink-0 gap-1 w-20">
+                <Text
+                  className={cn(
+                    "text-xs text-center leading-tight",
+                    variant === "ghost" && "opacity-40",
+                  )}
+                >
+                  {slot.topLabel}
+                </Text>
+                <DotNode variant={variant} />
+                <Text className="text-xs text-center leading-tight text-muted-foreground min-h-8">
+                  {bottomLabel ?? ""}
+                </Text>
+              </Box>
+              {i < slots.length - 1 && (
+                <SegmentLine state={getSegmentState(i, mode)} />
+              )}
+            </Fragment>
+          );
+        })}
+      </Box>
+    );
+  }
 
   return (
-    <Box className="items-center">
-      {dots.map((dot, i) => (
-        <Fragment key={dot.key}>
-          <Box col className="items-center shrink-0 gap-1 w-20">
-            <Text className="text-xs text-center leading-tight">
-              {dot.topLabel}
-            </Text>
-            <DotNode variant={dot.variant} />
-            <Text className="text-xs text-center leading-tight text-muted-foreground min-h-8">
-              {dot.bottomLabel ?? ""}
-            </Text>
-          </Box>
-          {i < dots.length - 1 && (
-            <SegmentLine
-              affected={
-                currentDotIdx !== -1 &&
-                i >= currentDotIdx &&
-                i < affectedUntilDotIdx
-              }
-            />
-          )}
-        </Fragment>
-      ))}
+    <Box col className="w-full gap-4">
+      <Box col className="gap-0.5">
+        <Text className="text-xs font-medium text-muted-foreground">
+          Current
+        </Text>
+        {renderRow("current")}
+      </Box>
+      <div className="border-t border-muted-foreground/20" />
+      <Box col className="gap-0.5">
+        <Text className="text-xs font-medium text-muted-foreground">
+          After removing
+        </Text>
+        {renderRow("after")}
+      </Box>
     </Box>
   );
 }

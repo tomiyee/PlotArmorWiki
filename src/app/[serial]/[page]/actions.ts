@@ -163,9 +163,9 @@ export async function savePageContent(
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
       const sectionId = parseInt(sectionIdStr, 10);
       const prevContent = prevContentBySectionId.get(sectionId) ?? "";
-      if (content === prevContent) {
-        // Content matches the previous revision — delete any revision at this
-        // chapter to uphold the invariant: consecutive revisions must differ.
+      if (!content.trim() || content === prevContent) {
+        // Never write empty revisions; also delete if matching previous revision
+        // to uphold the invariant: consecutive revisions must differ.
         await tx
           .delete(pageSectionRevisions)
           .where(
@@ -252,7 +252,7 @@ export async function savePageContent(
       )) {
         const infoboxSectionId = parseInt(infoboxSectionIdStr, 10);
         const prevContent = prevContentByInfoboxId.get(infoboxSectionId) ?? "";
-        if (content === prevContent) {
+        if (!content.trim() || content === prevContent) {
           await tx
             .delete(pageInfoboxRevisions)
             .where(
