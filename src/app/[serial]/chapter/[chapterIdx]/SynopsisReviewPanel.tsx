@@ -37,14 +37,7 @@ export function SynopsisReviewPanel(props: SynopsisReviewPanelProps) {
   const { suggestions, currentContent, serialSlug } = props;
 
   if (suggestions.length === 0) {
-    return (
-      <Box col className="gap-2 rounded-lg border border-border bg-muted/20 p-4">
-        <Text variant="h3">Pending synopsis suggestions</Text>
-        <Text muted className="text-sm">
-          No pending synopsis suggestions for this chapter.
-        </Text>
-      </Box>
-    );
+    return null;
   }
 
   return (
