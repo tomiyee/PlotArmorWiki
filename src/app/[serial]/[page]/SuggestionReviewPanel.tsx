@@ -188,7 +188,7 @@ function SuggestionCard(props: SuggestionCardProps) {
       {suggestion.sectionChanges.map((change) => (
         <Box col key={change.sectionId} className="gap-2">
           <Text variant="h4">{change.sectionName}</Text>
-          <Box className="gap-3 items-start flex-col sm:flex-row">
+          <Box className="gap-3 items-stretch flex-col sm:flex-row">
             {/* Current */}
             <Box col className="flex-1 gap-1 min-w-0">
               <Text
@@ -197,7 +197,7 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Current
               </Text>
-              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-60px overflow-auto">
+              <Box className="flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm min-h-60px overflow-auto">
                 {change.currentContent ? (
                   <MarkdownRenderer serialSlug={serialSlug} sm>
                     {change.currentContent}
@@ -217,7 +217,7 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Proposed
               </Text>
-              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-60px overflow-auto">
+              <Box className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-60px overflow-auto">
                 <MarkdownRenderer serialSlug={serialSlug} sm>
                   {change.proposedContent}
                 </MarkdownRenderer>
@@ -231,7 +231,7 @@ function SuggestionCard(props: SuggestionCardProps) {
       {suggestion.infoboxChanges.map((change) => (
         <Box col key={change.infoboxSectionId} className="gap-2">
           <Text variant="h4">Infobox: {change.infoboxSectionLabel}</Text>
-          <Box className="gap-3 items-start flex-col sm:flex-row">
+          <Box className="gap-3 items-stretch flex-col sm:flex-row">
             <Box col className="flex-1 gap-1 min-w-0">
               <Text
                 muted
@@ -239,7 +239,7 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Current
               </Text>
-              <Box className="rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px overflow-auto">
+              <Box className="flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px overflow-auto">
                 {change.currentContent ? (
                   <MarkdownRenderer serialSlug={serialSlug} sm>
                     {change.currentContent}
@@ -258,7 +258,7 @@ function SuggestionCard(props: SuggestionCardProps) {
               >
                 Proposed
               </Text>
-              <Box className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px overflow-auto">
+              <Box className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px overflow-auto">
                 <MarkdownRenderer serialSlug={serialSlug} sm>
                   {change.proposedContent}
                 </MarkdownRenderer>
@@ -289,27 +289,22 @@ function SuggestionCard(props: SuggestionCardProps) {
       )}
 
       {/* Actions */}
-      <Box className="gap-2 flex-wrap">
-        <Button onClick={handleApprove} disabled={isPending}>
-          Approve
-        </Button>
+      <Box className="gap-2 flex-wrap justify-end">
         {!showRejectForm ? (
-          <Button
-            variant="outline"
-            onClick={() => setShowRejectForm(true)}
-            disabled={isPending}
-          >
-            Reject
-          </Button>
-        ) : (
           <>
             <Button
-              variant="destructive"
-              onClick={handleReject}
+              variant="outline"
+              onClick={() => setShowRejectForm(true)}
               disabled={isPending}
             >
-              {isPending ? "Rejecting…" : "Confirm rejection"}
+              Reject
             </Button>
+            <Button onClick={handleApprove} disabled={isPending}>
+              Approve
+            </Button>
+          </>
+        ) : (
+          <>
             <Button
               variant="ghost"
               onClick={() => {
@@ -319,6 +314,13 @@ function SuggestionCard(props: SuggestionCardProps) {
               disabled={isPending}
             >
               Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleReject}
+              disabled={isPending}
+            >
+              {isPending ? "Rejecting…" : "Confirm rejection"}
             </Button>
           </>
         )}
