@@ -168,7 +168,7 @@ export default async function SerialLayout({ children, params }: Props) {
         tocSlot={<SerialTOCDrawer key="toc-drawer" tocContent={tocContent} />}
         tocContent={tocContent}
       />
-      <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
     </>
   );
 }
