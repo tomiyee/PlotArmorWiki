@@ -339,10 +339,21 @@ function RevisionTimeline(props: RevisionTimelineProps) {
             <Fragment key={slot.key}>
               {!isHealedGhost && (
                 <Box className="items-center gap-1.5">
-                  <div className="w-16 shrink-0 flex justify-end">
-                    <Text className="text-[10px] leading-tight text-right truncate">
-                      {topLabel}
-                    </Text>
+                  <div className="w-16 shrink-0 flex flex-col items-end justify-center">
+                    {topLabel.includes(" · ") ? (
+                      <>
+                        <Text className="text-[10px] leading-none text-right text-muted-foreground truncate w-full">
+                          {topLabel.slice(0, topLabel.indexOf(" · "))}
+                        </Text>
+                        <Text className="text-[10px] leading-tight text-right truncate w-full">
+                          {topLabel.slice(topLabel.indexOf(" · ") + 3)}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text className="text-[10px] leading-tight text-right truncate w-full">
+                        {topLabel}
+                      </Text>
+                    )}
                   </div>
                   <div className="w-5 flex justify-center shrink-0">
                     <DotNode variant={variant} />
