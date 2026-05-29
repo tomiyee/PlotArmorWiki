@@ -598,7 +598,7 @@ export default async function SerialPage({ params }: Props) {
       <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-(--content-width) mx-auto w-full px-4 py-6 flex gap-6">
         {/* Left sidebar - sticky, full viewport height, desktop only */}
-        <aside className="hidden md:block w-56 shrink-0 sticky top-0 h-dvh py-6">
+        <aside className="hidden md:block w-56 shrink-0 sticky top-0 max-h-dvh overflow-hidden py-6">
           <SerialTOCSidebar
             serialId={serial.id}
             serialSlug={serialSlug}
