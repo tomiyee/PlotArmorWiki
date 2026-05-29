@@ -61,9 +61,7 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
   }
 
   function handleConfirm() {
-    if (pendingChapterId !== null) {
-      onChange(pendingChapterId);
-    }
+    onChange(pendingChapterId!);
     setPendingChapterId(null);
   }
 
@@ -73,11 +71,11 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
 
   const banner = (
     <div
-      className="fixed top-[var(--navbar-height,54px)] left-0 right-0 z-[9] border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      className="fixed top-[var(--navbar-height)] left-0 right-0 z-[9] border-b border-accent-foreground/20 bg-accent"
       aria-label="Writing as of chapter selector"
     >
-      <div className="mx-auto max-w-(--content-width) w-full px-4 py-2 flex items-center justify-center gap-3">
-        <Text as="span" className="shrink-0 text-sm font-medium">
+      <div className="mx-auto max-w-(--content-width) w-full px-4 py-1 flex items-center justify-center gap-3">
+        <Text as="span" className="shrink-0 text-sm font-medium text-accent-foreground">
           Writing as of:
         </Text>
         <Select<number>
@@ -94,7 +92,7 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
 
   return (
     <>
-      {typeof document !== "undefined" && createPortal(banner, document.body)}
+      {createPortal(banner, document.body)}
 
       <Dialog
         isOpen={pendingChapterId !== null}

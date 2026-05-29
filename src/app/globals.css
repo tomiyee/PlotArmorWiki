@@ -55,6 +55,7 @@
   /* Layout */
   --content-width: 64rem; /* 5xl = 64rem */
   --navbar-height: 54px; /* min-h-13.5 (3.375rem) + 2×py-2 (1rem) ≈ 54px */
+  --writing-banner-height: 2.5rem; /* py-1 (0.5rem) + select h-9 (2.25rem) ≈ 2.75rem, rounded to 2.5rem */
 }
 
 .dark {
