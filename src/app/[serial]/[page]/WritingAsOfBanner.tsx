@@ -54,7 +54,10 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
   function handleSelect(chapterId: number) {
     if (chapterId === value) return;
     if (isDirty) {
-      setPendingChapterId(chapterId);
+      // Defer so the mousedown that triggered this selection finishes propagating
+      // before the dialog mounts — otherwise @base-ui's dismiss handler catches
+      // the same event and closes the dialog immediately.
+      setTimeout(() => setPendingChapterId(chapterId), 0);
     } else {
       onChange(chapterId);
     }
