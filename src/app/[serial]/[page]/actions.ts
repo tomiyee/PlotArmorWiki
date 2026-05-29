@@ -20,10 +20,13 @@ import {
   count,
   desc,
   eq,
+  gt,
   inArray,
   isNull,
+  lt,
   lte,
   max,
+  min,
   ne,
 } from "drizzle-orm";
 import {
@@ -106,9 +109,74 @@ export async function savePageContent(
   const headChapterId = targetChapterId ?? (await getHeadChapterId(serialId));
 
   await db.transaction(async (tx) => {
+    // Resolve the idx of the target chapter so we can find the previous revision
+    // (highest idx strictly less than headIdx) for each section and infobox row.
+    const [targetChapterRow] = await tx
+      .select({ idx: chapters.idx })
+      .from(chapters)
+      .where(eq(chapters.id, headChapterId))
+      .limit(1);
+    const headIdx = targetChapterRow?.idx ?? 0;
+
+    // ── Section revisions ─────────────────────────────────────────────────────
+    const sectionIds = Object.keys(sectionContent).map(Number);
+    let prevContentBySectionId = new Map<number, string>();
+    if (sectionIds.length > 0 && headIdx > 0) {
+      const prevMaxSq = tx
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .where(
+          and(
+            eq(pageSectionRevisions.pageId, pageId),
+            inArray(pageSectionRevisions.sectionId, sectionIds),
+            lt(chapters.idx, headIdx),
+          ),
+        )
+        .groupBy(pageSectionRevisions.sectionId)
+        .as("prev_max_sq");
+
+      const prevRevisions = await tx
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          content: pageSectionRevisions.content,
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .innerJoin(
+          prevMaxSq,
+          and(
+            eq(pageSectionRevisions.sectionId, prevMaxSq.sectionId),
+            eq(chapters.idx, prevMaxSq.maxPrevIdx),
+          ),
+        )
+        .where(eq(pageSectionRevisions.pageId, pageId));
+
+      prevContentBySectionId = new Map(
+        prevRevisions.map((r) => [r.sectionId, r.content ?? ""]),
+      );
+    }
+
     for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
-      if (!content.trim()) continue; // never write empty revisions
       const sectionId = parseInt(sectionIdStr, 10);
+      const prevContent = prevContentBySectionId.get(sectionId) ?? "";
+      if (!content.trim() || content === prevContent) {
+        // Never write empty revisions; also delete if matching previous revision
+        // to uphold the invariant: consecutive revisions must differ.
+        await tx
+          .delete(pageSectionRevisions)
+          .where(
+            and(
+              eq(pageSectionRevisions.pageId, pageId),
+              eq(pageSectionRevisions.sectionId, sectionId),
+              eq(pageSectionRevisions.chapterId, headChapterId),
+            ),
+          );
+        continue;
+      }
       await tx
         .insert(pageSectionRevisions)
         .values({ pageId, sectionId, chapterId: headChapterId, content })
@@ -134,11 +202,68 @@ export async function savePageContent(
           set: { imageUrl: floaterImageUrl },
         });
 
+      // ── Infobox row revisions ───────────────────────────────────────────────
+      const infoboxIds = Object.keys(floaterRowContent).map(Number);
+      let prevContentByInfoboxId = new Map<number, string>();
+      if (infoboxIds.length > 0 && headIdx > 0) {
+        const ibPrevMaxSq = tx
+          .select({
+            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+            maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
+          })
+          .from(pageInfoboxRevisions)
+          .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+          .where(
+            and(
+              eq(pageInfoboxRevisions.pageId, pageId),
+              inArray(pageInfoboxRevisions.infoboxSectionId, infoboxIds),
+              lt(chapters.idx, headIdx),
+            ),
+          )
+          .groupBy(pageInfoboxRevisions.infoboxSectionId)
+          .as("ib_prev_max_sq");
+
+        const ibPrevRevisions = await tx
+          .select({
+            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+            content: pageInfoboxRevisions.content,
+          })
+          .from(pageInfoboxRevisions)
+          .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+          .innerJoin(
+            ibPrevMaxSq,
+            and(
+              eq(
+                pageInfoboxRevisions.infoboxSectionId,
+                ibPrevMaxSq.infoboxSectionId,
+              ),
+              eq(chapters.idx, ibPrevMaxSq.maxPrevIdx),
+            ),
+          )
+          .where(eq(pageInfoboxRevisions.pageId, pageId));
+
+        prevContentByInfoboxId = new Map(
+          ibPrevRevisions.map((r) => [r.infoboxSectionId, r.content ?? ""]),
+        );
+      }
+
       for (const [infoboxSectionIdStr, content] of Object.entries(
         floaterRowContent,
       )) {
-        if (!content.trim()) continue; // never write empty revisions
         const infoboxSectionId = parseInt(infoboxSectionIdStr, 10);
+        const prevContent = prevContentByInfoboxId.get(infoboxSectionId) ?? "";
+        if (!content.trim() || content === prevContent) {
+          await tx
+            .delete(pageInfoboxRevisions)
+            .where(
+              and(
+                eq(pageInfoboxRevisions.pageId, pageId),
+                eq(pageInfoboxRevisions.infoboxSectionId, infoboxSectionId),
+                eq(pageInfoboxRevisions.chapterId, headChapterId),
+              ),
+            );
+          continue;
+        }
         await tx
           .insert(pageInfoboxRevisions)
           .values({
@@ -186,6 +311,16 @@ export async function getPageContentAtChapter(
     id: number;
     content: string;
     lastUpdatedChapterIdx: number | null;
+    /** Content from the revision immediately before this chapter's revision. Empty when no prior revision exists. */
+    previousContent: string;
+    /** Chapter idx of the revision immediately before this chapter's revision, or null when no prior revision exists. */
+    previousRevisionChapterIdx: number | null;
+    /**
+     * Chapter idx of the next revision strictly after this chapter, or null when
+     * this is the most recent revision. Used by the remove-revision dialog to
+     * compute the exact range of affected chapters.
+     */
+    nextRevisionChapterIdx: number | null;
   }[];
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
@@ -218,7 +353,52 @@ export async function getPageContentAtChapter(
     .groupBy(pageSectionRevisions.sectionId)
     .as("section_max_idx_sq");
 
-  const [activeSections, sectionVersions] = await Promise.all([
+  // Previous revision: highest idx STRICTLY less than the actual revision's idx
+  // (not the cutoff). This ensures the correct previous content is returned even
+  // when the selected chapter is beyond the revision chapter (non-direct case).
+  const sectionPrevMaxIdxSq = db
+    .select({
+      sectionId: pageSectionRevisions.sectionId,
+      maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
+    })
+    .from(pageSectionRevisions)
+    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+    .innerJoin(
+      sectionMaxIdxSq,
+      and(
+        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+        lt(chapters.idx, sectionMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(eq(pageSectionRevisions.pageId, pageId))
+    .groupBy(pageSectionRevisions.sectionId)
+    .as("section_prev_max_idx_sq");
+
+  // Next revision: lowest idx STRICTLY greater than the actual revision's idx.
+  const sectionNextMinIdxSq = db
+    .select({
+      sectionId: pageSectionRevisions.sectionId,
+      minNextIdx: min(chapters.idx).as("min_next_idx"),
+    })
+    .from(pageSectionRevisions)
+    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+    .innerJoin(
+      sectionMaxIdxSq,
+      and(
+        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+        gt(chapters.idx, sectionMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(eq(pageSectionRevisions.pageId, pageId))
+    .groupBy(pageSectionRevisions.sectionId)
+    .as("section_next_min_idx_sq");
+
+  const [
+    activeSections,
+    sectionVersions,
+    sectionPrevVersions,
+    sectionNextRevisions,
+  ] = await Promise.all([
     db
       .select({ id: pageSections.id })
       .from(pageSections)
@@ -242,6 +422,37 @@ export async function getPageContentAtChapter(
         ),
       )
       .where(eq(pageSectionRevisions.pageId, pageId)),
+    db
+      .select({
+        sectionId: pageSectionRevisions.sectionId,
+        content: pageSectionRevisions.content,
+        chapterIdx: chapters.idx,
+      })
+      .from(pageSectionRevisions)
+      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+      .innerJoin(
+        sectionPrevMaxIdxSq,
+        and(
+          eq(pageSectionRevisions.sectionId, sectionPrevMaxIdxSq.sectionId),
+          eq(chapters.idx, sectionPrevMaxIdxSq.maxPrevIdx),
+        ),
+      )
+      .where(eq(pageSectionRevisions.pageId, pageId)),
+    db
+      .select({
+        sectionId: pageSectionRevisions.sectionId,
+        chapterIdx: chapters.idx,
+      })
+      .from(pageSectionRevisions)
+      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+      .innerJoin(
+        sectionNextMinIdxSq,
+        and(
+          eq(pageSectionRevisions.sectionId, sectionNextMinIdxSq.sectionId),
+          eq(chapters.idx, sectionNextMinIdxSq.minNextIdx),
+        ),
+      )
+      .where(eq(pageSectionRevisions.pageId, pageId)),
   ]);
 
   const versionBySectionId = new Map(
@@ -250,12 +461,24 @@ export async function getPageContentAtChapter(
       { content: v.content, chapterIdx: v.chapterIdx },
     ]),
   );
+  const prevContentBySectionId = new Map(
+    sectionPrevVersions.map((v) => [v.sectionId, v.content ?? ""]),
+  );
+  const prevRevisionIdxBySectionId = new Map(
+    sectionPrevVersions.map((v) => [v.sectionId, v.chapterIdx]),
+  );
+  const nextRevisionIdxBySectionId = new Map(
+    sectionNextRevisions.map((v) => [v.sectionId, v.chapterIdx]),
+  );
   const sections = activeSections.map((s) => {
     const v = versionBySectionId.get(s.id);
     return {
       id: s.id,
       content: v?.content ?? "",
       lastUpdatedChapterIdx: v?.chapterIdx ?? null,
+      previousContent: prevContentBySectionId.get(s.id) ?? "",
+      previousRevisionChapterIdx: prevRevisionIdxBySectionId.get(s.id) ?? null,
+      nextRevisionChapterIdx: nextRevisionIdxBySectionId.get(s.id) ?? null,
     };
   });
 

@@ -21,6 +21,7 @@ import {
   eq,
   inArray,
   isNull,
+  lt,
   lte,
   max,
 } from "drizzle-orm";
@@ -71,9 +72,6 @@ export async function submitPageSuggestion(
   if (sectionChanges.length === 0 && infoboxChanges.length === 0) {
     return { error: "At least one section change is required." };
   }
-  if (sectionChanges.some((c) => !c.proposedContent.trim())) {
-    return { error: "Proposed content cannot be empty for any section." };
-  }
 
   // Admins should use savePageContent directly.
   const serialId = await getSerialIdByPageId(pageId);
@@ -104,7 +102,6 @@ export async function submitPageSuggestion(
     }
 
     for (const change of infoboxChanges) {
-      if (!change.proposedContent.trim()) continue;
       await tx.insert(pageSuggestionInfoboxChanges).values({
         suggestionId: suggestion.id,
         infoboxSectionId: change.infoboxSectionId,
@@ -518,9 +515,71 @@ export async function approveSuggestion(
   ]);
 
   await db.transaction(async (tx) => {
-    // Write each section change as a new revision at the target chapter.
+    // Resolve the idx of the target chapter for the previous-revision invariant check.
+    const [targetChapterRow] = await tx
+      .select({ idx: chapters.idx })
+      .from(chapters)
+      .where(eq(chapters.id, suggestion.targetChapterId))
+      .limit(1);
+    const targetIdx = targetChapterRow?.idx ?? 0;
+
+    // ── Section revisions ──────────────────────────────────────────────────────
+    const sectionIds = changes.map((c) => c.sectionId);
+    let prevContentBySectionId = new Map<number, string>();
+    if (sectionIds.length > 0 && targetIdx > 0) {
+      const prevMaxSq = tx
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .where(
+          and(
+            eq(pageSectionRevisions.pageId, suggestion.pageId),
+            inArray(pageSectionRevisions.sectionId, sectionIds),
+            lt(chapters.idx, targetIdx),
+          ),
+        )
+        .groupBy(pageSectionRevisions.sectionId)
+        .as("prev_max_sq");
+
+      const prevRevisions = await tx
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          content: pageSectionRevisions.content,
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .innerJoin(
+          prevMaxSq,
+          and(
+            eq(pageSectionRevisions.sectionId, prevMaxSq.sectionId),
+            eq(chapters.idx, prevMaxSq.maxPrevIdx),
+          ),
+        )
+        .where(eq(pageSectionRevisions.pageId, suggestion.pageId));
+
+      prevContentBySectionId = new Map(
+        prevRevisions.map((r) => [r.sectionId, r.content ?? ""]),
+      );
+    }
+
     for (const change of changes) {
-      if (!change.proposedContent.trim()) continue;
+      const prevContent =
+        prevContentBySectionId.get(change.sectionId) ?? "";
+      if (change.proposedContent === prevContent) {
+        await tx
+          .delete(pageSectionRevisions)
+          .where(
+            and(
+              eq(pageSectionRevisions.pageId, suggestion.pageId),
+              eq(pageSectionRevisions.sectionId, change.sectionId),
+              eq(pageSectionRevisions.chapterId, suggestion.targetChapterId),
+            ),
+          );
+        continue;
+      }
       await tx
         .insert(pageSectionRevisions)
         .values({
@@ -539,9 +598,69 @@ export async function approveSuggestion(
         });
     }
 
-    // Write each infobox change as a new infobox revision at the target chapter.
+    // ── Infobox row revisions ─────────────────────────────────────────────────
+    const infoboxIds = ibChanges.map((c) => c.infoboxSectionId);
+    let prevContentByInfoboxId = new Map<number, string>();
+    if (infoboxIds.length > 0 && targetIdx > 0) {
+      const ibPrevMaxSq = tx
+        .select({
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
+        })
+        .from(pageInfoboxRevisions)
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+        .where(
+          and(
+            eq(pageInfoboxRevisions.pageId, suggestion.pageId),
+            inArray(pageInfoboxRevisions.infoboxSectionId, infoboxIds),
+            lt(chapters.idx, targetIdx),
+          ),
+        )
+        .groupBy(pageInfoboxRevisions.infoboxSectionId)
+        .as("ib_prev_max_sq");
+
+      const ibPrevRevisions = await tx
+        .select({
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          content: pageInfoboxRevisions.content,
+        })
+        .from(pageInfoboxRevisions)
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+        .innerJoin(
+          ibPrevMaxSq,
+          and(
+            eq(
+              pageInfoboxRevisions.infoboxSectionId,
+              ibPrevMaxSq.infoboxSectionId,
+            ),
+            eq(chapters.idx, ibPrevMaxSq.maxPrevIdx),
+          ),
+        )
+        .where(eq(pageInfoboxRevisions.pageId, suggestion.pageId));
+
+      prevContentByInfoboxId = new Map(
+        ibPrevRevisions.map((r) => [r.infoboxSectionId, r.content ?? ""]),
+      );
+    }
+
     for (const change of ibChanges) {
-      if (!change.proposedContent.trim()) continue;
+      const prevContent =
+        prevContentByInfoboxId.get(change.infoboxSectionId) ?? "";
+      if (change.proposedContent === prevContent) {
+        await tx
+          .delete(pageInfoboxRevisions)
+          .where(
+            and(
+              eq(pageInfoboxRevisions.pageId, suggestion.pageId),
+              eq(
+                pageInfoboxRevisions.infoboxSectionId,
+                change.infoboxSectionId,
+              ),
+              eq(pageInfoboxRevisions.chapterId, suggestion.targetChapterId),
+            ),
+          );
+        continue;
+      }
       await tx
         .insert(pageInfoboxRevisions)
         .values({
