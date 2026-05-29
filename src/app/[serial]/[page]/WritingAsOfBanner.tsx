@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { useEditMode } from "@/contexts/EditModeContext";
 import type { ChapterGroupOption } from "./types";
 
 type WritingAsOfBannerProps = {
@@ -54,10 +55,7 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
   function handleSelect(chapterId: number) {
     if (chapterId === value) return;
     if (isDirty) {
-      // Defer so the mousedown that triggered this selection finishes propagating
-      // before the dialog mounts — otherwise @base-ui's dismiss handler catches
-      // the same event and closes the dialog immediately.
-      setTimeout(() => setPendingChapterId(chapterId), 0);
+      setPendingChapterId(chapterId);
     } else {
       onChange(chapterId);
     }
@@ -97,10 +95,14 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
     <>
       {createPortal(banner, document.body)}
 
+      {/* disablePointerDismissal prevents @base-ui from closing the dialog when
+          the same mousedown that triggered the chapter selection propagates to
+          document after the dialog mounts. */}
       <Dialog
         isOpen={pendingChapterId !== null}
         onClose={handleCancel}
         showCloseButton={false}
+        disablePointerDismissal
       >
         <DialogHeader>
           <DialogTitle>Switch chapter and discard changes?</DialogTitle>
@@ -120,4 +122,23 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
       </Dialog>
     </>
   );
+}
+
+/**
+ * Spacer that reserves vertical space equal to the "Writing as of" banner
+ * height. Render this at the very top of page content so the fixed banner
+ * does not obscure the breadcrumb or other elements when in edit mode.
+ *
+ * Only visible while edit mode is active; renders nothing in read mode.
+ *
+ * @example
+ * <PageContainer>
+ *   {hasChapters && <WritingAsOfBannerSpacer />}
+ *   <Box col>...</Box>
+ * </PageContainer>
+ */
+export function WritingAsOfBannerSpacer() {
+  const { isEditing } = useEditMode();
+  if (!isEditing) return null;
+  return <div className="h-[var(--writing-banner-height)]" aria-hidden />;
 }

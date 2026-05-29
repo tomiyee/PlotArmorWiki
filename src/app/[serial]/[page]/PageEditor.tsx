@@ -566,16 +566,13 @@ export function PageEditor(props: Props) {
   return (
     <Box col className="gap-6">
       {allChapters.length > 0 && (
-        <>
-          <WritingAsOfBanner
-            options={chapterSelectOptions}
-            value={selectedChapterId ?? undefined}
-            onChange={handleChapterChange}
-            isPending={isPending}
-            isDirty={isDirty}
-          />
-          <div className="h-[var(--writing-banner-height)]" />
-        </>
+        <WritingAsOfBanner
+          options={chapterSelectOptions}
+          value={selectedChapterId ?? undefined}
+          onChange={handleChapterChange}
+          isPending={isPending}
+          isDirty={isDirty}
+        />
       )}
 
       {editModeHeader}

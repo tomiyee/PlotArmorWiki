@@ -20,6 +20,7 @@ import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageEditor } from "./PageEditor";
+import { WritingAsOfBannerSpacer } from "./WritingAsOfBanner";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin, isAuthenticated } from "@/lib/auth-guard";
 import {
@@ -618,6 +619,7 @@ export default async function PageView({ params }: Props) {
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
       <PageContainer>
+        {allChapters.length > 0 && <WritingAsOfBannerSpacer />}
         <Box col className="gap-6">
           {/* Breadcrumb: Serial > Parent1, Parent2 */}
           <Text muted className="text-sm flex items-center gap-1 flex-wrap">
