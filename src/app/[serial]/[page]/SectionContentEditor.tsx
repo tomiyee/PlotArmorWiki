@@ -40,8 +40,11 @@ type SectionContentEditorProps = {
   previousRevisionContent: string;
   /** Chapter idx of the revision immediately before the selected chapter's revision, or null when no prior revision exists. */
   previousRevisionChapterIdx: number | null;
-  /** True when the selected chapter has its own direct revision for this section (not just inherited). */
-  hasRevisionAtChapter: boolean;
+  /**
+   * Called when the user confirms removing the revision in the dialog. The parent
+   * (PageEditor) handles the draft update and any necessary chapter switch.
+   */
+  onConfirmRemove: () => void;
   /** All chapters in the serial. Used to compute impact range in the remove-revision dialog. */
   allChapters: ChapterData[];
   /**
@@ -72,7 +75,7 @@ type SectionContentEditorProps = {
  *   serialSlug="one-piece"
  *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  *   previousRevisionContent="Earlier content"
- *   hasRevisionAtChapter={true}
+ *   onConfirmRemove={() => {}}
  *   allChapters={allChapters}
  * />
  */
@@ -90,7 +93,7 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
     chapterType,
     previousRevisionContent,
     previousRevisionChapterIdx,
-    hasRevisionAtChapter,
+    onConfirmRemove,
     allChapters,
     nextRevisionChapterIdx,
   } = props;
@@ -98,7 +101,7 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   function handleConfirmRemove() {
-    onChange(previousRevisionContent);
+    onConfirmRemove();
     setIsDialogOpen(false);
   }
 
@@ -114,26 +117,26 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
           selectedChapterIdx={selectedChapterIdx}
         />
         <Box className="ml-auto">
-          {hasRevisionAtChapter ? (
+          {lastUpdatedIdx !== null ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => setIsDialogOpen(true)}
-              aria-label="Remove this chapter's revision"
+              aria-label="Remove this section's revision"
               className="text-muted-foreground hover:text-foreground gap-1.5"
             >
               <Eraser size={14} />
               Remove revision
             </Button>
           ) : (
-            <Tooltip content="No direct revision at this chapter — select a chapter where a revision exists">
+            <Tooltip content="No revision exists for this section yet">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 disabled
-                aria-label="Remove this chapter's revision"
+                aria-label="Remove this section's revision"
                 className="gap-1.5"
               >
                 <Eraser size={14} />
@@ -164,7 +167,7 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
         previousContent={previousRevisionContent}
         previousRevisionChapterIdx={previousRevisionChapterIdx}
         allChapters={allChapters}
-        selectedChapterIdx={selectedChapterIdx}
+        selectedChapterIdx={lastUpdatedIdx}
         nextRevisionChapterIdx={nextRevisionChapterIdx}
       />
     </Box>

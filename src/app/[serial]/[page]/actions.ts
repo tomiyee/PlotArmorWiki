@@ -353,7 +353,9 @@ export async function getPageContentAtChapter(
     .groupBy(pageSectionRevisions.sectionId)
     .as("section_max_idx_sq");
 
-  // Previous revision: highest idx STRICTLY less than cutoffIdx.
+  // Previous revision: highest idx STRICTLY less than the actual revision's idx
+  // (not the cutoff). This ensures the correct previous content is returned even
+  // when the selected chapter is beyond the revision chapter (non-direct case).
   const sectionPrevMaxIdxSq = db
     .select({
       sectionId: pageSectionRevisions.sectionId,
@@ -361,13 +363,18 @@ export async function getPageContentAtChapter(
     })
     .from(pageSectionRevisions)
     .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(eq(pageSectionRevisions.pageId, pageId), lt(chapters.idx, cutoffIdx)),
+    .innerJoin(
+      sectionMaxIdxSq,
+      and(
+        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+        lt(chapters.idx, sectionMaxIdxSq.maxIdx),
+      ),
     )
+    .where(eq(pageSectionRevisions.pageId, pageId))
     .groupBy(pageSectionRevisions.sectionId)
     .as("section_prev_max_idx_sq");
 
-  // Next revision: lowest idx STRICTLY greater than cutoffIdx.
+  // Next revision: lowest idx STRICTLY greater than the actual revision's idx.
   const sectionNextMinIdxSq = db
     .select({
       sectionId: pageSectionRevisions.sectionId,
@@ -375,9 +382,14 @@ export async function getPageContentAtChapter(
     })
     .from(pageSectionRevisions)
     .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(eq(pageSectionRevisions.pageId, pageId), gt(chapters.idx, cutoffIdx)),
+    .innerJoin(
+      sectionMaxIdxSq,
+      and(
+        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+        gt(chapters.idx, sectionMaxIdxSq.maxIdx),
+      ),
     )
+    .where(eq(pageSectionRevisions.pageId, pageId))
     .groupBy(pageSectionRevisions.sectionId)
     .as("section_next_min_idx_sq");
 

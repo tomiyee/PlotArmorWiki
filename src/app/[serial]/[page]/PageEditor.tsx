@@ -415,7 +415,10 @@ export function PageEditor(props: Props) {
    * readers at that chapter currently see and replace both the reference view
    * and the draft with it so the editor can review and then overwrite it.
    */
-  function handleChapterChange(chapterId: number) {
+  function handleChapterChange(
+    chapterId: number,
+    draftOverrides: Record<number, string> = {},
+  ) {
     setSelectedChapterId(chapterId);
     startTransition(async () => {
       const [data, parents] = await Promise.all([
@@ -425,7 +428,7 @@ export function PageEditor(props: Props) {
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
       );
-      setDraftSectionContent(newContent);
+      setDraftSectionContent({ ...newContent, ...draftOverrides });
       setCurrentSectionLastUpdatedIdx(
         Object.fromEntries(
           data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx]),
@@ -452,6 +455,31 @@ export function PageEditor(props: Props) {
       }
       setCurrentParentPages(parents);
     });
+  }
+
+  function handleRemoveRevisionConfirmed(sectionId: number) {
+    const prevContent = previousSectionContent[sectionId] ?? "";
+    const lastUpdatedIdx = currentSectionLastUpdatedIdx[sectionId];
+    const isDirectRevision =
+      lastUpdatedIdx !== null && lastUpdatedIdx === selectedChapterIdx;
+
+    if (isDirectRevision) {
+      setDraftSectionContent((prev) => ({ ...prev, [sectionId]: prevContent }));
+      // Optimistically update the last-updated tag to the prior revision's chapter.
+      setCurrentSectionLastUpdatedIdx((prev) => ({
+        ...prev,
+        [sectionId]: previousSectionRevisionChapterIdx[sectionId] ?? null,
+      }));
+    } else if (lastUpdatedIdx !== null) {
+      // Non-direct: the revision lives at a different chapter than the current
+      // selection. Switch to that chapter so the subsequent save targets it.
+      const revisionChapterId = allChapters.find(
+        (c) => c.idx === lastUpdatedIdx,
+      )?.id;
+      if (revisionChapterId !== undefined) {
+        handleChapterChange(revisionChapterId, { [sectionId]: prevContent });
+      }
+    }
   }
 
   // Build chapter name → idx map for MarkdownRenderer
@@ -628,10 +656,7 @@ export function PageEditor(props: Props) {
           previousRevisionChapterIdx={
             previousSectionRevisionChapterIdx[section.id] ?? null
           }
-          hasRevisionAtChapter={
-            currentSectionLastUpdatedIdx[section.id] !== null &&
-            currentSectionLastUpdatedIdx[section.id] === selectedChapterIdx
-          }
+          onConfirmRemove={() => handleRemoveRevisionConfirmed(section.id)}
           allChapters={allChapters}
           nextRevisionChapterIdx={
             nextSectionRevisionChapterIdx[section.id] ?? null

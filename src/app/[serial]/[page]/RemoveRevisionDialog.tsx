@@ -133,11 +133,14 @@ function DiffCell(props: DiffCellProps) {
 
 // ── RevisionTimeline ───────────────────────────────────────────────────────
 
+// "ghost" reserves column space in the after-row without rendering a dot or label,
+// keeping the prev/next nodes aligned with the current row above.
 type DotVariant = "edge" | "revision" | "target" | "next-revision" | "ghost";
 
 type TimelineSlot = {
   key: string;
   topLabel: string;
+  afterTopLabel?: string;
   currentBottomLabel?: string;
   afterBottomLabel?: string;
   currentVariant: DotVariant;
@@ -145,7 +148,6 @@ type TimelineSlot = {
 };
 
 type DotNodeProps = {
-  /** Visual style for this node; "ghost" reserves space without rendering a dot. */
   variant: DotVariant;
 };
 
@@ -167,7 +169,7 @@ function DotNode(props: DotNodeProps) {
     );
   }
   if (variant === "ghost") {
-    // Invisible placeholder keeps the column width consistent with the current row.
+    // Same size as target so the row height stays consistent.
     return <div className="w-3.5 h-3.5 shrink-0" />;
   }
   return (
@@ -238,6 +240,7 @@ function buildTimelineSlots(
     slots.push({
       key: "current",
       topLabel: toLabel(selectedChapterIdx),
+      afterTopLabel: "",
       currentBottomLabel: "Removing",
       currentVariant: "target",
       afterVariant: "ghost",
@@ -284,11 +287,11 @@ function RevisionTimeline(props: RevisionTimelineProps) {
   const nextSlotIdx = slots.findIndex((s) => s.key === "next");
   const endSlotIdx = slots.findIndex((s) => s.key === "end");
 
-  // Upper boundary shared by both rows: up to (not including) next revision, or end.
+  // Current row: amber from target up to (not including) next revision or end.
   const affectedTo = nextSlotIdx !== -1 ? nextSlotIdx : endSlotIdx;
 
-  // Green range: from "prev" through the ghost to the same upper boundary.
-  // -1 when no prior revision exists (nothing to heal back to → no green segments).
+  // After row: green spans prev→ghost and ghost→next, making the line look
+  // continuous from prev to next. No green when there is no prior revision.
   const healedFrom = prevSlotIdx;
 
   function getSegmentState(i: number, mode: "current" | "after"): SegmentState {
@@ -296,12 +299,7 @@ function RevisionTimeline(props: RevisionTimelineProps) {
       if (currentSlotIdx !== -1 && i >= currentSlotIdx && i < affectedTo)
         return "affected";
     } else {
-      if (
-        currentSlotIdx !== -1 &&
-        healedFrom !== -1 &&
-        i >= healedFrom &&
-        i < affectedTo
-      )
+      if (healedFrom !== -1 && i >= healedFrom && i < affectedTo)
         return "healed";
     }
     return "normal";
@@ -313,22 +311,38 @@ function RevisionTimeline(props: RevisionTimelineProps) {
         {slots.map((slot, i) => {
           const variant =
             mode === "current" ? slot.currentVariant : slot.afterVariant;
+          const topLabel =
+            mode === "current"
+              ? slot.topLabel
+              : (slot.afterTopLabel ?? slot.topLabel);
           const bottomLabel =
             mode === "current"
               ? slot.currentBottomLabel
               : slot.afterBottomLabel;
+          const isHealedGhost = variant === "ghost" && healedFrom !== -1;
           return (
             <Fragment key={slot.key}>
-              <Box col className="items-center shrink-0 gap-1 w-20">
-                <Text
-                  className={cn(
-                    "text-xs text-center leading-tight",
-                    variant === "ghost" && "opacity-40",
-                  )}
-                >
-                  {slot.topLabel}
+              <Box
+                col
+                className={cn(
+                  "items-center shrink-0 gap-1 w-20",
+                  isHealedGhost && "relative",
+                )}
+              >
+                <Text className="text-xs text-center leading-tight">
+                  {topLabel}
                 </Text>
-                <DotNode variant={variant} />
+                {isHealedGhost ? (
+                  <>
+                    {/* Absolutely-positioned so top-1/2 lands at the col's vertical
+                        midpoint, which equals the row midpoint (col is always the
+                        tallest element). Matches the self-center segment lines. */}
+                    <div className="absolute inset-x-0 top-[calc(50%_-_1px)] border-t-2 border-green-500 dark:border-green-400" />
+                    <div className="w-3.5 h-3.5 shrink-0" />
+                  </>
+                ) : (
+                  <DotNode variant={variant} />
+                )}
                 <Text className="text-xs text-center leading-tight text-muted-foreground min-h-8">
                   {bottomLabel ?? ""}
                 </Text>
