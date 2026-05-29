@@ -597,29 +597,27 @@ export default async function SerialPage({ params }: Props) {
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-(--content-width) mx-auto w-full px-4 py-6 flex gap-6">
-        {/* Left sidebar - sticky, independent scroll, desktop only */}
-        <aside className="hidden md:block w-56 shrink-0">
-          <div className="sticky top-6 overflow-y-auto max-h-[calc(100vh-5rem)] pr-1">
-            <SerialTOCSidebar
-              serialId={serial.id}
-              serialSlug={serialSlug}
-              volumes={volumeList}
-              chaptersByVolume={chaptersByVolume}
-              chapterType={serial.chapterType}
-              volumeType={serial.volumeType}
-              addChapterAction={addChapterForSerial}
-              addVolumeAction={addVolumeForSerial}
-              deleteChapterAction={deleteChapterForSerial}
-              deleteVolumeAction={deleteVolumeForSerial}
-              renameChapterAction={renameChapterForSerial}
-              renameVolumeAction={renameVolumeForSerial}
-              reorderVolumesAction={reorderVolumesForSerial}
-              reorderAllChaptersAction={reorderAllChaptersForSerial}
-              updateSerialTypesAction={updateSerialTypesForSerial}
-              bulkApplyTocAction={bulkApplyTocForSerial}
-              isAdmin={isAdmin}
-            />
-          </div>
+        {/* Left sidebar - sticky, full viewport height, desktop only */}
+        <aside className="hidden md:block w-56 shrink-0 sticky top-0 h-dvh py-6">
+          <SerialTOCSidebar
+            serialId={serial.id}
+            serialSlug={serialSlug}
+            volumes={volumeList}
+            chaptersByVolume={chaptersByVolume}
+            chapterType={serial.chapterType}
+            volumeType={serial.volumeType}
+            addChapterAction={addChapterForSerial}
+            addVolumeAction={addVolumeForSerial}
+            deleteChapterAction={deleteChapterForSerial}
+            deleteVolumeAction={deleteVolumeForSerial}
+            renameChapterAction={renameChapterForSerial}
+            renameVolumeAction={renameVolumeForSerial}
+            reorderVolumesAction={reorderVolumesForSerial}
+            reorderAllChaptersAction={reorderAllChaptersForSerial}
+            updateSerialTypesAction={updateSerialTypesForSerial}
+            bulkApplyTocAction={bulkApplyTocForSerial}
+            isAdmin={isAdmin}
+          />
         </aside>
 
         {/* Main content */}
