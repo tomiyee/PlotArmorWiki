@@ -199,6 +199,21 @@ function SegmentLine(props: SegmentLineProps) {
   return <div className="flex-1 self-center min-w-4 h-px bg-muted-foreground/30" />;
 }
 
+function VerticalSegmentLine(props: SegmentLineProps) {
+  const { state } = props;
+  if (state === "affected") {
+    return (
+      <div className="w-0.5 h-4 border-l-2 border-dashed border-amber-400/80 dark:border-amber-500/60" />
+    );
+  }
+  if (state === "healed") {
+    return (
+      <div className="w-0.5 h-4 border-l-2 border-green-500 dark:border-green-400" />
+    );
+  }
+  return <div className="w-px h-4 bg-muted-foreground/30" />;
+}
+
 type RevisionTimelineProps = {
   allChapters: ChapterData[];
   selectedChapterIdx: number | null;
@@ -305,6 +320,53 @@ function RevisionTimeline(props: RevisionTimelineProps) {
     return "normal";
   }
 
+  function renderVerticalColumn(mode: "current" | "after") {
+    return (
+      <Box col className="items-stretch flex-1">
+        {slots.map((slot, i) => {
+          const variant =
+            mode === "current" ? slot.currentVariant : slot.afterVariant;
+          const topLabel =
+            mode === "current"
+              ? slot.topLabel
+              : (slot.afterTopLabel ?? slot.topLabel);
+          const bottomLabel =
+            mode === "current"
+              ? slot.currentBottomLabel
+              : slot.afterBottomLabel;
+          const isHealedGhost = variant === "ghost" && healedFrom !== -1;
+          return (
+            <Fragment key={slot.key}>
+              {!isHealedGhost && (
+                <Box className="items-center gap-1.5">
+                  <div className="w-16 shrink-0 flex justify-end">
+                    <Text className="text-[10px] leading-tight text-right truncate">
+                      {topLabel}
+                    </Text>
+                  </div>
+                  <div className="w-5 flex justify-center shrink-0">
+                    <DotNode variant={variant} />
+                  </div>
+                  <Text className="text-[10px] leading-tight text-muted-foreground flex-1">
+                    {bottomLabel ?? ""}
+                  </Text>
+                </Box>
+              )}
+              {i < slots.length - 1 && (
+                <Box className="items-start h-4">
+                  <div className="w-16 shrink-0" />
+                  <div className="w-5 flex justify-center shrink-0 h-full">
+                    <VerticalSegmentLine state={getSegmentState(i, mode)} />
+                  </div>
+                </Box>
+              )}
+            </Fragment>
+          );
+        })}
+      </Box>
+    );
+  }
+
   function renderRow(mode: "current" | "after") {
     return (
       <Box className="w-full items-center">
@@ -359,18 +421,38 @@ function RevisionTimeline(props: RevisionTimelineProps) {
 
   return (
     <Box col className="w-full gap-4">
-      <Box col className="gap-0.5">
-        <Text className="text-xs font-medium text-muted-foreground">
-          Current
-        </Text>
-        {renderRow("current")}
+      {/* Large screens: two horizontal rows stacked */}
+      <Box col className="gap-4 hidden sm:flex">
+        <Box col className="gap-0.5">
+          <Text className="text-xs font-medium text-muted-foreground">
+            Current
+          </Text>
+          {renderRow("current")}
+        </Box>
+        <div className="border-t border-muted-foreground/20" />
+        <Box col className="gap-0.5">
+          <Text className="text-xs font-medium text-muted-foreground">
+            After removing
+          </Text>
+          {renderRow("after")}
+        </Box>
       </Box>
-      <div className="border-t border-muted-foreground/20" />
-      <Box col className="gap-0.5">
-        <Text className="text-xs font-medium text-muted-foreground">
-          After removing
-        </Text>
-        {renderRow("after")}
+
+      {/* Small screens: two vertical columns side by side */}
+      <Box className="gap-3 sm:hidden">
+        <Box col className="flex-1 gap-1">
+          <Text className="text-xs font-medium text-muted-foreground">
+            Current
+          </Text>
+          {renderVerticalColumn("current")}
+        </Box>
+        <div className="border-l border-muted-foreground/20 self-stretch" />
+        <Box col className="flex-1 gap-1">
+          <Text className="text-xs font-medium text-muted-foreground">
+            After removing
+          </Text>
+          {renderVerticalColumn("after")}
+        </Box>
       </Box>
     </Box>
   );
