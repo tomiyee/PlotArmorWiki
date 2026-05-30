@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { InfoIcon } from "@/components/ui/InfoIcon";
@@ -109,7 +110,7 @@ export function PageInfoboxPanel({
           {floaterRows.map((row) => (
             <Box key={row.id} col className="gap-1.5">
               <Label htmlFor={`floater-row-${row.id}`}>{row.label}</Label>
-              <Input
+              <Textarea
                 id={`floater-row-${row.id}`}
                 value={draftFloaterRowContent[row.id] ?? ""}
                 onChange={(e) =>
@@ -119,6 +120,7 @@ export function PageInfoboxPanel({
                   }))
                 }
                 disabled={disabled}
+                rows={2}
               />
             </Box>
           ))}

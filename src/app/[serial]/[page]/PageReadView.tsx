@@ -212,16 +212,16 @@ export function PageReadView(props: PageReadViewProps) {
                 <div className="flex flex-col gap-2">
                   <Text className="text-xs font-medium">Infobox changes</Text>
                   {currentSuggestion.infoboxChanges.map((change, i) => (
-                    <div key={i} className="flex gap-2 text-xs">
+                    <div key={i} className="flex flex-col gap-0.5 text-xs">
                       <Text
                         as="span"
-                        className="font-medium text-muted-foreground shrink-0"
+                        className="font-medium text-muted-foreground"
                       >
                         {change.label}:
                       </Text>
-                      <span className="whitespace-pre-wrap">
+                      <MarkdownRenderer sm serialSlug={serialSlug}>
                         {change.proposedContent}
-                      </span>
+                      </MarkdownRenderer>
                     </div>
                   ))}
                 </div>
@@ -289,8 +289,18 @@ export function PageReadView(props: PageReadViewProps) {
                   <dt className="font-medium text-muted-foreground">
                     {row.label}
                   </dt>
-                  <dd className="text-foreground whitespace-pre-wrap">
-                    {row.content || (
+                  <dd className="text-foreground">
+                    {row.content ? (
+                      <MarkdownRenderer
+                        sm
+                        serialSlug={serialSlug}
+                        pageTitles={pageTitles}
+                        chapterType={chapterType}
+                        wikiChapters={wikiChapters}
+                      >
+                        {row.content}
+                      </MarkdownRenderer>
+                    ) : (
                       <Text as="span" muted>
                         -
                       </Text>
