@@ -240,7 +240,7 @@ export function PageEditor(props: Props) {
     editModeHeader,
     isAdmin = false,
     isAuthenticated = false,
-    pendingSuggestionCount = 0,
+    pendingSuggestionCount: _pendingSuggestionCount = 0,
     pendingSuggestions = [],
     myPageSuggestions = [],
   } = props;
