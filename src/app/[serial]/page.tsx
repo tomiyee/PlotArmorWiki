@@ -321,8 +321,13 @@ export default async function SerialPage({ params }: Props) {
   }[] = [];
   let floaterImageUrl: string | null | undefined = undefined;
   let floaterRows: { id: number; label: string; content: string }[] = [];
-  let childPages: { id: number; name: string; slug: string; title: string }[] =
-    [];
+  let childPages: {
+    id: number;
+    name: string;
+    slug: string;
+    title: string;
+    hasChildren: boolean;
+  }[] = [];
 
   if (homePage) {
     const sectionMaxIdxSq = db
@@ -557,11 +562,59 @@ export default async function SerialPage({ params }: Props) {
       childTitleMap = new Map(childTitleRows.map((r) => [r.pageId, r.title]));
     }
 
+    // Compute hasChildren for each active child page of the home page.
+    const hasChildrenSet = new Set<number>();
+    if (childPageIds.length > 0) {
+      const grandchildRelMaxIdxSq = db
+        .select({
+          parentPageId: pageRelationships.parentPageId,
+          childPageId: pageRelationships.childPageId,
+          maxIdx: max(chapters.idx).as("max_idx"),
+        })
+        .from(pageRelationships)
+        .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+        .where(
+          and(
+            inArray(pageRelationships.parentPageId, childPageIds),
+            lte(chapters.idx, cutoffIdx),
+          ),
+        )
+        .groupBy(pageRelationships.parentPageId, pageRelationships.childPageId)
+        .as("grandchild_rel_max_idx_sq");
+
+      const grandchildRows = await db
+        .select({
+          parentPageId: pageRelationships.parentPageId,
+          isActive: pageRelationships.isActive,
+        })
+        .from(pageRelationships)
+        .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+        .innerJoin(
+          grandchildRelMaxIdxSq,
+          and(
+            eq(pageRelationships.parentPageId, grandchildRelMaxIdxSq.parentPageId),
+            eq(pageRelationships.childPageId, grandchildRelMaxIdxSq.childPageId),
+            eq(chapters.idx, grandchildRelMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(
+          and(
+            inArray(pageRelationships.parentPageId, childPageIds),
+            eq(pageRelationships.isActive, true),
+          ),
+        );
+
+      for (const row of grandchildRows) {
+        hasChildrenSet.add(row.parentPageId);
+      }
+    }
+
     childPages = activeChildPages.map((r) => ({
       id: r.id,
       name: r.name,
       slug: r.slug,
       title: childTitleMap.get(r.id) ?? r.name,
+      hasChildren: hasChildrenSet.has(r.id),
     }));
   }
 
