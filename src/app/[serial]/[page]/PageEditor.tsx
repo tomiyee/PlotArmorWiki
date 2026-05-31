@@ -676,6 +676,10 @@ export function PageEditor(props: Props) {
         draftFloaterRowContent={draftFloaterRowContent}
         setDraftFloaterRowContent={setDraftFloaterRowContent}
         isPending={isPending}
+        serialSlug={serialSlug}
+        wikiPages={wikiPages}
+        wikiChapters={wikiChapters}
+        chapterType={chapterType}
       />
 
     </Box>
