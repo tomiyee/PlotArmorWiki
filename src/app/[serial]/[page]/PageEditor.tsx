@@ -98,7 +98,7 @@ interface Props {
    * cutoff (derived from `page_relationships`). Rendered as a sub-page list
    * below the content in read mode.
    */
-  childPages: { id: number; name: string; slug: string; title: string }[];
+  childPages: { id: number; name: string; slug: string; title: string; hasChildren: boolean }[];
   /**
    * Parent pages that are actively related to this page at the reader's chapter
    * cutoff (derived from `page_relationships`). Shown as a breadcrumb in read

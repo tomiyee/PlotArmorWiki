@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { FilePenLine, ChevronLeft, ChevronRight } from "lucide-react";
+import { FilePenLine, ChevronLeft, ChevronRight, Folder, FileText } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { SuggestionForm } from "./SuggestionForm";
 import type { SectionData, FloaterRowData, ChapterData } from "./types";
@@ -51,8 +52,8 @@ type PageReadViewProps = {
   floaterImageUrl: string | null | undefined;
   /** Infobox rows to render in the floater panel. */
   floaterRows: FloaterRowData[];
-  /** Child pages active at the reader's chapter cutoff. */
-  childPages: { id: number; name: string; slug: string; title: string }[];
+  /** Sub-pages active at the reader's chapter cutoff. `hasChildren` drives folder vs. document icon. */
+  childPages: { id: number; name: string; slug: string; title: string; hasChildren: boolean }[];
   /** DB id of this page, used for linking to the new-page form and suggestion submission. */
   pageId: number;
   /** slug → title map passed to MarkdownRenderer so `[[slug]]` links show the correct title. */
@@ -68,6 +69,63 @@ type PageReadViewProps = {
    */
   suggestionContext?: SuggestionContext;
 };
+
+type SubPageListProps = {
+  /** Sub-pages to render, with `hasChildren` flag for folder vs. document icon. */
+  childPages: { id: number; name: string; slug: string; title: string; hasChildren: boolean }[];
+  /** Serial slug used to build hrefs. */
+  serialSlug: string;
+  /** Case-insensitive substring filter applied to page titles. */
+  search: string;
+};
+
+/**
+ * Renders sub-pages as a compact searchable menu: sub-categories (hasChildren=true)
+ * first with a folder icon, then leaf pages with a document icon. Both groups are
+ * filtered by the search string before rendering.
+ *
+ * @example
+ * <SubPageList childPages={childPages} serialSlug="one-piece" search="" />
+ */
+function SubPageList(props: SubPageListProps) {
+  const { childPages, serialSlug, search } = props;
+  const needle = search.toLowerCase();
+  const filtered = needle
+    ? childPages.filter((p) => p.title.toLowerCase().includes(needle))
+    : childPages;
+
+  const categories = filtered.filter((p) => p.hasChildren);
+  const leaves = filtered.filter((p) => !p.hasChildren);
+  const ordered = [...categories, ...leaves];
+
+  if (filtered.length === 0) {
+    return (
+      <Text muted className="text-sm px-3 py-2">
+        No sub-pages match your search.
+      </Text>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-border">
+      {ordered.map((child) => (
+        <li key={child.id}>
+          <Link
+            href={`/${serialSlug}/${child.slug}`}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+          >
+            {child.hasChildren ? (
+              <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            {child.title}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * Read-mode layout for a wiki page: infobox floater, section content, and child page list.
@@ -103,6 +161,7 @@ export function PageReadView(props: PageReadViewProps) {
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
   const [showSuggestionDetail, setShowSuggestionDetail] = useState(false);
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
+  const [subPageSearch, setSubPageSearch] = useState("");
 
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -371,26 +430,28 @@ export function PageReadView(props: PageReadViewProps) {
 
       <div className="clear-right mt-6 pt-6 border-t border-border">
         <Text variant="h3" className="mb-3">
-          Child pages
+          Sub-pages
         </Text>
         {childPages.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {childPages.map((child) => (
-              <li key={child.id}>
-                <Link
-                  href={`/${serialSlug}/${child.slug}`}
-                  className="rounded-lg border border-border px-4 py-2 flex items-center hover:bg-muted transition-colors"
-                >
-                  <Text variant="body" as="span">
-                    {child.title}
-                  </Text>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <div className="border border-border rounded-lg overflow-hidden max-w-sm">
+            <div className="border-b border-border">
+              <Input
+                type="search"
+                placeholder="Search sub-pages…"
+                value={subPageSearch}
+                onChange={(e) => setSubPageSearch(e.target.value)}
+                className="border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 h-8 text-sm"
+              />
+            </div>
+            <SubPageList
+              childPages={childPages}
+              serialSlug={serialSlug}
+              search={subPageSearch}
+            />
+          </div>
         ) : (
           <Text muted className="text-sm">
-            No child pages yet.
+            No sub-pages yet.
           </Text>
         )}
         {suggestionContext?.isAdmin && (
