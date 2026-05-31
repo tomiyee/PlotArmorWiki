@@ -155,7 +155,11 @@ function PreviewContent({
                 <dt className="text-muted-foreground font-medium whitespace-nowrap">
                   {row.label}
                 </dt>
-                <dd className="text-foreground truncate">{row.content}</dd>
+                <dd className="text-foreground">
+                  <MarkdownRenderer sm serialSlug={serialSlug} pageTitles={preview.pageTitles}>
+                    {row.content}
+                  </MarkdownRenderer>
+                </dd>
               </Fragment>
             ))}
         </dl>
@@ -167,6 +171,7 @@ function PreviewContent({
           <MarkdownRenderer
             sm
             serialSlug={serialSlug}
+            pageTitles={preview.pageTitles}
             className="[&_p]:mb-1 [&_p:last-child]:mb-0"
           >
             {truncatedContent}

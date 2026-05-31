@@ -13,8 +13,9 @@ import {
   pageInfoboxImageRevisions,
   pageSections,
   pageSectionRevisions,
+  pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, max } from "drizzle-orm";
 
 export interface WikiLinkPreviewData {
   pageName: string;
@@ -27,6 +28,8 @@ export interface WikiLinkPreviewData {
   floaterImageUrl: string | null;
   /** Floater key-value rows. */
   floaterRows: { label: string; content: string }[];
+  /** slug → chapter-versioned title at the user's cutoff, for resolving [[slug]] wiki links. */
+  pageTitles: Record<string, string>;
 }
 
 /**
@@ -95,6 +98,47 @@ export async function getWikiLinkPreview(
     ? `${serial.chapterType} ${introChapterRow.displayName}`
     : null;
 
+  // Fetch slug → title map for all visible pages at the cutoff (used by MarkdownRenderer
+  // to resolve [[slug]] display text inside the preview content and floater rows).
+  const allPageRows = await db
+    .select({ id: pages.id, slug: pages.slug, name: pages.name })
+    .from(pages)
+    .where(eq(pages.serialId, serial.id));
+
+  let resolvedPageTitles: Record<string, string> = {};
+  if (allPageRows.length > 0) {
+    const pageIds = allPageRows.map((p) => p.id);
+    const titleMaxIdxSq = db
+      .select({
+        pageId: pageTitles.pageId,
+        maxIdx: max(chapters.idx).as("max_idx"),
+      })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .where(
+        and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)),
+      )
+      .groupBy(pageTitles.pageId)
+      .as("title_max_idx_sq");
+
+    const titleRows = await db
+      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+      .from(pageTitles)
+      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+      .innerJoin(
+        titleMaxIdxSq,
+        and(
+          eq(pageTitles.pageId, titleMaxIdxSq.pageId),
+          eq(chapters.idx, titleMaxIdxSq.maxIdx),
+        ),
+      );
+
+    const titleByPageId = new Map(titleRows.map((r) => [r.pageId, r.title]));
+    resolvedPageTitles = Object.fromEntries(
+      allPageRows.map((p) => [p.slug, titleByPageId.get(p.id) ?? p.name]),
+    );
+  }
+
   // Check spoiler visibility
   if (introChapterRow && introChapterRow.idx > cutoffIdx) {
     return {
@@ -104,6 +148,7 @@ export async function getWikiLinkPreview(
       firstSectionContent: "",
       floaterImageUrl: null,
       floaterRows: [],
+      pageTitles: resolvedPageTitles,
     };
   }
 
@@ -242,6 +287,7 @@ export async function getWikiLinkPreview(
     firstSectionContent,
     floaterImageUrl,
     floaterRows,
+    pageTitles: resolvedPageTitles,
   };
 }
 

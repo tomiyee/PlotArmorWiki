@@ -240,7 +240,7 @@ export function PageEditor(props: Props) {
     editModeHeader,
     isAdmin = false,
     isAuthenticated = false,
-    pendingSuggestionCount = 0,
+    pendingSuggestionCount: _pendingSuggestionCount = 0,
     pendingSuggestions = [],
     myPageSuggestions = [],
   } = props;
@@ -676,6 +676,10 @@ export function PageEditor(props: Props) {
         draftFloaterRowContent={draftFloaterRowContent}
         setDraftFloaterRowContent={setDraftFloaterRowContent}
         isPending={isPending}
+        serialSlug={serialSlug}
+        wikiPages={wikiPages}
+        wikiChapters={wikiChapters}
+        chapterType={chapterType}
       />
 
     </Box>
