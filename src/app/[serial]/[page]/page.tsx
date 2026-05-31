@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { db } from "@/db/index";
 import {
   serials,
@@ -30,6 +31,7 @@ import {
 
 interface Props {
   params: Promise<{ serial: string; page: string }>;
+  searchParams: Promise<{ trail?: string }>;
 }
 
 /**
@@ -64,8 +66,9 @@ async function getChapterCutoff(
   return { cutoffIdx: row.idx, readingChapterId: chapterId };
 }
 
-export default async function PageView({ params }: Props) {
+export default async function PageView({ params, searchParams }: Props) {
   const { serial: serialSlug, page: pageParam } = await params;
+  const { trail: trailParam } = await searchParams;
 
   const decodedPageSlug = decodeURIComponent(pageParam);
 
@@ -173,6 +176,38 @@ export default async function PageView({ params }: Props) {
     name: wikiTitleByPageId.get(p.id) ?? p.name,
     slug: p.slug,
   }));
+
+  // ── Navigation trail ─────────────────────────────────────────────────────────
+  // Parse ?trail= param: comma-delimited list of prior page slugs (oldest first).
+  // The last entry is the page the reader came from (the immediate "back" target).
+  // We resolve its display title for the "← Back to …" link.
+  const trailSlugs = trailParam
+    ? trailParam.split(",").filter(Boolean)
+    : [];
+  const backSlug = trailSlugs.length > 0 ? trailSlugs[trailSlugs.length - 1] : null;
+
+  // Attempt a cheap lookup from already-fetched wikiPageTitles; fall back to a
+  // single DB row for pages not visible at the current cutoff (e.g. the reader
+  // has since advanced their chapter).
+  let backTitle: string | null = null;
+  if (backSlug) {
+    backTitle = wikiPageTitles[backSlug] ?? null;
+    if (backTitle === null) {
+      const [fallback] = await db
+        .select({ name: pages.name })
+        .from(pages)
+        .where(and(eq(pages.serialId, serial.id), eq(pages.slug, backSlug)))
+        .limit(1);
+      backTitle = fallback?.name ?? backSlug;
+    }
+  }
+
+  // The back link's href drops the last trail entry; an empty remaining trail
+  // omits the ?trail param entirely.
+  const remainingTrail = trailSlugs.slice(0, -1);
+  const backHref = backSlug
+    ? `/${serialSlug}/${backSlug}${remainingTrail.length > 0 ? `?trail=${remainingTrail.join(",")}` : ""}`
+    : null;
 
   const [page] = await db
     .select()
@@ -670,6 +705,15 @@ export default async function PageView({ params }: Props) {
       <EditModeAdminSetter isAdmin={isAdmin} />
       <PageContainer>
           <Box col className="gap-6">
+            {backHref && backTitle && (
+              <Link
+                href={backHref}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+              >
+                <ArrowLeft className="size-3.5 shrink-0" />
+                Back to {backTitle}
+              </Link>
+            )}
             <Text muted className="text-sm flex items-center gap-1 flex-wrap">
               <Link href={`/${serialSlug}`} className="hover:underline">
                 {serial.title}
@@ -725,6 +769,8 @@ export default async function PageView({ params }: Props) {
               childPages={childPages}
               parentPages={parentPages}
               allSerialPages={allSerialPagesRaw}
+              currentPageSlug={decodedPageSlug}
+              trailParam={trailParam}
               isAdmin={isAdmin}
               isAuthenticated={isUserAuthenticated}
               pendingSuggestionCount={pendingSuggestionCount}

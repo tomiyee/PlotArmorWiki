@@ -111,6 +111,18 @@ interface Props {
    */
   allSerialPages: { id: number; name: string }[];
   /**
+   * Slug of the page currently being viewed. Forwarded to PageReadView and
+   * MarkdownRenderer so outgoing wiki-link hrefs include a `?trail=…` parameter
+   * enabling the "← Back to …" breadcrumb on the destination page.
+   */
+  currentPageSlug?: string;
+  /**
+   * The `trail` query-parameter value from the current URL (comma-separated
+   * prior slugs, oldest first). Forwarded to MarkdownRenderer so it can
+   * prepend the existing trail before appending `currentPageSlug`.
+   */
+  trailParam?: string;
+  /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
    * parents), so both panels are irrelevant there.
@@ -236,6 +248,8 @@ export function PageEditor(props: Props) {
     childPages,
     parentPages,
     allSerialPages,
+    currentPageSlug,
+    trailParam,
     isHomePage = false,
     editModeHeader,
     isAdmin = false,
@@ -518,6 +532,8 @@ export function PageEditor(props: Props) {
           pageTitles={pageTitles}
           wikiChapters={wikiChaptersByName}
           chapterType={chapterType}
+          currentPageSlug={currentPageSlug}
+          trailParam={trailParam}
           suggestionContext={
             isAuthenticated
               ? {
