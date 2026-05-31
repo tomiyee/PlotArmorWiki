@@ -196,7 +196,9 @@ function SegmentLine(props: SegmentLineProps) {
       <div className="flex-1 self-center min-w-4 border-t-2 border-green-500 dark:border-green-400" />
     );
   }
-  return <div className="flex-1 self-center min-w-4 h-px bg-muted-foreground/30" />;
+  return (
+    <div className="flex-1 self-center min-w-4 h-px bg-muted-foreground/30" />
+  );
 }
 
 function VerticalSegmentLine(props: SegmentLineProps) {
@@ -410,7 +412,7 @@ function RevisionTimeline(props: RevisionTimelineProps) {
                     {/* Absolutely-positioned so top-1/2 lands at the col's vertical
                         midpoint, which equals the row midpoint (col is always the
                         tallest element). Matches the self-center segment lines. */}
-                    <div className="absolute inset-x-0 top-[calc(50%_-_1px)] border-t-2 border-green-500 dark:border-green-400" />
+                    <div className="absolute inset-x-0 top-[calc(50%-1px)] border-t-2 border-green-500 dark:border-green-400" />
                     <div className="w-3.5 h-3.5 shrink-0" />
                   </>
                 ) : (

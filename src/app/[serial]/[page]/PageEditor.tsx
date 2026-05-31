@@ -17,6 +17,7 @@ import {
   getParentPagesAtChapter,
 } from "./actions";
 import { useEditMode } from "@/contexts/EditModeContext";
+import { Banner } from "@/components/ui/Banner";
 import { WritingAsOfBanner } from "./WritingAsOfBanner";
 import { PageSectionManager, type PageSection } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
@@ -564,6 +565,7 @@ export function PageEditor(props: Props) {
   })();
 
   return (
+    <Banner scrollable={false}>
     <Box col className="gap-6">
       {allChapters.length > 0 && (
         <WritingAsOfBanner
@@ -671,5 +673,6 @@ export function PageEditor(props: Props) {
       />
 
     </Box>
+    </Banner>
   );
 }

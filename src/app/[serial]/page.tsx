@@ -594,7 +594,7 @@ export default async function SerialPage({ params }: Props) {
   }
 
   return (
-    <main>
+    <main className="size-full">
       <EditModeAdminSetter isAdmin={isAdmin} />
       <div className="max-w-(--content-width) mx-auto w-full px-4 py-6 flex gap-6">
         {/* Left sidebar - sticky, independent scroll, desktop only */}
@@ -607,6 +607,7 @@ export default async function SerialPage({ params }: Props) {
               chaptersByVolume={chaptersByVolume}
               chapterType={serial.chapterType}
               volumeType={serial.volumeType}
+              readingChapterId={readingChapterId}
               addChapterAction={addChapterForSerial}
               addVolumeAction={addVolumeForSerial}
               deleteChapterAction={deleteChapterForSerial}
