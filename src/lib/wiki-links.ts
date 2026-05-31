@@ -44,12 +44,13 @@ export interface WikiLinkParts {
  * optional `|alias` suffix. Inner contents are parsed by `parseWikiLink`.
  *
  * Group 1: inner path (everything before the optional `|`)
- * Group 2: alias (everything after `|`, if present)
+ * Group 2: alias (everything after `|`, if present); may contain `]` as long as
+ * the sequence `]]` only appears as the closing delimiter.
  *
  * Leaves room for future syntax extensions (anchors, embeds, etc.) by keeping
  * the outer match broad and delegating inner parsing to `parseWikiLink`.
  */
-export const WIKI_LINK_RE = /\[\[([^|\]]+)(?:\|([^\]]*))?\]\]/g;
+export const WIKI_LINK_RE = /\[\[([^|]+)(?:\|((?:[^\]]|\](?!\]))*(?:\](?=\]\]))?))?\]\]/g;
 
 /**
  * Parse the inner content of a `[[…]]` token into its structured parts.
