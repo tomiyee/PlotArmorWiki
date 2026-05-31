@@ -31,7 +31,7 @@ import {
   not,
   sql,
 } from "drizzle-orm";
-import { parseChapterType, parseVolumeType } from "@/lib/serialTypes";
+import { parseChapterType, parseVolumeType } from "@/lib/serial-types";
 import { titleToSlug } from "@/lib/slug";
 import { requireSerialAdmin } from "@/lib/auth-guard";
 import { auth } from "@/auth";
