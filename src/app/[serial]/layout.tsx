@@ -14,6 +14,7 @@ import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
 import { SerialTOCDrawer } from "@/components/SerialTOCDrawer";
 import { ChapterData, NavbarSerialData } from "@/types";
+import { WritingAsOfBannerFlexSpacer } from "./[page]/WritingAsOfBanner";
 import { auth } from "@/auth";
 
 interface Props {
@@ -168,6 +169,7 @@ export default async function SerialLayout({ children, params }: Props) {
         tocSlot={<SerialTOCDrawer key="toc-drawer" tocContent={tocContent} />}
         tocContent={tocContent}
       />
+      <WritingAsOfBannerFlexSpacer />
       <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>
     </>
   );

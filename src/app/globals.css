@@ -56,6 +56,12 @@
   --content-width: 64rem; /* 5xl = 64rem */
   --navbar-height: 54px; /* min-h-13.5 (3.375rem) + 2×py-2 (1rem) ≈ 54px */
   --writing-banner-height: 2.75rem; /* py-1 (0.5rem) + select trigger h-9 (2.25rem) */
+  /* Reflects whatever is consuming vertical space above the scroll container.
+     WritingAsOfBannerFlexSpacer sets this to --writing-banner-height when active. */
+  --banner-offset: 0px;
+  /* Height of the serial scroll container — use this instead of 100dvh arithmetic
+     in any sticky sidebar so banner visibility is handled automatically. */
+  --scroll-area-h: calc(100dvh - var(--navbar-height) - var(--banner-offset));
 }
 
 .dark {

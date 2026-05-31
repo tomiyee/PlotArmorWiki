@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Select } from "@/components/ui/Select";
 import { Text } from "@/components/ui/Text";
@@ -125,20 +125,33 @@ export function WritingAsOfBanner(props: WritingAsOfBannerProps) {
 }
 
 /**
- * Spacer that reserves vertical space equal to the "Writing as of" banner
- * height. Render this at the very top of page content so the fixed banner
- * does not obscure the breadcrumb or other elements when in edit mode.
+ * Flex-level spacer that reserves vertical space equal to the "Writing as of"
+ * banner height. Render this as a flex sibling ABOVE the scroll container in
+ * the serial layout so the scroll container's top edge is pushed down to the
+ * banner's bottom edge. This ensures content can never scroll behind the fixed
+ * banner at any scroll position — not just at scroll=0.
  *
- * Only visible while edit mode is active; renders nothing in read mode.
+ * Only visible while an admin is in edit mode; renders nothing otherwise.
  *
  * @example
- * <PageContainer>
- *   {hasChapters && <WritingAsOfBannerSpacer />}
- *   <Box col>...</Box>
- * </PageContainer>
+ * // In the serial layout, between the nav injector and scroll container:
+ * <WritingAsOfBannerFlexSpacer />
+ * <div className="flex-1 min-h-0 overflow-y-scroll">{children}</div>
  */
-export function WritingAsOfBannerSpacer() {
-  const { isEditing } = useEditMode();
-  if (!isEditing) return null;
-  return <div className="h-[var(--writing-banner-height)]" aria-hidden />;
+export function WritingAsOfBannerFlexSpacer() {
+  const { isEditing, isAdmin } = useEditMode();
+  const active = isEditing && isAdmin;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (active) {
+      root.style.setProperty("--banner-offset", "var(--writing-banner-height)");
+    } else {
+      root.style.removeProperty("--banner-offset");
+    }
+    return () => { root.style.removeProperty("--banner-offset"); };
+  }, [active]);
+
+  if (!active) return null;
+  return <div className="h-[var(--writing-banner-height)] shrink-0" aria-hidden />;
 }
