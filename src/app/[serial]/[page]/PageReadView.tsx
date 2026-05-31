@@ -80,9 +80,9 @@ type SubPageListProps = {
 };
 
 /**
- * Renders sub-pages split into two ordered groups: sub-categories (hasChildren=true)
- * shown with a folder icon, then leaf pages (hasChildren=false) with a document icon.
- * Both groups are filtered by the search string before rendering.
+ * Renders sub-pages as a compact searchable menu: sub-categories (hasChildren=true)
+ * first with a folder icon, then leaf pages with a document icon. Both groups are
+ * filtered by the search string before rendering.
  *
  * @example
  * <SubPageList childPages={childPages} serialSlug="one-piece" search="" />
@@ -96,40 +96,30 @@ function SubPageList(props: SubPageListProps) {
 
   const categories = filtered.filter((p) => p.hasChildren);
   const leaves = filtered.filter((p) => !p.hasChildren);
+  const ordered = [...categories, ...leaves];
 
   if (filtered.length === 0) {
     return (
-      <Text muted className="text-sm">
+      <Text muted className="text-sm px-3 py-2">
         No sub-pages match your search.
       </Text>
     );
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {categories.map((child) => (
+    <ul className="divide-y divide-border">
+      {ordered.map((child) => (
         <li key={child.id}>
           <Link
             href={`/${serialSlug}/${child.slug}`}
-            className="rounded-lg border border-border px-4 py-2 flex items-center gap-3 hover:bg-muted transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors"
           >
-            <Folder className="size-4 shrink-0 text-muted-foreground" />
-            <Text variant="body" as="span">
-              {child.title}
-            </Text>
-          </Link>
-        </li>
-      ))}
-      {leaves.map((child) => (
-        <li key={child.id}>
-          <Link
-            href={`/${serialSlug}/${child.slug}`}
-            className="rounded-lg border border-border px-4 py-2 flex items-center gap-3 hover:bg-muted transition-colors"
-          >
-            <FileText className="size-4 shrink-0 text-muted-foreground" />
-            <Text variant="body" as="span">
-              {child.title}
-            </Text>
+            {child.hasChildren ? (
+              <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            {child.title}
           </Link>
         </li>
       ))}
@@ -443,22 +433,22 @@ export function PageReadView(props: PageReadViewProps) {
           Sub-pages
         </Text>
         {childPages.length > 0 ? (
-          <>
-            {childPages.length > 5 && (
+          <div className="border border-border rounded-lg overflow-hidden max-w-sm">
+            <div className="border-b border-border">
               <Input
                 type="search"
                 placeholder="Search sub-pages…"
                 value={subPageSearch}
                 onChange={(e) => setSubPageSearch(e.target.value)}
-                className="mb-3 max-w-sm"
+                className="border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 h-8 text-sm"
               />
-            )}
+            </div>
             <SubPageList
               childPages={childPages}
               serialSlug={serialSlug}
               search={subPageSearch}
             />
-          </>
+          </div>
         ) : (
           <Text muted className="text-sm">
             No sub-pages yet.
