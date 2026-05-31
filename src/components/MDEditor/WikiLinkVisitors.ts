@@ -12,11 +12,9 @@ import {
 import { ElementNode, $createTextNode } from "lexical";
 import type * as Mdast from "mdast";
 import { WikiLinkNode, $isWikiLinkNode } from "./WikiLinkNode";
+import { WIKI_LINK_RE } from "@/lib/wiki-links";
 
 // ── MDXEditor import visitor: text → WikiLinkNode ────────────────────────────
-
-// Matches [[token]] and [[token|alias]]; group 1 = token, group 2 = alias.
-const WIKI_LINK_RE = /\[\[([^|\]]+)(?:\|([^\]]*))?\]\]/g;
 
 /**
  * Intercepts mdast text nodes that contain `[[token]]` patterns and splits

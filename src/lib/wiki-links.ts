@@ -49,7 +49,7 @@ export interface WikiLinkParts {
  * Leaves room for future syntax extensions (anchors, embeds, etc.) by keeping
  * the outer match broad and delegating inner parsing to `parseWikiLink`.
  */
-export const WIKI_LINK_RE = /\[\[([^|\]]+)(?:\|([^\]]*))?\]\]/g;
+export const WIKI_LINK_RE = /\[\[([^|]+)(?:\|([^\]]*))?\]\]/g;
 
 /**
  * Parse the inner content of a `[[…]]` token into its structured parts.
