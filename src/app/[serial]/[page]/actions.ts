@@ -34,6 +34,7 @@ import {
   requireSerialAdminByPageId,
 } from "@/lib/auth-guard";
 import { applyPageContentRevisions } from "./revisionHelpers";
+import { resolvePageTitlesAtIdx } from "@/db/queries";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -919,35 +920,7 @@ export async function getParentPagesAtChapter(
 
   const parentPageIds = activeParents.map((r) => r.id);
 
-  const titleMaxIdxSq = db
-    .select({
-      pageId: pageTitles.pageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageTitles)
-    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .where(
-      and(
-        inArray(pageTitles.pageId, parentPageIds),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageTitles.pageId)
-    .as("title_max_idx_sq");
-
-  const titleRows = await db
-    .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-    .from(pageTitles)
-    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .innerJoin(
-      titleMaxIdxSq,
-      and(
-        eq(pageTitles.pageId, titleMaxIdxSq.pageId),
-        eq(chapters.idx, titleMaxIdxSq.maxIdx),
-      ),
-    );
-
-  const titleMap = new Map(titleRows.map((r) => [r.pageId, r.title]));
+  const titleMap = await resolvePageTitlesAtIdx(parentPageIds, cutoffIdx);
 
   return activeParents.map((r) => ({
     id: r.id,

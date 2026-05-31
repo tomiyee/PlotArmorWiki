@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/db/index";
-import { pages, chapters, serials, pageTitles } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { pages, chapters, serials } from "@/db/schema";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { resolvePageTitlesAtIdx } from "@/db/queries";
 
 export interface PageSearchResult {
   /** DB primary key. */
@@ -71,34 +72,8 @@ export async function getVisiblePages(
   if (rawPages.length === 0) return [];
 
   // Step 2: resolve each page's chapter-versioned title at the cutoff.
-  // Mirrors the same max-idx pattern used by the page view.
   const pageIds = rawPages.map((p) => p.id);
-  const titleMaxIdxSq = db
-    .select({
-      pageId: pageTitles.pageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageTitles)
-    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .where(
-      and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)),
-    )
-    .groupBy(pageTitles.pageId)
-    .as("title_max_idx_sq");
-
-  const titleRows = await db
-    .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-    .from(pageTitles)
-    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .innerJoin(
-      titleMaxIdxSq,
-      and(
-        eq(pageTitles.pageId, titleMaxIdxSq.pageId),
-        eq(chapters.idx, titleMaxIdxSq.maxIdx),
-      ),
-    );
-
-  const titleByPageId = new Map(titleRows.map((r) => [r.pageId, r.title]));
+  const titleByPageId = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
 
   return rawPages.map((p) => ({
     id: p.id,

@@ -16,6 +16,7 @@ import {
   pageTitles,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { resolvePageTitlesAtIdx } from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -133,37 +134,7 @@ export default async function PageView({ params }: Props) {
 
   // Resolve chapter-versioned titles for all wiki pages at the reader's cutoff.
   const wikiPageIds = rawWikiPages.map((p) => p.id);
-  let wikiTitleByPageId = new Map<number, string>();
-  if (wikiPageIds.length > 0) {
-    const wikiTitleMaxIdxSq = db
-      .select({
-        pageId: pageTitles.pageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(
-        and(
-          inArray(pageTitles.pageId, wikiPageIds),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageTitles.pageId)
-      .as("wiki_title_max_idx_sq");
-
-    const wikiTitleRows = await db
-      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .innerJoin(
-        wikiTitleMaxIdxSq,
-        and(
-          eq(pageTitles.pageId, wikiTitleMaxIdxSq.pageId),
-          eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
-        ),
-      );
-    wikiTitleByPageId = new Map(wikiTitleRows.map((r) => [r.pageId, r.title]));
-  }
+  const wikiTitleByPageId = await resolvePageTitlesAtIdx(wikiPageIds, cutoffIdx);
 
   // slug → chapter-versioned title (falls back to pages.name for pages without title entries).
   const wikiPageTitles: Record<string, string> = Object.fromEntries(
@@ -477,38 +448,7 @@ export default async function PageView({ params }: Props) {
 
   // Resolve temporal titles for each active child page at the reader's cutoff.
   const childPageIds = activeChildPages.map((r) => r.id);
-  let childTitleMap = new Map<number, string>();
-  if (childPageIds.length > 0) {
-    const childTitleMaxIdxSq = db
-      .select({
-        pageId: pageTitles.pageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(
-        and(
-          inArray(pageTitles.pageId, childPageIds),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageTitles.pageId)
-      .as("child_title_max_idx_sq");
-
-    const childTitleRows = await db
-      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .innerJoin(
-        childTitleMaxIdxSq,
-        and(
-          eq(pageTitles.pageId, childTitleMaxIdxSq.pageId),
-          eq(chapters.idx, childTitleMaxIdxSq.maxIdx),
-        ),
-      );
-
-    childTitleMap = new Map(childTitleRows.map((r) => [r.pageId, r.title]));
-  }
+  const childTitleMap = await resolvePageTitlesAtIdx(childPageIds, cutoffIdx);
 
   // Compute hasChildren for each active child page: does any of these child
   // pages itself have active child relationships at the reader's cutoff?
@@ -570,38 +510,7 @@ export default async function PageView({ params }: Props) {
 
   // Resolve temporal titles for each active parent page at the reader's cutoff.
   const parentPageIds = activeParentPagesRaw.map((r) => r.id);
-  let parentTitleMap = new Map<number, string>();
-  if (parentPageIds.length > 0) {
-    const parentTitleMaxIdxSq = db
-      .select({
-        pageId: pageTitles.pageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(
-        and(
-          inArray(pageTitles.pageId, parentPageIds),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageTitles.pageId)
-      .as("parent_title_max_idx_sq");
-
-    const parentTitleRows = await db
-      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .innerJoin(
-        parentTitleMaxIdxSq,
-        and(
-          eq(pageTitles.pageId, parentTitleMaxIdxSq.pageId),
-          eq(chapters.idx, parentTitleMaxIdxSq.maxIdx),
-        ),
-      );
-
-    parentTitleMap = new Map(parentTitleRows.map((r) => [r.pageId, r.title]));
-  }
+  const parentTitleMap = await resolvePageTitlesAtIdx(parentPageIds, cutoffIdx);
 
   const parentPages = activeParentPagesRaw.map((r) => ({
     id: r.id,

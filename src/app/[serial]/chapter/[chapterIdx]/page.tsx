@@ -8,9 +8,9 @@ import {
   chapters,
   chapterSynopses,
   pages,
-  pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { resolvePageTitlesAtIdx } from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -192,39 +192,7 @@ export default async function ChapterPage({ params }: Props) {
       .orderBy(asc(pages.name));
 
     const wikiPageIds = rawWikiPages.map((p) => p.id);
-    let wikiTitleByPageId = new Map<number, string>();
-    if (wikiPageIds.length > 0) {
-      const wikiTitleMaxIdxSq = db
-        .select({
-          pageId: pageTitles.pageId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .where(
-          and(
-            inArray(pageTitles.pageId, wikiPageIds),
-            lte(chapters.idx, chapter.idx),
-          ),
-        )
-        .groupBy(pageTitles.pageId)
-        .as("wiki_title_max_idx_sq");
-
-      const wikiTitleRows = await db
-        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .innerJoin(
-          wikiTitleMaxIdxSq,
-          and(
-            eq(pageTitles.pageId, wikiTitleMaxIdxSq.pageId),
-            eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
-          ),
-        );
-      wikiTitleByPageId = new Map(
-        wikiTitleRows.map((r) => [r.pageId, r.title]),
-      );
-    }
+    const wikiTitleByPageId = await resolvePageTitlesAtIdx(wikiPageIds, chapter.idx);
 
     wikiPages = rawWikiPages.map((p) => ({
       name: wikiTitleByPageId.get(p.id) ?? p.name,
@@ -247,43 +215,8 @@ export default async function ChapterPage({ params }: Props) {
       )
       .orderBy(pages.name);
 
-    // Resolve chapter-versioned titles for introduced pages, bounded by the
-    // user's cutoffIdx so the title reflects what they know at their reading
-    // position rather than the raw fallback in pages.name.
     const introducedPageIds = introducedPages.map((r) => r.pageId);
-    let introTitleByPageId = new Map<number, string>();
-    if (introducedPageIds.length > 0) {
-      const introTitleMaxIdxSq = db
-        .select({
-          pageId: pageTitles.pageId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .where(
-          and(
-            inArray(pageTitles.pageId, introducedPageIds),
-            lte(chapters.idx, cutoffIdx),
-          ),
-        )
-        .groupBy(pageTitles.pageId)
-        .as("intro_title_max_idx_sq");
-
-      const introTitleRows = await db
-        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .innerJoin(
-          introTitleMaxIdxSq,
-          and(
-            eq(pageTitles.pageId, introTitleMaxIdxSq.pageId),
-            eq(chapters.idx, introTitleMaxIdxSq.maxIdx),
-          ),
-        );
-      introTitleByPageId = new Map(
-        introTitleRows.map((r) => [r.pageId, r.title]),
-      );
-    }
+    const introTitleByPageId = await resolvePageTitlesAtIdx(introducedPageIds, cutoffIdx);
 
     if (introducedPages.length > 0) {
       const resolvedPages = introducedPages
