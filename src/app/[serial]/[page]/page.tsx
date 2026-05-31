@@ -618,70 +618,69 @@ export default async function PageView({ params }: Props) {
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
       <PageContainer>
-        <Box col className="gap-6">
-          {/* Breadcrumb: Serial > Parent1, Parent2 */}
-          <Text muted className="text-sm flex items-center gap-1 flex-wrap">
-            <Link href={`/${serialSlug}`} className="hover:underline">
-              {serial.title}
-            </Link>
-            {parentPages.length > 0 && (
-              <>
-                <span>&gt;</span>
-                {parentPages.map((parent, i) => (
-                  <span key={parent.id} className="flex items-center gap-1">
-                    {i > 0 && <Text as="span">,</Text>}
-                    <Link
-                      href={`/${serialSlug}/${parent.slug}`}
-                      className="hover:underline"
-                    >
-                      {parent.title}
-                    </Link>
-                  </span>
-                ))}
-              </>
-            )}
-          </Text>
+          <Box col className="gap-6">
+            <Text muted className="text-sm flex items-center gap-1 flex-wrap">
+              <Link href={`/${serialSlug}`} className="hover:underline">
+                {serial.title}
+              </Link>
+              {parentPages.length > 0 && (
+                <>
+                  <span>&gt;</span>
+                  {parentPages.map((parent, i) => (
+                    <span key={parent.id} className="flex items-center gap-1">
+                      {i > 0 && <Text as="span">,</Text>}
+                      <Link
+                        href={`/${serialSlug}/${parent.slug}`}
+                        className="hover:underline"
+                      >
+                        {parent.title}
+                      </Link>
+                    </span>
+                  ))}
+                </>
+              )}
+            </Text>
 
-          <Box col className="gap-2">
-            <Text variant="h1">{resolvedTitle}</Text>
-            {introChapter && (
-              <Text muted className="text-sm">
-                Introduced in {serial.chapterType} {introChapter.displayName}
-              </Text>
-            )}
+            <Box col className="gap-2">
+              <Text variant="h1">{resolvedTitle}</Text>
+              {introChapter && (
+                <Text muted className="text-sm">
+                  Introduced in {serial.chapterType} {introChapter.displayName}
+                </Text>
+              )}
+            </Box>
+
+            <PageEditor
+              serialSlug={serialSlug}
+              pageSlug={decodedPageSlug}
+              pageId={page.id}
+              pageTitleEntries={pageTitleEntries}
+              pageSectionStructure={pageSectionStructure}
+              sections={sections}
+              infoboxSectionStructure={infoboxSectionStructure}
+              floaterImageUrl={floaterImageUrl}
+              floaterRows={floaterRows}
+              allChapters={allChapters}
+              headChapterId={headChapterId}
+              readingChapterId={readingChapterId}
+              wikiPages={wikiPages}
+              pageTitles={wikiPageTitles}
+              wikiChapters={allChapters.map((c) => ({
+                name: c.displayName,
+                idx: c.idx,
+              }))}
+              chapterType={serial.chapterType}
+              introChapterIdx={introChapter?.idx ?? null}
+              childPages={childPages}
+              parentPages={parentPages}
+              allSerialPages={allSerialPagesRaw}
+              isAdmin={isAdmin}
+              isAuthenticated={isUserAuthenticated}
+              pendingSuggestionCount={pendingSuggestionCount}
+              pendingSuggestions={pendingSuggestions}
+              myPageSuggestions={myPageSuggestions}
+            />
           </Box>
-
-          <PageEditor
-            serialSlug={serialSlug}
-            pageSlug={decodedPageSlug}
-            pageId={page.id}
-            pageTitleEntries={pageTitleEntries}
-            pageSectionStructure={pageSectionStructure}
-            sections={sections}
-            infoboxSectionStructure={infoboxSectionStructure}
-            floaterImageUrl={floaterImageUrl}
-            floaterRows={floaterRows}
-            allChapters={allChapters}
-            headChapterId={headChapterId}
-            readingChapterId={readingChapterId}
-            wikiPages={wikiPages}
-            pageTitles={wikiPageTitles}
-            wikiChapters={allChapters.map((c) => ({
-              name: c.displayName,
-              idx: c.idx,
-            }))}
-            chapterType={serial.chapterType}
-            introChapterIdx={introChapter?.idx ?? null}
-            childPages={childPages}
-            parentPages={parentPages}
-            allSerialPages={allSerialPagesRaw}
-            isAdmin={isAdmin}
-            isAuthenticated={isUserAuthenticated}
-            pendingSuggestionCount={pendingSuggestionCount}
-            pendingSuggestions={pendingSuggestions}
-            myPageSuggestions={myPageSuggestions}
-          />
-        </Box>
       </PageContainer>
     </main>
   );

@@ -55,6 +55,8 @@ type SerialTOCSidebarProps = {
   bulkApplyTocAction: (payload: BulkTocPayload) => Promise<void>;
   /** When false, hides the edit (pen) icon so non-admins cannot open SerialEditor. */
   isAdmin?: boolean;
+  /** The chapter the admin is currently reading; forwarded to SerialEditor as the initial "Writing as of" selection. */
+  readingChapterId?: number | null;
 };
 
 /**
@@ -84,6 +86,7 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
     updateSerialTypesAction,
     bulkApplyTocAction,
     isAdmin = false,
+    readingChapterId = null,
   } = props;
   const [editOpen, setEditOpen] = useState(false);
 
@@ -137,6 +140,7 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
             chaptersByVolume={chaptersByVolume}
             chapterType={chapterType}
             volumeType={volumeType}
+            readingChapterId={readingChapterId}
             addChapterAction={addChapterAction}
             addVolumeAction={addVolumeAction}
             deleteChapterAction={deleteChapterAction}
