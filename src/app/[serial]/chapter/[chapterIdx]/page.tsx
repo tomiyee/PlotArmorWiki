@@ -247,15 +247,56 @@ export default async function ChapterPage({ params }: Props) {
       )
       .orderBy(pages.name);
 
+    // Resolve chapter-versioned titles for introduced pages, bounded by the
+    // user's cutoffIdx so the title reflects what they know at their reading
+    // position rather than the raw fallback in pages.name.
+    const introducedPageIds = introducedPages.map((r) => r.pageId);
+    let introTitleByPageId = new Map<number, string>();
+    if (introducedPageIds.length > 0) {
+      const introTitleMaxIdxSq = db
+        .select({
+          pageId: pageTitles.pageId,
+          maxIdx: max(chapters.idx).as("max_idx"),
+        })
+        .from(pageTitles)
+        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+        .where(
+          and(
+            inArray(pageTitles.pageId, introducedPageIds),
+            lte(chapters.idx, cutoffIdx),
+          ),
+        )
+        .groupBy(pageTitles.pageId)
+        .as("intro_title_max_idx_sq");
+
+      const introTitleRows = await db
+        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
+        .from(pageTitles)
+        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
+        .innerJoin(
+          introTitleMaxIdxSq,
+          and(
+            eq(pageTitles.pageId, introTitleMaxIdxSq.pageId),
+            eq(chapters.idx, introTitleMaxIdxSq.maxIdx),
+          ),
+        );
+      introTitleByPageId = new Map(
+        introTitleRows.map((r) => [r.pageId, r.title]),
+      );
+    }
+
     if (introducedPages.length > 0) {
+      const resolvedPages = introducedPages
+        .map((r) => ({
+          id: r.pageId,
+          name: introTitleByPageId.get(r.pageId) ?? r.pageName,
+          slug: r.pageSlug,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
       groupedIntroductions = [
         {
           categoryName: "",
-          pages: introducedPages.map((r) => ({
-            id: r.pageId,
-            name: r.pageName,
-            slug: r.pageSlug,
-          })),
+          pages: resolvedPages,
         },
       ];
     }
