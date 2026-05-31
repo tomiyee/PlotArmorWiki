@@ -33,6 +33,7 @@ import {
   requireSerialAdminBySlug,
   requireSerialAdminByPageId,
 } from "@/lib/auth-guard";
+import { applyPageContentRevisions } from "./revisionHelpers";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -118,77 +119,15 @@ export async function savePageContent(
       .limit(1);
     const headIdx = targetChapterRow?.idx ?? 0;
 
-    // ── Section revisions ─────────────────────────────────────────────────────
-    const sectionIds = Object.keys(sectionContent).map(Number);
-    let prevContentBySectionId = new Map<number, string>();
-    if (sectionIds.length > 0 && headIdx > 0) {
-      const prevMaxSq = tx
-        .select({
-          sectionId: pageSectionRevisions.sectionId,
-          maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
-        })
-        .from(pageSectionRevisions)
-        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-        .where(
-          and(
-            eq(pageSectionRevisions.pageId, pageId),
-            inArray(pageSectionRevisions.sectionId, sectionIds),
-            lt(chapters.idx, headIdx),
-          ),
-        )
-        .groupBy(pageSectionRevisions.sectionId)
-        .as("prev_max_sq");
-
-      const prevRevisions = await tx
-        .select({
-          sectionId: pageSectionRevisions.sectionId,
-          content: pageSectionRevisions.content,
-        })
-        .from(pageSectionRevisions)
-        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-        .innerJoin(
-          prevMaxSq,
-          and(
-            eq(pageSectionRevisions.sectionId, prevMaxSq.sectionId),
-            eq(chapters.idx, prevMaxSq.maxPrevIdx),
-          ),
-        )
-        .where(eq(pageSectionRevisions.pageId, pageId));
-
-      prevContentBySectionId = new Map(
-        prevRevisions.map((r) => [r.sectionId, r.content ?? ""]),
-      );
-    }
-
-    for (const [sectionIdStr, content] of Object.entries(sectionContent)) {
-      const sectionId = parseInt(sectionIdStr, 10);
-      const prevContent = prevContentBySectionId.get(sectionId) ?? "";
-      if (!content.trim() || content === prevContent) {
-        // Never write empty revisions; also delete if matching previous revision
-        // to uphold the invariant: consecutive revisions must differ.
-        await tx
-          .delete(pageSectionRevisions)
-          .where(
-            and(
-              eq(pageSectionRevisions.pageId, pageId),
-              eq(pageSectionRevisions.sectionId, sectionId),
-              eq(pageSectionRevisions.chapterId, headChapterId),
-            ),
-          );
-        continue;
-      }
-      await tx
-        .insert(pageSectionRevisions)
-        .values({ pageId, sectionId, chapterId: headChapterId, content })
-        .onConflictDoUpdate({
-          target: [
-            pageSectionRevisions.pageId,
-            pageSectionRevisions.sectionId,
-            pageSectionRevisions.chapterId,
-          ],
-          set: { content },
-        });
-    }
+    await applyPageContentRevisions(
+      tx,
+      pageId,
+      headChapterId,
+      headIdx,
+      sectionContent,
+      {},
+      /* deleteIfEmpty */ true,
+    );
 
     if (floaterImageUrl !== null || Object.keys(floaterRowContent).length > 0) {
       await tx
@@ -202,85 +141,15 @@ export async function savePageContent(
           set: { imageUrl: floaterImageUrl },
         });
 
-      // ── Infobox row revisions ───────────────────────────────────────────────
-      const infoboxIds = Object.keys(floaterRowContent).map(Number);
-      let prevContentByInfoboxId = new Map<number, string>();
-      if (infoboxIds.length > 0 && headIdx > 0) {
-        const ibPrevMaxSq = tx
-          .select({
-            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-            maxPrevIdx: max(chapters.idx).as("max_prev_idx"),
-          })
-          .from(pageInfoboxRevisions)
-          .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-          .where(
-            and(
-              eq(pageInfoboxRevisions.pageId, pageId),
-              inArray(pageInfoboxRevisions.infoboxSectionId, infoboxIds),
-              lt(chapters.idx, headIdx),
-            ),
-          )
-          .groupBy(pageInfoboxRevisions.infoboxSectionId)
-          .as("ib_prev_max_sq");
-
-        const ibPrevRevisions = await tx
-          .select({
-            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-            content: pageInfoboxRevisions.content,
-          })
-          .from(pageInfoboxRevisions)
-          .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-          .innerJoin(
-            ibPrevMaxSq,
-            and(
-              eq(
-                pageInfoboxRevisions.infoboxSectionId,
-                ibPrevMaxSq.infoboxSectionId,
-              ),
-              eq(chapters.idx, ibPrevMaxSq.maxPrevIdx),
-            ),
-          )
-          .where(eq(pageInfoboxRevisions.pageId, pageId));
-
-        prevContentByInfoboxId = new Map(
-          ibPrevRevisions.map((r) => [r.infoboxSectionId, r.content ?? ""]),
-        );
-      }
-
-      for (const [infoboxSectionIdStr, content] of Object.entries(
+      await applyPageContentRevisions(
+        tx,
+        pageId,
+        headChapterId,
+        headIdx,
+        {},
         floaterRowContent,
-      )) {
-        const infoboxSectionId = parseInt(infoboxSectionIdStr, 10);
-        const prevContent = prevContentByInfoboxId.get(infoboxSectionId) ?? "";
-        if (!content.trim() || content === prevContent) {
-          await tx
-            .delete(pageInfoboxRevisions)
-            .where(
-              and(
-                eq(pageInfoboxRevisions.pageId, pageId),
-                eq(pageInfoboxRevisions.infoboxSectionId, infoboxSectionId),
-                eq(pageInfoboxRevisions.chapterId, headChapterId),
-              ),
-            );
-          continue;
-        }
-        await tx
-          .insert(pageInfoboxRevisions)
-          .values({
-            pageId,
-            infoboxSectionId,
-            chapterId: headChapterId,
-            content,
-          })
-          .onConflictDoUpdate({
-            target: [
-              pageInfoboxRevisions.pageId,
-              pageInfoboxRevisions.infoboxSectionId,
-              pageInfoboxRevisions.chapterId,
-            ],
-            set: { content },
-          });
-      }
+        /* deleteIfEmpty */ true,
+      );
     }
   });
 }
