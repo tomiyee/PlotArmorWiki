@@ -24,7 +24,7 @@ Progress is stored in `localStorage` for anonymous users and synced to their acc
 
 ### Pages
 
-Each serial has a home page (the root of the wiki DAG) and any number of child pages. Every page records the chapter it was first introduced in, which determines its visibility to a given user.
+Each serial has a home page (the root of the wiki DAG) and any number of sub-pages. Every page records the chapter it was first introduced in, which determines its visibility to a given user.
 
 Pages contain two optional layout components:
 
