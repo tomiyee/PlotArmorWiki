@@ -187,6 +187,7 @@ export default async function SerialPage({ params }: Props) {
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
+  const isUserAuthenticated = !!session?.user?.id;
 
   const chaptersByVolume: Record<
     number,
@@ -765,6 +766,7 @@ export default async function SerialPage({ params }: Props) {
                 allSerialPages={[]}
                 isHomePage
                 isAdmin={isAdmin}
+                isAuthenticated={isUserAuthenticated}
                 editModeHeader={
                   <>
                     <AdminManager
