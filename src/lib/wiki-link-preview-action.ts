@@ -13,9 +13,9 @@ import {
   pageInfoboxImageRevisions,
   pageSections,
   pageSectionRevisions,
-  pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
+import { resolvePageTitlesAtIdx } from "@/db/queries";
 
 export interface WikiLinkPreviewData {
   pageName: string;
@@ -108,32 +108,7 @@ export async function getWikiLinkPreview(
   let resolvedPageTitles: Record<string, string> = {};
   if (allPageRows.length > 0) {
     const pageIds = allPageRows.map((p) => p.id);
-    const titleMaxIdxSq = db
-      .select({
-        pageId: pageTitles.pageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(
-        and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)),
-      )
-      .groupBy(pageTitles.pageId)
-      .as("title_max_idx_sq");
-
-    const titleRows = await db
-      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .innerJoin(
-        titleMaxIdxSq,
-        and(
-          eq(pageTitles.pageId, titleMaxIdxSq.pageId),
-          eq(chapters.idx, titleMaxIdxSq.maxIdx),
-        ),
-      );
-
-    const titleByPageId = new Map(titleRows.map((r) => [r.pageId, r.title]));
+    const titleByPageId = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
     resolvedPageTitles = Object.fromEntries(
       allPageRows.map((p) => [p.slug, titleByPageId.get(p.id) ?? p.name]),
     );
