@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ButtonWithTooltip } from "@mdxeditor/editor";
 import { Link2 } from "lucide-react";
 import { WikiLinkContext } from "./WikiLinkContext";
@@ -40,14 +41,19 @@ export function InsertWikiLinkButton() {
     }
   }, []);
 
-  // Reposition the fixed popover whenever the user scrolls or resizes.
+  // Reposition the fixed popover whenever the user scrolls, resizes, or the
+  // iOS virtual keyboard opens/closes (visualViewport resize).
   useEffect(() => {
     if (!isOpen) return;
     window.addEventListener("scroll", updatePosition, true);
     window.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
     return () => {
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
     };
   }, [isOpen, updatePosition]);
 
@@ -119,49 +125,51 @@ export function InsertWikiLinkButton() {
         <Link2 className="size-4" />
       </ButtonWithTooltip>
 
-      {isOpen && (
-        <div
-          style={{
-            position: "fixed",
-            zIndex: 9999,
-            top: popoverPos.top,
-            left: popoverPos.left,
-          }}
-          className="w-80 rounded-lg border border-border bg-popover p-3 shadow-md flex flex-col gap-3"
-          onMouseDown={(e) => e.preventDefault()}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setIsOpen(false);
-              focusEditor();
-            }
-          }}
-        >
-          <Select<string>
-            options={selectOptions}
-            value={selectedToken}
-            onChange={handleTokenChange}
-            placeholder="Select a page or chapter…"
-            popupWidth="320px"
-          />
-          <Input
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
-            placeholder="Link text"
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleInsert();
+      {isOpen &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              zIndex: 9999,
+              top: popoverPos.top,
+              left: popoverPos.left,
             }}
-          />
-          <Button
-            type="button"
-            onClick={handleInsert}
-            disabled={!selectedToken}
-            className="w-full"
+            className="w-80 rounded-lg border border-border bg-popover p-3 shadow-md flex flex-col gap-3"
+            onMouseDown={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setIsOpen(false);
+                focusEditor();
+              }
+            }}
           >
-            Insert Wiki Link
-          </Button>
-        </div>
-      )}
+            <Select<string>
+              options={selectOptions}
+              value={selectedToken}
+              onChange={handleTokenChange}
+              placeholder="Select a page or chapter…"
+              popupWidth="320px"
+            />
+            <Input
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+              placeholder="Link text"
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleInsert();
+              }}
+            />
+            <Button
+              type="button"
+              onClick={handleInsert}
+              disabled={!selectedToken}
+              className="w-full"
+            >
+              Insert Wiki Link
+            </Button>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

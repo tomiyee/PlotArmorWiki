@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect, useSyncExternalStore } from "react";
 import type { CSSProperties } from "react";
+import { useTheme } from "next-themes";
 import type { MDXEditorMethods, RealmPlugin } from "@mdxeditor/editor";
 import {
   headingsPlugin,
@@ -150,6 +151,17 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     wikiChapters = [],
     chapterType,
   } = props;
+
+  // Sync MDXEditor's built-in .dark class with the app's class-based theme.
+  // next-themes returns undefined during SSR, so we gate on hasMounted to
+  // avoid hydration mismatches. After mount, resolvedTheme is always defined.
+  const { resolvedTheme } = useTheme();
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const isDark = hasMounted && resolvedTheme === "dark";
 
   const editorRef = useRef<MDXEditorMethods>(null);
   // Snapshot of value on mount - used as the diff baseline so "Diff" mode shows
@@ -458,7 +470,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           onChange={handleChange}
           plugins={plugins}
           toMarkdownOptions={{ extensions: [wikiLinkToMarkdownExtension] }}
-          className="mdx-editor-wiki"
+          className={isDark ? "mdx-editor-wiki dark" : "mdx-editor-wiki"}
           contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
         />
       </WikiLinkContext.Provider>
