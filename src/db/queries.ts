@@ -10,6 +10,9 @@ import {
 } from "@/db/schema";
 import { and, eq, inArray, lte, max } from "drizzle-orm";
 
+/** PostgreSQL INT4 max — use as cutoffIdx to mean "no chapter cutoff". */
+export const PG_INT_MAX = 2_147_483_647;
+
 /**
  * Resolves chapter-versioned display titles for a set of pages at a given reading position.
  *
@@ -194,9 +197,8 @@ export function infoboxRowMaxIdxSq(pageId: number, cutoffIdx: number) {
  * exists. Callers join this to `pageRelationships` + `chapters` to obtain the
  * latest active/inactive state per child at the reader's cutoff.
  *
- * Pass `Number.MAX_SAFE_INTEGER` as `cutoffIdx` to get the latest state across
- * all chapters (no cutoff), as used in the navbar where spoiler filtering is
- * not applied.
+ * Pass `PG_INT_MAX` as `cutoffIdx` to get the latest state across all chapters
+ * (no cutoff), as used in the navbar where spoiler filtering is not applied.
  *
  * @example
  * const sq = childRelMaxIdxSq(homePage.id, cutoffIdx);
