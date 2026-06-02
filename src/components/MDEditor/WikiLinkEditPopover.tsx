@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useMemo, useRef, useEffect, useState } from "react";
+import { useContext, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { XIcon } from "lucide-react";
 import { WikiLinkContext } from "./WikiLinkContext";
 import { Select, type Option } from "@/components/ui/Select";
@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 
 type WikiLinkEditPopoverProps = {
-  /** Bounding rect of the anchor element (button or chip) used to position the fixed popover. */
-  anchorRect: DOMRect;
+  /** Anchor element (button or chip) used to position the fixed popover. Re-queried on scroll/resize so the popover tracks the element on iOS when the virtual keyboard opens. */
+  anchorEl: HTMLElement;
   /** Pre-fills the page/chapter selector, e.g. `"page:luffy"`. */
   initialToken?: string;
   /** Pre-fills the alias input. */
@@ -28,8 +28,8 @@ type WikiLinkEditPopoverProps = {
 
 /**
  * Shared popover for inserting or editing a wiki link.
- * Rendered at a fixed position derived from `anchorRect` and re-anchors on
- * scroll and resize so it stays aligned while the page moves.
+ * Rendered at a fixed position derived from `anchorEl.getBoundingClientRect()` and
+ * re-anchors on scroll, resize, and visualViewport changes (iOS keyboard open/close).
  *
  * Extracted from `InsertWikiLinkButton` so the same form is reused for:
  * - toolbar "Insert wiki link" button
@@ -38,7 +38,7 @@ type WikiLinkEditPopoverProps = {
  *
  * @example
  * <WikiLinkEditPopover
- *   anchorRect={chipEl.getBoundingClientRect()}
+ *   anchorEl={chipEl}
  *   initialToken="page:luffy"
  *   initialAlias="Luffy"
  *   onConfirm={(token, alias) => updateNode(token, alias)}
@@ -47,7 +47,7 @@ type WikiLinkEditPopoverProps = {
  */
 export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
   const {
-    anchorRect,
+    anchorEl,
     initialToken,
     initialAlias = "",
     autoFocusAlias = false,
@@ -59,6 +59,30 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
   const [selectedToken, setSelectedToken] = useState<string | undefined>(initialToken);
   const [alias, setAlias] = useState(initialAlias);
   const aliasInputRef = useRef<HTMLInputElement>(null);
+
+  const [pos, setPos] = useState(() => {
+    const r = anchorEl.getBoundingClientRect();
+    return { top: r.bottom + 4, left: r.left };
+  });
+
+  const updatePos = useCallback(() => {
+    const r = anchorEl.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left });
+  }, [anchorEl]);
+
+  // Reposition on scroll, resize, and iOS visualViewport changes (virtual keyboard open/close).
+  useEffect(() => {
+    window.addEventListener("scroll", updatePos, true);
+    window.addEventListener("resize", updatePos);
+    window.visualViewport?.addEventListener("resize", updatePos);
+    window.visualViewport?.addEventListener("scroll", updatePos);
+    return () => {
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+      window.visualViewport?.removeEventListener("resize", updatePos);
+      window.visualViewport?.removeEventListener("scroll", updatePos);
+    };
+  }, [updatePos]);
 
   // Auto-focus alias input when requested (post-autocomplete alias step).
   useEffect(() => {
@@ -118,8 +142,8 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
       <div className="fixed inset-0 z-[49]" onMouseDown={onClose} />
       <div
         style={{
-          top: anchorRect.bottom + 4,
-          left: anchorRect.left,
+          top: pos.top,
+          left: pos.left,
         }}
         className="fixed z-50 w-80 rounded-lg border border-border bg-popover p-3 shadow-md flex flex-col gap-3"
         onMouseDown={(e) => e.preventDefault()}

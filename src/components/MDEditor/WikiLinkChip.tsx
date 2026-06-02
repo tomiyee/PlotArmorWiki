@@ -54,8 +54,7 @@ export function WikiLinkChip(props: WikiLinkChipProps) {
 
   const handleClick = useCallback(() => {
     if (!nodeKey || !spanRef.current) return;
-    const rect = spanRef.current.getBoundingClientRect();
-    openEditMenu(nodeKey, rect);
+    openEditMenu(nodeKey, spanRef.current);
   }, [nodeKey, openEditMenu]);
 
   return (

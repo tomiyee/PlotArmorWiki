@@ -201,7 +201,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   // State for the edit/insert popover. nodeKey is null for toolbar insert mode.
   const [editState, setEditState] = useState<{
     nodeKey: string | null;
-    rect: DOMRect;
+    anchorEl: HTMLElement;
     initialToken: string;
     initialAlias: string;
     autoFocusAlias: boolean;
@@ -222,7 +222,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
 
   // Stable ref that always points to the latest handleAfterInsert callback.
   // Avoids a forward-reference issue since handleAfterInsert is defined below.
-  type AfterInsertFn = (nodeKey: string, rect: DOMRect) => void;
+  type AfterInsertFn = (nodeKey: string, el: HTMLElement) => void;
   const onAfterInsertRef = useRef<AfterInsertFn | undefined>(undefined);
 
   const { applySuggestion, isApplyingRef, lastEmittedRef, prevValueRef } =
@@ -233,8 +233,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       closeSuggestions,
       chapterType,
       onChange,
-      onAfterInsert: useCallback((nodeKey: string, rect: DOMRect) => {
-        onAfterInsertRef.current?.(nodeKey, rect);
+      onAfterInsert: useCallback((nodeKey: string, el: HTMLElement) => {
+        onAfterInsertRef.current?.(nodeKey, el);
       }, []),
     });
 
@@ -369,12 +369,12 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   }, []);
 
   /**
-   * Opens the insert-wiki-link popover anchored to the toolbar button rect.
+   * Opens the insert-wiki-link popover anchored to the toolbar button element.
    * Rendering happens here (outside MDXEditor's DOM) so popover styling is
    * consistent with chip-click edits, which also render at this level.
    */
-  const openInsertMenu = useCallback((rect: DOMRect) => {
-    setEditState({ nodeKey: null, rect, initialToken: "", initialAlias: "", autoFocusAlias: false });
+  const openInsertMenu = useCallback((anchorEl: HTMLElement) => {
+    setEditState({ nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false });
   }, []);
 
   /**
@@ -383,7 +383,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
    * an edit without owning Lexical state themselves.
    */
   const openEditMenu = useCallback(
-    (nodeKey: string, rect: DOMRect) => {
+    (nodeKey: string, anchorEl: HTMLElement) => {
       const editorEl = containerRef.current?.querySelector<HTMLElement>(
         '[contenteditable="true"]',
       );
@@ -392,7 +392,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
       if (!read) return;
       setEditState({
-        nodeKey, rect, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: false,
+        nodeKey, anchorEl, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: false,
       });
     },
     [],
@@ -405,7 +405,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
    * forward-reference problem.
    */
   const handleAfterInsert = useCallback(
-    (nodeKey: string, rect: DOMRect) => {
+    (nodeKey: string, anchorEl: HTMLElement) => {
       const editorEl = containerRef.current?.querySelector<HTMLElement>(
         '[contenteditable="true"]',
       );
@@ -414,7 +414,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
       if (!read) return;
       setEditState({
-        nodeKey, rect, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: true,
+        nodeKey, anchorEl, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: true,
       });
     },
     [],
@@ -608,7 +608,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
         />
         {editState && (
           <WikiLinkEditPopover
-            anchorRect={editState.rect}
+            anchorEl={editState.anchorEl}
             initialToken={editState.initialToken}
             initialAlias={editState.initialAlias}
             autoFocusAlias={editState.autoFocusAlias}
