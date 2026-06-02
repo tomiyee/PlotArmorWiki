@@ -79,7 +79,7 @@ export class WikiLinkNode extends DecoratorNode<ReactElement> {
   }
 
   decorate(_editor: LexicalEditor, _config: EditorConfig): ReactElement {
-    return <WikiLinkChip token={this.__token} alias={this.__alias} />;
+    return <WikiLinkChip token={this.__token} alias={this.__alias} nodeKey={this.__key} />;
   }
 }
 
