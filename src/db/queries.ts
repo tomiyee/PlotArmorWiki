@@ -1,5 +1,5 @@
 import { db } from "@/db/index";
-import { chapters, pageTitles } from "@/db/schema";
+import { chapters, pageTitles, pageRelationships } from "@/db/schema";
 import { and, eq, inArray, lte, max } from "drizzle-orm";
 
 /**
@@ -49,4 +49,58 @@ export async function resolvePageTitlesAtIdx(
     );
 
   return new Map(rows.map((r) => [r.pageId, r.title]));
+}
+
+/**
+ * For each page in `pageIds`, determines whether it has at least one active
+ * child relationship at `cutoffIdx` (highest chapter_idx ≤ cutoff resolves to
+ * is_active = true). Used to decide folder vs. document icon in sub-page lists.
+ *
+ * @example
+ * const hasChildren = await resolveHasChildrenAtIdx(childPageIds, cutoffIdx);
+ * const icon = hasChildren.has(page.id) ? <Folder /> : <FileText />;
+ */
+export async function resolveHasChildrenAtIdx(
+  pageIds: number[],
+  cutoffIdx: number,
+): Promise<Set<number>> {
+  if (pageIds.length === 0) return new Set();
+
+  const relMaxIdxSq = db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      childPageId: pageRelationships.childPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .where(
+      and(
+        inArray(pageRelationships.parentPageId, pageIds),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .groupBy(pageRelationships.parentPageId, pageRelationships.childPageId)
+    .as("has_children_rel_max_idx_sq");
+
+  const rows = await db
+    .select({ parentPageId: pageRelationships.parentPageId })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      relMaxIdxSq,
+      and(
+        eq(pageRelationships.parentPageId, relMaxIdxSq.parentPageId),
+        eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+        eq(chapters.idx, relMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(
+      and(
+        inArray(pageRelationships.parentPageId, pageIds),
+        eq(pageRelationships.isActive, true),
+      ),
+    );
+
+  return new Set(rows.map((r) => r.parentPageId));
 }
