@@ -6,6 +6,7 @@ import { Text } from "@/components/ui/Text";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { getChapterLinkPreview } from "@/lib/wiki-link-preview-action";
 import type { ChapterLinkPreviewData } from "@/lib/wiki-link-preview-action";
+import { WIKI_LINK_CHIP_CLASSES } from "@/components/MDEditor/wikiLinkChipClasses";
 
 type ChapterLinkPreviewProps = {
   /** The URL the link points to (e.g. `/my-serial/chapter/5`). */
@@ -50,7 +51,7 @@ export function ChapterLinkPreview(props: ChapterLinkPreviewProps) {
   const anchor = (
     <a
       href={href}
-      className="text-primary underline hover:text-primary/80"
+      className={`${WIKI_LINK_CHIP_CLASSES} cursor-pointer hover:bg-accent hover:text-accent-foreground`}
       onMouseEnter={handleMouseEnter}
     >
       {children}
