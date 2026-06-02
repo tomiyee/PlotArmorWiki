@@ -1,5 +1,5 @@
 import { db } from "@/db/index";
-import { chapters, pageTitles } from "@/db/schema";
+import { chapters, pageTitles, pageRelationships } from "@/db/schema";
 import { and, eq, inArray, lte, max } from "drizzle-orm";
 
 /**
@@ -49,4 +49,61 @@ export async function resolvePageTitlesAtIdx(
     );
 
   return new Map(rows.map((r) => [r.pageId, r.title]));
+}
+
+/**
+ * Returns the set of page IDs (from `pageIds`) that have at least one active
+ * child relationship at `cutoffIdx` — i.e. pages that should render a folder
+ * icon rather than a document icon in the sub-pages list.
+ *
+ * Uses the max-idx pattern: the latest `pageRelationships` revision per
+ * (parent, child) pair at or before `cutoffIdx` must have `isActive = true`.
+ *
+ * @example
+ * const hasChildrenSet = await resolveHasChildrenSet(childPageIds, cutoffIdx);
+ * const hasChildren = hasChildrenSet.has(page.id);
+ */
+export async function resolveHasChildrenSet(
+  pageIds: number[],
+  cutoffIdx: number,
+): Promise<Set<number>> {
+  if (pageIds.length === 0) return new Set();
+
+  const grandchildRelMaxIdxSq = db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      childPageId: pageRelationships.childPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .where(
+      and(
+        inArray(pageRelationships.parentPageId, pageIds),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .groupBy(pageRelationships.parentPageId, pageRelationships.childPageId)
+    .as("grandchild_rel_max_idx_sq");
+
+  const rows = await db
+    .select({ parentPageId: pageRelationships.parentPageId })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      grandchildRelMaxIdxSq,
+      and(
+        eq(pageRelationships.parentPageId, grandchildRelMaxIdxSq.parentPageId),
+        eq(pageRelationships.childPageId, grandchildRelMaxIdxSq.childPageId),
+        eq(chapters.idx, grandchildRelMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(
+      and(
+        inArray(pageRelationships.parentPageId, pageIds),
+        eq(pageRelationships.isActive, true),
+      ),
+    );
+
+  return new Set(rows.map((r) => r.parentPageId));
 }

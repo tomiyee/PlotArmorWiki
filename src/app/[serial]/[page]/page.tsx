@@ -16,7 +16,7 @@ import {
   pageTitles,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx } from "@/db/queries";
+import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -446,59 +446,12 @@ export default async function PageView({ params }: Props) {
   const activeChildPages = childPagesRaw.filter((r) => r.isActive);
   const activeParentPagesRaw = parentPagesRaw.filter((r) => r.isActive);
 
-  // Resolve temporal titles for each active child page at the reader's cutoff.
+  // Resolve temporal titles and folder/leaf classification for active child pages.
   const childPageIds = activeChildPages.map((r) => r.id);
-  const childTitleMap = await resolvePageTitlesAtIdx(childPageIds, cutoffIdx);
-
-  // Compute hasChildren for each active child page: does any of these child
-  // pages itself have active child relationships at the reader's cutoff?
-  // Uses the same max-idx pattern: latest page_relationships row per
-  // (parent, child) pair where chapter_idx ≤ cutoff and is_active = true.
-  const hasChildrenSet = new Set<number>();
-  if (childPageIds.length > 0) {
-    const grandchildRelMaxIdxSq = db
-      .select({
-        parentPageId: pageRelationships.parentPageId,
-        childPageId: pageRelationships.childPageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageRelationships)
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .where(
-        and(
-          inArray(pageRelationships.parentPageId, childPageIds),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageRelationships.parentPageId, pageRelationships.childPageId)
-      .as("grandchild_rel_max_idx_sq");
-
-    const grandchildRows = await db
-      .select({
-        parentPageId: pageRelationships.parentPageId,
-        isActive: pageRelationships.isActive,
-      })
-      .from(pageRelationships)
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .innerJoin(
-        grandchildRelMaxIdxSq,
-        and(
-          eq(pageRelationships.parentPageId, grandchildRelMaxIdxSq.parentPageId),
-          eq(pageRelationships.childPageId, grandchildRelMaxIdxSq.childPageId),
-          eq(chapters.idx, grandchildRelMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(
-        and(
-          inArray(pageRelationships.parentPageId, childPageIds),
-          eq(pageRelationships.isActive, true),
-        ),
-      );
-
-    for (const row of grandchildRows) {
-      hasChildrenSet.add(row.parentPageId);
-    }
-  }
+  const [childTitleMap, hasChildrenSet] = await Promise.all([
+    resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
+    resolveHasChildrenSet(childPageIds, cutoffIdx),
+  ]);
 
   const childPages = activeChildPages.map((r) => ({
     id: r.id,

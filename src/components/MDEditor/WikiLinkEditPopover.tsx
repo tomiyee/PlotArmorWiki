@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useEffect, useState } from "react";
 import { XIcon } from "lucide-react";
 import { WikiLinkContext } from "./WikiLinkContext";
 import { Select, type Option } from "@/components/ui/Select";
@@ -58,25 +58,7 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
 
   const [selectedToken, setSelectedToken] = useState<string | undefined>(initialToken);
   const [alias, setAlias] = useState(initialAlias);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>(() => ({
-    top: anchorRect.bottom + 4,
-    left: anchorRect.left,
-  }));
   const aliasInputRef = useRef<HTMLInputElement>(null);
-
-  // Re-anchor to anchorRect on scroll/resize.
-  const updatePosition = useCallback(() => {
-    setPopoverPos({ top: anchorRect.bottom + 4, left: anchorRect.left });
-  }, [anchorRect]);
-
-  useEffect(() => {
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [updatePosition]);
 
   // Auto-focus alias input when requested (post-autocomplete alias step).
   useEffect(() => {
@@ -136,8 +118,8 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
       <div className="fixed inset-0 z-[49]" onMouseDown={onClose} />
       <div
         style={{
-          top: popoverPos.top,
-          left: popoverPos.left,
+          top: anchorRect.bottom + 4,
+          left: anchorRect.left,
         }}
         className="fixed z-50 w-80 rounded-lg border border-border bg-popover p-3 shadow-md flex flex-col gap-3"
         onMouseDown={(e) => e.preventDefault()}

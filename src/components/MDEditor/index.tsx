@@ -93,6 +93,23 @@ type WikiLinkMDEditorProps = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Reads token and alias from a WikiLinkNode by key; returns null if not found. */
+function readWikiLinkTokenAlias(
+  lexEditor: ReturnType<typeof getNearestEditorFromDOMNode>,
+  nodeKey: string,
+): { token: string; alias: string } | null {
+  let token = "";
+  let alias = "";
+  lexEditor!.read(() => {
+    const node = $getNodeByKey(nodeKey);
+    if ($isWikiLinkNode(node)) {
+      token = node.__token;
+      alias = node.__alias ?? "";
+    }
+  });
+  return token ? { token, alias } : null;
+}
+
 /**
  * Inserts a WikiLinkNode at the current cursor selection in the given Lexical
  * editor without replacing any `[[` fragment - suitable for toolbar-triggered
@@ -360,20 +377,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       );
       const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
       if (!lexEditor) return;
-
-      let token = "";
-      let alias = "";
-      lexEditor.read(() => {
-        const node = $getNodeByKey(nodeKey);
-        if ($isWikiLinkNode(node)) {
-          token = node.__token;
-          alias = node.__alias ?? "";
-        }
-      });
-
-      if (!token) return;
+      const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
+      if (!read) return;
       setEditState({
-        nodeKey, rect, initialToken: token, initialAlias: alias, autoFocusAlias: false,
+        nodeKey, rect, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: false,
       });
     },
     [],
@@ -392,20 +399,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       );
       const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
       if (!lexEditor) return;
-
-      let token = "";
-      let alias = "";
-      lexEditor.read(() => {
-        const node = $getNodeByKey(nodeKey);
-        if ($isWikiLinkNode(node)) {
-          token = node.__token;
-          alias = node.__alias ?? "";
-        }
-      });
-
-      if (!token) return;
+      const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
+      if (!read) return;
       setEditState({
-        nodeKey, rect, initialToken: token, initialAlias: alias, autoFocusAlias: true,
+        nodeKey, rect, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: true,
       });
     },
     [],
