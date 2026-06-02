@@ -21,7 +21,7 @@ import {
   users,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx, resolveHasChildrenAtIdx } from "@/db/queries";
+import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
 import {
   addChapter,
   addVolume,
@@ -501,9 +501,10 @@ export default async function SerialPage({ params }: Props) {
 
     const activeChildPages = childPagesRaw.filter((r) => r.isActive);
     const childPageIds = activeChildPages.map((r) => r.id);
-    const childTitleMap = await resolvePageTitlesAtIdx(childPageIds, cutoffIdx);
-
-    const hasChildrenSet = await resolveHasChildrenAtIdx(childPageIds, cutoffIdx);
+    const [childTitleMap, hasChildrenSet] = await Promise.all([
+      resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
+      resolveHasChildrenSet(childPageIds, cutoffIdx),
+    ]);
 
     childPages = activeChildPages.map((r) => ({
       id: r.id,

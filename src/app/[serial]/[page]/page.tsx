@@ -16,7 +16,7 @@ import {
   pageTitles,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx, resolveHasChildrenAtIdx } from "@/db/queries";
+import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -446,11 +446,12 @@ export default async function PageView({ params }: Props) {
   const activeChildPages = childPagesRaw.filter((r) => r.isActive);
   const activeParentPagesRaw = parentPagesRaw.filter((r) => r.isActive);
 
-  // Resolve temporal titles for each active child page at the reader's cutoff.
+  // Resolve temporal titles and folder/leaf classification for active child pages.
   const childPageIds = activeChildPages.map((r) => r.id);
-  const childTitleMap = await resolvePageTitlesAtIdx(childPageIds, cutoffIdx);
-
-  const hasChildrenSet = await resolveHasChildrenAtIdx(childPageIds, cutoffIdx);
+  const [childTitleMap, hasChildrenSet] = await Promise.all([
+    resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
+    resolveHasChildrenSet(childPageIds, cutoffIdx),
+  ]);
 
   const childPages = activeChildPages.map((r) => ({
     id: r.id,
