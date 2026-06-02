@@ -19,9 +19,15 @@ export const WikiLinkContext = createContext<{
   insertWikiLink: (token: string, alias?: string) => void;
   /** Focuses the editor's contenteditable after a toolbar interaction. */
   focusEditor: () => void;
+  /**
+   * Opens the edit popover anchored to `rect` for the WikiLinkNode identified by `nodeKey`.
+   * Called from WikiLinkChip onClick so the chip can request an edit without owning Lexical state.
+   */
+  openEditMenu: (nodeKey: string, rect: DOMRect) => void;
 }>({
   wikiPages: [],
   wikiChapters: [],
   insertWikiLink: () => {},
   focusEditor: () => {},
+  openEditMenu: () => {},
 });

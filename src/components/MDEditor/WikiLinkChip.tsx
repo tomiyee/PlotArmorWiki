@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext } from "react";
+import { useCallback, useContext, useRef } from "react";
 import { WikiLinkContext } from "./WikiLinkContext";
 
 type WikiLinkChipProps = {
@@ -8,20 +8,28 @@ type WikiLinkChipProps = {
   token: string;
   /** When provided, shown instead of the resolved page or chapter name. */
   alias?: string;
+  /**
+   * Lexical node key for this chip. When provided, clicking the chip opens the
+   * edit popover via `WikiLinkContext.openEditMenu` so the token and alias can
+   * be changed without deleting and re-inserting the chip.
+   */
+  nodeKey?: string;
 };
 
 /**
  * Inline chip rendered inside the WYSIWYG editor for a resolved wiki link.
  * Reads page names from WikiLinkContext so slugs show as human-readable titles.
  * When an explicit alias is provided it is displayed directly, bypassing the lookup.
+ * Clicking the chip opens an edit popover (when `nodeKey` is supplied).
  *
  * @example
- * <WikiLinkChip token="page:luffy" />
- * <WikiLinkChip token="Chapter:Chapter 5" alias="Ch. 5" />
+ * <WikiLinkChip token="page:luffy" nodeKey={node.__key} />
+ * <WikiLinkChip token="Chapter:Chapter 5" alias="Ch. 5" nodeKey={node.__key} />
  */
 export function WikiLinkChip(props: WikiLinkChipProps) {
-  const { token, alias } = props;
-  const { wikiPages, chapterType } = useContext(WikiLinkContext);
+  const { token, alias, nodeKey } = props;
+  const { wikiPages, chapterType, openEditMenu } = useContext(WikiLinkContext);
+  const spanRef = useRef<HTMLSpanElement>(null);
 
   const colonIdx = token.indexOf(":");
   const category = colonIdx !== -1 ? token.slice(0, colonIdx) : "page";
@@ -44,10 +52,19 @@ export function WikiLinkChip(props: WikiLinkChipProps) {
   const showActualName = alias && alias !== actualName;
   const isChapter = !alias && chapterType && category === chapterType;
 
+  const handleClick = useCallback(() => {
+    if (!nodeKey || !spanRef.current) return;
+    const rect = spanRef.current.getBoundingClientRect();
+    openEditMenu(nodeKey, rect);
+  }, [nodeKey, openEditMenu]);
+
   return (
     <span
+      ref={spanRef}
       contentEditable={false}
-      className="inline-flex select-none items-baseline gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+      data-wiki-key={nodeKey}
+      onClick={nodeKey ? handleClick : undefined}
+      className={`inline-flex select-none items-baseline gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200${nodeKey ? " cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60" : ""}`}
     >
       {label}
       {showActualName && (
