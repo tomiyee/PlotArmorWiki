@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
 import { db } from "@/db/index";
-import { serialAdmins, serials, pages } from "@/db/schema";
+import { serialAdmins, pages } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { getSerialBySlug } from "@/db/queries";
 
 /**
  * Returns `true` when the currently authenticated user is an admin of the given
@@ -80,11 +81,7 @@ export async function requireSerialAdmin(serialId: number): Promise<string> {
 export async function requireSerialAdminBySlug(
   serialSlug: string,
 ): Promise<string> {
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
 
   if (!serial) throw new Error("Serial not found.");
 
