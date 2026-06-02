@@ -169,9 +169,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     left: number;
   } | null>(null);
 
-  // State for the edit popover opened when clicking a chip or after autocomplete.
+  // State for the edit/insert popover. nodeKey is null for toolbar insert mode.
   const [editState, setEditState] = useState<{
-    nodeKey: string;
+    nodeKey: string | null;
     rect: DOMRect;
     initialToken: string;
     initialAlias: string;
@@ -340,6 +340,15 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   }, []);
 
   /**
+   * Opens the insert-wiki-link popover anchored to the toolbar button rect.
+   * Rendering happens here (outside MDXEditor's DOM) so popover styling is
+   * consistent with chip-click edits, which also render at this level.
+   */
+  const openInsertMenu = useCallback((rect: DOMRect) => {
+    setEditState({ nodeKey: null, rect, initialToken: "", initialAlias: "", autoFocusAlias: false });
+  }, []);
+
+  /**
    * Opens the edit popover for an existing WikiLinkNode.
    * Called from WikiLinkChip onClick via WikiLinkContext so chips can request
    * an edit without owning Lexical state themselves.
@@ -407,38 +416,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   });
 
   /**
-   * Applies an edited token/alias to an existing WikiLinkNode in place.
-   */
-  const handleEditConfirm = useCallback(
-    (token: string, alias: string | undefined) => {
-      if (!editState) return;
-      const { nodeKey } = editState;
-      setEditState(null);
-
-      const editorEl = containerRef.current?.querySelector<HTMLElement>(
-        '[contenteditable="true"]',
-      );
-      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
-      if (!lexEditor) return;
-
-      isApplyingRef.current = true;
-      lexEditor.update(() => {
-        const node = $getNodeByKey(nodeKey);
-        if ($isWikiLinkNode(node)) {
-          const writable = node.getWritable();
-          writable.__token = token;
-          writable.__alias = alias;
-        }
-      });
-      requestAnimationFrame(() => {
-        isApplyingRef.current = false;
-        lexEditor.focus();
-      });
-    },
-    [editState, isApplyingRef],
-  );
-
-  /**
    * Inserts a `[[token]]` WikiLinkNode at the current Lexical cursor position.
    * Exposed via WikiLinkContext so InsertWikiLinkButton (inside the MDXEditor
    * plugin subtree) can trigger an insertion without DOM traversal.
@@ -476,6 +453,45 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       });
     },
     [isApplyingRef, lastEmittedRef, onChange, prevValueRef],
+  );
+
+  /**
+   * Applies an edited token/alias to an existing WikiLinkNode in place,
+   * or inserts a new one when opened from the toolbar button (nodeKey === null).
+   */
+  const handleEditConfirm = useCallback(
+    (token: string, alias: string | undefined) => {
+      if (!editState) return;
+      const { nodeKey } = editState;
+      setEditState(null);
+
+      if (nodeKey === null) {
+        insertWikiLink(token, alias);
+        requestAnimationFrame(() => focusEditor());
+        return;
+      }
+
+      const editorEl = containerRef.current?.querySelector<HTMLElement>(
+        '[contenteditable="true"]',
+      );
+      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+      if (!lexEditor) return;
+
+      isApplyingRef.current = true;
+      lexEditor.update(() => {
+        const node = $getNodeByKey(nodeKey);
+        if ($isWikiLinkNode(node)) {
+          const writable = node.getWritable();
+          writable.__token = token;
+          writable.__alias = alias;
+        }
+      });
+      requestAnimationFrame(() => {
+        isApplyingRef.current = false;
+        lexEditor.focus();
+      });
+    },
+    [editState, isApplyingRef, insertWikiLink, focusEditor],
   );
 
   /**
@@ -569,6 +585,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           insertWikiLink,
           focusEditor,
           openEditMenu,
+          openInsertMenu,
         }}
       >
         <MDXEditorClient
@@ -580,6 +597,19 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           className="mdx-editor-wiki"
           contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
         />
+        {editState && (
+          <WikiLinkEditPopover
+            anchorRect={editState.rect}
+            initialToken={editState.initialToken}
+            initialAlias={editState.initialAlias}
+            autoFocusAlias={editState.autoFocusAlias}
+            onConfirm={handleEditConfirm}
+            onClose={() => {
+              setEditState(null);
+              focusEditor();
+            }}
+          />
+        )}
       </WikiLinkContext.Provider>
       {isOpen && suggestions.length > 0 && (
         <ul
@@ -610,19 +640,6 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
             </li>
           ))}
         </ul>
-      )}
-      {editState && (
-        <WikiLinkEditPopover
-          anchorRect={editState.rect}
-          initialToken={editState.initialToken}
-          initialAlias={editState.initialAlias}
-          autoFocusAlias={editState.autoFocusAlias}
-          onConfirm={handleEditConfirm}
-          onClose={() => {
-            setEditState(null);
-            focusEditor();
-          }}
-        />
       )}
     </div>
   );

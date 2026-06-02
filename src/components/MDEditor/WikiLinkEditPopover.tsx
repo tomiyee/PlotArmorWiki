@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { XIcon } from "lucide-react";
 import { WikiLinkContext } from "./WikiLinkContext";
 import { Select, type Option } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Text } from "@/components/ui/Text";
 
 type WikiLinkEditPopoverProps = {
   /** Bounding rect of the anchor element (button or chip) used to position the fixed popover. */
@@ -20,7 +22,7 @@ type WikiLinkEditPopoverProps = {
   autoFocusAlias?: boolean;
   /** Called when the user confirms the link selection. */
   onConfirm: (token: string, alias: string | undefined) => void;
-  /** Called when the user dismisses the popover (Escape, or blur). */
+  /** Called when the user dismisses the popover (Escape, backdrop click, or × button). */
   onClose: () => void;
 };
 
@@ -129,47 +131,61 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        zIndex: 9999,
-        top: popoverPos.top,
-        left: popoverPos.left,
-      }}
-      className="w-80 rounded-lg border border-border bg-popover p-3 shadow-md flex flex-col gap-3"
-      onMouseDown={(e) => e.preventDefault()}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          onClose();
-        }
-      }}
-    >
-      <Select<string>
-        options={selectOptions}
-        value={selectedToken}
-        onChange={handleTokenChange}
-        placeholder="Select a page or chapter…"
-        popupWidth="320px"
-      />
-      <Input
-        ref={aliasInputRef}
-        value={alias}
-        onChange={(e) => setAlias(e.target.value)}
-        placeholder="Link text"
-        autoFocus={autoFocusAlias}
-        onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleConfirm();
+    <>
+      {/* Transparent backdrop — clicking outside the popover closes it. */}
+      <div className="fixed inset-0 z-[49]" onMouseDown={onClose} />
+      <div
+        style={{
+          top: popoverPos.top,
+          left: popoverPos.left,
         }}
-      />
-      <Button
-        type="button"
-        onClick={handleConfirm}
-        disabled={!selectedToken}
-        className="w-full"
+        className="fixed z-50 w-80 rounded-lg border border-border bg-popover p-3 shadow-md flex flex-col gap-3"
+        onMouseDown={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            onClose();
+          }
+        }}
       >
-        {initialToken ? "Update Wiki Link" : "Insert Wiki Link"}
-      </Button>
-    </div>
+        <div className="flex items-center justify-between">
+          <Text variant="label">{initialToken ? "Edit Wiki Link" : "Insert Wiki Link"}</Text>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="size-6 shrink-0"
+          >
+            <XIcon className="size-4" />
+          </Button>
+        </div>
+        <Select<string>
+          options={selectOptions}
+          value={selectedToken}
+          onChange={handleTokenChange}
+          placeholder="Select a page or chapter…"
+          popupWidth="320px"
+        />
+        <Input
+          ref={aliasInputRef}
+          value={alias}
+          onChange={(e) => setAlias(e.target.value)}
+          placeholder="Link text"
+          autoFocus={autoFocusAlias}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleConfirm();
+          }}
+        />
+        <Button
+          type="button"
+          onClick={handleConfirm}
+          disabled={!selectedToken}
+          className="w-full"
+        >
+          {initialToken ? "Update Wiki Link" : "Insert Wiki Link"}
+        </Button>
+      </div>
+    </>
   );
 }

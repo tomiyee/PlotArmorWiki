@@ -24,10 +24,17 @@ export const WikiLinkContext = createContext<{
    * Called from WikiLinkChip onClick so the chip can request an edit without owning Lexical state.
    */
   openEditMenu: (nodeKey: string, rect: DOMRect) => void;
+  /**
+   * Opens the insert-wiki-link popover anchored to `rect`.
+   * Called from InsertWikiLinkButton so the popover is rendered outside the
+   * MDXEditor toolbar DOM subtree, avoiding inherited toolbar CSS.
+   */
+  openInsertMenu: (rect: DOMRect) => void;
 }>({
   wikiPages: [],
   wikiChapters: [],
   insertWikiLink: () => {},
   focusEditor: () => {},
   openEditMenu: () => {},
+  openInsertMenu: () => {},
 });

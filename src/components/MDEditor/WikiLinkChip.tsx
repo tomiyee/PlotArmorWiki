@@ -64,14 +64,14 @@ export function WikiLinkChip(props: WikiLinkChipProps) {
       contentEditable={false}
       data-wiki-key={nodeKey}
       onClick={nodeKey ? handleClick : undefined}
-      className={`inline-flex select-none items-baseline gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200${nodeKey ? " cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60" : ""}`}
+      className={`inline-flex select-none items-baseline gap-1 rounded bg-muted px-1.5 py-0.5 text-sm font-medium text-foreground${nodeKey ? " cursor-pointer hover:bg-accent hover:text-accent-foreground" : ""}`}
     >
       {label}
       {showActualName && (
         <span className="text-xs font-normal opacity-70">({actualName})</span>
       )}
       {isChapter && (
-        <span className="ml-0.5 shrink-0 text-xs text-blue-500 dark:text-blue-400">
+        <span className="ml-0.5 shrink-0 text-xs text-muted-foreground">
           {chapterType}
         </span>
       )}
