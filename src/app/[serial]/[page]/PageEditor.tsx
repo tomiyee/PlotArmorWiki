@@ -384,21 +384,7 @@ export function PageEditor(props: Props) {
     getPageContentAtChapter(serialSlug, pageSlug, selectedChapterId).then(
       (data) => {
         if (!cancelled) {
-          setPreviousSectionContent(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousContent]),
-            ),
-          );
-          setPreviousSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-            ),
-          );
-          setNextSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-            ),
-          );
+          applyRevisionMetadata(data);
         }
       },
     );
@@ -409,6 +395,24 @@ export function PageEditor(props: Props) {
     // handleChapterChange which also updates these states.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
+
+  function applyRevisionMetadata(
+    data: Awaited<ReturnType<typeof getPageContentAtChapter>>,
+  ) {
+    setPreviousSectionContent(
+      Object.fromEntries(data.sections.map((s) => [s.id, s.previousContent])),
+    );
+    setPreviousSectionRevisionChapterIdx(
+      Object.fromEntries(
+        data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
+      ),
+    );
+    setNextSectionRevisionChapterIdx(
+      Object.fromEntries(
+        data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
+      ),
+    );
+  }
 
   /**
    * When the editor picks a different target chapter, fetch the content that
@@ -434,19 +438,7 @@ export function PageEditor(props: Props) {
           data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx]),
         ),
       );
-      setPreviousSectionContent(
-        Object.fromEntries(data.sections.map((s) => [s.id, s.previousContent])),
-      );
-      setPreviousSectionRevisionChapterIdx(
-        Object.fromEntries(
-          data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-        ),
-      );
-      setNextSectionRevisionChapterIdx(
-        Object.fromEntries(
-          data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-        ),
-      );
+      applyRevisionMetadata(data);
       if (hasInfobox) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
@@ -480,21 +472,7 @@ export function PageEditor(props: Props) {
             pageSlug,
             selectedChapterId,
           );
-          setPreviousSectionContent(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousContent]),
-            ),
-          );
-          setPreviousSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-            ),
-          );
-          setNextSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-            ),
-          );
+          applyRevisionMetadata(data);
         });
       }
     } else if (lastUpdatedIdx !== null) {

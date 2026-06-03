@@ -9,7 +9,7 @@ import {
   userProgress,
 } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
-import { childRelMaxIdxSq as buildChildRelMaxIdxSq, PG_INT_MAX } from "@/db/queries";
+import { childRelMaxIdxSq as buildChildRelMaxIdxSq } from "@/db/queries";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
@@ -98,7 +98,7 @@ export default async function SerialLayout({ children, params }: Props) {
   let navPages: { id: number; name: string; slug: string }[] = [];
   if (homePage) {
     // No chapter cutoff for the navbar — show all current children regardless of reader position.
-    const relMaxIdxSq = buildChildRelMaxIdxSq(homePage.id, PG_INT_MAX);
+    const relMaxIdxSq = buildChildRelMaxIdxSq(homePage.id);
 
     const rawChildren = await db
       .select({

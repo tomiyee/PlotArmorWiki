@@ -16,7 +16,13 @@ import {
   pageTitles,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
+import {
+  resolvePageTitlesAtIdx,
+  resolveHasChildrenSet,
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+  childRelMaxIdxSq as buildChildRelMaxIdxSq,
+} from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -191,21 +197,7 @@ export default async function PageView({ params }: Props) {
   }
 
   // ── Section content (chapter-versioned) ───────────────────────────────────
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(page.id, cutoffIdx);
 
   const [activeSections, sectionVersions] = await Promise.all([
     db
@@ -300,21 +292,7 @@ export default async function PageView({ params }: Props) {
       )
       .as("floater_max_idx_sq");
 
-    const infoboxRowMaxIdxSq = db
-      .select({
-        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageInfoboxRevisions)
-      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageInfoboxRevisions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageInfoboxRevisions.infoboxSectionId)
-      .as("infobox_row_max_idx_sq");
+    const infoboxRowMaxIdxSq = buildInfoboxRowMaxIdxSq(page.id, cutoffIdx);
 
     const [[floaterVersion], infoboxRowVersions] = await Promise.all([
       db
@@ -360,24 +338,7 @@ export default async function PageView({ params }: Props) {
   }
 
   // ── Child pages (active at the user's cutoff) ──────────────────────────────
-  // Find the latest page_relationships row per (parent, child) pair where
-  // chapter_idx ≤ cutoff, and keep only those where is_active = true.
-  // Using a subquery-join (same max-idx pattern as section content).
-  const relMaxIdxSq = db
-    .select({
-      childPageId: pageRelationships.childPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.parentPageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.childPageId)
-    .as("rel_max_idx_sq");
+  const relMaxIdxSq = buildChildRelMaxIdxSq(page.id, cutoffIdx);
 
   // ── Parent pages (active at the user's cutoff) ─────────────────────────────
   // Same max-idx pattern, but from child's perspective: find latest row per
