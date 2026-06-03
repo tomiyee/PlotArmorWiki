@@ -15,8 +15,15 @@ import {
   pageRelationships,
   pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
+import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
+import {
+  resolvePageTitlesAtIdx,
+  resolveHasChildrenSet,
+  getChapterIdxById,
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+  childRelMaxIdxSq as buildChildRelMaxIdxSq,
+} from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -55,14 +62,10 @@ async function getChapterCutoff(
   const chapterId = parseInt(raw, 10);
   if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
 
-  const [row] = await db
-    .select({ idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, chapterId))
-    .limit(1);
+  const idx = await getChapterIdxById(chapterId);
 
-  if (!row) return { cutoffIdx: 0, readingChapterId: null };
-  return { cutoffIdx: row.idx, readingChapterId: chapterId };
+  if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
+  return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
 export default async function PageView({ params }: Props) {
@@ -191,21 +194,7 @@ export default async function PageView({ params }: Props) {
   }
 
   // ── Section content (chapter-versioned) ───────────────────────────────────
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(page.id, cutoffIdx);
 
   const [activeSections, sectionVersions] = await Promise.all([
     db
@@ -300,21 +289,7 @@ export default async function PageView({ params }: Props) {
       )
       .as("floater_max_idx_sq");
 
-    const infoboxRowMaxIdxSq = db
-      .select({
-        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageInfoboxRevisions)
-      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageInfoboxRevisions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageInfoboxRevisions.infoboxSectionId)
-      .as("infobox_row_max_idx_sq");
+    const infoboxRowMaxIdxSq = buildInfoboxRowMaxIdxSq(page.id, cutoffIdx);
 
     const [[floaterVersion], infoboxRowVersions] = await Promise.all([
       db
@@ -360,24 +335,7 @@ export default async function PageView({ params }: Props) {
   }
 
   // ── Child pages (active at the user's cutoff) ──────────────────────────────
-  // Find the latest page_relationships row per (parent, child) pair where
-  // chapter_idx ≤ cutoff, and keep only those where is_active = true.
-  // Using a subquery-join (same max-idx pattern as section content).
-  const relMaxIdxSq = db
-    .select({
-      childPageId: pageRelationships.childPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.parentPageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.childPageId)
-    .as("rel_max_idx_sq");
+  const relMaxIdxSq = buildChildRelMaxIdxSq(page.id, cutoffIdx);
 
   // ── Parent pages (active at the user's cutoff) ─────────────────────────────
   // Same max-idx pattern, but from child's perspective: find latest row per
@@ -583,6 +541,7 @@ export default async function PageView({ params }: Props) {
                 idx: c.idx,
               }))}
               chapterType={serial.chapterType}
+              introChapterId={page.introChapterId ?? null}
               introChapterIdx={introChapter?.idx ?? null}
               childPages={childPages}
               parentPages={parentPages}

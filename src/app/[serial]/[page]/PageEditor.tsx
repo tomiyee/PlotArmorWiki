@@ -15,7 +15,9 @@ import {
   savePageContent,
   getPageContentAtChapter,
   getParentPagesAtChapter,
+  updatePageIntroChapter,
 } from "./actions";
+import { Select } from "@/components/ui/Select";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Banner } from "@/components/ui/Banner";
 import { WritingAsOfBanner } from "./WritingAsOfBanner";
@@ -91,6 +93,12 @@ interface Props {
    * and routing in the editor preview.
    */
   chapterType?: string;
+  /**
+   * The DB id of the chapter this page was introduced in. Passed alongside
+   * `introChapterIdx` so the admin intro-chapter selector can write back to
+   * the server via `updatePageIntroChapter`.
+   */
+  introChapterId: number | null;
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
   /**
@@ -232,6 +240,7 @@ export function PageEditor(props: Props) {
     pageTitles,
     wikiChapters,
     chapterType,
+    introChapterId,
     introChapterIdx,
     childPages,
     parentPages,
@@ -293,6 +302,12 @@ export function PageEditor(props: Props) {
     readingChapterId ?? headChapterId,
   );
 
+  // Tracks the currently selected intro chapter in edit mode. Initialises from
+  // the prop so the selector shows the current value before any changes.
+  const [draftIntroChapterId, setDraftIntroChapterId] = useState<number | null>(
+    introChapterId,
+  );
+
   const hasInfobox = infoboxSectionStructure.length > 0;
 
   // Filter pending suggestions to those whose target chapter is within the admin's
@@ -338,6 +353,7 @@ export function PageEditor(props: Props) {
     );
     setCurrentParentPages(parentPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
+    setDraftIntroChapterId(introChapterId);
   }, [
     sections,
     floaterImageUrl,
@@ -345,6 +361,7 @@ export function PageEditor(props: Props) {
     parentPages,
     readingChapterId,
     headChapterId,
+    introChapterId,
   ]);
 
   const handleSave = useCallback(() => {
@@ -374,6 +391,24 @@ export function PageEditor(props: Props) {
   useEffect(() => {
     return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
   }, [registerHandlers, handleSave, handleDiscard]);
+
+  /**
+   * Persists the intro chapter change immediately (not deferred to the page
+   * save) so the spoiler gate updates as soon as the admin confirms. A
+   * router.refresh() revalidates the SSR view to reflect the new gate.
+   */
+  function handleIntroChapterChange(chapterId: number) {
+    const previousId = draftIntroChapterId;
+    setDraftIntroChapterId(chapterId);
+    startTransition(async () => {
+      try {
+        await updatePageIntroChapter(pageId, chapterId);
+        router.refresh();
+      } catch {
+        setDraftIntroChapterId(previousId);
+      }
+    });
+  }
 
   // When entering edit mode, prime previousSectionContent and nextSectionRevisionChapterIdx
   // for the initial chapter so the "Remove revision" button is available without needing
@@ -566,6 +601,26 @@ export function PageEditor(props: Props) {
   const selectedChapterIdx =
     allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
+  // Intro chapter selector: all chapters enabled (no cutoff restriction). An
+  // admin must be able to move the intro chapter to any chapter in the serial,
+  // including ones beyond their personal reading progress.
+  const introChapterSelectOptions: ChapterGroupOption[] = (() => {
+    const volumeMap = new Map<
+      string,
+      { label: string; value: number; disabled: boolean }[]
+    >();
+    for (const ch of allChapters) {
+      const arr = volumeMap.get(ch.volumeName) ?? [];
+      arr.push({ label: ch.displayName, value: ch.id, disabled: false });
+      volumeMap.set(ch.volumeName, arr);
+    }
+    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
+      label: volumeName,
+      value: -1 as number,
+      children: chaps,
+    }));
+  })();
+
   // Chapters before the page's intro chapter are disabled - content can't predate the page.
   // Chapters beyond the reader's cutoff are also disabled - editors can't write spoilers.
   const chapterSelectOptions: ChapterGroupOption[] = (() => {
@@ -639,6 +694,19 @@ export function PageEditor(props: Props) {
           See the guide.
         </Link>
       </Text>
+
+      {!isHomePage && allChapters.length > 0 && (
+        <Box col className="gap-2">
+          <Text variant="label">Introduced in {chapterType ?? "Chapter"}</Text>
+          <Select<number>
+            options={introChapterSelectOptions}
+            placeholder="Select a chapter…"
+            value={draftIntroChapterId ?? undefined}
+            onChange={handleIntroChapterChange}
+            disabled={isPending}
+          />
+        </Box>
+      )}
 
       {!isHomePage && (
         <PageTitlesPanel

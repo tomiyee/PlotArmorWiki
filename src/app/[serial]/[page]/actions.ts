@@ -465,6 +465,41 @@ export async function deletePageTitle(
   return {};
 }
 
+/**
+ * Updates the chapter in which a page was introduced. Only admins of the
+ * serial that owns the page may call this. Intended for correcting a wrong
+ * intro chapter set at page-creation time.
+ *
+ * The updated value immediately changes the spoiler-gate: readers whose
+ * chapter cutoff is below the new intro chapter will no longer see the page.
+ *
+ * @example
+ * await updatePageIntroChapter(42, 7);
+ */
+export async function updatePageIntroChapter(
+  pageId: number,
+  chapterId: number,
+): Promise<void> {
+  await requireSerialAdminByPageId(pageId);
+
+  // Verify the chapter exists AND belongs to the same serial as the page.
+  // chapters.idx is serial-scoped; a cross-serial intro chapter would corrupt
+  // the spoiler gate (idx values are meaningless across serials).
+  const [chapterRow] = await db
+    .select({ id: chapters.id })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .innerJoin(pages, and(eq(volumes.serialId, pages.serialId), eq(pages.id, pageId)))
+    .where(eq(chapters.id, chapterId))
+    .limit(1);
+  if (!chapterRow) throw new Error("Chapter not found");
+
+  await db
+    .update(pages)
+    .set({ introChapterId: chapterId })
+    .where(eq(pages.id, pageId));
+}
+
 // ── Page section structure management ────────────────────────────────────────
 // These actions manage the wall-clock-versioned `page_sections` rows (add,
 // delete, rename, reorder). Content is managed separately via savePageContent.

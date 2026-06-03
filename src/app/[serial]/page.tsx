@@ -617,6 +617,7 @@ export default async function SerialPage({ params }: Props) {
                   idx: c.idx,
                 }))}
                 chapterType={serial.chapterType}
+                introChapterId={null}
                 introChapterIdx={null}
                 childPages={childPages}
                 parentPages={[]}
