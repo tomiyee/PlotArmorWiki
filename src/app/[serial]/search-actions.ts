@@ -1,10 +1,14 @@
 "use server";
 
 import { db } from "@/db/index";
-import { pages, chapters, serials } from "@/db/schema";
+import { pages, chapters } from "@/db/schema";
 import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { resolvePageTitlesAtIdx } from "@/db/queries";
+import {
+  resolvePageTitlesAtIdx,
+  getSerialBySlug,
+  getChapterIdxById,
+} from "@/db/queries";
 
 export interface PageSearchResult {
   /** DB primary key. */
@@ -30,11 +34,7 @@ export interface PageSearchResult {
 export async function getVisiblePages(
   serialSlug: string,
 ): Promise<PageSearchResult[]> {
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
 
   if (!serial) return [];
 
@@ -45,12 +45,8 @@ export async function getVisiblePages(
   if (raw) {
     const chapterId = parseInt(raw, 10);
     if (!isNaN(chapterId)) {
-      const [row] = await db
-        .select({ idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, chapterId))
-        .limit(1);
-      if (row) cutoffIdx = row.idx;
+      const idx = await getChapterIdxById(chapterId);
+      if (idx !== null) cutoffIdx = idx;
     }
   }
 

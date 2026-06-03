@@ -2,7 +2,6 @@
 
 import { db } from "@/db/index";
 import {
-  serials,
   pages,
   chapters,
   volumes,
@@ -21,7 +20,6 @@ import {
   desc,
   eq,
   gt,
-  inArray,
   isNull,
   lt,
   lte,
@@ -34,7 +32,13 @@ import {
   requireSerialAdminByPageId,
 } from "@/lib/auth-guard";
 import { applyPageContentRevisions } from "./revisionHelpers";
-import { resolvePageTitlesAtIdx } from "@/db/queries";
+import {
+  resolvePageTitlesAtIdx,
+  getSerialBySlug,
+  getChapterIdxById,
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+} from "@/db/queries";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -63,11 +67,7 @@ async function getHeadChapterId(serialId: number): Promise<number> {
  * @throws Error if the serial or page is not found in the database
  */
 async function resolvePageIds(serialSlug: string, pageSlug: string) {
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) throw new Error("Serial not found");
 
   const [page] = await db
@@ -195,33 +195,15 @@ export async function getPageContentAtChapter(
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
-  const [{ pageId }, [targetChapter]] = await Promise.all([
+  const [{ pageId }, cutoffIdxResult] = await Promise.all([
     resolvePageIds(serialSlug, pageSlug),
-    db
-      .select({ idx: chapters.idx })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .limit(1),
+    getChapterIdxById(chapterId),
   ]);
-  if (!targetChapter) throw new Error("Chapter not found");
+  if (cutoffIdxResult === null) throw new Error("Chapter not found");
 
-  const cutoffIdx = targetChapter.idx;
+  const cutoffIdx = cutoffIdxResult;
 
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
 
   // Previous revision: highest idx STRICTLY less than the actual revision's idx
   // (not the cutoff). This ensures the correct previous content is returned even
@@ -364,21 +346,7 @@ export async function getPageContentAtChapter(
     )
     .as("floater_max_idx_sq");
 
-  const infoboxRowMaxIdxSq = db
-    .select({
-      infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageInfoboxRevisions)
-    .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageInfoboxRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageInfoboxRevisions.infoboxSectionId)
-    .as("infobox_row_max_idx_sq");
+  const ibRowMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
 
   const [[floaterVersion], activeInfoboxRows, infoboxRowVersions] =
     await Promise.all([
@@ -410,13 +378,13 @@ export async function getPageContentAtChapter(
         .from(pageInfoboxRevisions)
         .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
         .innerJoin(
-          infoboxRowMaxIdxSq,
+          ibRowMaxIdxSq,
           and(
             eq(
               pageInfoboxRevisions.infoboxSectionId,
-              infoboxRowMaxIdxSq.infoboxSectionId,
+              ibRowMaxIdxSq.infoboxSectionId,
             ),
-            eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
+            eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
           ),
         )
         .where(eq(pageInfoboxRevisions.pageId, pageId)),
@@ -868,17 +836,13 @@ export async function getParentPagesAtChapter(
   pageSlug: string,
   chapterId: number,
 ): Promise<{ id: number; name: string; slug: string; title: string }[]> {
-  const [{ pageId }, [targetChapter]] = await Promise.all([
+  const [{ pageId }, cutoffIdxForParents] = await Promise.all([
     resolvePageIds(serialSlug, pageSlug),
-    db
-      .select({ idx: chapters.idx })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .limit(1),
+    getChapterIdxById(chapterId),
   ]);
-  if (!targetChapter) throw new Error("Chapter not found");
+  if (cutoffIdxForParents === null) throw new Error("Chapter not found");
 
-  const cutoffIdx = targetChapter.idx;
+  const cutoffIdx = cutoffIdxForParents;
 
   const parentRelMaxIdxSq = db
     .select({

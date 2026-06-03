@@ -21,7 +21,14 @@ import {
   users,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
+import {
+  resolvePageTitlesAtIdx,
+  resolveHasChildrenSet,
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+  childRelMaxIdxSq as buildChildRelMaxIdxSq,
+  getChapterIdxById,
+} from "@/db/queries";
 import {
   addChapter,
   addVolume,
@@ -79,14 +86,10 @@ async function getChapterCutoff(
   const chapterId = parseInt(raw, 10);
   if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
 
-  const [row] = await db
-    .select({ idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, chapterId))
-    .limit(1);
+  const idx = await getChapterIdxById(chapterId);
 
-  if (!row) return { cutoffIdx: 0, readingChapterId: null };
-  return { cutoffIdx: row.idx, readingChapterId: chapterId };
+  if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
+  return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
 export default async function SerialPage({ params }: Props) {
@@ -302,21 +305,7 @@ export default async function SerialPage({ params }: Props) {
   }[] = [];
 
   if (homePage) {
-    const sectionMaxIdxSq = db
-      .select({
-        sectionId: pageSectionRevisions.sectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageSectionRevisions)
-      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageSectionRevisions.pageId, homePage.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageSectionRevisions.sectionId)
-      .as("section_max_idx_sq");
+    const sectionMaxIdxSq = buildSectionMaxIdxSq(homePage.id, cutoffIdx);
 
     const [activeSections, sectionVersions] = await Promise.all([
       db
@@ -405,21 +394,7 @@ export default async function SerialPage({ params }: Props) {
         )
         .as("floater_max_idx_sq");
 
-      const infoboxRowMaxIdxSq = db
-        .select({
-          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageInfoboxRevisions)
-        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-        .where(
-          and(
-            eq(pageInfoboxRevisions.pageId, homePage.id),
-            lte(chapters.idx, cutoffIdx),
-          ),
-        )
-        .groupBy(pageInfoboxRevisions.infoboxSectionId)
-        .as("infobox_row_max_idx_sq");
+      const ibRowMaxIdxSq = buildInfoboxRowMaxIdxSq(homePage.id, cutoffIdx);
 
       const [[floaterVersion], infoboxRowVersions] = await Promise.all([
         db
@@ -440,13 +415,13 @@ export default async function SerialPage({ params }: Props) {
           .from(pageInfoboxRevisions)
           .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
           .innerJoin(
-            infoboxRowMaxIdxSq,
+            ibRowMaxIdxSq,
             and(
               eq(
                 pageInfoboxRevisions.infoboxSectionId,
-                infoboxRowMaxIdxSq.infoboxSectionId,
+                ibRowMaxIdxSq.infoboxSectionId,
               ),
-              eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
+              eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
             ),
           )
           .where(eq(pageInfoboxRevisions.pageId, homePage.id)),
@@ -464,21 +439,7 @@ export default async function SerialPage({ params }: Props) {
     }
 
     // Child pages active at the user's cutoff (same max-idx pattern).
-    const relMaxIdxSq = db
-      .select({
-        childPageId: pageRelationships.childPageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageRelationships)
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageRelationships.parentPageId, homePage.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageRelationships.childPageId)
-      .as("rel_max_idx_sq");
+    const relMaxIdxSq = buildChildRelMaxIdxSq(homePage.id, cutoffIdx);
 
     const childPagesRaw = await db
       .select({
