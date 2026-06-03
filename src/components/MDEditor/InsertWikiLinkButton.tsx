@@ -23,8 +23,7 @@ export function InsertWikiLinkButton() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const handleButtonClick = useCallback(() => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (rect) openInsertMenu(rect);
+    if (buttonRef.current) openInsertMenu(buttonRef.current);
   }, [openInsertMenu]);
 
   return (

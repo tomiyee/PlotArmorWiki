@@ -35,10 +35,10 @@ type UseApplySuggestionParams = {
   onChange: (val: string | undefined) => void;
   /**
    * Called after the WikiLinkNode is inserted, with the Lexical node key and the
-   * chip's bounding rect so the caller can open the alias-input step.
-   * Receives `null` when the node key or DOM span could not be located.
+   * chip's DOM element so the caller can open the alias-input step with live positioning.
+   * Not called when the node key or DOM span could not be located.
    */
-  onAfterInsert?: (nodeKey: string, rect: DOMRect) => void;
+  onAfterInsert?: (nodeKey: string, el: HTMLElement) => void;
 };
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ export function useApplySuggestion(params: UseApplySuggestionParams) {
               `[data-wiki-key="${insertedKey}"]`,
             );
             if (chipSpan) {
-              onAfterInsert(insertedKey, chipSpan.getBoundingClientRect());
+              onAfterInsert(insertedKey, chipSpan);
               return;
             }
           }
