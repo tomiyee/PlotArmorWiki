@@ -15,6 +15,7 @@ import {
   savePageContent,
   getPageContentAtChapter,
   getParentPagesAtChapter,
+  getAllSerialPagesAtChapter,
   updatePageIntroChapter,
 } from "./actions";
 import { Select } from "@/components/ui/Select";
@@ -115,9 +116,10 @@ interface Props {
   parentPages: ParentPageEntry[];
   /**
    * All pages in the serial (excluding the current page) used to populate the
-   * "Add parent" dropdown in the Relationships edit panel.
+   * "Add parent" dropdown in the Relationships edit panel. Titles are resolved
+   * at the reader's chapter cutoff so the dropdown reflects temporal renames.
    */
-  allSerialPages: { id: number; name: string }[];
+  allSerialPages: { id: number; title: string }[];
   /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
@@ -289,6 +291,10 @@ export function PageEditor(props: Props) {
   const [currentParentPages, setCurrentParentPages] =
     useState<ParentPageEntry[]>(parentPages);
 
+  const [currentAllSerialPages, setCurrentAllSerialPages] = useState<
+    { id: number; title: string }[]
+  >(allSerialPages);
+
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
   );
@@ -456,9 +462,10 @@ export function PageEditor(props: Props) {
   ) {
     setSelectedChapterId(chapterId);
     startTransition(async () => {
-      const [data, parents] = await Promise.all([
+      const [data, parents, serialPages] = await Promise.all([
         getPageContentAtChapter(serialSlug, pageSlug, chapterId),
         getParentPagesAtChapter(serialSlug, pageSlug, chapterId),
+        getAllSerialPagesAtChapter(serialSlug, pageSlug, chapterId),
       ]);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
@@ -489,6 +496,7 @@ export function PageEditor(props: Props) {
         );
       }
       setCurrentParentPages(parents);
+      setCurrentAllSerialPages(serialPages);
     });
   }
 
@@ -722,7 +730,7 @@ export function PageEditor(props: Props) {
         <PageRelationshipsPanel
           pageId={pageId}
           parentPages={currentParentPages}
-          allSerialPages={allSerialPages}
+          allSerialPages={currentAllSerialPages}
           chapterId={selectedChapterId}
         />
       )}

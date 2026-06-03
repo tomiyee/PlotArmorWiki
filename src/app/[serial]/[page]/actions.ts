@@ -26,6 +26,7 @@ import {
   max,
   min,
   ne,
+  or,
 } from "drizzle-orm";
 import {
   requireSerialAdminBySlug,
@@ -927,6 +928,54 @@ export async function getParentPagesAtChapter(
     slug: r.slug,
     title: titleMap.get(r.id) ?? r.name,
   }));
+}
+
+/**
+ * Returns all pages in the serial with their titles resolved at the given
+ * chapter's cutoff, excluding the current page. Used to keep the "Add parent"
+ * dropdown in sync with the "Writing as of Chapter" selector — the same
+ * temporal title resolution applied to `getParentPagesAtChapter`.
+ *
+ * @example
+ * const allPages = await getAllSerialPagesAtChapter('one-piece', 'luffy', 7);
+ * // allPages: [{ id: 1, title: 'Nami' }, ...]
+ */
+export async function getAllSerialPagesAtChapter(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ id: number; title: string }[]> {
+  const [{ serialId, pageId }, cutoffIdxResult] = await Promise.all([
+    resolvePageIds(serialSlug, pageSlug),
+    getChapterIdxById(chapterId),
+  ]);
+  if (cutoffIdxResult === null) throw new Error("Chapter not found");
+
+  const cutoffIdx = cutoffIdxResult;
+
+  // Fetch all pages in the serial that are visible at the cutoff (intro chapter ≤ cutoffIdx).
+  // Uses a left join so pages without an intro chapter (e.g. home page) are included.
+  const allPages = await db
+    .select({ id: pages.id, name: pages.name })
+    .from(pages)
+    .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(
+      and(
+        eq(pages.serialId, serialId),
+        or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+      ),
+    )
+    .orderBy(asc(pages.name));
+
+  const pageIds = allPages.map((p) => p.id);
+  const titleMap = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
+
+  return allPages
+    .filter((p) => p.id !== pageId)
+    .map((p) => ({
+      id: p.id,
+      title: titleMap.get(p.id) ?? p.name,
+    }));
 }
 
 /**

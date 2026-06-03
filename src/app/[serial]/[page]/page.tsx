@@ -394,10 +394,17 @@ export default async function PageView({ params }: Props) {
       )
       .where(eq(pageRelationships.childPageId, page.id)),
     // All pages in the serial for the "Add parent" dropdown in edit mode.
+    // Includes pages without an intro chapter (e.g. home page) via left join.
     db
       .select({ id: pages.id, name: pages.name })
       .from(pages)
-      .where(eq(pages.serialId, serial.id))
+      .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+      .where(
+        and(
+          eq(pages.serialId, serial.id),
+          or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+        ),
+      )
       .orderBy(asc(pages.name)),
   ]);
 
@@ -406,10 +413,16 @@ export default async function PageView({ params }: Props) {
 
   // Resolve temporal titles and folder/leaf classification for active child pages.
   const childPageIds = activeChildPages.map((r) => r.id);
-  const [childTitleMap, hasChildrenSet] = await Promise.all([
-    resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
-    resolveHasChildrenSet(childPageIds, cutoffIdx),
-  ]);
+  const parentPageIds = activeParentPagesRaw.map((r) => r.id);
+  const allSerialPageIds = allSerialPagesRaw.map((r) => r.id);
+
+  const [childTitleMap, hasChildrenSet, parentTitleMap, allSerialTitleMap] =
+    await Promise.all([
+      resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
+      resolveHasChildrenSet(childPageIds, cutoffIdx),
+      resolvePageTitlesAtIdx(parentPageIds, cutoffIdx),
+      resolvePageTitlesAtIdx(allSerialPageIds, cutoffIdx),
+    ]);
 
   const childPages = activeChildPages.map((r) => ({
     id: r.id,
@@ -419,15 +432,17 @@ export default async function PageView({ params }: Props) {
     hasChildren: hasChildrenSet.has(r.id),
   }));
 
-  // Resolve temporal titles for each active parent page at the reader's cutoff.
-  const parentPageIds = activeParentPagesRaw.map((r) => r.id);
-  const parentTitleMap = await resolvePageTitlesAtIdx(parentPageIds, cutoffIdx);
-
   const parentPages = activeParentPagesRaw.map((r) => ({
     id: r.id,
     name: r.name,
     slug: r.slug,
     title: parentTitleMap.get(r.id) ?? r.name,
+  }));
+
+  // All pages in the serial with chapter-versioned titles for the "Add parent" dropdown.
+  const allSerialPages = allSerialPagesRaw.map((r) => ({
+    id: r.id,
+    title: allSerialTitleMap.get(r.id) ?? r.name,
   }));
 
   // ── Temporal title resolution ──────────────────────────────────────────────
@@ -545,7 +560,7 @@ export default async function PageView({ params }: Props) {
               introChapterIdx={introChapter?.idx ?? null}
               childPages={childPages}
               parentPages={parentPages}
-              allSerialPages={allSerialPagesRaw}
+              allSerialPages={allSerialPages}
               isAdmin={isAdmin}
               isAuthenticated={isUserAuthenticated}
               pendingSuggestionCount={pendingSuggestionCount}

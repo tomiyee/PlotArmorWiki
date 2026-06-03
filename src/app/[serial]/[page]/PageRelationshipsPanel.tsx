@@ -23,7 +23,7 @@ interface PageRelationshipsPanelProps {
   /** Active parent pages at the reader's chapter cutoff. */
   parentPages: ParentPageEntry[];
   /** All pages in the serial (used for the "Add parent" dropdown). Excludes the current page. */
-  allSerialPages: { id: number; name: string }[];
+  allSerialPages: { id: number; title: string }[];
   /** The chapter to stamp new/removed relationship rows with. */
   chapterId: number | null;
 }
@@ -40,7 +40,7 @@ interface PageRelationshipsPanelProps {
  * <PageRelationshipsPanel
  *   pageId={42}
  *   parentPages={[{ id: 1, name: 'Characters', slug: 'characters', title: 'Characters' }]}
- *   allSerialPages={[{ id: 1, name: 'Characters' }, { id: 3, name: 'Straw Hats' }]}
+ *   allSerialPages={[{ id: 1, title: 'Characters' }, { id: 3, title: 'Straw Hats' }]}
  *   chapterId={7}
  * />
  */
@@ -93,7 +93,7 @@ export function PageRelationshipsPanel({
   }
 
   const addSelectOptions = addablePages.map((p) => ({
-    label: p.name,
+    label: p.title,
     value: p.id,
   }));
 
