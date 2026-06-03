@@ -470,6 +470,33 @@ export function PageEditor(props: Props) {
         ...prev,
         [sectionId]: previousSectionRevisionChapterIdx[sectionId] ?? null,
       }));
+      // Re-fetch previous/next revision metadata for the selected chapter so that
+      // a second "Remove revision" click shows the correct diff rather than stale
+      // data from before the first removal.
+      if (selectedChapterId !== null) {
+        startTransition(async () => {
+          const data = await getPageContentAtChapter(
+            serialSlug,
+            pageSlug,
+            selectedChapterId,
+          );
+          setPreviousSectionContent(
+            Object.fromEntries(
+              data.sections.map((s) => [s.id, s.previousContent]),
+            ),
+          );
+          setPreviousSectionRevisionChapterIdx(
+            Object.fromEntries(
+              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
+            ),
+          );
+          setNextSectionRevisionChapterIdx(
+            Object.fromEntries(
+              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
+            ),
+          );
+        });
+      }
     } else if (lastUpdatedIdx !== null) {
       // Non-direct: the revision lives at a different chapter than the current
       // selection. Switch to that chapter so the subsequent save targets it.
