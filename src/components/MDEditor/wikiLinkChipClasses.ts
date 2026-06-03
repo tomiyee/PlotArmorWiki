@@ -26,8 +26,8 @@ export const WIKI_LINK_CHIP_INTERACTIVE =
 
 /**
  * Interactive hover style for read-mode anchor chips (pointer cursor, accent
- * background). Identical to `WIKI_LINK_CHIP_INTERACTIVE` but semantically
- * distinct — these are navigable `<a>` elements.
+ * background). Overrides `select-none` from the base — navigable `<a>`
+ * elements must allow text selection so users can copy the link label.
  */
 export const WIKI_LINK_CHIP_LINK =
-  "cursor-pointer hover:bg-accent hover:text-accent-foreground";
+  "cursor-pointer hover:bg-accent hover:text-accent-foreground select-text";
