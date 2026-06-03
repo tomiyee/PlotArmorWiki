@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useRef } from "react";
 import { WikiLinkContext } from "./WikiLinkContext";
+import { WIKI_LINK_CHIP_CLASSES } from "./wikiLinkChipClasses";
 
 type WikiLinkChipProps = {
   /** Wiki link token in `category:value` format, resolved to a display name via WikiLinkContext. */
@@ -64,7 +65,7 @@ export function WikiLinkChip(props: WikiLinkChipProps) {
       contentEditable={false}
       data-wiki-key={nodeKey}
       onClick={nodeKey ? handleClick : undefined}
-      className={`inline-flex select-none items-baseline gap-1 rounded bg-muted px-1.5 py-0.5 text-sm font-medium text-foreground${nodeKey ? " cursor-pointer hover:bg-accent hover:text-accent-foreground" : ""}`}
+      className={`${WIKI_LINK_CHIP_CLASSES}${nodeKey ? " cursor-pointer hover:bg-accent hover:text-accent-foreground" : ""}`}
     >
       {label}
       {showActualName && (

@@ -6,6 +6,7 @@ import { Text } from "@/components/ui/Text";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { getWikiLinkPreview } from "@/lib/wiki-link-preview-action";
 import type { WikiLinkPreviewData } from "@/lib/wiki-link-preview-action";
+import { WIKI_LINK_CHIP_CLASSES } from "@/components/MDEditor/wikiLinkChipClasses";
 
 interface Props {
   /** The URL the link points to. */
@@ -59,7 +60,7 @@ export function WikiLinkPreview({
   const anchor = (
     <a
       href={href}
-      className="text-primary underline hover:text-primary/80"
+      className={`${WIKI_LINK_CHIP_CLASSES} cursor-pointer hover:bg-accent hover:text-accent-foreground`}
       onMouseEnter={handleMouseEnter}
     >
       {children}
