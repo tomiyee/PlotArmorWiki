@@ -15,7 +15,7 @@ import {
   pageRelationships,
   pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
 import { resolvePageTitlesAtIdx, resolveHasChildrenSet } from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
@@ -583,6 +583,7 @@ export default async function PageView({ params }: Props) {
                 idx: c.idx,
               }))}
               chapterType={serial.chapterType}
+              introChapterId={page.introChapterId ?? null}
               introChapterIdx={introChapter?.idx ?? null}
               childPages={childPages}
               parentPages={parentPages}
