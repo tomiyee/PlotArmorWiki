@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +36,14 @@ type MobileMenuDrawerProps = {
 export function MobileMenuDrawer(props: MobileMenuDrawerProps) {
   const { serialTitle, serialSlug, categories, tocContent } = props;
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Close the drawer on any navigation. Using pathname change as the trigger
+  // avoids the double-animation bug caused by explicit setOpen(false) in link
+  // onClick handlers firing alongside Base UI's internal onOpenChange callback.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   return (
     <>
@@ -51,7 +60,6 @@ export function MobileMenuDrawer(props: MobileMenuDrawerProps) {
           {serialTitle && serialSlug ? (
             <Link
               href={`/${serialSlug}`}
-              onClick={() => setOpen(false)}
               className="text-lg font-semibold hover:text-foreground/80"
             >
               {serialTitle}
@@ -72,7 +80,6 @@ export function MobileMenuDrawer(props: MobileMenuDrawerProps) {
                 <Link
                   key={cat.id}
                   href={`/${serialSlug}/${cat.slug}`}
-                  onClick={() => setOpen(false)}
                   className="block rounded px-2 py-1.5 text-sm hover:bg-muted"
                 >
                   {cat.name}
@@ -81,13 +88,7 @@ export function MobileMenuDrawer(props: MobileMenuDrawerProps) {
             </div>
           )}
           {tocContent && (
-            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-            <div
-              className="flex flex-col gap-0.5"
-              onClick={(e) => {
-                if ((e.target as HTMLElement).closest("a")) setOpen(false);
-              }}
-            >
+            <div className="flex flex-col gap-0.5">
               <Text
                 variant="label"
                 muted
