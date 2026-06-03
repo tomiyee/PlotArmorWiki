@@ -482,10 +482,14 @@ export async function updatePageIntroChapter(
 ): Promise<void> {
   await requireSerialAdminByPageId(pageId);
 
-  // Verify the chapter exists before writing.
+  // Verify the chapter exists AND belongs to the same serial as the page.
+  // chapters.idx is serial-scoped; a cross-serial intro chapter would corrupt
+  // the spoiler gate (idx values are meaningless across serials).
   const [chapterRow] = await db
     .select({ id: chapters.id })
     .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .innerJoin(pages, and(eq(volumes.serialId, pages.serialId), eq(pages.id, pageId)))
     .where(eq(chapters.id, chapterId))
     .limit(1);
   if (!chapterRow) throw new Error("Chapter not found");

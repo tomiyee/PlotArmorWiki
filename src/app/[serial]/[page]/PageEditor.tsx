@@ -398,10 +398,15 @@ export function PageEditor(props: Props) {
    * router.refresh() revalidates the SSR view to reflect the new gate.
    */
   function handleIntroChapterChange(chapterId: number) {
+    const previousId = draftIntroChapterId;
     setDraftIntroChapterId(chapterId);
     startTransition(async () => {
-      await updatePageIntroChapter(pageId, chapterId);
-      router.refresh();
+      try {
+        await updatePageIntroChapter(pageId, chapterId);
+        router.refresh();
+      } catch {
+        setDraftIntroChapterId(previousId);
+      }
     });
   }
 
