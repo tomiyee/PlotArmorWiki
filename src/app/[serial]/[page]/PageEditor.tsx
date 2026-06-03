@@ -358,6 +358,7 @@ export function PageEditor(props: Props) {
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setCurrentParentPages(parentPages);
+    setCurrentAllSerialPages(allSerialPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
     setDraftIntroChapterId(introChapterId);
   }, [
@@ -365,6 +366,7 @@ export function PageEditor(props: Props) {
     floaterImageUrl,
     floaterRows,
     parentPages,
+    allSerialPages,
     readingChapterId,
     headChapterId,
     introChapterId,
@@ -424,23 +426,7 @@ export function PageEditor(props: Props) {
     let cancelled = false;
     getPageContentAtChapter(serialSlug, pageSlug, selectedChapterId).then(
       (data) => {
-        if (!cancelled) {
-          setPreviousSectionContent(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousContent]),
-            ),
-          );
-          setPreviousSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-            ),
-          );
-          setNextSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-            ),
-          );
-        }
+        if (!cancelled) applyRevisionMetadata(data.sections);
       },
     );
     return () => {
@@ -450,6 +436,27 @@ export function PageEditor(props: Props) {
     // handleChapterChange which also updates these states.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
+
+  function applyRevisionMetadata(sections: {
+    id: number;
+    previousContent: string;
+    previousRevisionChapterIdx: number | null;
+    nextRevisionChapterIdx: number | null;
+  }[]) {
+    setPreviousSectionContent(
+      Object.fromEntries(sections.map((s) => [s.id, s.previousContent])),
+    );
+    setPreviousSectionRevisionChapterIdx(
+      Object.fromEntries(
+        sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
+      ),
+    );
+    setNextSectionRevisionChapterIdx(
+      Object.fromEntries(
+        sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
+      ),
+    );
+  }
 
   /**
    * When the editor picks a different target chapter, fetch the content that
@@ -476,19 +483,7 @@ export function PageEditor(props: Props) {
           data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx]),
         ),
       );
-      setPreviousSectionContent(
-        Object.fromEntries(data.sections.map((s) => [s.id, s.previousContent])),
-      );
-      setPreviousSectionRevisionChapterIdx(
-        Object.fromEntries(
-          data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-        ),
-      );
-      setNextSectionRevisionChapterIdx(
-        Object.fromEntries(
-          data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-        ),
-      );
+      applyRevisionMetadata(data.sections);
       if (hasInfobox) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
@@ -523,21 +518,7 @@ export function PageEditor(props: Props) {
             pageSlug,
             selectedChapterId,
           );
-          setPreviousSectionContent(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousContent]),
-            ),
-          );
-          setPreviousSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-            ),
-          );
-          setNextSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-            ),
-          );
+          applyRevisionMetadata(data.sections);
         });
       }
     } else if (lastUpdatedIdx !== null) {
@@ -609,17 +590,16 @@ export function PageEditor(props: Props) {
   const selectedChapterIdx =
     allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
-  // Intro chapter selector: all chapters enabled (no cutoff restriction). An
-  // admin must be able to move the intro chapter to any chapter in the serial,
-  // including ones beyond their personal reading progress.
-  const introChapterSelectOptions: ChapterGroupOption[] = (() => {
+  function buildChapterGroupOptions(
+    isDisabled: (ch: ChapterData) => boolean,
+  ): ChapterGroupOption[] {
     const volumeMap = new Map<
       string,
       { label: string; value: number; disabled: boolean }[]
     >();
     for (const ch of allChapters) {
       const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id, disabled: false });
+      arr.push({ label: ch.displayName, value: ch.id, disabled: isDisabled(ch) });
       volumeMap.set(ch.volumeName, arr);
     }
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
@@ -627,32 +607,20 @@ export function PageEditor(props: Props) {
       value: -1 as number,
       children: chaps,
     }));
-  })();
+  }
+
+  // Intro chapter selector: all chapters enabled (no cutoff restriction). An
+  // admin must be able to move the intro chapter to any chapter in the serial,
+  // including ones beyond their personal reading progress.
+  const introChapterSelectOptions = buildChapterGroupOptions(() => false);
 
   // Chapters before the page's intro chapter are disabled - content can't predate the page.
   // Chapters beyond the reader's cutoff are also disabled - editors can't write spoilers.
-  const chapterSelectOptions: ChapterGroupOption[] = (() => {
-    const volumeMap = new Map<
-      string,
-      { label: string; value: number; idx: number }[]
-    >();
-    for (const ch of allChapters) {
-      const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id, idx: ch.idx });
-      volumeMap.set(ch.volumeName, arr);
-    }
-    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
-      label: volumeName,
-      value: -1 as number,
-      children: chaps.map((c) => ({
-        label: c.label,
-        value: c.value,
-        disabled:
-          (introChapterIdx !== null && c.idx < introChapterIdx) ||
-          (readingCutoffIdx !== null && c.idx > readingCutoffIdx),
-      })),
-    }));
-  })();
+  const chapterSelectOptions = buildChapterGroupOptions(
+    (ch) =>
+      (introChapterIdx !== null && ch.idx < introChapterIdx) ||
+      (readingCutoffIdx !== null && ch.idx > readingCutoffIdx),
+  );
 
   return (
     <Banner scrollable={false}>
