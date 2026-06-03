@@ -1,13 +1,33 @@
 /**
- * Shared Tailwind class string for the wiki-link chip visual treatment.
+ * Shared Tailwind class strings for the wiki-link chip appearance.
  *
- * Used by `WikiLinkChip` (editor) and the read-mode preview components
- * (`WikiLinkPreview`, `ChapterLinkPreview`) so both surfaces stay in sync.
- * Append interaction classes (e.g. `cursor-pointer`) per callsite as needed.
+ * Centralised here so the WYSIWYG editor chip (`WikiLinkChip`) and the
+ * read-mode hover-card triggers (`WikiLinkPreview`, `ChapterLinkPreview`)
+ * stay visually identical without duplicating the class list.
  *
  * @example
- * import { WIKI_LINK_CHIP_CLASSES } from "@/components/MDEditor/wikiLinkChipClasses";
- * <span className={`${WIKI_LINK_CHIP_CLASSES} cursor-pointer`} />
+ * // Editor chip (clickable, non-navigable)
+ * className={`${WIKI_LINK_CHIP_BASE} ${WIKI_LINK_CHIP_INTERACTIVE}`}
+ *
+ * // Read-mode anchor (navigable link)
+ * className={`${WIKI_LINK_CHIP_BASE} ${WIKI_LINK_CHIP_LINK}`}
  */
-export const WIKI_LINK_CHIP_CLASSES =
+
+/** Base visual treatment shared by all wiki-link chip surfaces. */
+export const WIKI_LINK_CHIP_BASE =
   "inline-flex select-none items-baseline gap-1 rounded bg-muted px-1.5 py-0.5 text-sm font-medium text-foreground";
+
+/**
+ * Interactive hover style for editor chips (pointer cursor, accent background).
+ * Use when the chip opens an edit popover rather than navigating.
+ */
+export const WIKI_LINK_CHIP_INTERACTIVE =
+  "cursor-pointer hover:bg-accent hover:text-accent-foreground";
+
+/**
+ * Interactive hover style for read-mode anchor chips (pointer cursor, accent
+ * background). Overrides `select-none` from the base — navigable `<a>`
+ * elements must allow text selection so users can copy the link label.
+ */
+export const WIKI_LINK_CHIP_LINK =
+  "cursor-pointer hover:bg-accent hover:text-accent-foreground select-text";

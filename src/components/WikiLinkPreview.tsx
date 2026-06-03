@@ -6,7 +6,10 @@ import { Text } from "@/components/ui/Text";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { getWikiLinkPreview } from "@/lib/wiki-link-preview-action";
 import type { WikiLinkPreviewData } from "@/lib/wiki-link-preview-action";
-import { WIKI_LINK_CHIP_CLASSES } from "@/components/MDEditor/wikiLinkChipClasses";
+import {
+  WIKI_LINK_CHIP_BASE,
+  WIKI_LINK_CHIP_LINK,
+} from "@/components/MDEditor/wikiLinkChipClasses";
 
 interface Props {
   /** The URL the link points to. */
@@ -60,7 +63,7 @@ export function WikiLinkPreview({
   const anchor = (
     <a
       href={href}
-      className={`${WIKI_LINK_CHIP_CLASSES} cursor-pointer hover:bg-accent hover:text-accent-foreground`}
+      className={`${WIKI_LINK_CHIP_BASE} ${WIKI_LINK_CHIP_LINK}`}
       onMouseEnter={handleMouseEnter}
     >
       {children}
