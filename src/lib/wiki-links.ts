@@ -43,14 +43,27 @@ export interface WikiLinkParts {
  * Broad outer regex that matches `[[…]]` wiki link syntax, including an
  * optional `|alias` suffix. Inner contents are parsed by `parseWikiLink`.
  *
- * Group 1: inner path (everything before the optional `|`)
- * Group 2: alias (everything after `|`, if present); may contain `]` as long as
- * the sequence `]]` only appears as the closing delimiter.
+ * The leading `\[?` optionally consumes one extra `[` that can appear before
+ * `[[` in rendered text nodes (e.g. when markdown stores `\[[[token]]` — a
+ * backslash-escaped `[` followed by a wiki link — remark produces the text
+ * node `[[[token]]`). Consuming the leading `[` as part of the match prevents
+ * it from appearing as orphaned literal text before the rendered chip/link.
  *
- * Leaves room for future syntax extensions (anchors, embeds, etc.) by keeping
- * the outer match broad and delegating inner parsing to `parseWikiLink`.
+ * Group 1: inner path (everything before the optional `|`)
+ * Group 2: alias (everything after `|`, if present); `\]` is an escape
+ * sequence for a literal `]` inside the alias.
  */
-export const WIKI_LINK_RE = /\[\[([^|\[\]]+)(?:\|((?:[^\]]|\](?!\]))*(?:\](?=\]\]))?))?\]\]/g;
+export const WIKI_LINK_RE = /\[?\[\[([^|\[\]]+)(?:\|((?:[^\]\\]|\\.)*))?\]\]/g;
+
+/** Escapes `]` → `\]` so an alias can be safely embedded in `[[token|alias]]`. */
+export function escapeWikiAlias(alias: string): string {
+  return alias.replace(/\]/g, "\\]");
+}
+
+/** Reverses `escapeWikiAlias`: `\]` → `]`. */
+export function unescapeWikiAlias(raw: string): string {
+  return raw.replace(/\\]/g, "]");
+}
 
 /**
  * Parse the inner content of a `[[…]]` token into its structured parts.
@@ -88,7 +101,7 @@ export function parseWikiLink(
   return {
     page,
     category,
-    alias: alias?.trim() || undefined,
+    alias: alias ? unescapeWikiAlias(alias.trim()) || undefined : undefined,
   };
 }
 
