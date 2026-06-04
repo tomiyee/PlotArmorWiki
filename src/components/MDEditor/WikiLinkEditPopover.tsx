@@ -66,8 +66,15 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
   });
 
   const updatePos = useCallback(() => {
+    if (!anchorEl.isConnected) return;
     const r = anchorEl.getBoundingClientRect();
-    setPos({ top: r.bottom + 4, left: r.left });
+    const nextTop = r.bottom + 4;
+    const nextLeft = r.left;
+    setPos((prev) =>
+      prev.top === nextTop && prev.left === nextLeft
+        ? prev
+        : { top: nextTop, left: nextLeft },
+    );
   }, [anchorEl]);
 
   // Reposition on scroll, resize, and iOS visualViewport changes (virtual keyboard open/close).
