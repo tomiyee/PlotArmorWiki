@@ -19,6 +19,8 @@ import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
 import {
   resolvePageTitlesAtIdx,
   resolveHasChildrenSet,
+  fetchActiveParentPagesAtIdx,
+  fetchSerialPagesAtIdx,
   getChapterIdxById,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
@@ -337,92 +339,42 @@ export default async function PageView({ params }: Props) {
   // ── Child pages (active at the user's cutoff) ──────────────────────────────
   const relMaxIdxSq = buildChildRelMaxIdxSq(page.id, cutoffIdx);
 
-  // ── Parent pages (active at the user's cutoff) ─────────────────────────────
-  // Same max-idx pattern, but from child's perspective: find latest row per
-  // (parent, child) pair where child = page.id, and keep is_active = true.
-  const parentRelMaxIdxSq = db
-    .select({
-      parentPageId: pageRelationships.parentPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.childPageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.parentPageId)
-    .as("parent_rel_max_idx_sq");
-
-  const [childPagesRaw, parentPagesRaw, allSerialPagesRaw] = await Promise.all([
-    db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        slug: pages.slug,
-        isActive: pageRelationships.isActive,
-      })
-      .from(pageRelationships)
-      .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .innerJoin(
-        relMaxIdxSq,
-        and(
-          eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
-          eq(chapters.idx, relMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageRelationships.parentPageId, page.id)),
-    db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        slug: pages.slug,
-        isActive: pageRelationships.isActive,
-      })
-      .from(pageRelationships)
-      .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .innerJoin(
-        parentRelMaxIdxSq,
-        and(
-          eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
-          eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageRelationships.childPageId, page.id)),
-    // All pages in the serial for the "Add parent" dropdown in edit mode.
-    // Includes pages without an intro chapter (e.g. home page) via left join.
-    db
-      .select({ id: pages.id, name: pages.name })
-      .from(pages)
-      .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
-      .where(
-        and(
-          eq(pages.serialId, serial.id),
-          or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
-        ),
-      )
-      .orderBy(asc(pages.name)),
-  ]);
+  const [childPagesRaw, activeParentPagesRaw, allSerialPagesRaw] =
+    await Promise.all([
+      db
+        .select({
+          id: pages.id,
+          name: pages.name,
+          slug: pages.slug,
+          isActive: pageRelationships.isActive,
+        })
+        .from(pageRelationships)
+        .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
+        .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+        .innerJoin(
+          relMaxIdxSq,
+          and(
+            eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+            eq(chapters.idx, relMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageRelationships.parentPageId, page.id)),
+      fetchActiveParentPagesAtIdx(page.id, cutoffIdx),
+      fetchSerialPagesAtIdx(serial.id, cutoffIdx),
+    ]);
 
   const activeChildPages = childPagesRaw.filter((r) => r.isActive);
-  const activeParentPagesRaw = parentPagesRaw.filter((r) => r.isActive);
 
-  // Resolve temporal titles and folder/leaf classification for active child pages.
   const childPageIds = activeChildPages.map((r) => r.id);
-  const parentPageIds = activeParentPagesRaw.map((r) => r.id);
   const allSerialPageIds = allSerialPagesRaw.map((r) => r.id);
 
-  const [childTitleMap, hasChildrenSet, parentTitleMap, allSerialTitleMap] =
-    await Promise.all([
-      resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
-      resolveHasChildrenSet(childPageIds, cutoffIdx),
-      resolvePageTitlesAtIdx(parentPageIds, cutoffIdx),
-      resolvePageTitlesAtIdx(allSerialPageIds, cutoffIdx),
-    ]);
+  // allSerialPageIds is a superset of parentPageIds (parents are visible serial pages),
+  // so one resolvePageTitlesAtIdx call covers both parent and serial-list lookups.
+  const [childTitleMap, hasChildrenSet, allSerialTitleMap] = await Promise.all([
+    resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
+    resolveHasChildrenSet(childPageIds, cutoffIdx),
+    resolvePageTitlesAtIdx(allSerialPageIds, cutoffIdx),
+  ]);
 
   const childPages = activeChildPages.map((r) => ({
     id: r.id,
@@ -436,7 +388,7 @@ export default async function PageView({ params }: Props) {
     id: r.id,
     name: r.name,
     slug: r.slug,
-    title: parentTitleMap.get(r.id) ?? r.name,
+    title: allSerialTitleMap.get(r.id) ?? r.name,
   }));
 
   // All pages in the serial with chapter-versioned titles for the "Add parent" dropdown.
