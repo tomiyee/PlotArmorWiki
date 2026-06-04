@@ -288,10 +288,12 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
       }),
     );
   }
-  // remark-refs must run after remarkWikiLinks so that refbox list items
-  // (which contain [[token]] wiki-link syntax) are NOT re-processed — by the
-  // time remark-refs runs, wiki links have already been converted to link nodes.
-  remarkPlugins.push(remarkRefs());
+  // remark-refs runs after remarkWikiLinks and receives the same serial context
+  // so it can emit mdast link nodes for refbox entries — makeAnchorComponent then
+  // wraps those links with hover-card previews just like wiki links.
+  remarkPlugins.push(
+    remarkRefs(serialSlug, pageTitles, { chapterType, chapters: wikiChapters }),
+  );
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug

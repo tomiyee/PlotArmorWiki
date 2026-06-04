@@ -1,15 +1,17 @@
 import { findAndReplace } from "mdast-util-find-and-replace";
-import type { Root, Text, Html, List, ListItem, Paragraph, Nodes } from "mdast";
+import type { Root, Text, Html, List, ListItem, Paragraph, Nodes, Link } from "mdast";
 import type { Plugin } from "unified";
+import { slugifyWikiName, isChapterCategory } from "./wiki-links";
 
 /**
  * Remark plugin that transforms `{{ref|token}}` inline citations and
  * `{{refbox}}` placeholders in markdown.
  *
- * Must be added to the plugin chain **after** `remarkWikiLinks` so that it
- * runs after wiki links have been resolved. The refbox is emitted as a plain
- * mdast `list` node with text display names — it does not re-run remarkWikiLinks
- * on its items.
+ * Must be added to the plugin chain **after** `remarkWikiLinks`. When
+ * `serialSlug` is supplied, refbox list entries are emitted as mdast `link`
+ * nodes using the same URL shapes that `remarkWikiLinks` produces, so
+ * `makeAnchorComponent` in MarkdownRenderer wraps them with hover-card
+ * previews automatically.
  *
  * Two-pass strategy:
  *   Pass 1 — walk all text nodes, collect `{{ref|…}}` tokens in document order,
@@ -21,7 +23,7 @@ import type { Plugin } from "unified";
  *
  * @example
  * // In a remarkPlugins array (must come after remarkWikiLinks):
- * remarkPlugins={[remarkWikiLinks(serialSlug, ...), remarkRefs()]}
+ * remarkPlugins={[remarkWikiLinks(serialSlug, ...), remarkRefs(serialSlug, pageTitles, { chapterType, chapters })]}
  */
 
 const REF_RE = /\{\{ref\|([^}]+)\}\}/g;
@@ -29,13 +31,25 @@ const REFBOX_RE = /\{\{refbox\}\}/g;
 const REFBOX_SENTINEL = "{{refbox-sentinel-placeholder}}";
 
 /**
- * Returns the remark-refs plugin. No parameters needed — all `{{ref|…}}` tokens
- * in the document are collected in a single document-level pass.
+ * Returns the remark-refs plugin.
+ *
+ * When `serialSlug` is provided, refbox list entries are emitted as clickable
+ * links with hover-card previews (page links → `WikiLinkPreview`, chapter links
+ * → `ChapterLinkPreview`). Without `serialSlug`, entries fall back to plain text.
  *
  * @example
- * remarkPlugins={[remarkWikiLinks(serialSlug, ...), remarkRefs()]}
+ * remarkPlugins={[remarkWikiLinks(serialSlug, pageTitles, opts), remarkRefs(serialSlug, pageTitles, opts)]}
  */
-export function remarkRefs(): Plugin<[], Root> {
+export function remarkRefs(
+  serialSlug?: string,
+  pageTitles?: Record<string, string>,
+  options?: {
+    /** The serial's chapter type (e.g. "Chapter", "Episode"). */
+    chapterType?: string;
+    /** Map of chapter display name → chapter idx for URL resolution. */
+    chapters?: Record<string, number>;
+  },
+): Plugin<[], Root> {
   return () => (tree) => {
     // ── Pass 1: collect all ref tokens in document order ────────────────────
     const ordinalMap = new Map<string, number>(); // token → 1-based ordinal
@@ -84,7 +98,7 @@ export function remarkRefs(): Plugin<[], Root> {
     // findAndReplace inserted the sentinel as an html node inside paragraphs.
     // Walk the top-level children and any block-level descendants to find
     // paragraphs that consist solely of the sentinel node and replace them.
-    replaceRefboxParagraphs(tree, ordinalMap);
+    replaceRefboxParagraphs(tree, ordinalMap, serialSlug, pageTitles, options);
   };
 }
 
@@ -126,6 +140,9 @@ function hasRefbox(node: Nodes | Root): boolean {
 function replaceRefboxParagraphs(
   node: { children: Nodes[] },
   ordinalMap: Map<string, number>,
+  serialSlug?: string,
+  pageTitles?: Record<string, string>,
+  options?: { chapterType?: string; chapters?: Record<string, number> },
 ): void {
   const children = node.children as Nodes[];
   for (let i = 0; i < children.length; i++) {
@@ -136,14 +153,14 @@ function replaceRefboxParagraphs(
       child.type === "paragraph" &&
       isSentinelParagraph(child as Paragraph)
     ) {
-      children.splice(i, 1, buildRefboxList(ordinalMap));
+      children.splice(i, 1, buildRefboxList(ordinalMap, serialSlug, pageTitles, options));
       // i stays the same — no need to revisit the replacement list node.
       continue;
     }
 
     // Recurse into block-level containers (blockquote, listItem, etc.).
     if ("children" in child && Array.isArray((child as { children: Nodes[] }).children)) {
-      replaceRefboxParagraphs(child as { children: Nodes[] }, ordinalMap);
+      replaceRefboxParagraphs(child as { children: Nodes[] }, ordinalMap, serialSlug, pageTitles, options);
     }
   }
 }
@@ -159,17 +176,26 @@ function isSentinelParagraph(para: Paragraph): boolean {
 }
 
 /** Builds an mdast ordered list from the ordinalMap. */
-function buildRefboxList(ordinalMap: Map<string, number>): List {
+function buildRefboxList(
+  ordinalMap: Map<string, number>,
+  serialSlug?: string,
+  pageTitles?: Record<string, string>,
+  options?: { chapterType?: string; chapters?: Record<string, number> },
+): List {
   const items: ListItem[] = [];
 
   ordinalMap.forEach((n, token) => {
     const backLink = `<a id="ref-${n}" href="#ref-cite-${n}">[${n}]</a>`;
-    const displayText = tokenToDisplayText(token);
+    const contentNode: Text | Link = serialSlug
+      ? buildRefLink(token, serialSlug, pageTitles, options)
+      : ({ type: "text", value: tokenToDisplayText(token) } as Text);
+
     const itemParagraph: Paragraph = {
       type: "paragraph",
       children: [
         { type: "html", value: backLink } as Html,
-        { type: "text", value: " " + displayText } as Text,
+        { type: "text", value: " " } as Text,
+        contentNode,
       ],
     };
     items.push({
@@ -189,8 +215,60 @@ function buildRefboxList(ordinalMap: Map<string, number>): List {
 }
 
 /**
+ * Converts a ref token into an mdast `link` node using the same URL shapes
+ * that `remarkWikiLinks` produces, so `makeAnchorComponent` wraps them with
+ * hover-card previews automatically.
+ *
+ * Falls back to a plain `text` node for unresolvable chapter tokens.
+ */
+function buildRefLink(
+  token: string,
+  serialSlug: string,
+  pageTitles?: Record<string, string>,
+  options?: { chapterType?: string; chapters?: Record<string, number> },
+): Link | Text {
+  const colonIdx = token.indexOf(":");
+  const { chapterType, chapters } = options ?? {};
+
+  if (colonIdx !== -1) {
+    const category = token.slice(0, colonIdx);
+    const value = token.slice(colonIdx + 1).trim();
+
+    if (chapterType && isChapterCategory(category, chapterType)) {
+      const idx = chapters?.[value];
+      if (idx !== undefined) {
+        return {
+          type: "link",
+          url: `/${serialSlug}/chapter/${idx}`,
+          children: [{ type: "text", value }],
+        } as Link;
+      }
+      // Unknown chapter name — fall back to plain text.
+      return { type: "text", value } as Text;
+    }
+
+    // Explicit "page:" prefix or any other unrecognised category — treat as page.
+    // `value` is the slug; look up a chapter-accurate display title if available.
+    const displayText = pageTitles?.[value] ?? value;
+    return {
+      type: "link",
+      url: `/${serialSlug}/${slugifyWikiName(value)}`,
+      children: [{ type: "text", value: displayText }],
+    } as Link;
+  }
+
+  // No colon — treat the whole token as a page slug.
+  const displayText = pageTitles?.[token] ?? token;
+  return {
+    type: "link",
+    url: `/${serialSlug}/${slugifyWikiName(token)}`,
+    children: [{ type: "text", value: displayText }],
+  } as Link;
+}
+
+/**
  * Converts a ref token (e.g. `page:luffy` or `Chapter:Chapter 5`) into a
- * human-readable display string for the refbox entry.
+ * human-readable display string for plain-text refbox fallback (no serialSlug).
  */
 function tokenToDisplayText(token: string): string {
   const colonIdx = token.indexOf(":");
