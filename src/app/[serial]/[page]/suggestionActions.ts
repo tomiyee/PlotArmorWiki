@@ -21,8 +21,6 @@ import {
   eq,
   inArray,
   isNull,
-  lte,
-  max,
 } from "drizzle-orm";
 import {
   requireAuthenticated,
@@ -30,6 +28,11 @@ import {
   isSerialAdmin,
 } from "@/lib/auth-guard";
 import { applyPageContentRevisions } from "./revisionHelpers";
+import {
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+  getChapterIdxById,
+} from "@/db/queries";
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -346,25 +349,7 @@ export async function getPendingSuggestions(pageId: number): Promise<
           (async () => {
             const m = new Map<number, string>();
             if (sectionIds.length === 0) return m;
-            const sectionMaxIdxSq = db
-              .select({
-                sectionId: pageSectionRevisions.sectionId,
-                maxIdx: max(chapters.idx).as("max_idx"),
-              })
-              .from(pageSectionRevisions)
-              .innerJoin(
-                chapters,
-                eq(pageSectionRevisions.chapterId, chapters.id),
-              )
-              .where(
-                and(
-                  eq(pageSectionRevisions.pageId, pageId),
-                  lte(chapters.idx, cutoffIdx),
-                ),
-              )
-              .groupBy(pageSectionRevisions.sectionId)
-              .as("section_max_idx_sq");
-
+            const secMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
             const currentRevisions = await db
               .select({
                 sectionId: pageSectionRevisions.sectionId,
@@ -376,10 +361,10 @@ export async function getPendingSuggestions(pageId: number): Promise<
                 eq(pageSectionRevisions.chapterId, chapters.id),
               )
               .innerJoin(
-                sectionMaxIdxSq,
+                secMaxIdxSq,
                 and(
-                  eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
-                  eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+                  eq(pageSectionRevisions.sectionId, secMaxIdxSq.sectionId),
+                  eq(chapters.idx, secMaxIdxSq.maxIdx),
                 ),
               )
               .where(eq(pageSectionRevisions.pageId, pageId));
@@ -392,25 +377,7 @@ export async function getPendingSuggestions(pageId: number): Promise<
           (async () => {
             const m = new Map<number, string>();
             if (ibSectionIds.length === 0) return m;
-            const ibMaxIdxSq = db
-              .select({
-                infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-                maxIdx: max(chapters.idx).as("max_idx"),
-              })
-              .from(pageInfoboxRevisions)
-              .innerJoin(
-                chapters,
-                eq(pageInfoboxRevisions.chapterId, chapters.id),
-              )
-              .where(
-                and(
-                  eq(pageInfoboxRevisions.pageId, pageId),
-                  lte(chapters.idx, cutoffIdx),
-                ),
-              )
-              .groupBy(pageInfoboxRevisions.infoboxSectionId)
-              .as("ib_max_idx_sq");
-
+            const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
             const currentRevisions = await db
               .select({
                 infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
@@ -673,46 +640,13 @@ export async function getSectionsAtChapter(
   }[];
   infoboxSections: { id: number; label: string; content: string }[];
 }> {
-  const [targetChapter] = await db
-    .select({ idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, chapterId))
-    .limit(1);
+  const cutoffIdxResult = await getChapterIdxById(chapterId);
 
-  if (!targetChapter) throw new Error("Chapter not found");
-  const cutoffIdx = targetChapter.idx;
+  if (cutoffIdxResult === null) throw new Error("Chapter not found");
+  const cutoffIdx = cutoffIdxResult;
 
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
-
-  const ibMaxIdxSq = db
-    .select({
-      infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageInfoboxRevisions)
-    .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageInfoboxRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageInfoboxRevisions.infoboxSectionId)
-    .as("ib_max_idx_sq");
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
+  const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
 
   const [activeSections, sectionVersions, activeInfoboxSections, ibVersions] =
     await Promise.all([

@@ -2,7 +2,6 @@
 
 import { db } from "@/db/index";
 import {
-  serials,
   pages,
   chapters,
   volumes,
@@ -21,19 +20,28 @@ import {
   desc,
   eq,
   gt,
-  inArray,
   isNull,
   lt,
   lte,
   max,
   min,
   ne,
+  or,
 } from "drizzle-orm";
 import {
   requireSerialAdminBySlug,
   requireSerialAdminByPageId,
 } from "@/lib/auth-guard";
 import { applyPageContentRevisions } from "./revisionHelpers";
+import {
+  resolvePageTitlesAtIdx,
+  fetchActiveParentPagesAtIdx,
+  fetchSerialPagesAtIdx,
+  getSerialBySlug,
+  getChapterIdxById,
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+} from "@/db/queries";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.
@@ -62,11 +70,7 @@ async function getHeadChapterId(serialId: number): Promise<number> {
  * @throws Error if the serial or page is not found in the database
  */
 async function resolvePageIds(serialSlug: string, pageSlug: string) {
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) throw new Error("Serial not found");
 
   const [page] = await db
@@ -194,33 +198,15 @@ export async function getPageContentAtChapter(
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
-  const [{ pageId }, [targetChapter]] = await Promise.all([
+  const [{ pageId }, cutoffIdxResult] = await Promise.all([
     resolvePageIds(serialSlug, pageSlug),
-    db
-      .select({ idx: chapters.idx })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .limit(1),
+    getChapterIdxById(chapterId),
   ]);
-  if (!targetChapter) throw new Error("Chapter not found");
+  if (cutoffIdxResult === null) throw new Error("Chapter not found");
 
-  const cutoffIdx = targetChapter.idx;
+  const cutoffIdx = cutoffIdxResult;
 
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
 
   // Previous revision: highest idx STRICTLY less than the actual revision's idx
   // (not the cutoff). This ensures the correct previous content is returned even
@@ -363,21 +349,7 @@ export async function getPageContentAtChapter(
     )
     .as("floater_max_idx_sq");
 
-  const infoboxRowMaxIdxSq = db
-    .select({
-      infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageInfoboxRevisions)
-    .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageInfoboxRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageInfoboxRevisions.infoboxSectionId)
-    .as("infobox_row_max_idx_sq");
+  const ibRowMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
 
   const [[floaterVersion], activeInfoboxRows, infoboxRowVersions] =
     await Promise.all([
@@ -409,13 +381,13 @@ export async function getPageContentAtChapter(
         .from(pageInfoboxRevisions)
         .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
         .innerJoin(
-          infoboxRowMaxIdxSq,
+          ibRowMaxIdxSq,
           and(
             eq(
               pageInfoboxRevisions.infoboxSectionId,
-              infoboxRowMaxIdxSq.infoboxSectionId,
+              ibRowMaxIdxSq.infoboxSectionId,
             ),
-            eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
+            eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
           ),
         )
         .where(eq(pageInfoboxRevisions.pageId, pageId)),
@@ -494,6 +466,41 @@ export async function deletePageTitle(
     );
 
   return {};
+}
+
+/**
+ * Updates the chapter in which a page was introduced. Only admins of the
+ * serial that owns the page may call this. Intended for correcting a wrong
+ * intro chapter set at page-creation time.
+ *
+ * The updated value immediately changes the spoiler-gate: readers whose
+ * chapter cutoff is below the new intro chapter will no longer see the page.
+ *
+ * @example
+ * await updatePageIntroChapter(42, 7);
+ */
+export async function updatePageIntroChapter(
+  pageId: number,
+  chapterId: number,
+): Promise<void> {
+  await requireSerialAdminByPageId(pageId);
+
+  // Verify the chapter exists AND belongs to the same serial as the page.
+  // chapters.idx is serial-scoped; a cross-serial intro chapter would corrupt
+  // the spoiler gate (idx values are meaningless across serials).
+  const [chapterRow] = await db
+    .select({ id: chapters.id })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .innerJoin(pages, and(eq(volumes.serialId, pages.serialId), eq(pages.id, pageId)))
+    .where(eq(chapters.id, chapterId))
+    .limit(1);
+  if (!chapterRow) throw new Error("Chapter not found");
+
+  await db
+    .update(pages)
+    .set({ introChapterId: chapterId })
+    .where(eq(pages.id, pageId));
 }
 
 // ── Page section structure management ────────────────────────────────────────
@@ -867,94 +874,54 @@ export async function getParentPagesAtChapter(
   pageSlug: string,
   chapterId: number,
 ): Promise<{ id: number; name: string; slug: string; title: string }[]> {
-  const [{ pageId }, [targetChapter]] = await Promise.all([
+  const [{ pageId }, cutoffIdx] = await Promise.all([
     resolvePageIds(serialSlug, pageSlug),
-    db
-      .select({ idx: chapters.idx })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .limit(1),
+    getChapterIdxById(chapterId),
   ]);
-  if (!targetChapter) throw new Error("Chapter not found");
+  if (cutoffIdx === null) throw new Error("Chapter not found");
 
-  const cutoffIdx = targetChapter.idx;
-
-  const parentRelMaxIdxSq = db
-    .select({
-      parentPageId: pageRelationships.parentPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.childPageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.parentPageId)
-    .as("parent_rel_max_idx_sq");
-
-  const parentPagesRaw = await db
-    .select({
-      id: pages.id,
-      name: pages.name,
-      slug: pages.slug,
-      isActive: pageRelationships.isActive,
-    })
-    .from(pageRelationships)
-    .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .innerJoin(
-      parentRelMaxIdxSq,
-      and(
-        eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
-        eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
-      ),
-    )
-    .where(eq(pageRelationships.childPageId, pageId));
-
-  const activeParents = parentPagesRaw.filter((r) => r.isActive);
-  if (activeParents.length === 0) return [];
-
-  const parentPageIds = activeParents.map((r) => r.id);
-
-  const titleMaxIdxSq = db
-    .select({
-      pageId: pageTitles.pageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageTitles)
-    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .where(
-      and(
-        inArray(pageTitles.pageId, parentPageIds),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageTitles.pageId)
-    .as("title_max_idx_sq");
-
-  const titleRows = await db
-    .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-    .from(pageTitles)
-    .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-    .innerJoin(
-      titleMaxIdxSq,
-      and(
-        eq(pageTitles.pageId, titleMaxIdxSq.pageId),
-        eq(chapters.idx, titleMaxIdxSq.maxIdx),
-      ),
-    );
-
-  const titleMap = new Map(titleRows.map((r) => [r.pageId, r.title]));
+  const activeParents = await fetchActiveParentPagesAtIdx(pageId, cutoffIdx);
+  const titleMap = await resolvePageTitlesAtIdx(
+    activeParents.map((r) => r.id),
+    cutoffIdx,
+  );
 
   return activeParents.map((r) => ({
-    id: r.id,
-    name: r.name,
-    slug: r.slug,
+    ...r,
     title: titleMap.get(r.id) ?? r.name,
   }));
+}
+
+/**
+ * Returns all pages in the serial with their titles resolved at the given
+ * chapter's cutoff, excluding the current page. Used to keep the "Add parent"
+ * dropdown in sync with the "Writing as of Chapter" selector — the same
+ * temporal title resolution applied to `getParentPagesAtChapter`.
+ *
+ * @example
+ * const allPages = await getAllSerialPagesAtChapter('one-piece', 'luffy', 7);
+ * // allPages: [{ id: 1, title: 'Nami' }, ...]
+ */
+export async function getAllSerialPagesAtChapter(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ id: number; title: string }[]> {
+  const [{ serialId, pageId }, cutoffIdx] = await Promise.all([
+    resolvePageIds(serialSlug, pageSlug),
+    getChapterIdxById(chapterId),
+  ]);
+  if (cutoffIdx === null) throw new Error("Chapter not found");
+
+  const allPages = await fetchSerialPagesAtIdx(serialId, cutoffIdx);
+  const titleMap = await resolvePageTitlesAtIdx(
+    allPages.map((p) => p.id),
+    cutoffIdx,
+  );
+
+  return allPages
+    .filter((p) => p.id !== pageId)
+    .map((p) => ({ id: p.id, title: titleMap.get(p.id) ?? p.name }));
 }
 
 /**

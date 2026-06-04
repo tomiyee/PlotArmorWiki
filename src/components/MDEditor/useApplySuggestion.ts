@@ -33,6 +33,12 @@ type UseApplySuggestionParams = {
   chapterType: string | undefined;
   /** Parent onChange handler; called with the new markdown after a fallback insertion. */
   onChange: (val: string | undefined) => void;
+  /**
+   * Called after the WikiLinkNode is inserted, with the Lexical node key and the
+   * chip's DOM element so the caller can open the alias-input step with live positioning.
+   * Not called when the node key or DOM span could not be located.
+   */
+  onAfterInsert?: (nodeKey: string, el: HTMLElement) => void;
 };
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -59,6 +65,7 @@ export function useApplySuggestion(params: UseApplySuggestionParams) {
     closeSuggestions,
     chapterType,
     onChange,
+    onAfterInsert,
   } = params;
 
   const isApplyingRef = useRef(false);
@@ -92,6 +99,7 @@ export function useApplySuggestion(params: UseApplySuggestionParams) {
 
       if (lexEditor) {
         isApplyingRef.current = true;
+        let insertedKey: string | null = null;
         lexEditor.update(() => {
           const sel = $getSelection();
           if (!$isRangeSelection(sel)) {
@@ -116,12 +124,25 @@ export function useApplySuggestion(params: UseApplySuggestionParams) {
           }
 
           // Select the [[query fragment and replace it with the chip node.
+          const node = new WikiLinkNode(token);
+          insertedKey = node.getKey();
           sel.setTextNodeRange(anchorNode, lastOpen, anchorNode, offset);
-          sel.insertNodes([new WikiLinkNode(token)]);
+          sel.insertNodes([node]);
         });
 
         requestAnimationFrame(() => {
           isApplyingRef.current = false;
+          // If a callback is registered, find the inserted chip's DOM span and
+          // hand off the alias-input step instead of returning focus to the editor.
+          if (onAfterInsert && insertedKey) {
+            const chipSpan = containerRef.current?.querySelector<HTMLElement>(
+              `[data-wiki-key="${insertedKey}"]`,
+            );
+            if (chipSpan) {
+              onAfterInsert(insertedKey, chipSpan);
+              return;
+            }
+          }
           lexEditor.focus();
         });
         return;
@@ -153,7 +174,7 @@ export function useApplySuggestion(params: UseApplySuggestionParams) {
         editorRef.current?.focus();
       });
     },
-    [chapterType, closeSuggestions, containerRef, editorRef, onChange],
+    [chapterType, closeSuggestions, containerRef, editorRef, onChange, onAfterInsert],
   );
 
   return { applySuggestion, isApplyingRef, lastEmittedRef, prevValueRef };

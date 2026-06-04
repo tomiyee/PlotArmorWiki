@@ -39,19 +39,6 @@ type MarkdownRendererProps = {
    * Only used when `serialSlug` and `chapterType` are also provided.
    */
   wikiChapters?: Record<string, number>;
-  /**
-   * The slug of the page that is currently being viewed.
-   * When provided alongside `trailParam`, clicking a wiki page link appends
-   * the current page to the navigation trail so readers can retrace their steps.
-   */
-  currentPageSlug?: string;
-  /**
-   * The existing `trail` query-parameter value from the current URL (comma-separated
-   * list of prior page slugs, oldest first). Combined with `currentPageSlug` to build
-   * the `?trail=…` parameter appended to outgoing wiki page links.
-   * Only used when `serialSlug` and `currentPageSlug` are also provided.
-   */
-  trailParam?: string;
 };
 
 const COMPONENTS: Components = {
@@ -207,17 +194,8 @@ const SM_COMPONENTS: Components = {
  * - `/{serialSlug}/chapter/{idx}` (3-level chapter URL) → `ChapterLinkPreview`
  *
  * All other links render as plain anchors.
- *
- * When `currentPageSlug` is provided, page links receive a `?trail=…`
- * parameter so the destination page can render a "← Back to …" link.
- * `trailParam` is the existing trail from the current page's URL, which is
- * prepended before appending `currentPageSlug`.
  */
-function makeAnchorComponent(
-  serialSlug: string,
-  currentPageSlug?: string,
-  trailParam?: string,
-): Components["a"] {
+function makeAnchorComponent(serialSlug: string): Components["a"] {
   const prefix = `/${serialSlug}/`;
   const chapterPrefix = `/${serialSlug}/chapter/`;
 
@@ -252,22 +230,8 @@ function makeAnchorComponent(
     if (rest && !rest.includes("/")) {
       const pageName = decodeURIComponent(rest);
 
-      // Build ?trail= parameter: existing trail entries + current page slug.
-      let hrefWithTrail = href;
-      if (currentPageSlug) {
-        const trailSlugs = trailParam
-          ? trailParam.split(",").filter(Boolean)
-          : [];
-        const newTrail = [...trailSlugs, currentPageSlug].join(",");
-        hrefWithTrail = `${href}?trail=${newTrail}`;
-      }
-
       return (
-        <WikiLinkPreview
-          href={hrefWithTrail}
-          serialSlug={serialSlug}
-          pageName={pageName}
-        >
+        <WikiLinkPreview href={href} serialSlug={serialSlug} pageName={pageName}>
           {children}
         </WikiLinkPreview>
       );
@@ -309,8 +273,6 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
     pageTitles,
     chapterType,
     wikiChapters,
-    currentPageSlug,
-    trailParam,
   } = props;
 
   const remarkPlugins: PluggableList = [remarkGfm];
@@ -325,7 +287,7 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug
-    ? { ...baseComponents, a: makeAnchorComponent(serialSlug, currentPageSlug, trailParam) }
+    ? { ...baseComponents, a: makeAnchorComponent(serialSlug) }
     : baseComponents;
 
   return (

@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/index";
 import {
-  serials,
   pages,
   pageTitles,
   pageRelationships,
@@ -17,6 +16,7 @@ import {
 import { and, asc, eq, like } from "drizzle-orm";
 import { titleToSlug } from "@/lib/slug";
 import { requireSerialAdminBySlug } from "@/lib/auth-guard";
+import { getSerialBySlug } from "@/db/queries";
 
 /**
  * Generates a slug unique within the serial. If `titleToSlug(name)` already
@@ -92,11 +92,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
       ? parseInt(templateIdRaw, 10)
       : null;
 
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) throw new Error("Serial not found");
 
   // Pre-fetch the template definition outside the transaction (read-only).

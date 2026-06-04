@@ -1,10 +1,10 @@
 "use server";
 
 import { db } from "@/db/index";
-import { chapters, chapterSynopses, serials, volumes } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { chapterSynopses } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { requireSerialAdminBySlug } from "@/lib/auth-guard";
+import { getSerialBySlug, getChapterBySerialAndIdx } from "@/db/queries";
 
 /**
  * Upserts the synopsis content for a chapter identified by serial slug + chapter idx.
@@ -19,19 +19,10 @@ export async function saveChapterSynopsis(
 ): Promise<void> {
   await requireSerialAdminBySlug(serialSlug);
 
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) throw new Error("Serial not found");
 
-  const [chapter] = await db
-    .select({ id: chapters.id })
-    .from(chapters)
-    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-    .where(and(eq(volumes.serialId, serial.id), eq(chapters.idx, chapterIdx)))
-    .limit(1);
+  const chapter = await getChapterBySerialAndIdx(serial.id, chapterIdx);
   if (!chapter) throw new Error("Chapter not found");
 
   await db

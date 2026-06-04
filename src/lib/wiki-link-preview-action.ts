@@ -3,7 +3,6 @@
 import { cookies } from "next/headers";
 import { db } from "@/db/index";
 import {
-  serials,
   pages,
   chapters,
   chapterSynopses,
@@ -13,9 +12,15 @@ import {
   pageInfoboxImageRevisions,
   pageSections,
   pageSectionRevisions,
-  pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
+import {
+  resolvePageTitlesAtIdx,
+  getSerialBySlug,
+  getChapterIdxById,
+  sectionMaxIdxSq,
+  infoboxRowMaxIdxSq,
+} from "@/db/queries";
 
 export interface WikiLinkPreviewData {
   pageName: string;
@@ -49,11 +54,7 @@ export async function getWikiLinkPreview(
   pageSlug: string,
 ): Promise<WikiLinkPreviewData | null> {
   // Resolve serial
-  const [serial] = await db
-    .select({ id: serials.id, chapterType: serials.chapterType })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) return null;
 
   // Read chapter cutoff from cookie (same pattern as page.tsx)
@@ -63,12 +64,8 @@ export async function getWikiLinkPreview(
   if (raw) {
     const chapterId = parseInt(raw, 10);
     if (!isNaN(chapterId)) {
-      const [row] = await db
-        .select({ idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, chapterId))
-        .limit(1);
-      if (row) cutoffIdx = row.idx;
+      const idx = await getChapterIdxById(chapterId);
+      if (idx !== null) cutoffIdx = idx;
     }
   }
 
@@ -108,32 +105,7 @@ export async function getWikiLinkPreview(
   let resolvedPageTitles: Record<string, string> = {};
   if (allPageRows.length > 0) {
     const pageIds = allPageRows.map((p) => p.id);
-    const titleMaxIdxSq = db
-      .select({
-        pageId: pageTitles.pageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(
-        and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)),
-      )
-      .groupBy(pageTitles.pageId)
-      .as("title_max_idx_sq");
-
-    const titleRows = await db
-      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .innerJoin(
-        titleMaxIdxSq,
-        and(
-          eq(pageTitles.pageId, titleMaxIdxSq.pageId),
-          eq(chapters.idx, titleMaxIdxSq.maxIdx),
-        ),
-      );
-
-    const titleByPageId = new Map(titleRows.map((r) => [r.pageId, r.title]));
+    const titleByPageId = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
     resolvedPageTitles = Object.fromEntries(
       allPageRows.map((p) => [p.slug, titleByPageId.get(p.id) ?? p.name]),
     );
@@ -153,21 +125,7 @@ export async function getWikiLinkPreview(
   }
 
   // Fetch the first section content at the user's cutoff
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+  const secMaxIdxSq = sectionMaxIdxSq(page.id, cutoffIdx);
 
   const [firstSection] = await db
     .select({ content: pageSectionRevisions.content })
@@ -178,10 +136,10 @@ export async function getWikiLinkPreview(
       eq(pageSectionRevisions.sectionId, pageSections.id),
     )
     .innerJoin(
-      sectionMaxIdxSq,
+      secMaxIdxSq,
       and(
-        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
-        eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+        eq(pageSectionRevisions.sectionId, secMaxIdxSq.sectionId),
+        eq(chapters.idx, secMaxIdxSq.maxIdx),
       ),
     )
     .where(
@@ -223,21 +181,7 @@ export async function getWikiLinkPreview(
       )
       .as("floater_max_idx_sq");
 
-    const infoboxRowMaxIdxSq = db
-      .select({
-        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageInfoboxRevisions)
-      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageInfoboxRevisions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageInfoboxRevisions.infoboxSectionId)
-      .as("infobox_row_max_idx_sq");
+    const ibRowMaxIdxSq = infoboxRowMaxIdxSq(page.id, cutoffIdx);
 
     const [[floaterVersion], infoboxRowVersions] = await Promise.all([
       db
@@ -258,13 +202,13 @@ export async function getWikiLinkPreview(
         .from(pageInfoboxRevisions)
         .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
         .innerJoin(
-          infoboxRowMaxIdxSq,
+          ibRowMaxIdxSq,
           and(
             eq(
               pageInfoboxRevisions.infoboxSectionId,
-              infoboxRowMaxIdxSq.infoboxSectionId,
+              ibRowMaxIdxSq.infoboxSectionId,
             ),
-            eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
+            eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
           ),
         )
         .where(eq(pageInfoboxRevisions.pageId, page.id)),
@@ -320,11 +264,7 @@ export async function getChapterLinkPreview(
   chapterIdx: number,
 ): Promise<ChapterLinkPreviewData | null> {
   // Resolve serial
-  const [serial] = await db
-    .select({ id: serials.id, chapterType: serials.chapterType })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) return null;
 
   // Read chapter cutoff from cookie
@@ -334,16 +274,12 @@ export async function getChapterLinkPreview(
   if (raw) {
     const chapterId = parseInt(raw, 10);
     if (!isNaN(chapterId)) {
-      const [row] = await db
-        .select({ idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, chapterId))
-        .limit(1);
-      if (row) cutoffIdx = row.idx;
+      const idx = await getChapterIdxById(chapterId);
+      if (idx !== null) cutoffIdx = idx;
     }
   }
 
-  // Resolve chapter by serial + idx
+  // Resolve chapter by serial + idx — need full row for displayName/idx/volumeId
   const [chapter] = await db
     .select({
       id: chapters.id,
@@ -394,4 +330,28 @@ export async function getChapterLinkPreview(
     synopsisSnippet,
     hidden: false,
   };
+}
+
+/**
+ * Returns the `pages.name` for a page identified by serial + page slug.
+ * Used by BackBreadcrumb to resolve the "← Back to …" title from document.referrer
+ * without requiring the full wiki-link preview query.
+ *
+ * @example
+ * const name = await getPageNameBySlug("one-piece", "erin-solstice");
+ */
+export async function getPageNameBySlug(
+  serialSlug: string,
+  pageSlug: string,
+): Promise<string | null> {
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) return null;
+
+  const [page] = await db
+    .select({ name: pages.name })
+    .from(pages)
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
+    .limit(1);
+
+  return page?.name ?? null;
 }

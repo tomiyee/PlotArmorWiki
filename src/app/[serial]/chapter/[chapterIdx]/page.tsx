@@ -8,9 +8,9 @@ import {
   chapters,
   chapterSynopses,
   pages,
-  pageTitles,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { resolvePageTitlesAtIdx } from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -192,39 +192,7 @@ export default async function ChapterPage({ params }: Props) {
       .orderBy(asc(pages.name));
 
     const wikiPageIds = rawWikiPages.map((p) => p.id);
-    let wikiTitleByPageId = new Map<number, string>();
-    if (wikiPageIds.length > 0) {
-      const wikiTitleMaxIdxSq = db
-        .select({
-          pageId: pageTitles.pageId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .where(
-          and(
-            inArray(pageTitles.pageId, wikiPageIds),
-            lte(chapters.idx, chapter.idx),
-          ),
-        )
-        .groupBy(pageTitles.pageId)
-        .as("wiki_title_max_idx_sq");
-
-      const wikiTitleRows = await db
-        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .innerJoin(
-          wikiTitleMaxIdxSq,
-          and(
-            eq(pageTitles.pageId, wikiTitleMaxIdxSq.pageId),
-            eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
-          ),
-        );
-      wikiTitleByPageId = new Map(
-        wikiTitleRows.map((r) => [r.pageId, r.title]),
-      );
-    }
+    const wikiTitleByPageId = await resolvePageTitlesAtIdx(wikiPageIds, chapter.idx);
 
     wikiPages = rawWikiPages.map((p) => ({
       name: wikiTitleByPageId.get(p.id) ?? p.name,
@@ -247,15 +215,21 @@ export default async function ChapterPage({ params }: Props) {
       )
       .orderBy(pages.name);
 
+    const introducedPageIds = introducedPages.map((r) => r.pageId);
+    const introTitleByPageId = await resolvePageTitlesAtIdx(introducedPageIds, cutoffIdx);
+
     if (introducedPages.length > 0) {
+      const resolvedPages = introducedPages
+        .map((r) => ({
+          id: r.pageId,
+          name: introTitleByPageId.get(r.pageId) ?? r.pageName,
+          slug: r.pageSlug,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
       groupedIntroductions = [
         {
           categoryName: "",
-          pages: introducedPages.map((r) => ({
-            id: r.pageId,
-            name: r.pageName,
-            slug: r.pageSlug,
-          })),
+          pages: resolvedPages,
         },
       ];
     }

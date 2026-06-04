@@ -63,18 +63,6 @@ type PageReadViewProps = {
   /** The serial's chapter type (e.g. `"Chapter"`, `"Episode"`). */
   chapterType?: string;
   /**
-   * Slug of the page currently being viewed.
-   * Forwarded to MarkdownRenderer so wiki-link hrefs include a `?trail=…`
-   * parameter that lets the destination page render a "← Back to …" breadcrumb.
-   */
-  currentPageSlug?: string;
-  /**
-   * The `trail` query-parameter value from the current URL (comma-separated
-   * prior slugs, oldest first). Prepended before `currentPageSlug` when
-   * building the outgoing trail parameter.
-   */
-  trailParam?: string;
-  /**
    * When provided, the authenticated non-admin suggestion flow is enabled -
    * shows "Suggest an edit" icon buttons on section headers, status banner, and inline form.
    * Omit for anonymous users or when the page is rendered in edit mode.
@@ -167,8 +155,6 @@ export function PageReadView(props: PageReadViewProps) {
     pageTitles,
     wikiChapters,
     chapterType,
-    currentPageSlug,
-    trailParam,
     suggestionContext,
   } = props;
 
@@ -370,8 +356,6 @@ export function PageReadView(props: PageReadViewProps) {
                         pageTitles={pageTitles}
                         chapterType={chapterType}
                         wikiChapters={wikiChapters}
-                        currentPageSlug={currentPageSlug}
-                        trailParam={trailParam}
                       >
                         {row.content}
                       </MarkdownRenderer>
@@ -415,8 +399,6 @@ export function PageReadView(props: PageReadViewProps) {
               pageTitles={pageTitles}
               chapterType={chapterType}
               wikiChapters={wikiChapters}
-              currentPageSlug={currentPageSlug}
-              trailParam={trailParam}
             >
               {section.content}
             </MarkdownRenderer>

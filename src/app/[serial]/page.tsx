@@ -22,6 +22,14 @@ import {
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import {
+  resolvePageTitlesAtIdx,
+  resolveHasChildrenSet,
+  sectionMaxIdxSq as buildSectionMaxIdxSq,
+  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+  childRelMaxIdxSq as buildChildRelMaxIdxSq,
+  getChapterIdxById,
+} from "@/db/queries";
+import {
   addChapter,
   addVolume,
   deleteChapter,
@@ -78,14 +86,10 @@ async function getChapterCutoff(
   const chapterId = parseInt(raw, 10);
   if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
 
-  const [row] = await db
-    .select({ idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, chapterId))
-    .limit(1);
+  const idx = await getChapterIdxById(chapterId);
 
-  if (!row) return { cutoffIdx: 0, readingChapterId: null };
-  return { cutoffIdx: row.idx, readingChapterId: chapterId };
+  if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
+  return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
 export default async function SerialPage({ params }: Props) {
@@ -262,37 +266,7 @@ export default async function SerialPage({ params }: Props) {
 
   // Resolve chapter-versioned titles for all wiki pages at the reader's cutoff.
   const wikiPageIds = rawWikiPages.map((p) => p.id);
-  let wikiTitleByPageId = new Map<number, string>();
-  if (wikiPageIds.length > 0) {
-    const wikiTitleMaxIdxSq = db
-      .select({
-        pageId: pageTitles.pageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .where(
-        and(
-          inArray(pageTitles.pageId, wikiPageIds),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageTitles.pageId)
-      .as("wiki_title_max_idx_sq");
-
-    const wikiTitleRows = await db
-      .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-      .from(pageTitles)
-      .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-      .innerJoin(
-        wikiTitleMaxIdxSq,
-        and(
-          eq(pageTitles.pageId, wikiTitleMaxIdxSq.pageId),
-          eq(chapters.idx, wikiTitleMaxIdxSq.maxIdx),
-        ),
-      );
-    wikiTitleByPageId = new Map(wikiTitleRows.map((r) => [r.pageId, r.title]));
-  }
+  const wikiTitleByPageId = await resolvePageTitlesAtIdx(wikiPageIds, cutoffIdx);
 
   // slug → chapter-versioned title (falls back to pages.name for pages without title entries).
   const wikiPageTitles: Record<string, string> = Object.fromEntries(
@@ -331,21 +305,7 @@ export default async function SerialPage({ params }: Props) {
   }[] = [];
 
   if (homePage) {
-    const sectionMaxIdxSq = db
-      .select({
-        sectionId: pageSectionRevisions.sectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageSectionRevisions)
-      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageSectionRevisions.pageId, homePage.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageSectionRevisions.sectionId)
-      .as("section_max_idx_sq");
+    const sectionMaxIdxSq = buildSectionMaxIdxSq(homePage.id, cutoffIdx);
 
     const [activeSections, sectionVersions] = await Promise.all([
       db
@@ -434,21 +394,7 @@ export default async function SerialPage({ params }: Props) {
         )
         .as("floater_max_idx_sq");
 
-      const infoboxRowMaxIdxSq = db
-        .select({
-          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageInfoboxRevisions)
-        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-        .where(
-          and(
-            eq(pageInfoboxRevisions.pageId, homePage.id),
-            lte(chapters.idx, cutoffIdx),
-          ),
-        )
-        .groupBy(pageInfoboxRevisions.infoboxSectionId)
-        .as("infobox_row_max_idx_sq");
+      const ibRowMaxIdxSq = buildInfoboxRowMaxIdxSq(homePage.id, cutoffIdx);
 
       const [[floaterVersion], infoboxRowVersions] = await Promise.all([
         db
@@ -469,13 +415,13 @@ export default async function SerialPage({ params }: Props) {
           .from(pageInfoboxRevisions)
           .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
           .innerJoin(
-            infoboxRowMaxIdxSq,
+            ibRowMaxIdxSq,
             and(
               eq(
                 pageInfoboxRevisions.infoboxSectionId,
-                infoboxRowMaxIdxSq.infoboxSectionId,
+                ibRowMaxIdxSq.infoboxSectionId,
               ),
-              eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
+              eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
             ),
           )
           .where(eq(pageInfoboxRevisions.pageId, homePage.id)),
@@ -493,21 +439,7 @@ export default async function SerialPage({ params }: Props) {
     }
 
     // Child pages active at the user's cutoff (same max-idx pattern).
-    const relMaxIdxSq = db
-      .select({
-        childPageId: pageRelationships.childPageId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageRelationships)
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageRelationships.parentPageId, homePage.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageRelationships.childPageId)
-      .as("rel_max_idx_sq");
+    const relMaxIdxSq = buildChildRelMaxIdxSq(homePage.id, cutoffIdx);
 
     const childPagesRaw = await db
       .select({
@@ -530,85 +462,10 @@ export default async function SerialPage({ params }: Props) {
 
     const activeChildPages = childPagesRaw.filter((r) => r.isActive);
     const childPageIds = activeChildPages.map((r) => r.id);
-    let childTitleMap = new Map<number, string>();
-    if (childPageIds.length > 0) {
-      const childTitleMaxIdxSq = db
-        .select({
-          pageId: pageTitles.pageId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .where(
-          and(
-            inArray(pageTitles.pageId, childPageIds),
-            lte(chapters.idx, cutoffIdx),
-          ),
-        )
-        .groupBy(pageTitles.pageId)
-        .as("child_title_max_idx_sq");
-
-      const childTitleRows = await db
-        .select({ pageId: pageTitles.pageId, title: pageTitles.title })
-        .from(pageTitles)
-        .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
-        .innerJoin(
-          childTitleMaxIdxSq,
-          and(
-            eq(pageTitles.pageId, childTitleMaxIdxSq.pageId),
-            eq(chapters.idx, childTitleMaxIdxSq.maxIdx),
-          ),
-        );
-
-      childTitleMap = new Map(childTitleRows.map((r) => [r.pageId, r.title]));
-    }
-
-    // Compute hasChildren for each active child page of the home page.
-    const hasChildrenSet = new Set<number>();
-    if (childPageIds.length > 0) {
-      const grandchildRelMaxIdxSq = db
-        .select({
-          parentPageId: pageRelationships.parentPageId,
-          childPageId: pageRelationships.childPageId,
-          maxIdx: max(chapters.idx).as("max_idx"),
-        })
-        .from(pageRelationships)
-        .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-        .where(
-          and(
-            inArray(pageRelationships.parentPageId, childPageIds),
-            lte(chapters.idx, cutoffIdx),
-          ),
-        )
-        .groupBy(pageRelationships.parentPageId, pageRelationships.childPageId)
-        .as("grandchild_rel_max_idx_sq");
-
-      const grandchildRows = await db
-        .select({
-          parentPageId: pageRelationships.parentPageId,
-          isActive: pageRelationships.isActive,
-        })
-        .from(pageRelationships)
-        .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-        .innerJoin(
-          grandchildRelMaxIdxSq,
-          and(
-            eq(pageRelationships.parentPageId, grandchildRelMaxIdxSq.parentPageId),
-            eq(pageRelationships.childPageId, grandchildRelMaxIdxSq.childPageId),
-            eq(chapters.idx, grandchildRelMaxIdxSq.maxIdx),
-          ),
-        )
-        .where(
-          and(
-            inArray(pageRelationships.parentPageId, childPageIds),
-            eq(pageRelationships.isActive, true),
-          ),
-        );
-
-      for (const row of grandchildRows) {
-        hasChildrenSet.add(row.parentPageId);
-      }
-    }
+    const [childTitleMap, hasChildrenSet] = await Promise.all([
+      resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
+      resolveHasChildrenSet(childPageIds, cutoffIdx),
+    ]);
 
     childPages = activeChildPages.map((r) => ({
       id: r.id,
@@ -760,6 +617,7 @@ export default async function SerialPage({ params }: Props) {
                   idx: c.idx,
                 }))}
                 chapterType={serial.chapterType}
+                introChapterId={null}
                 introChapterIdx={null}
                 childPages={childPages}
                 parentPages={[]}
