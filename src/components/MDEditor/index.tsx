@@ -39,6 +39,11 @@ import { InsertWikiLinkButton } from "./InsertWikiLinkButton";
 import { WikiLinkNode, $isWikiLinkNode } from "./WikiLinkNode";
 import { WikiLinkEditPopover } from "./WikiLinkEditPopover";
 import { wikiPlugin, wikiLinkToMarkdownExtension } from "./WikiLinkVisitors";
+import { RefContext } from "./RefContext";
+import { InsertRefButton } from "./InsertRefButton";
+import { RefNode, $isRefNode } from "./RefNode";
+import { RefEditPopover } from "./RefEditPopover";
+import { refPlugin, refToMarkdownExtension } from "./RefVisitors";
 import { normalizeMarkdown } from "./normalizeMarkdown";
 import {
   useApplySuggestion,
@@ -198,13 +203,20 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     left: number;
   } | null>(null);
 
-  // State for the edit/insert popover. nodeKey is null for toolbar insert mode.
+  // State for the wiki link edit/insert popover. nodeKey is null for toolbar insert mode.
   const [editState, setEditState] = useState<{
     nodeKey: string | null;
     anchorEl: HTMLElement;
     initialToken: string;
     initialAlias: string;
     autoFocusAlias: boolean;
+  } | null>(null);
+
+  // State for the ref edit/insert popover. nodeKey is null for toolbar insert mode.
+  const [refEditState, setRefEditState] = useState<{
+    nodeKey: string | null;
+    anchorEl: HTMLElement;
+    initialToken: string;
   } | null>(null);
 
   useEffect(() => {
@@ -503,6 +515,115 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
     [editState, isApplyingRef, insertWikiLink, focusEditor],
   );
 
+  // ── Ref insert / edit callbacks ──────────────────────────────────────────────
+
+  /**
+   * Opens the insert-ref popover anchored to the toolbar button element.
+   */
+  const openRefInsertMenu = useCallback((anchorEl: HTMLElement) => {
+    setRefEditState({ nodeKey: null, anchorEl, initialToken: "" });
+  }, []);
+
+  /**
+   * Opens the edit popover for an existing RefNode.
+   * Called from RefChip onClick via RefContext.
+   */
+  const openRefEditMenu = useCallback(
+    (nodeKey: string, anchorEl: HTMLElement) => {
+      const editorEl = containerRef.current?.querySelector<HTMLElement>(
+        '[contenteditable="true"]',
+      );
+      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+      if (!lexEditor) return;
+      let token = "";
+      lexEditor.read(() => {
+        const node = $getNodeByKey(nodeKey);
+        if ($isRefNode(node)) token = node.__token;
+      });
+      if (!token) return;
+      setRefEditState({ nodeKey, anchorEl, initialToken: token });
+    },
+    [],
+  );
+
+  /**
+   * Inserts a `{{ref|token}}` RefNode at the current Lexical cursor position.
+   */
+  const insertRef = useCallback(
+    (token: string) => {
+      const editorEl = containerRef.current?.querySelector<HTMLElement>(
+        '[contenteditable="true"]',
+      );
+      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+
+      if (lexEditor) {
+        isApplyingRef.current = true;
+        lexEditor.update(() => {
+          const sel = $getSelection();
+          if ($isRangeSelection(sel)) {
+            sel.insertNodes([new RefNode(token)]);
+          }
+        });
+        requestAnimationFrame(() => {
+          isApplyingRef.current = false;
+        });
+        return;
+      }
+
+      // Fallback: append at end of document.
+      const current = lastEmittedRef.current;
+      const refText = `{{ref|${token}}}`;
+      const newMarkdown = current ? `${current}\n${refText}` : refText;
+      isApplyingRef.current = true;
+      editorRef.current?.setMarkdown(newMarkdown);
+      lastEmittedRef.current = newMarkdown;
+      prevValueRef.current = newMarkdown;
+      onChange(newMarkdown);
+      requestAnimationFrame(() => {
+        isApplyingRef.current = false;
+      });
+    },
+    [isApplyingRef, lastEmittedRef, onChange, prevValueRef],
+  );
+
+  /**
+   * Applies the selected token to an existing RefNode in place, or inserts a
+   * new one when opened from the toolbar button (nodeKey === null).
+   */
+  const handleRefEditConfirm = useCallback(
+    (token: string) => {
+      if (!refEditState) return;
+      const { nodeKey } = refEditState;
+      setRefEditState(null);
+
+      if (nodeKey === null) {
+        insertRef(token);
+        requestAnimationFrame(() => focusEditor());
+        return;
+      }
+
+      const editorEl = containerRef.current?.querySelector<HTMLElement>(
+        '[contenteditable="true"]',
+      );
+      const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+      if (!lexEditor) return;
+
+      isApplyingRef.current = true;
+      lexEditor.update(() => {
+        const node = $getNodeByKey(nodeKey);
+        if ($isRefNode(node)) {
+          const writable = node.getWritable();
+          writable.__token = token;
+        }
+      });
+      requestAnimationFrame(() => {
+        isApplyingRef.current = false;
+        lexEditor.focus();
+      });
+    },
+    [refEditState, isApplyingRef, insertRef, focusEditor],
+  );
+
   /**
    * Intercepts dropdown navigation keys in the capture phase on the wrapper div.
    * Capture fires before MDXEditor's Lexical key handlers, so our handler always
@@ -541,6 +662,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const plugins = useMemo((): RealmPlugin[] => {
     return [
       wikiPlugin,
+      refPlugin,
       toolbarPlugin({
         toolbarContents: () => (
           <DiffSourceToggleWrapper>
@@ -557,6 +679,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
             <InsertThematicBreak />
             <Separator />
             <InsertWikiLinkButton />
+            <InsertRefButton />
           </DiffSourceToggleWrapper>
         ),
       }),
@@ -571,8 +694,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       codeBlockPlugin(),
       diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: initialValue }),
     ];
-    // InsertWikiLinkButton is self-contained and reads all mutable data from
-    // WikiLinkContext, so only initialValue (the diff baseline) is a real dep.
+    // InsertWikiLinkButton and InsertRefButton are self-contained and read all
+    // mutable data from context, so only initialValue (the diff baseline) is a real dep.
   }, [initialValue]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
@@ -597,28 +720,48 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           openInsertMenu,
         }}
       >
-        <MDXEditorClient
-          ref={editorRef}
-          markdown={initialValue}
-          onChange={handleChange}
-          plugins={plugins}
-          toMarkdownOptions={{ extensions: [wikiLinkToMarkdownExtension] }}
-          className={isDark ? "mdx-editor-wiki dark" : "mdx-editor-wiki"}
-          contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
-        />
-        {editState && (
-          <WikiLinkEditPopover
-            anchorEl={editState.anchorEl}
-            initialToken={editState.initialToken}
-            initialAlias={editState.initialAlias}
-            autoFocusAlias={editState.autoFocusAlias}
-            onConfirm={handleEditConfirm}
-            onClose={() => {
-              setEditState(null);
-              focusEditor();
+        <RefContext.Provider
+          value={{
+            openRefEditMenu,
+            openRefInsertMenu,
+          }}
+        >
+          <MDXEditorClient
+            ref={editorRef}
+            markdown={initialValue}
+            onChange={handleChange}
+            plugins={plugins}
+            toMarkdownOptions={{
+              extensions: [wikiLinkToMarkdownExtension, refToMarkdownExtension],
             }}
+            className={isDark ? "mdx-editor-wiki dark" : "mdx-editor-wiki"}
+            contentEditableClassName="max-w-none px-4 py-3 focus:outline-none"
           />
-        )}
+          {editState && (
+            <WikiLinkEditPopover
+              anchorEl={editState.anchorEl}
+              initialToken={editState.initialToken}
+              initialAlias={editState.initialAlias}
+              autoFocusAlias={editState.autoFocusAlias}
+              onConfirm={handleEditConfirm}
+              onClose={() => {
+                setEditState(null);
+                focusEditor();
+              }}
+            />
+          )}
+          {refEditState && (
+            <RefEditPopover
+              anchorEl={refEditState.anchorEl}
+              initialToken={refEditState.initialToken}
+              onConfirm={handleRefEditConfirm}
+              onClose={() => {
+                setRefEditState(null);
+                focusEditor();
+              }}
+            />
+          )}
+        </RefContext.Provider>
       </WikiLinkContext.Provider>
       {isOpen && suggestions.length > 0 && (
         <ul

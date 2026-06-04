@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/Text";
 import { remarkWikiLinks } from "@/lib/remark-wiki-links";
+import { remarkRefs } from "@/lib/remark-refs";
 import { WikiLinkPreview } from "@/components/WikiLinkPreview";
 import { ChapterLinkPreview } from "@/components/ChapterLinkPreview";
 
@@ -287,6 +288,10 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
       }),
     );
   }
+  // remark-refs must run after remarkWikiLinks so that refbox list items
+  // (which contain [[token]] wiki-link syntax) are NOT re-processed — by the
+  // time remark-refs runs, wiki links have already been converted to link nodes.
+  remarkPlugins.push(remarkRefs());
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug
