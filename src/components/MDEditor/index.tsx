@@ -39,7 +39,7 @@ import { InsertWikiLinkButton } from "./InsertWikiLinkButton";
 import { WikiLinkNode, $isWikiLinkNode } from "./WikiLinkNode";
 import { WikiLinkEditPopover } from "./WikiLinkEditPopover";
 import { wikiPlugin, wikiLinkToMarkdownExtension } from "./WikiLinkVisitors";
-import { normalizeMarkdown } from "./normalizeMarkdown";
+import { normalizeMarkdown, prepareMarkdownForEditor } from "./normalizeMarkdown";
 import {
   useApplySuggestion,
   type Suggestion,
@@ -185,7 +185,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
   // Snapshot of value on mount - used as the diff baseline so "Diff" mode shows
   // changes made in this editing session relative to what was loaded from the server.
-  const [initialValue] = useState(() => normalizeMarkdown(value));
+  const [initialValue] = useState(() => prepareMarkdownForEditor(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
 
