@@ -8,12 +8,10 @@ import {
   useId,
   useMemo,
   type ChangeEvent,
-  type Dispatch,
   type KeyboardEvent,
   type ReactNode,
   type RefCallback,
   type RefObject,
-  type SetStateAction,
 } from "react";
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -138,7 +136,25 @@ function useAccordionState<T>(options: Option<T>[]) {
     [allRowIds],
   );
 
-  return { effectiveExpandedIds, toggleExpand };
+  const ensureExpanded = useCallback(
+    (ids: string[]) => {
+      setExpandedIds((prev) => {
+        const base = prev ?? allRowIds;
+        const next = new Set(base);
+        let changed = false;
+        for (const id of ids) {
+          if (!next.has(id)) {
+            next.add(id);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    },
+    [allRowIds],
+  );
+
+  return { effectiveExpandedIds, toggleExpand, ensureExpanded };
 }
 
 /**
@@ -180,10 +196,10 @@ type KeyboardNavOptions<T> = {
   totalSelectableCount: number;
   /** Flat list of rendered rows, used to resolve the active index to an item on Enter. */
   selectableRows: FlatRow<T>[];
-  /** Index into `selectableRows` of the currently highlighted option. */
+  /** Index into `selectableRows` of the currently highlighted option (-1 = none). */
   activeSelectableIdx: number;
-  /** Updates the highlighted index; called on Arrow/Home/End key presses. */
-  setActiveSelectableIdx: Dispatch<SetStateAction<number>>;
+  /** Updates the highlighted row by its stable path ID; called on Arrow/Home/End key presses. */
+  setActiveRowId: (id: string | null) => void;
   /** Confirms the selection of a row; called when Enter is pressed. */
   onSelect: (row: FlatRow<T>) => void;
   /** Closes the dropdown; called when Escape is pressed. */
@@ -209,7 +225,7 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
     totalSelectableCount,
     selectableRows,
     activeSelectableIdx,
-    setActiveSelectableIdx,
+    setActiveRowId,
     onSelect,
     onClose,
   } = opts;
@@ -218,23 +234,25 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (!isOpen) return;
       switch (e.key) {
-        case "ArrowDown":
+        case "ArrowDown": {
           e.preventDefault();
-          setActiveSelectableIdx((i) =>
-            Math.min(i + 1, totalSelectableCount - 1),
-          );
+          const next = Math.min(activeSelectableIdx + 1, totalSelectableCount - 1);
+          setActiveRowId(selectableRows[next]?.id ?? null);
           break;
-        case "ArrowUp":
+        }
+        case "ArrowUp": {
           e.preventDefault();
-          setActiveSelectableIdx((i) => Math.max(i - 1, 0));
+          const prev = Math.max(activeSelectableIdx - 1, 0);
+          setActiveRowId(selectableRows[prev]?.id ?? null);
           break;
+        }
         case "Home":
           e.preventDefault();
-          setActiveSelectableIdx(0);
+          setActiveRowId(selectableRows[0]?.id ?? null);
           break;
         case "End":
           e.preventDefault();
-          setActiveSelectableIdx(Math.max(0, totalSelectableCount - 1));
+          setActiveRowId(selectableRows[totalSelectableCount - 1]?.id ?? null);
           break;
         case "Enter": {
           e.preventDefault();
@@ -253,7 +271,7 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
       totalSelectableCount,
       selectableRows,
       activeSelectableIdx,
-      setActiveSelectableIdx,
+      setActiveRowId,
       onSelect,
       onClose,
     ],
@@ -623,7 +641,7 @@ function Select<T>(props: SelectProps<T>) {
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [activeSelectableIdx, setActiveSelectableIdx] = useState(0);
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -636,12 +654,20 @@ function Select<T>(props: SelectProps<T>) {
   const uid = useId();
   const treeId = `${uid}-tree`;
 
-  const { effectiveExpandedIds, toggleExpand } = useAccordionState(options);
+  const { effectiveExpandedIds, toggleExpand, ensureExpanded } = useAccordionState(options);
   const { flatRows, selectableRows, totalSelectableCount } = useFlatRows(
     options,
     effectiveExpandedIds,
     query,
     searchable,
+  );
+
+  // Derive the active index from the stable row ID so accordion
+  // collapse/expand never shifts the highlight to the wrong option.
+  const activeSelectableIdx = useMemo(
+    () =>
+      activeRowId === null ? -1 : selectableRows.findIndex((r) => r.id === activeRowId),
+    [activeRowId, selectableRows],
   );
 
   const handleClose = useCallback(() => {
@@ -665,26 +691,46 @@ function Select<T>(props: SelectProps<T>) {
     if (disabled) return;
     setQuery("");
     onOpen();
-    // Batched with setIsOpen so the correct row is active on the first render,
-    // producing a single callback-ref fire that scrolls it to the top.
-    const selectedIdx = selectableRows.findIndex(
-      (r) => value !== undefined && r.option.value === value,
+    // Expand any collapsed groups that contain the selected option so the
+    // scroll target is visible on the first render.
+    const ancestorIds =
+      value !== undefined ? (findAncestorIds(options, value) ?? []) : [];
+    if (ancestorIds.length > 0) ensureExpanded(ancestorIds);
+    // Compute rows with the now-expanded state to find the right row ID.
+    // All state updates below are batched into one re-render (React 18).
+    const nextExpandedIds =
+      ancestorIds.length > 0
+        ? new Set([...effectiveExpandedIds, ...ancestorIds])
+        : effectiveExpandedIds;
+    const nextSelectableRows = buildFlatRows(options, nextExpandedIds, "").filter(
+      (r) => r.selectable,
     );
-    setActiveSelectableIdx(selectedIdx >= 0 ? selectedIdx : 0);
+    const selectedRow =
+      value !== undefined
+        ? nextSelectableRows.find((r) => r.option.value === value)
+        : undefined;
+    setActiveRowId(selectedRow?.id ?? nextSelectableRows[0]?.id ?? null);
     setIsOpen(true);
-  }, [disabled, onOpen, selectableRows, value]);
+  }, [disabled, onOpen, options, value, effectiveExpandedIds, ensureExpanded]);
 
   const handleQueryChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
-    setActiveSelectableIdx(0);
   }, []);
+
+  // Reset to the first matching row after each query change. Runs after render
+  // so selectableRows already reflects the new query when this fires.
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveRowId(selectableRows[0]?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only reset on query change
+  }, [query]);
 
   const handleKeyDown = useKeyboardNav({
     isOpen,
     totalSelectableCount,
     selectableRows,
     activeSelectableIdx,
-    setActiveSelectableIdx,
+    setActiveRowId,
     onSelect: handleSelect,
     onClose: handleClose,
   });
@@ -912,4 +958,31 @@ function findLabel<T>(options: Option<T>[], value: T): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Returns the row IDs of every ancestor group that must be expanded to make
+ * the option matching `value` visible in the flat row list. Returns `null`
+ * when the value is not found, or `[]` when it is a root-level option.
+ *
+ * IDs use the same path-based scheme as `buildFlatRows` (e.g. `"0"`, `"0-2"`).
+ *
+ * @example
+ * const ids = findAncestorIds(options, chapterId); // ["1", "1-2"]
+ */
+function findAncestorIds<T>(
+  options: Option<T>[],
+  value: T,
+  prefix = "",
+): string[] | null {
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    const id = prefix ? `${prefix}-${i}` : `${i}`;
+    if (opt.value === value) return [];
+    if (opt.children) {
+      const childPath = findAncestorIds(opt.children, value, id);
+      if (childPath !== null) return [id, ...childPath];
+    }
+  }
+  return null;
 }
