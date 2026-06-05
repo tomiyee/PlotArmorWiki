@@ -632,8 +632,17 @@ function Select<T>(props: SelectProps<T>) {
   });
 
   useEffect(() => {
-    if (isOpen) setActiveSelectableIdx(0);
-  }, [isOpen]);
+    if (!isOpen) return;
+    // On open, jump to the currently selected option so the scroll-into-view
+    // effect below brings it into view. Falls back to 0 when nothing is selected
+    // or the selected value is not in the visible row list.
+    const selectedIdx = selectableRows.findIndex(
+      (r) => value !== undefined && r.option.value === value,
+    );
+    setActiveSelectableIdx(selectedIdx >= 0 ? selectedIdx : 0);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Intentionally omitting `selectableRows` and `value` — we only want to
+  // re-derive the active index when the dropdown opens, not on every render.
 
   useEffect(() => {
     if (!isOpen) return;
