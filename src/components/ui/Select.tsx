@@ -11,6 +11,7 @@ import {
   type Dispatch,
   type KeyboardEvent,
   type ReactNode,
+  type RefCallback,
   type RefObject,
   type SetStateAction,
 } from "react";
@@ -259,16 +260,49 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
   );
 }
 
+/**
+ * Manages scroll-into-view for the keyboard-active dropdown row.
+ *
+ * Attach `activeRowRef` to the active row. Call `onOpen()` before opening the
+ * dropdown so the first mount scrolls the row to the top of the list
+ * (`block:"start"`); keyboard-nav re-attaches use `block:"nearest"` so the
+ * item stays visible without jumping.
+ *
+ * @example
+ * const { activeRowRef, onOpen } = useScrollToActiveRow();
+ * // In handleOpen: onOpen();
+ * // In renderRow: <LeafRow activeRowRef={isActive ? activeRowRef : undefined} />
+ */
+function useScrollToActiveRow() {
+  const scrollToTopRef = useRef(false);
+
+  const activeRowRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    node.scrollIntoView({ block: scrollToTopRef.current ? "start" : "nearest" });
+    scrollToTopRef.current = false;
+  }, []);
+
+  const onOpen = useCallback(() => {
+    scrollToTopRef.current = true;
+  }, []);
+
+  return { activeRowRef, onOpen };
+}
+
 type GroupRowProps = {
   /** DOM element id for ARIA references. */
   domId: string;
+  /** Display text of the section header. */
   label: string;
+  /** Optional secondary text shown after the label. */
   description?: string;
   /** Nesting depth used to compute left-padding. */
   depth: number;
+  /** Whether this accordion section is currently expanded. */
   expanded: boolean;
   /** When false, the row is a static label with no expand/collapse behavior. */
   isAccordion: boolean;
+  /** Called when the user clicks to expand or collapse. */
   onToggle: () => void;
 };
 
@@ -326,15 +360,21 @@ function GroupRow(props: GroupRowProps) {
 type LeafRowProps = {
   /** DOM element id for ARIA references. */
   domId: string;
+  /** Display text of the option. */
   label: string;
+  /** Optional secondary text shown alongside the label. */
   description?: string;
   /** Nesting depth used to compute left-padding. */
   depth: number;
+  /** When true, the row is visually dimmed and cannot be selected. */
   disabled?: boolean;
+  /** Whether this row is currently keyboard-highlighted. */
   isActive: boolean;
+  /** Whether this row matches the current controlled value. */
   isSelected: boolean;
-  /** Attached only when this row is keyboard-active, enabling the parent's scroll-into-view effect. */
-  activeRowRef?: RefObject<HTMLDivElement | null>;
+  /** Attached only when this row is keyboard-active; fires scrollIntoView the moment the node mounts. */
+  activeRowRef?: RefObject<HTMLDivElement | null> | RefCallback<HTMLDivElement>;
+  /** Called when the user clicks or presses Enter on this row. */
   onSelect: () => void;
 };
 
@@ -402,15 +442,25 @@ function LeafRow(props: LeafRowProps) {
 }
 
 type DropdownContentProps = {
+  /** When false, the search input is hidden and options are never filtered. */
   searchable: boolean;
+  /** Current text in the search input. */
   query: string;
+  /** Called on every input event in the search box. */
   onQueryChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  /** Keyboard handler for Arrow/Enter/Escape navigation. */
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** Whether the dropdown is currently visible; triggers focus on the search input. */
   isOpen: boolean;
+  /** DOM id applied to the tree element for ARIA references. */
   treeId: string;
+  /** DOM id of the currently highlighted row for aria-activedescendant. */
   activeRowDomId: string | undefined;
+  /** When false, renders the empty-state message instead of the tree. */
   hasOptions: boolean;
+  /** Number of selectable options, used in the screen-reader live region. */
   selectableCount: number;
+  /** Rendered rows; this component does not inspect them. */
   children: ReactNode;
 };
 
@@ -578,7 +628,8 @@ function Select<T>(props: SelectProps<T>) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const activeRowRef = useRef<HTMLDivElement>(null);
+
+  const { activeRowRef, onOpen } = useScrollToActiveRow();
 
   const hasCustomTrigger = children != null;
 
@@ -613,8 +664,15 @@ function Select<T>(props: SelectProps<T>) {
   const handleOpen = useCallback(() => {
     if (disabled) return;
     setQuery("");
+    onOpen();
+    // Batched with setIsOpen so the correct row is active on the first render,
+    // producing a single callback-ref fire that scrolls it to the top.
+    const selectedIdx = selectableRows.findIndex(
+      (r) => value !== undefined && r.option.value === value,
+    );
+    setActiveSelectableIdx(selectedIdx >= 0 ? selectedIdx : 0);
     setIsOpen(true);
-  }, [disabled]);
+  }, [disabled, onOpen, selectableRows, value]);
 
   const handleQueryChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -630,24 +688,6 @@ function Select<T>(props: SelectProps<T>) {
     onSelect: handleSelect,
     onClose: handleClose,
   });
-
-  useEffect(() => {
-    if (!isOpen) return;
-    // On open, jump to the currently selected option so the scroll-into-view
-    // effect below brings it into view. Falls back to 0 when nothing is selected
-    // or the selected value is not in the visible row list.
-    const selectedIdx = selectableRows.findIndex(
-      (r) => value !== undefined && r.option.value === value,
-    );
-    setActiveSelectableIdx(selectedIdx >= 0 ? selectedIdx : 0);
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Intentionally omitting `selectableRows` and `value` — we only want to
-  // re-derive the active index when the dropdown opens, not on every render.
-
-  useEffect(() => {
-    if (!isOpen) return;
-    activeRowRef.current?.scrollIntoView({ block: "nearest" });
-  }, [activeSelectableIdx, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
