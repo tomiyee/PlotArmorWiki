@@ -183,9 +183,12 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const isDark = hasMounted && resolvedTheme === "dark";
 
   const editorRef = useRef<MDXEditorMethods>(null);
-  // Snapshot of value on mount - used as the diff baseline so "Diff" mode shows
-  // changes made in this editing session relative to what was loaded from the server.
+  // prepareMarkdownForEditor doubles backslashes for CommonMark safety; that
+  // format must NOT be used as the diff baseline because the editor emits the
+  // un-doubled form on onChange. normalizeMarkdown(value) matches the save-path
+  // format, so the diff shows real content changes instead of escape artifacts.
   const [initialValue] = useState(() => prepareMarkdownForEditor(value));
+  const [diffBaseline] = useState(() => normalizeMarkdown(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
 
@@ -569,11 +572,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       linkDialogPlugin(),
       tablePlugin(),
       codeBlockPlugin(),
-      diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: initialValue }),
+      diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: diffBaseline }),
     ];
     // InsertWikiLinkButton is self-contained and reads all mutable data from
-    // WikiLinkContext, so only initialValue (the diff baseline) is a real dep.
-  }, [initialValue]);
+    // WikiLinkContext, so only diffBaseline (the diff baseline) is a real dep.
+  }, [diffBaseline]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
 
