@@ -94,6 +94,10 @@ interface Props {
    * and routing in the editor preview.
    */
   chapterType?: string;
+  /** Slug of this page, forwarded to MarkdownRenderer for `?trail=` link building. */
+  currentPageSlug?: string;
+  /** Existing comma-delimited trail from the page URL, forwarded to MarkdownRenderer. */
+  trailParam?: string;
   /**
    * The DB id of the chapter this page was introduced in. Passed alongside
    * `introChapterIdx` so the admin intro-chapter selector can write back to
@@ -242,6 +246,8 @@ export function PageEditor(props: Props) {
     pageTitles,
     wikiChapters,
     chapterType,
+    currentPageSlug,
+    trailParam,
     introChapterId,
     introChapterIdx,
     childPages,
@@ -569,6 +575,8 @@ export function PageEditor(props: Props) {
           pageTitles={pageTitles}
           wikiChapters={wikiChaptersByName}
           chapterType={chapterType}
+          currentPageSlug={currentPageSlug}
+          trailParam={trailParam}
           suggestionContext={
             isAuthenticated
               ? {
