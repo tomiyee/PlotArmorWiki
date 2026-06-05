@@ -1,6 +1,7 @@
 import ReactMarkdown, { Components } from "react-markdown";
 import type { PluggableList } from "unified";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/Text";
 import { remarkWikiLinks } from "@/lib/remark-wiki-links";
@@ -302,7 +303,11 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
 
   return (
     <div className={cn("max-w-none", className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={[rehypeRaw]}
+        components={components}
+      >
         {children}
       </ReactMarkdown>
     </div>
