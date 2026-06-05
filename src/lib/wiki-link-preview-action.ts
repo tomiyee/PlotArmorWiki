@@ -333,6 +333,31 @@ export async function getChapterLinkPreview(
 }
 
 /**
+ * Returns the display label for a chapter identified by serial slug + chapter idx,
+ * e.g. "Chapter 5". Used by BackBreadcrumb for `/{serial}/chapter/{idx}` referrers.
+ *
+ * @example
+ * const label = await getChapterLabelByIdx("one-piece", 5); // "Episode 5"
+ */
+export async function getChapterLabelByIdx(
+  serialSlug: string,
+  chapterIdx: number,
+): Promise<string | null> {
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) return null;
+
+  const [chapter] = await db
+    .select({ displayName: chapters.displayName })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .where(and(eq(volumes.serialId, serial.id), eq(chapters.idx, chapterIdx)))
+    .limit(1);
+
+  if (!chapter) return null;
+  return `${serial.chapterType} ${chapter.displayName}`;
+}
+
+/**
  * Returns the `pages.name` for a page identified by serial + page slug.
  * Used by BackBreadcrumb to resolve the "← Back to …" title from document.referrer
  * without requiring the full wiki-link preview query.
