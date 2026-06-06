@@ -48,7 +48,7 @@ interface Template {
   infoboxSections: TemplateInfoboxSection[];
 }
 
-interface Props {
+interface NewPageFormProps {
   serialSlug: string;
   chapterType: string;
   volumeList: Volume[];
@@ -77,7 +77,7 @@ export function NewPageForm({
   existingPages,
   defaultParentPageId,
   templates,
-}: Props) {
+}: NewPageFormProps) {
   const chapterTypeLabel = chapterType.toLowerCase();
 
   // Build chapter id → idx lookup for filtering.

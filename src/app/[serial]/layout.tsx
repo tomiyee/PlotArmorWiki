@@ -17,7 +17,7 @@ import { SerialTOCDrawer } from "@/components/SerialTOCDrawer";
 import { ChapterData, NavbarSerialData } from "@/types";
 import { auth } from "@/auth";
 
-interface Props {
+interface SerialLayoutProps {
   children: React.ReactNode;
   params: Promise<{ serial: string }>;
 }
@@ -29,7 +29,7 @@ interface Props {
  * @example
  * // Automatically applied to /[serial], /[serial]/[schema], /[serial]/[schema]/[page], etc.
  */
-export default async function SerialLayout({ children, params }: Props) {
+export default async function SerialLayout({ children, params }: SerialLayoutProps) {
   const { serial: serialSlug } = await params;
 
   const [serial] = await db

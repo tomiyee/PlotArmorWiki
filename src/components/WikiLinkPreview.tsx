@@ -11,7 +11,7 @@ import {
   WIKI_LINK_CHIP_LINK,
 } from "@/components/MDEditor/wikiLinkChipClasses";
 
-interface Props {
+interface WikiLinkPreviewProps {
   /** The URL the link points to. */
   href: string;
   /** Link label text. */
@@ -48,7 +48,7 @@ export function WikiLinkPreview({
   children,
   serialSlug,
   pageName,
-}: Props) {
+}: WikiLinkPreviewProps) {
   const [preview, setPreview] = useState<
     WikiLinkPreviewData | "loading" | "missing"
   >("loading");

@@ -41,7 +41,7 @@ import type {
   ChapterGroupOption,
 } from "./types";
 
-interface Props {
+interface PageEditorProps {
   serialSlug: string;
   pageSlug: string;
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
@@ -224,7 +224,7 @@ interface Props {
  *   allSerialPages={[]}
  * />
  */
-export function PageEditor(props: Props) {
+export function PageEditor(props: PageEditorProps) {
   const {
     serialSlug,
     pageSlug,

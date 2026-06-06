@@ -38,7 +38,7 @@ import {
   getMyPageSuggestions,
 } from "./suggestionActions";
 
-interface Props {
+interface PageViewProps {
   params: Promise<{ serial: string; page: string }>;
 }
 
@@ -70,7 +70,7 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function PageView({ params }: Props) {
+export default async function PageView({ params }: PageViewProps) {
   const { serial: serialSlug, page: pageParam } = await params;
 
   const decodedPageSlug = decodeURIComponent(pageParam);

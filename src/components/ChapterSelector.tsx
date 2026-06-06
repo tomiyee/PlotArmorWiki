@@ -14,7 +14,7 @@ import { ChapterData, Volume } from "@/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { syncUserProgress } from "@/app/[serial]/actions";
 
-interface Props {
+interface ChapterSelectorProps {
   serialId: number;
   serialSlug: string;
   chapterType: string;
@@ -63,7 +63,7 @@ const GLOBAL_POPOVER_DISMISSED_KEY = "plotarmor:spoiler_popover_dismissed";
  *   chaptersByVolume={chaptersByVolume}
  * />
  */
-export function ChapterSelector(props: Props) {
+export function ChapterSelector(props: ChapterSelectorProps) {
   const {
     serialId,
     chapterType,

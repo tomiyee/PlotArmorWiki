@@ -38,11 +38,11 @@ import {
   bulkApplyToc,
 } from "../../actions";
 
-interface Props {
+interface ChapterPageProps {
   params: Promise<{ serial: string; chapterIdx: string }>;
 }
 
-export default async function ChapterPage({ params }: Props) {
+export default async function ChapterPage({ params }: ChapterPageProps) {
   const { serial: serialSlug, chapterIdx: chapterIdxRaw } = await params;
 
   const chapterIdx = parseInt(chapterIdxRaw, 10);

@@ -9,7 +9,7 @@ import { Menu } from "@/components/ui/Menu";
 import { Text } from "@/components/ui/Text";
 import { CategoryNavData } from "@/types";
 
-interface Props {
+interface PagesDropdownProps {
   serialSlug: string;
   categories: CategoryNavData[];
 }
@@ -21,7 +21,7 @@ interface Props {
  * @example
  * <PagesDropdown serialSlug="my-serial" categories={[{ id: 1, name: "Characters" }]} />
  */
-export function PagesDropdown({ serialSlug, categories }: Props) {
+export function PagesDropdown({ serialSlug, categories }: PagesDropdownProps) {
   const [open, setOpen] = useState(false);
 
   return (

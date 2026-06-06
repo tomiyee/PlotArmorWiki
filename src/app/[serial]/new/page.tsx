@@ -17,12 +17,12 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { NewPageForm } from "./NewPageForm";
 
-interface Props {
+interface NewPagePageProps {
   params: Promise<{ serial: string }>;
   searchParams: Promise<{ parentPageId?: string }>;
 }
 
-export default async function NewPagePage({ params, searchParams }: Props) {
+export default async function NewPagePage({ params, searchParams }: NewPagePageProps) {
   const { serial: serialSlug } = await params;
   const { parentPageId: parentPageIdParam } = await searchParams;
   const defaultParentPageId = parentPageIdParam

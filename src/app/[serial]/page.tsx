@@ -72,7 +72,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/Accordion";
 
-interface Props {
+interface SerialPageProps {
   params: Promise<{ serial: string }>;
 }
 
@@ -92,7 +92,7 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function SerialPage({ params }: Props) {
+export default async function SerialPage({ params }: SerialPageProps) {
   const { serial: serialSlug } = await params;
 
   const [serial] = await db

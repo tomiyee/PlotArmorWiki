@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 
-interface Props {
+interface SerialTOCDrawerProps {
   /** Pre-rendered <SerialTOC> to display inside the drawer. */
   tocContent: ReactNode;
 }
@@ -24,7 +24,7 @@ interface Props {
  * @example
  * <SerialTOCDrawer tocContent={<SerialTOC ... />} />
  */
-export function SerialTOCDrawer({ tocContent }: Props) {
+export function SerialTOCDrawer({ tocContent }: SerialTOCDrawerProps) {
   const [open, setOpen] = useState(false);
 
   return (

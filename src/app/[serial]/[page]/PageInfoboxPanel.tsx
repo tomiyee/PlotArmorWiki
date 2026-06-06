@@ -14,7 +14,7 @@ import { addInfoboxSection } from "./actions";
 import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
 import type { FloaterRowData } from "./types";
 
-interface Props {
+interface PageInfoboxPanelProps {
   pageId: number;
   infoboxSectionStructure: InfoboxSection[];
   floaterRows: FloaterRowData[];
@@ -53,7 +53,7 @@ interface Props {
  *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  * />
  */
-export function PageInfoboxPanel(props: Props) {
+export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
   const {
     pageId,
     infoboxSectionStructure,
