@@ -73,23 +73,13 @@ export function SuggestionCard(props: SuggestionCardProps) {
     day: "numeric",
   });
 
-  function handleApprove() {
+  function handleAction(
+    action: (note?: string) => Promise<{ error?: string }>,
+    note?: string,
+  ) {
     setActionError(null);
     startTransition(async () => {
-      const result = await onApprove(reviewNote || undefined);
-      if (result.error) {
-        setActionError(result.error);
-      } else {
-        setResolved(true);
-        router.refresh();
-      }
-    });
-  }
-
-  function handleReject() {
-    setActionError(null);
-    startTransition(async () => {
-      const result = await onReject(reviewNote || undefined);
+      const result = await action(note);
       if (result.error) {
         setActionError(result.error);
       } else {
@@ -148,7 +138,7 @@ export function SuggestionCard(props: SuggestionCardProps) {
             >
               Reject
             </Button>
-            <Button onClick={handleApprove} disabled={isPending}>
+            <Button onClick={() => handleAction(onApprove)} disabled={isPending}>
               Approve
             </Button>
           </>
@@ -166,7 +156,7 @@ export function SuggestionCard(props: SuggestionCardProps) {
             </Button>
             <Button
               variant="destructive"
-              onClick={handleReject}
+              onClick={() => handleAction(onReject, reviewNote || undefined)}
               disabled={isPending}
             >
               {isPending ? "Rejecting…" : "Confirm rejection"}

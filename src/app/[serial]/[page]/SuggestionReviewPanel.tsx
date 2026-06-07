@@ -6,6 +6,63 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { SuggestionCard } from "@/components/SuggestionCard";
 import { approveSuggestion, rejectSuggestion } from "./suggestionActions";
 
+type DiffRowProps = {
+  /** Heading shown above the two-column diff (section name or infobox label). */
+  label: string;
+  /** Current stored markdown at the target chapter. */
+  currentContent: string;
+  /** Proposed replacement markdown. */
+  proposedContent: string;
+  /** Tailwind min-height class for the content boxes. */
+  minH: string;
+  /** Serial slug forwarded to MarkdownRenderer for wiki-link resolution. */
+  serialSlug: string;
+};
+
+function DiffRow(props: DiffRowProps) {
+  const { label, currentContent, proposedContent, minH, serialSlug } = props;
+  return (
+    <Box col className="gap-2">
+      <Text variant="h4">{label}</Text>
+      <Box className="gap-3 items-stretch flex-col sm:flex-row">
+        <Box col className="flex-1 gap-1 min-w-0">
+          <Text muted className="text-xs font-medium uppercase tracking-wide">
+            Current
+          </Text>
+          <Box
+            className={`flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm ${minH} overflow-auto`}
+          >
+            {currentContent ? (
+              <MarkdownRenderer serialSlug={serialSlug} sm>
+                {currentContent}
+              </MarkdownRenderer>
+            ) : (
+              <Text muted className="text-sm">
+                (empty)
+              </Text>
+            )}
+          </Box>
+        </Box>
+        <Box col className="flex-1 gap-1 min-w-0">
+          <Text
+            className="text-xs font-medium uppercase tracking-wide"
+            style={{ color: "var(--color-primary)" }}
+          >
+            Proposed
+          </Text>
+          <Box
+            className={`flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm ${minH} overflow-auto`}
+          >
+            <MarkdownRenderer serialSlug={serialSlug} sm>
+              {proposedContent}
+            </MarkdownRenderer>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 /** A proposed change to a single body section of the wiki page. */
 type SectionChange = {
   /** Database ID of the `page_sections` row being changed. */
@@ -107,86 +164,26 @@ export function SuggestionReviewPanel(props: SuggestionReviewPanelProps) {
 
           {/* Section diffs */}
           {suggestion.sectionChanges.map((change) => (
-            <Box col key={change.sectionId} className="gap-2">
-              <Text variant="h4">{change.sectionName}</Text>
-              <Box className="gap-3 items-stretch flex-col sm:flex-row">
-                {/* Current */}
-                <Box col className="flex-1 gap-1 min-w-0">
-                  <Text
-                    muted
-                    className="text-xs font-medium uppercase tracking-wide"
-                  >
-                    Current
-                  </Text>
-                  <Box className="flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm min-h-60px overflow-auto">
-                    {change.currentContent ? (
-                      <MarkdownRenderer serialSlug={serialSlug} sm>
-                        {change.currentContent}
-                      </MarkdownRenderer>
-                    ) : (
-                      <Text muted className="text-sm">
-                        (empty)
-                      </Text>
-                    )}
-                  </Box>
-                </Box>
-                {/* Proposed */}
-                <Box col className="flex-1 gap-1 min-w-0">
-                  <Text
-                    className="text-xs font-medium uppercase tracking-wide"
-                    style={{ color: "var(--color-primary)" }}
-                  >
-                    Proposed
-                  </Text>
-                  <Box className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-60px overflow-auto">
-                    <MarkdownRenderer serialSlug={serialSlug} sm>
-                      {change.proposedContent}
-                    </MarkdownRenderer>
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
+            <DiffRow
+              key={change.sectionId}
+              label={change.sectionName}
+              currentContent={change.currentContent}
+              proposedContent={change.proposedContent}
+              minH="min-h-60px"
+              serialSlug={serialSlug}
+            />
           ))}
 
           {/* Infobox diffs */}
           {suggestion.infoboxChanges.map((change) => (
-            <Box col key={change.infoboxSectionId} className="gap-2">
-              <Text variant="h4">Infobox: {change.infoboxSectionLabel}</Text>
-              <Box className="gap-3 items-stretch flex-col sm:flex-row">
-                <Box col className="flex-1 gap-1 min-w-0">
-                  <Text
-                    muted
-                    className="text-xs font-medium uppercase tracking-wide"
-                  >
-                    Current
-                  </Text>
-                  <Box className="flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px overflow-auto">
-                    {change.currentContent ? (
-                      <MarkdownRenderer serialSlug={serialSlug} sm>
-                        {change.currentContent}
-                      </MarkdownRenderer>
-                    ) : (
-                      <Text muted className="text-sm">
-                        (empty)
-                      </Text>
-                    )}
-                  </Box>
-                </Box>
-                <Box col className="flex-1 gap-1 min-w-0">
-                  <Text
-                    className="text-xs font-medium uppercase tracking-wide"
-                    style={{ color: "var(--color-primary)" }}
-                  >
-                    Proposed
-                  </Text>
-                  <Box className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px overflow-auto">
-                    <MarkdownRenderer serialSlug={serialSlug} sm>
-                      {change.proposedContent}
-                    </MarkdownRenderer>
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
+            <DiffRow
+              key={change.infoboxSectionId}
+              label={`Infobox: ${change.infoboxSectionLabel}`}
+              currentContent={change.currentContent}
+              proposedContent={change.proposedContent}
+              minH="min-h-40px"
+              serialSlug={serialSlug}
+            />
           ))}
         </SuggestionCard>
       ))}
