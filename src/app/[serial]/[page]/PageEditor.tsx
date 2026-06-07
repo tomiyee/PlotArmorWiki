@@ -22,7 +22,7 @@ import { Select } from "@/components/ui/Select";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Banner } from "@/components/ui/Banner";
 import { WritingAsOfBanner } from "./WritingAsOfBanner";
-import { PageSectionManager, type PageSection } from "./PageSectionManager";
+import { PageSectionManager, type PageSection, type SerialTemplate } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
 import { PageReadView } from "./PageReadView";
 import { PageTitlesPanel } from "./PageTitlesPanel";
@@ -125,13 +125,7 @@ interface Props {
    * the "Apply template" feature. Empty when the serial has no templates or the
    * current user is not an admin.
    */
-  serialTemplates?: {
-    id: number;
-    name: string;
-    hasInfobox: boolean;
-    sections: { id: number; name: string; displayOrder: number }[];
-    infoboxSections: { id: number; label: string; displayOrder: number }[];
-  }[];
+  serialTemplates?: SerialTemplate[];
   /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no

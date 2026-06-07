@@ -531,20 +531,12 @@ export async function applyTemplateSections(
 }> {
   await requireSerialAdminByPageId(pageId);
 
-  // Verify the template belongs to the same serial as the page.
-  const [pageRow] = await db
-    .select({ serialId: pages.serialId })
-    .from(pages)
-    .where(eq(pages.id, pageId))
-    .limit(1);
-  if (!pageRow) throw new Error("Page not found");
-
+  // Verify the template exists and belongs to the same serial as the page.
   const [tmpl] = await db
     .select({ id: templates.id, hasInfobox: templates.hasInfobox })
     .from(templates)
-    .where(
-      and(eq(templates.id, templateId), eq(templates.serialId, pageRow.serialId)),
-    )
+    .innerJoin(pages, and(eq(pages.serialId, templates.serialId), eq(pages.id, pageId)))
+    .where(eq(templates.id, templateId))
     .limit(1);
   if (!tmpl) throw new Error("Template not found");
 
@@ -575,16 +567,18 @@ export async function applyTemplateSections(
 
     const liveSectionNames = new Set(liveSections.map((s) => s.name.toLowerCase()));
 
-    // Fetch live infobox rows for this page.
-    const liveInfoboxRows = await tx
-      .select({ label: pageInfoboxSections.label })
-      .from(pageInfoboxSections)
-      .where(
-        and(
-          eq(pageInfoboxSections.pageId, pageId),
-          isNull(pageInfoboxSections.deletedAt),
-        ),
-      );
+    // Fetch live infobox rows for this page (skip when template has no infobox).
+    const liveInfoboxRows = tmpl.hasInfobox
+      ? await tx
+          .select({ label: pageInfoboxSections.label })
+          .from(pageInfoboxSections)
+          .where(
+            and(
+              eq(pageInfoboxSections.pageId, pageId),
+              isNull(pageInfoboxSections.deletedAt),
+            ),
+          )
+      : [];
 
     const liveInfoboxLabels = new Set(
       liveInfoboxRows.map((r) => r.label.toLowerCase()),
@@ -598,12 +592,7 @@ export async function applyTemplateSections(
 
     // Insert new sections with displayOrder continuing from the current max.
     if (sectionsToAdd.length > 0) {
-      const [{ cnt }] = await tx
-        .select({ cnt: count() })
-        .from(pageSections)
-        .where(
-          and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
-        );
+      const cnt = liveSections.length;
 
       await tx.insert(pageSections).values(
         sectionsToAdd.map((s, i) => ({
@@ -621,15 +610,7 @@ export async function applyTemplateSections(
     const skippedInfoboxRows = tmplInfoboxSections.length - infoboxRowsToAdd.length;
 
     if (infoboxRowsToAdd.length > 0) {
-      const [{ cnt }] = await tx
-        .select({ cnt: count() })
-        .from(pageInfoboxSections)
-        .where(
-          and(
-            eq(pageInfoboxSections.pageId, pageId),
-            isNull(pageInfoboxSections.deletedAt),
-          ),
-        );
+      const cnt = liveInfoboxRows.length;
 
       await tx.insert(pageInfoboxSections).values(
         infoboxRowsToAdd.map((s, i) => ({
