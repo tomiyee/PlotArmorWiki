@@ -14,6 +14,9 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
   pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
 } from "@/db/schema";
 import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
 import {
@@ -452,6 +455,74 @@ export default async function PageView({ params }: Props) {
         : Promise.resolve([]),
     ]);
 
+  // ── Template data (for "Apply template" feature in PageSectionManager) ────
+  // Only fetched when the user is an admin; non-admins never see the edit panel.
+  const serialTemplates = isAdmin
+    ? await (async () => {
+        const tmplRows = await db
+          .select({
+            id: templates.id,
+            name: templates.name,
+            hasInfobox: templates.hasInfobox,
+          })
+          .from(templates)
+          .where(eq(templates.serialId, serial.id))
+          .orderBy(asc(templates.name));
+
+        if (tmplRows.length === 0) return [];
+
+        // Fetch all section/infobox rows for every template in this serial in two
+        // queries, then group in JS. Templates per serial are a small set so this
+        // is always fast.
+        const [allTmplSections, allTmplInfoboxSections] = await Promise.all([
+          db
+            .select({
+              templateId: templateSections.templateId,
+              id: templateSections.id,
+              name: templateSections.name,
+              displayOrder: templateSections.displayOrder,
+            })
+            .from(templateSections)
+            .innerJoin(templates, eq(templateSections.templateId, templates.id))
+            .where(eq(templates.serialId, serial.id))
+            .orderBy(asc(templateSections.displayOrder)),
+          db
+            .select({
+              templateId: templateInfoboxSections.templateId,
+              id: templateInfoboxSections.id,
+              label: templateInfoboxSections.label,
+              displayOrder: templateInfoboxSections.displayOrder,
+            })
+            .from(templateInfoboxSections)
+            .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
+            .where(eq(templates.serialId, serial.id))
+            .orderBy(asc(templateInfoboxSections.displayOrder)),
+        ]);
+
+        const sectionsByTemplate = new Map<number, typeof allTmplSections>();
+        for (const s of allTmplSections) {
+          const arr = sectionsByTemplate.get(s.templateId) ?? [];
+          arr.push(s);
+          sectionsByTemplate.set(s.templateId, arr);
+        }
+
+        const infoboxByTemplate = new Map<number, typeof allTmplInfoboxSections>();
+        for (const s of allTmplInfoboxSections) {
+          const arr = infoboxByTemplate.get(s.templateId) ?? [];
+          arr.push(s);
+          infoboxByTemplate.set(s.templateId, arr);
+        }
+
+        return tmplRows.map((t) => ({
+          id: t.id,
+          name: t.name,
+          hasInfobox: t.hasInfobox,
+          sections: sectionsByTemplate.get(t.id) ?? [],
+          infoboxSections: infoboxByTemplate.get(t.id) ?? [],
+        }));
+      })()
+    : [];
+
   return (
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
@@ -513,6 +584,7 @@ export default async function PageView({ params }: Props) {
               childPages={childPages}
               parentPages={parentPages}
               allSerialPages={allSerialPages}
+              serialTemplates={serialTemplates}
               isAdmin={isAdmin}
               isAuthenticated={isUserAuthenticated}
               pendingSuggestionCount={pendingSuggestionCount}
