@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import type { TemplateSection } from "./types";
 import { SortableRow } from "./SortableRow";
-import { useSortableSensors, makeDragEndHandler } from "./dndUtils";
+import { useSortableSensors, makeDragEndHandler } from "@/lib/dndUtils";
 
 interface TemplateSectionListProps {
   /** The list of sections to display. */

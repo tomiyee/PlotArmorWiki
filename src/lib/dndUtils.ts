@@ -10,7 +10,7 @@ import {
 import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
 
 /**
- * Standard PointerSensor + KeyboardSensor setup for template sortable lists.
+ * Standard PointerSensor + KeyboardSensor setup for sortable lists.
  *
  * @example
  * const sensors = useSortableSensors();
