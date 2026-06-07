@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db/index";
+import { BackBreadcrumb } from "@/components/BackBreadcrumb";
 import {
   serials,
   pages,
@@ -40,6 +41,7 @@ import {
 
 interface Props {
   params: Promise<{ serial: string; page: string }>;
+  searchParams: Promise<{ trail?: string }>;
 }
 
 /**
@@ -70,8 +72,9 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function PageView({ params }: Props) {
-  const { serial: serialSlug, page: pageParam } = await params;
+export default async function PageView({ params, searchParams }: Props) {
+  const [{ serial: serialSlug, page: pageParam }, { trail: trailRaw }] =
+    await Promise.all([params, searchParams]);
 
   const decodedPageSlug = decodeURIComponent(pageParam);
 
@@ -149,6 +152,18 @@ export default async function PageView({ params }: Props) {
     name: wikiTitleByPageId.get(p.id) ?? p.name,
     slug: p.slug,
   }));
+
+  // Parse the trail: comma-delimited list of slugs the reader navigated through to arrive here.
+  const trailSlugs = trailRaw ? trailRaw.split(",").filter(Boolean) : [];
+  const backSlug = trailSlugs.at(-1);
+  const remainingTrail = trailSlugs.slice(0, -1);
+  const backTitle = backSlug ? (wikiPageTitles[backSlug] ?? backSlug) : null;
+  const backHref = backSlug
+    ? remainingTrail.length > 0
+      ? `/${serialSlug}/${backSlug}?trail=${remainingTrail.join(",")}`
+      : `/${serialSlug}/${backSlug}`
+    : null;
+  const trailParam = trailRaw ?? undefined;
 
   const [page] = await db
     .select()
@@ -457,6 +472,9 @@ export default async function PageView({ params }: Props) {
       <EditModeAdminSetter isAdmin={isAdmin} />
       <PageContainer>
           <Box col className="gap-6">
+            {backHref && backTitle && (
+              <BackBreadcrumb backHref={backHref} backTitle={backTitle} />
+            )}
             <Text muted className="text-sm flex items-center gap-1 flex-wrap">
               <Link href={`/${serialSlug}`} className="hover:underline">
                 {serial.title}
@@ -503,6 +521,8 @@ export default async function PageView({ params }: Props) {
               readingChapterId={readingChapterId}
               wikiPages={wikiPages}
               pageTitles={wikiPageTitles}
+              currentPageSlug={decodedPageSlug}
+              trailParam={trailParam}
               wikiChapters={allChapters.map((c) => ({
                 name: c.displayName,
                 idx: c.idx,

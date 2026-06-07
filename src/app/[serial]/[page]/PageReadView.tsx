@@ -62,6 +62,10 @@ type PageReadViewProps = {
   wikiChapters?: Record<string, number>;
   /** The serial's chapter type (e.g. `"Chapter"`, `"Episode"`). */
   chapterType?: string;
+  /** Slug of the current page, forwarded to MarkdownRenderer to build outgoing `?trail=` hrefs. */
+  currentPageSlug?: string;
+  /** Existing trail from the current page's URL, forwarded to MarkdownRenderer. */
+  trailParam?: string;
   /**
    * When provided, the authenticated non-admin suggestion flow is enabled -
    * shows "Suggest an edit" icon buttons on section headers, status banner, and inline form.
@@ -155,6 +159,8 @@ export function PageReadView(props: PageReadViewProps) {
     pageTitles,
     wikiChapters,
     chapterType,
+    currentPageSlug,
+    trailParam,
     suggestionContext,
   } = props;
 
@@ -356,6 +362,8 @@ export function PageReadView(props: PageReadViewProps) {
                         pageTitles={pageTitles}
                         chapterType={chapterType}
                         wikiChapters={wikiChapters}
+                        currentPageSlug={currentPageSlug}
+                        trailParam={trailParam}
                       >
                         {row.content}
                       </MarkdownRenderer>
@@ -399,6 +407,8 @@ export function PageReadView(props: PageReadViewProps) {
               pageTitles={pageTitles}
               chapterType={chapterType}
               wikiChapters={wikiChapters}
+              currentPageSlug={currentPageSlug}
+              trailParam={trailParam}
             >
               {section.content}
             </MarkdownRenderer>
