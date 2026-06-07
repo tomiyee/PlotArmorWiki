@@ -73,6 +73,7 @@ import {
 } from "@/components/ui/Accordion";
 
 interface SerialPageProps {
+  /** Next.js dynamic route params containing the `serial` slug. */
   params: Promise<{ serial: string }>;
 }
 
@@ -92,7 +93,14 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function SerialPage({ params }: SerialPageProps) {
+/**
+ * Serial home page: metadata editor, home wiki page content, template manager, and admin controls.
+ *
+ * @example
+ * // Rendered automatically by Next.js for /{serial} routes.
+ */
+export default async function SerialPage(props: SerialPageProps) {
+  const { params } = props;
   const { serial: serialSlug } = await params;
 
   const [serial] = await db

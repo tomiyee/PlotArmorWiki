@@ -24,7 +24,8 @@ interface SerialTOCDrawerProps {
  * @example
  * <SerialTOCDrawer tocContent={<SerialTOC ... />} />
  */
-export function SerialTOCDrawer({ tocContent }: SerialTOCDrawerProps) {
+export function SerialTOCDrawer(props: SerialTOCDrawerProps) {
+  const { tocContent } = props;
   const [open, setOpen] = useState(false);
 
   return (

@@ -15,10 +15,15 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { syncUserProgress } from "@/app/[serial]/actions";
 
 interface ChapterSelectorProps {
+  /** DB id of the serial; used to scope the localStorage key, cookie name, and progress sync. */
   serialId: number;
+  /** URL slug of the serial. */
   serialSlug: string;
+  /** Label for the chapter unit (e.g. `"Chapter"`, `"Episode"`). */
   chapterType: string;
+  /** All volumes for this serial, used to build grouped chapter options. */
   volumes: Volume[];
+  /** Chapters keyed by volume id, used alongside `volumes` to populate the dropdown. */
   chaptersByVolume: Partial<Record<number, ChapterData[]>>;
   /**
    * Chapter ID sourced from the `user_progress` database row (for authenticated

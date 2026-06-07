@@ -18,11 +18,20 @@ import { isSerialAdmin } from "@/lib/auth-guard";
 import { NewPageForm } from "./NewPageForm";
 
 interface NewPagePageProps {
+  /** Next.js dynamic route params containing the `serial` slug. */
   params: Promise<{ serial: string }>;
+  /** Query params; `parentPageId` pre-selects the parent in the new-page form. */
   searchParams: Promise<{ parentPageId?: string }>;
 }
 
-export default async function NewPagePage({ params, searchParams }: NewPagePageProps) {
+/**
+ * Server Component for the new-page creation form.
+ *
+ * @example
+ * // Rendered automatically by Next.js for /{serial}/new routes.
+ */
+export default async function NewPagePage(props: NewPagePageProps) {
+  const { params, searchParams } = props;
   const { serial: serialSlug } = await params;
   const { parentPageId: parentPageIdParam } = await searchParams;
   const defaultParentPageId = parentPageIdParam

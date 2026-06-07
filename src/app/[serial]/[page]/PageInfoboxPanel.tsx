@@ -15,12 +15,19 @@ import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
 import type { FloaterRowData } from "./types";
 
 interface PageInfoboxPanelProps {
+  /** DB id of the page this infobox belongs to. */
   pageId: number;
+  /** Wall-clock-versioned infobox row structure for the management panel. */
   infoboxSectionStructure: InfoboxSection[];
+  /** Infobox rows at the reader's current chapter cutoff, used to seed draft state. */
   floaterRows: FloaterRowData[];
+  /** Controlled draft value for the floater image URL, owned by `PageEditor`. */
   draftFloaterImageUrl: string;
+  /** Setter for `draftFloaterImageUrl`, owned by `PageEditor`. */
   setDraftFloaterImageUrl: Dispatch<SetStateAction<string>>;
+  /** Controlled draft content keyed by infobox section id, owned by `PageEditor`. */
   draftFloaterRowContent: Record<number, string>;
+  /** Setter for `draftFloaterRowContent`, owned by `PageEditor`. */
   setDraftFloaterRowContent: Dispatch<SetStateAction<Record<number, string>>>;
   /** Whether the parent editor is pending a transition (disables inputs). */
   isPending: boolean;

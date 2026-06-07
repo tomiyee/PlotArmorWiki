@@ -39,10 +39,18 @@ import {
 } from "../../actions";
 
 interface ChapterPageProps {
+  /** Next.js dynamic route params: `serial` slug and `chapterIdx` string. */
   params: Promise<{ serial: string; chapterIdx: string }>;
 }
 
-export default async function ChapterPage({ params }: ChapterPageProps) {
+/**
+ * Server Component for the chapter detail page: synopsis, introduced pages, and suggestion workflow.
+ *
+ * @example
+ * // Rendered automatically by Next.js for /{serial}/chapter/{chapterIdx} routes.
+ */
+export default async function ChapterPage(props: ChapterPageProps) {
+  const { params } = props;
   const { serial: serialSlug, chapterIdx: chapterIdxRaw } = await params;
 
   const chapterIdx = parseInt(chapterIdxRaw, 10);

@@ -43,12 +43,8 @@ const PREVIEW_CHARS = 200;
  *   Luffy
  * </WikiLinkPreview>
  */
-export function WikiLinkPreview({
-  href,
-  children,
-  serialSlug,
-  pageName,
-}: WikiLinkPreviewProps) {
+export function WikiLinkPreview(props: WikiLinkPreviewProps) {
+  const { href, children, serialSlug, pageName } = props;
   const [preview, setPreview] = useState<
     WikiLinkPreviewData | "loading" | "missing"
   >("loading");
@@ -82,16 +78,16 @@ export function WikiLinkPreview({
 }
 
 interface PreviewContentProps {
+  /** Fetched preview data, or `"loading"` / `"missing"` sentinel values. */
   preview: WikiLinkPreviewData | "loading" | "missing";
+  /** Display name of the linked page, shown while loading or when missing. */
   pageName: string;
+  /** Serial slug forwarded to `MarkdownRenderer` for nested wiki link resolution. */
   serialSlug: string;
 }
 
-function PreviewContent({
-  preview,
-  pageName,
-  serialSlug,
-}: PreviewContentProps) {
+function PreviewContent(props: PreviewContentProps) {
+  const { preview, pageName, serialSlug } = props;
   if (preview === "loading") {
     return (
       <Text muted className="text-sm">

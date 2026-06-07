@@ -42,7 +42,9 @@ import type {
 } from "./types";
 
 interface PageEditorProps {
+  /** Slug of the serial this page belongs to. */
   serialSlug: string;
+  /** URL slug of this wiki page. */
   pageSlug: string;
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
   pageId: number;
@@ -57,6 +59,7 @@ interface PageEditorProps {
    * carries chapter-versioned content).
    */
   pageSectionStructure: PageSection[];
+  /** Chapter-versioned section content at the reader's current cutoff. */
   sections: SectionData[];
   /**
    * Wall-clock-versioned infobox row structure for this page, used to power
