@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Trash2Icon,
   PencilIcon,
@@ -15,30 +16,48 @@ import { Label } from "@/components/ui/Label";
 import { useServerAction } from "@/hooks/useServerAction";
 import { TemplateSectionList } from "./TemplateSectionList";
 import { TemplateInfoboxSectionList } from "./TemplateInfoboxSectionList";
-import type { Template, ServerAction } from "./types";
+import type { Template, ServerAction, ReorderAction } from "./types";
 
 interface TemplateItemProps {
+  /** The template to display and edit. */
   template: Template;
+  /** Server action to delete this template. */
   deleteTemplateAction: ServerAction;
+  /** Server action to rename this template. */
   renameTemplateAction: ServerAction;
+  /** Server action to toggle the infobox flag on this template. */
   toggleTemplateInfoboxAction: ServerAction;
+  /** Server action to append a section to this template. */
   addTemplateSectionAction: ServerAction;
+  /** Server action to delete a section from this template. */
   deleteTemplateSectionAction: ServerAction;
+  /** Server action to persist the new section order after drag-and-drop. */
+  reorderTemplateSectionAction: ReorderAction;
+  /** Server action to append an infobox row to this template. */
   addTemplateInfoboxSectionAction: ServerAction;
+  /** Server action to delete an infobox row from this template. */
   deleteTemplateInfoboxSectionAction: ServerAction;
+  /** Server action to persist the new infobox row order after drag-and-drop. */
+  reorderTemplateInfoboxSectionAction: ReorderAction;
 }
 
-export function TemplateItem({
-  template,
-  deleteTemplateAction,
-  renameTemplateAction,
-  toggleTemplateInfoboxAction,
-  addTemplateSectionAction,
-  deleteTemplateSectionAction,
-  addTemplateInfoboxSectionAction,
-  deleteTemplateInfoboxSectionAction,
-}: TemplateItemProps) {
+export function TemplateItem(props: TemplateItemProps) {
+  const {
+    template,
+    deleteTemplateAction,
+    renameTemplateAction,
+    toggleTemplateInfoboxAction,
+    addTemplateSectionAction,
+    deleteTemplateSectionAction,
+    reorderTemplateSectionAction,
+    addTemplateInfoboxSectionAction,
+    deleteTemplateInfoboxSectionAction,
+    reorderTemplateInfoboxSectionAction,
+  } = props;
+
+  const router = useRouter();
   const { run, isPending } = useServerAction();
+  const [reorderPending, startReorderTransition] = useTransition();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState(template.name);
@@ -121,6 +140,22 @@ export function TemplateItem({
     run(deleteTemplateInfoboxSectionAction, fd);
   }
 
+  function handleReorderSections(orderedIds: number[]) {
+    startReorderTransition(async () => {
+      await reorderTemplateSectionAction(template.id, orderedIds);
+      router.refresh();
+    });
+  }
+
+  function handleReorderInfoboxSections(orderedIds: number[]) {
+    startReorderTransition(async () => {
+      await reorderTemplateInfoboxSectionAction(template.id, orderedIds);
+      router.refresh();
+    });
+  }
+
+  const anyPending = isPending || reorderPending;
+
   const sortedSections = [...template.sections].sort(
     (a, b) => a.displayOrder - b.displayOrder,
   );
@@ -174,7 +209,7 @@ export function TemplateItem({
               setRenaming((p) => !p);
               setRenameDraft(template.name);
             }}
-            disabled={isPending}
+            disabled={anyPending}
           >
             <PencilIcon className="h-3 w-3" />
           </Button>
@@ -184,7 +219,7 @@ export function TemplateItem({
             size="icon-sm"
             title="Delete template"
             onClick={handleDelete}
-            disabled={isPending}
+            disabled={anyPending}
           >
             <Trash2Icon className="h-3 w-3 text-red-500" />
           </Button>
@@ -199,7 +234,7 @@ export function TemplateItem({
               id={`has-infobox-${template.id}`}
               checked={template.hasInfobox}
               onChange={(e) => handleToggleInfobox(e.target.checked)}
-              disabled={isPending}
+              disabled={anyPending}
               className="h-4 w-4 rounded border-border"
             />
             <Label htmlFor={`has-infobox-${template.id}`}>
@@ -212,7 +247,8 @@ export function TemplateItem({
             onChange={setAddingSectionName}
             onAdd={handleAddSection}
             onDelete={handleDeleteSection}
-            isPending={isPending}
+            onReorder={handleReorderSections}
+            isPending={anyPending}
             inputRef={sectionInputRef}
           />
           {template.hasInfobox && (
@@ -222,7 +258,8 @@ export function TemplateItem({
               onChange={setAddingInfoboxLabel}
               onAdd={handleAddInfoboxSection}
               onDelete={handleDeleteInfoboxSection}
-              isPending={isPending}
+              onReorder={handleReorderInfoboxSections}
+              isPending={anyPending}
               inputRef={infoboxInputRef}
             />
           )}

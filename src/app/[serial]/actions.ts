@@ -887,6 +887,43 @@ export async function reorderTemplateSections(
 }
 
 /**
+ * Reorders infobox sections within a template. `orderedSectionIds` must
+ * include every infobox section for the template — no partial reorders.
+ *
+ * @example
+ * await reorderTemplateInfoboxSections(42, 7, [5, 3, 8]);
+ */
+export async function reorderTemplateInfoboxSections(
+  serialId: number,
+  templateId: number,
+  orderedSectionIds: number[],
+) {
+  await requireSerialAdmin(serialId);
+  if (orderedSectionIds.length === 0) return;
+
+  // Verify ownership.
+  const [target] = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error("Template not found");
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedSectionIds.length; i++) {
+      await tx
+        .update(templateInfoboxSections)
+        .set({ displayOrder: i })
+        .where(
+          and(
+            eq(templateInfoboxSections.id, orderedSectionIds[i]),
+            eq(templateInfoboxSections.templateId, templateId),
+          ),
+        );
+    }
+  });
+}
+
+/**
  * Appends a new infobox section label to a template.
  *
  * @example
