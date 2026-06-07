@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { LockIcon, PenIcon, PlusIcon, Trash2Icon, LayoutTemplateIcon } from "lucide-react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import {
   Dialog,
   DialogHeader,
@@ -24,6 +25,7 @@ import {
   deletePageSection,
   renamePageSection,
   reorderPageSections,
+  applyTemplateSections,
 } from "./actions";
 
 export interface PageSection {
@@ -32,10 +34,31 @@ export interface PageSection {
   displayOrder: number;
 }
 
-interface PageSectionManagerProps {
-  pageId: number;
-  sections: PageSection[];
+/** A template with its full section and infobox structure. */
+export interface SerialTemplate {
+  /** DB primary key. */
+  id: number;
+  /** Display name shown in the dropdown. */
+  name: string;
+  /** Whether the template includes infobox rows. */
+  hasInfobox: boolean;
+  /** Ordered section slots defined by this template. */
+  sections: { id: number; name: string; displayOrder: number }[];
+  /** Ordered infobox row slots defined by this template. */
+  infoboxSections: { id: number; label: string; displayOrder: number }[];
 }
+
+type PageSectionManagerProps = {
+  /** DB id of the page these sections belong to. */
+  pageId: number;
+  /** Current live (non-deleted) sections for this page. */
+  sections: PageSection[];
+  /**
+   * Templates defined for this serial. When non-empty, an "Apply template"
+   * button is rendered so editors can bulk-insert template sections.
+   */
+  serialTemplates?: SerialTemplate[];
+};
 
 function ReorderableSection({
   section,
@@ -164,23 +187,65 @@ function ReorderableSection({
  * Lets editors add, rename, reorder (up/down), and delete sections.
  * Delete is guarded: sections with existing content revisions cannot be removed.
  *
+ * When `serialTemplates` is non-empty, also renders an "Apply template" button
+ * that opens a confirmation dialog. The dialog previews which sections will be
+ * added vs. skipped (already present on the page) before committing.
+ *
  * Shown only in edit mode, above the content editors in PageEditor.
  *
  * @example
  * <PageSectionManager
  *   pageId={42}
  *   sections={[{ id: 1, name: 'Summary', displayOrder: 0 }]}
+ *   serialTemplates={[{ id: 1, name: 'Character', hasInfobox: true, sections: [], infoboxSections: [] }]}
  * />
  */
-export function PageSectionManager({
-  pageId,
-  sections,
-}: PageSectionManagerProps) {
+export function PageSectionManager(props: PageSectionManagerProps) {
+  const { pageId, sections, serialTemplates = [] } = props;
   const { run, isPending } = useServerAction();
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PageSection | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ── Apply template state ──────────────────────────────────────────────────
+  const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number>(
+    serialTemplates[0]?.id ?? 0,
+  );
+  const [applyResult, setApplyResult] = useState<{
+    addedSections: number;
+    skippedSections: number;
+    addedInfoboxRows: number;
+    skippedInfoboxRows: number;
+  } | null>(null);
+
+  const selectedTemplate = serialTemplates.find((t) => t.id === selectedTemplateId) ?? null;
+
+  // Compute live section names for the preview (case-insensitive).
+  const liveSectionNames = new Set(sections.map((s) => s.name.toLowerCase()));
+
+  const templateOptions = serialTemplates.map((t) => ({
+    label: t.name,
+    value: t.id,
+  }));
+
+  function openApplyTemplateDialog() {
+    setApplyResult(null);
+    setSelectedTemplateId(serialTemplates[0]?.id ?? 0);
+    setApplyTemplateOpen(true);
+  }
+
+  async function confirmApplyTemplate() {
+    if (!selectedTemplate) return;
+    const result = await applyTemplateSections(pageId, selectedTemplate.id);
+    setApplyResult(result);
+  }
+
+  function closeApplyTemplateDialog() {
+    setApplyTemplateOpen(false);
+    setApplyResult(null);
+  }
 
   function moveSection(id: number, direction: "up" | "down") {
     const idx = sections.findIndex((s) => s.id === id);
@@ -207,9 +272,31 @@ export function PageSectionManager({
     }
   }
 
+  // Preview: which template sections will be added vs skipped.
+  const sortedTemplateSections = selectedTemplate
+    ? [...selectedTemplate.sections].sort((a, b) => a.displayOrder - b.displayOrder)
+    : [];
+  const sortedTemplateInfoboxSections = selectedTemplate
+    ? [...selectedTemplate.infoboxSections].sort((a, b) => a.displayOrder - b.displayOrder)
+    : [];
+
   return (
     <Box col className="gap-3 rounded-lg border border-border bg-card p-4">
-      <Text variant="h4">Sections</Text>
+      <Box className="items-center justify-between">
+        <Text variant="h4">Sections</Text>
+        {serialTemplates.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={openApplyTemplateDialog}
+            disabled={isPending}
+          >
+            <LayoutTemplateIcon className="h-3.5 w-3.5" />
+            Apply template
+          </Button>
+        )}
+      </Box>
 
       {sections.length > 0 ? (
         <ol className="flex flex-col gap-1">
@@ -290,6 +377,7 @@ export function PageSectionManager({
         </Button>
       )}
 
+      {/* Delete section confirmation dialog */}
       <Dialog
         isOpen={deleteTarget !== null}
         onClose={() => {
@@ -337,6 +425,156 @@ export function PageSectionManager({
               onClick={confirmDelete}
             >
               {isPending ? "Deleting…" : "Delete"}
+            </Button>
+          )}
+        </DialogFooter>
+      </Dialog>
+
+      {/* Apply template confirmation dialog */}
+      <Dialog
+        isOpen={applyTemplateOpen}
+        onClose={closeApplyTemplateDialog}
+        showCloseButton={false}
+      >
+        <DialogHeader>
+          <DialogTitle>Apply template</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          {applyResult ? (
+            <Box col className="gap-3">
+              <Text variant="body">
+                Template applied successfully.
+              </Text>
+              <Box col className="gap-1 text-sm">
+                <Text>
+                  Sections added:{" "}
+                  <Text as="span" variant="label">
+                    {applyResult.addedSections}
+                  </Text>
+                </Text>
+                {applyResult.skippedSections > 0 && (
+                  <Text muted>
+                    Sections skipped (already exist):{" "}
+                    {applyResult.skippedSections}
+                  </Text>
+                )}
+                {applyResult.addedInfoboxRows > 0 && (
+                  <Text>
+                    Infobox rows added:{" "}
+                    <Text as="span" variant="label">
+                      {applyResult.addedInfoboxRows}
+                    </Text>
+                  </Text>
+                )}
+                {applyResult.skippedInfoboxRows > 0 && (
+                  <Text muted>
+                    Infobox rows skipped (already exist):{" "}
+                    {applyResult.skippedInfoboxRows}
+                  </Text>
+                )}
+              </Box>
+            </Box>
+          ) : (
+            <Box col className="gap-4">
+              <DialogDescription>
+                Choose a template to apply. Sections that already exist on this
+                page (matched by name) will be skipped.
+              </DialogDescription>
+
+              <Box col className="gap-1.5">
+                <Text variant="label">Template</Text>
+                <Select<number>
+                  options={templateOptions}
+                  value={selectedTemplateId}
+                  onChange={setSelectedTemplateId}
+                  searchable={false}
+                />
+              </Box>
+
+              {selectedTemplate && (
+                <Box col className="gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                  <Text variant="label">Preview</Text>
+
+                  {sortedTemplateSections.length > 0 ? (
+                    <Box col className="gap-1">
+                      <Text muted className="text-xs">
+                        Sections
+                      </Text>
+                      <Box col className="gap-0.5">
+                        {sortedTemplateSections.map((s) => {
+                          const isDuplicate = liveSectionNames.has(
+                            s.name.toLowerCase(),
+                          );
+                          return (
+                            <Box
+                              key={s.id}
+                              className="items-center gap-2 pl-2 border-l-2 border-border"
+                            >
+                              <Text
+                                className={
+                                  isDuplicate
+                                    ? "text-sm text-muted-foreground line-through"
+                                    : "text-sm"
+                                }
+                              >
+                                {s.name}
+                              </Text>
+                              {isDuplicate && (
+                                <Text
+                                  as="span"
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  (duplicate — will skip)
+                                </Text>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Text muted className="text-xs">
+                      No sections defined in this template.
+                    </Text>
+                  )}
+
+                  {selectedTemplate.hasInfobox &&
+                    sortedTemplateInfoboxSections.length > 0 && (
+                      <Box col className="gap-1">
+                        <Text muted className="text-xs">
+                          Infobox rows
+                        </Text>
+                        <Box col className="gap-0.5">
+                          {sortedTemplateInfoboxSections.map((s) => (
+                            <Text
+                              key={s.id}
+                              className="text-sm pl-2 border-l-2 border-border"
+                            >
+                              {s.label}
+                            </Text>
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          <DialogClose
+            render={
+              <Button variant="outline" onClick={closeApplyTemplateDialog} />
+            }
+          >
+            {applyResult ? "Close" : "Cancel"}
+          </DialogClose>
+          {!applyResult && (
+            <Button
+              disabled={isPending || !selectedTemplate}
+              onClick={confirmApplyTemplate}
+            >
+              {isPending ? "Applying…" : "Apply"}
             </Button>
           )}
         </DialogFooter>

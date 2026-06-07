@@ -121,6 +121,18 @@ interface Props {
    */
   allSerialPages: { id: number; title: string }[];
   /**
+   * Templates defined for this serial, passed to PageSectionManager to power
+   * the "Apply template" feature. Empty when the serial has no templates or the
+   * current user is not an admin.
+   */
+  serialTemplates?: {
+    id: number;
+    name: string;
+    hasInfobox: boolean;
+    sections: { id: number; name: string; displayOrder: number }[];
+    infoboxSections: { id: number; label: string; displayOrder: number }[];
+  }[];
+  /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
    * parents), so both panels are irrelevant there.
@@ -247,6 +259,7 @@ export function PageEditor(props: Props) {
     childPages,
     parentPages,
     allSerialPages,
+    serialTemplates = [],
     isHomePage = false,
     editModeHeader,
     isAdmin = false,
@@ -703,7 +716,11 @@ export function PageEditor(props: Props) {
         />
       )}
 
-      <PageSectionManager pageId={pageId} sections={pageSectionStructure} />
+      <PageSectionManager
+        pageId={pageId}
+        sections={pageSectionStructure}
+        serialTemplates={serialTemplates}
+      />
 
       {sections.map((section, i) => (
         <SectionContentEditor
