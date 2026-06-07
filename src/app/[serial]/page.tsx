@@ -93,12 +93,7 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-/**
- * Serial home page: metadata editor, home wiki page content, template manager, and admin controls.
- *
- * @example
- * // Rendered automatically by Next.js for /{serial} routes.
- */
+/** Serial home page: metadata editor, home wiki page content, template manager, and admin controls. */
 export default async function SerialPage(props: SerialPageProps) {
   const { params } = props;
   const { serial: serialSlug } = await params;

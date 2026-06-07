@@ -71,12 +71,7 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-/**
- * Server Component that renders a wiki page at the reader's chapter cutoff.
- *
- * @example
- * // Rendered automatically by Next.js for /{serial}/{page} routes.
- */
+/** Server Component that renders a wiki page at the reader's chapter cutoff. */
 export default async function PageView(props: PageViewProps) {
   const { params } = props;
   const { serial: serialSlug, page: pageParam } = await params;

@@ -43,12 +43,7 @@ interface ChapterPageProps {
   params: Promise<{ serial: string; chapterIdx: string }>;
 }
 
-/**
- * Server Component for the chapter detail page: synopsis, introduced pages, and suggestion workflow.
- *
- * @example
- * // Rendered automatically by Next.js for /{serial}/chapter/{chapterIdx} routes.
- */
+/** Server Component for the chapter detail page: synopsis, introduced pages, and suggestion workflow. */
 export default async function ChapterPage(props: ChapterPageProps) {
   const { params } = props;
   const { serial: serialSlug, chapterIdx: chapterIdxRaw } = await params;

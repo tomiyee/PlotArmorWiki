@@ -24,12 +24,7 @@ interface NewPagePageProps {
   searchParams: Promise<{ parentPageId?: string }>;
 }
 
-/**
- * Server Component for the new-page creation form.
- *
- * @example
- * // Rendered automatically by Next.js for /{serial}/new routes.
- */
+/** Server Component for the new-page creation form. */
 export default async function NewPagePage(props: NewPagePageProps) {
   const { params, searchParams } = props;
   const { serial: serialSlug } = await params;
