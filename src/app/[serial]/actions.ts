@@ -872,17 +872,14 @@ export async function reorderTemplateSections(
   if (!target) throw new Error("Template not found");
 
   await db.transaction(async (tx) => {
-    for (let i = 0; i < orderedSectionIds.length; i++) {
-      await tx
-        .update(templateSections)
-        .set({ displayOrder: i })
-        .where(
-          and(
-            eq(templateSections.id, orderedSectionIds[i]),
-            eq(templateSections.templateId, templateId),
-          ),
-        );
-    }
+    await Promise.all(
+      orderedSectionIds.map((id, i) =>
+        tx
+          .update(templateSections)
+          .set({ displayOrder: i })
+          .where(and(eq(templateSections.id, id), eq(templateSections.templateId, templateId))),
+      ),
+    );
   });
 }
 
@@ -909,17 +906,16 @@ export async function reorderTemplateInfoboxSections(
   if (!target) throw new Error("Template not found");
 
   await db.transaction(async (tx) => {
-    for (let i = 0; i < orderedSectionIds.length; i++) {
-      await tx
-        .update(templateInfoboxSections)
-        .set({ displayOrder: i })
-        .where(
-          and(
-            eq(templateInfoboxSections.id, orderedSectionIds[i]),
-            eq(templateInfoboxSections.templateId, templateId),
+    await Promise.all(
+      orderedSectionIds.map((id, i) =>
+        tx
+          .update(templateInfoboxSections)
+          .set({ displayOrder: i })
+          .where(
+            and(eq(templateInfoboxSections.id, id), eq(templateInfoboxSections.templateId, templateId)),
           ),
-        );
-    }
+      ),
+    );
   });
 }
 

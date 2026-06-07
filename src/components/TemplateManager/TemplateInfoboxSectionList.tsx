@@ -1,84 +1,15 @@
 "use client";
 
-import { PlusIcon, Trash2Icon, GripVerticalIcon } from "lucide-react";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { PlusIcon } from "lucide-react";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import type { TemplateInfoboxSection } from "./types";
-
-type SortableInfoboxRowProps = {
-  /** The infobox section data for this row. */
-  row: TemplateInfoboxSection;
-  /** Whether any server action is in-flight. */
-  isPending: boolean;
-  /** Callback to remove this infobox row. */
-  onDelete: (infoboxSectionId: number) => void;
-};
-
-function SortableInfoboxRow(props: SortableInfoboxRowProps) {
-  const { row, isPending, onDelete } = props;
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: row.id, disabled: isPending });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1,
-  };
-
-  return (
-    <Box
-      ref={setNodeRef}
-      style={style}
-      className="items-center gap-2 rounded border border-border px-2 py-1"
-    >
-      <span
-        {...attributes}
-        {...listeners}
-        className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
-        title="Drag to reorder"
-      >
-        <GripVerticalIcon className="h-3 w-3" />
-      </span>
-      <Text className="flex-1 text-sm">{row.label}</Text>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        title="Remove infobox row"
-        onClick={() => onDelete(row.id)}
-        disabled={isPending}
-      >
-        <Trash2Icon className="h-2.5 w-2.5 text-red-400" />
-      </Button>
-    </Box>
-  );
-}
+import { SortableRow } from "./SortableRow";
+import { useSortableSensors, makeDragEndHandler } from "./dndUtils";
 
 interface TemplateInfoboxSectionListProps {
   /** The list of infobox sections to display. */
@@ -93,7 +24,7 @@ interface TemplateInfoboxSectionListProps {
   onDelete: (infoboxSectionId: number) => void;
   /** Callback fired when drag-and-drop reorder ends; receives the new ordered id array. */
   onReorder: (orderedIds: number[]) => void;
-  /** Whether the component is in a pending state (e.g., loading). */
+  /** Whether any server action is in-flight. */
   isPending: boolean;
   /** Reference to the input element. */
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -105,22 +36,8 @@ export function TemplateInfoboxSectionList(
   const { rows, value, onChange, onAdd, onDelete, onReorder, isPending, inputRef } =
     props;
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = rows.findIndex((r) => r.id === active.id);
-    const newIndex = rows.findIndex((r) => r.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    const reordered = arrayMove(rows, oldIndex, newIndex);
-    onReorder(reordered.map((r) => r.id));
-  }
+  const sensors = useSortableSensors();
+  const handleDragEnd = makeDragEndHandler(rows, onReorder);
 
   return (
     <div>
@@ -128,21 +45,16 @@ export function TemplateInfoboxSectionList(
         Infobox rows
       </Text>
       {rows.length > 0 ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={rows.map((r) => r.id)}
-            strategy={verticalListSortingStrategy}
-          >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
             <Box col className="gap-1 mb-2">
               {rows.map((row) => (
-                <SortableInfoboxRow
+                <SortableRow
                   key={row.id}
-                  row={row}
+                  id={row.id}
+                  label={row.label}
                   isPending={isPending}
+                  deleteTitle="Remove infobox row"
                   onDelete={onDelete}
                 />
               ))}
