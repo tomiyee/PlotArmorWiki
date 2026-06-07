@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/Dialog";
 import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
+import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useSortableSensors, makeDragEndHandler } from "@/lib/dndUtils";
 import {
@@ -155,11 +156,16 @@ export function PageInfoboxManager({
   const [deleteTarget, setDeleteTarget] = useState<InfoboxSection | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // localSections is the optimistic view; it updates instantly on drag and
+  // syncs back to `sections` once router.refresh() delivers the server result.
+  const { items: localSections, applyOptimistic, revert } = useOptimisticOrder(sections);
+
   const sensors = useSortableSensors();
-  const handleDragEnd = makeDragEndHandler(sections, (reorderedIds) => {
+  const handleDragEnd = makeDragEndHandler(localSections, (reorderedIds) => {
+    applyOptimistic(reorderedIds); // update UI immediately, before the round-trip
     const fd = new FormData();
     fd.set("orderedIds", JSON.stringify(reorderedIds));
-    run(reorderInfoboxSections, fd);
+    run(reorderInfoboxSections, fd, undefined, revert); // revert on server error
   });
 
   async function confirmDelete() {
@@ -179,11 +185,11 @@ export function PageInfoboxManager({
     <Box col className="gap-3">
       <Text variant="h4">Infobox rows</Text>
 
-      {sections.length > 0 ? (
+      {localSections.length > 0 ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={localSections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <ol className="flex flex-col gap-1">
-              {sections.map((section) => (
+              {localSections.map((section) => (
                 <SortableInfoboxRow
                   key={section.id}
                   section={section}
