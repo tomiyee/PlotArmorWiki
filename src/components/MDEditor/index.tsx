@@ -377,7 +377,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
    * consistent with chip-click edits, which also render at this level.
    */
   const openInsertMenu = useCallback((anchorEl: HTMLElement) => {
-    setEditState({ nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false });
+    setEditState({
+      nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false,
+    });
   }, []);
 
   /**
@@ -395,7 +397,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
       if (!read) return;
       setEditState({
-        nodeKey, anchorEl, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: false,
+        nodeKey,
+        anchorEl,
+        initialToken: read.token,
+        initialAlias: read.alias,
+        autoFocusAlias: false,
       });
     },
     [],

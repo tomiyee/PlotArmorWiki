@@ -38,7 +38,8 @@ import {
   getMyPageSuggestions,
 } from "./suggestionActions";
 
-interface Props {
+interface PageViewProps {
+  /** Next.js dynamic route params: `serial` slug and `page` slug. */
   params: Promise<{ serial: string; page: string }>;
 }
 
@@ -70,7 +71,9 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function PageView({ params }: Props) {
+/** Server Component that renders a wiki page at the reader's chapter cutoff. */
+export default async function PageView(props: PageViewProps) {
+  const { params } = props;
   const { serial: serialSlug, page: pageParam } = await params;
 
   const decodedPageSlug = decodeURIComponent(pageParam);

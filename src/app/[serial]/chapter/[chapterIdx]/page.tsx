@@ -38,11 +38,14 @@ import {
   bulkApplyToc,
 } from "../../actions";
 
-interface Props {
+interface ChapterPageProps {
+  /** Next.js dynamic route params: `serial` slug and `chapterIdx` string. */
   params: Promise<{ serial: string; chapterIdx: string }>;
 }
 
-export default async function ChapterPage({ params }: Props) {
+/** Server Component for the chapter detail page: synopsis, introduced pages, and suggestion workflow. */
+export default async function ChapterPage(props: ChapterPageProps) {
+  const { params } = props;
   const { serial: serialSlug, chapterIdx: chapterIdxRaw } = await params;
 
   const chapterIdx = parseInt(chapterIdxRaw, 10);
