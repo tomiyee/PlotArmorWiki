@@ -41,6 +41,13 @@ type MarkdownRendererProps = {
    * Only used when `serialSlug` and `chapterType` are also provided.
    */
   wikiChapters?: Record<string, number>;
+  /**
+   * When provided, overrides local `{{ref|token}}` ordinal computation with
+   * globally consistent ordinals from `WikiPageRefsProvider`. Enables correct
+   * cross-section reference numbering on wiki pages.
+   * Obtain this from `useWikiPageRefOrdinals` in read mode.
+   */
+  refOrdinalMap?: Map<string, number>;
 };
 
 const COMPONENTS: Components = {
@@ -278,6 +285,7 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
     pageTitles,
     chapterType,
     wikiChapters,
+    refOrdinalMap,
   } = props;
 
   const remarkPlugins: PluggableList = [remarkGfm];
@@ -293,7 +301,11 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
   // so it can emit mdast link nodes for refbox entries — makeAnchorComponent then
   // wraps those links with hover-card previews just like wiki links.
   remarkPlugins.push(
-    remarkRefs(serialSlug, pageTitles, { chapterType, chapters: wikiChapters }),
+    remarkRefs(serialSlug, pageTitles, {
+      chapterType,
+      chapters: wikiChapters,
+      externalOrdinalMap: refOrdinalMap,
+    }),
   );
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;

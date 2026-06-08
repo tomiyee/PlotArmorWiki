@@ -37,6 +37,10 @@ const REFBOX_SENTINEL = "{{refbox-sentinel-placeholder}}";
  * links with hover-card previews (page links → `WikiLinkPreview`, chapter links
  * → `ChapterLinkPreview`). Without `serialSlug`, entries fall back to plain text.
  *
+ * When `externalOrdinalMap` is supplied (e.g. from `WikiPageRefsProvider`), the
+ * plugin skips local token collection and uses the externally computed global
+ * ordinals instead. This enables consistent cross-section ref numbering.
+ *
  * @example
  * remarkPlugins={[remarkWikiLinks(serialSlug, pageTitles, opts), remarkRefs(serialSlug, pageTitles, opts)]}
  */
@@ -48,26 +52,45 @@ export function remarkRefs(
     chapterType?: string;
     /** Map of chapter display name → chapter idx for URL resolution. */
     chapters?: Record<string, number>;
+    /**
+     * When provided, skips local Pass-1 token collection and uses these
+     * globally computed ordinals instead. Supplied by `WikiPageRefsProvider`
+     * so ref numbers are consistent across all page sections.
+     */
+    externalOrdinalMap?: Map<string, number>;
   },
 ): Plugin<[], Root> {
   return () => (tree) => {
-    // ── Pass 1: collect all ref tokens in document order ────────────────────
-    const ordinalMap = new Map<string, number>(); // token → 1-based ordinal
+    const { externalOrdinalMap } = options ?? {};
+    let ordinalMap: Map<string, number>;
 
-    walkTextNodes(tree, (text) => {
-      if (!text.includes("{{ref|")) return;
-      REF_RE.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = REF_RE.exec(text)) !== null) {
-        const token = m[1].trim();
-        if (!ordinalMap.has(token)) {
-          ordinalMap.set(token, ordinalMap.size + 1);
+    if (externalOrdinalMap && externalOrdinalMap.size > 0) {
+      ordinalMap = externalOrdinalMap;
+      // Skip processing if this section has neither local refs nor a refbox.
+      let hasLocalRef = false;
+      walkTextNodes(tree, (t) => {
+        if (t.includes("{{ref|")) hasLocalRef = true;
+      });
+      if (!hasLocalRef && !hasRefbox(tree)) return;
+    } else {
+      // ── Pass 1: collect all ref tokens in document order ──────────────────
+      ordinalMap = new Map<string, number>(); // token → 1-based ordinal
+
+      walkTextNodes(tree, (text) => {
+        if (!text.includes("{{ref|")) return;
+        REF_RE.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = REF_RE.exec(text)) !== null) {
+          const token = m[1].trim();
+          if (!ordinalMap.has(token)) {
+            ordinalMap.set(token, ordinalMap.size + 1);
+          }
         }
-      }
-    });
+      });
 
-    // Nothing to do if no refs or refbox found.
-    if (ordinalMap.size === 0 && !hasRefbox(tree)) return;
+      // Nothing to do if no refs or refbox found.
+      if (ordinalMap.size === 0 && !hasRefbox(tree)) return;
+    }
 
     // ── Pass 2a: replace {{ref|token}} with superscript html nodes ──────────
     findAndReplace(tree, [
