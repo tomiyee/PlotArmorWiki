@@ -536,6 +536,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       case "Enter":
         e.preventDefault();
         e.stopPropagation();
+        // Stop the native event too; Lexical registers its own keydown listener
+        // on the contenteditable and doesn't check defaultPrevented, so without
+        // this it would still insert a newline after the chip is inserted.
+        e.nativeEvent.stopImmediatePropagation();
         applySuggestion(suggestions[activeIndex]);
         break;
       case "Escape":
