@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useState, useMemo } from "react";
+import type { CSSProperties } from "react";
+import { GripVerticalIcon, LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -17,8 +21,10 @@ import {
 } from "@/components/ui/Dialog";
 import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
+import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { InfoIcon } from "@/components/ui/InfoIcon";
+import { useSortableSensors, makeDragEndHandler } from "@/lib/dndUtils";
 import {
   addPageSection,
   deletePageSection,
@@ -37,51 +43,53 @@ interface PageSectionManagerProps {
   sections: PageSection[];
 }
 
-function ReorderableSection({
+function LockedSection({ section }: { section: PageSection }) {
+  return (
+    <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50">
+      <Box className="w-4 mr-1 flex-shrink-0" />
+      <Box className="flex-1 items-center gap-1.5">
+        <Text as="span" variant="label">
+          {section.name}
+        </Text>
+        <InfoIcon contents="This section appears at the top of the page without a heading. Its content will be shown in preview tooltips when this page is mentioned elsewhere." />
+      </Box>
+      <LockIcon className="h-3 w-3 text-muted-foreground" />
+    </li>
+  );
+}
+
+function SortableSection({
   section,
-  isFirst,
-  isLast,
-  isLocked,
   isPending,
   isRenaming,
-  onMoveUp,
-  onMoveDown,
   onStartRename,
   onCancelRename,
   onDelete,
   onRename,
 }: {
   section: PageSection;
-  isFirst: boolean;
-  isLast: boolean;
-  /** When true, the section is pinned in place and cannot be moved, renamed, or deleted. */
-  isLocked: boolean;
   isPending: boolean;
   isRenaming: boolean;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onStartRename: () => void;
   onCancelRename: () => void;
   onDelete: () => void;
   onRename: (fd: FormData) => void;
 }) {
-  if (isLocked) {
-    return (
-      <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50">
-        <Box className="w-4 mr-1 flex-shrink-0" />
-        <Box className="flex-1 items-center gap-1.5">
-          <Text as="span" variant="label">
-            {section.name}
-          </Text>
-          <InfoIcon contents="This section appears at the top of the page without a heading. Its content will be shown in preview tooltips when this page is mentioned elsewhere." />
-        </Box>
-        <LockIcon className="h-3 w-3 text-muted-foreground" />
-      </li>
-    );
-  }
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: section.id, disabled: isPending });
+
+  const style: CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1,
+  };
 
   return (
-    <li className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50">
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50"
+    >
       {isRenaming ? (
         <RenameForm
           hiddenName="sectionId"
@@ -94,41 +102,23 @@ function ReorderableSection({
         />
       ) : (
         <>
-          <Box className="flex-1 items-center gap-2">
-            <Box col className="gap-0.5 mr-1">
-              <Button
-                type="button"
-                variant="ghost"
-                title="Move up"
-                disabled={isFirst || isPending}
-                onClick={onMoveUp}
-                className="h-3 w-4 p-0 rounded-sm text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-30 leading-none"
-                aria-label={`Move ${section.name} up`}
-              >
-                ▲
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                title="Move down"
-                disabled={isLast || isPending}
-                onClick={onMoveDown}
-                className="h-3 w-4 p-0 rounded-sm text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-30 leading-none"
-                aria-label={`Move ${section.name} down`}
-              >
-                ▼
-              </Button>
-            </Box>
-            <Text
-              as="span"
-              variant="label"
-              className="cursor-pointer hover:text-primary transition-colors"
-              title="Click to rename"
-              onClick={onStartRename}
-            >
-              {section.name}
-            </Text>
-          </Box>
+          <span
+            {...attributes}
+            {...listeners}
+            className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
+            title="Drag to reorder"
+          >
+            <GripVerticalIcon className="h-3 w-3" />
+          </span>
+          <Text
+            as="span"
+            variant="label"
+            className="flex-1 cursor-pointer hover:text-primary transition-colors"
+            title="Click to rename"
+            onClick={onStartRename}
+          >
+            {section.name}
+          </Text>
           <Box className="items-center gap-1">
             <Tooltip content={`Rename ${section.name}`}>
               <Button
@@ -161,8 +151,9 @@ function ReorderableSection({
 
 /**
  * Manages the wall-clock-versioned section structure for a single wiki page.
- * Lets editors add, rename, reorder (up/down), and delete sections.
+ * Lets editors add, rename, reorder (drag-and-drop), and delete sections.
  * Delete is guarded: sections with existing content revisions cannot be removed.
+ * The first section is always locked in place (it holds the lead/preview content).
  *
  * Shown only in edit mode, above the content editors in PageEditor.
  *
@@ -182,17 +173,24 @@ export function PageSectionManager({
   const [deleteTarget, setDeleteTarget] = useState<PageSection | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  function moveSection(id: number, direction: "up" | "down") {
-    const idx = sections.findIndex((s) => s.id === id);
-    if (idx === -1) return;
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sections.length) return;
-    const newOrder = sections.map((s) => s.id);
-    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+  // The first section is always locked; only sections[1+] are sortable.
+  const lockedSection = sections[0] as PageSection | undefined;
+  // Memoized so the reference only changes when server data changes, not on every
+  // render triggered by isPending flipping — which would reset optimistic state mid-flight.
+  const sortableSections = useMemo(() => sections.slice(1), [sections]);
+
+  const { items: localSections, applyOptimistic, revert } = useOptimisticOrder(sortableSections);
+
+  const sensors = useSortableSensors();
+  const handleDragEnd = makeDragEndHandler(localSections, (reorderedIds) => {
+    applyOptimistic(reorderedIds); // instant visual update before server round-trip
     const fd = new FormData();
-    fd.set("orderedIds", JSON.stringify(newOrder));
-    run(reorderPageSections, fd);
-  }
+    fd.set(
+      "orderedIds",
+      JSON.stringify(lockedSection ? [lockedSection.id, ...reorderedIds] : reorderedIds),
+    );
+    run(reorderPageSections, fd, undefined, revert); // revert on server error
+  });
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -213,29 +211,32 @@ export function PageSectionManager({
 
       {sections.length > 0 ? (
         <ol className="flex flex-col gap-1">
-          {sections.map((section, i) => (
-            <ReorderableSection
-              key={section.id}
-              section={section}
-              isFirst={i <= 1}
-              isLast={i === sections.length - 1}
-              isLocked={i === 0}
-              isPending={isPending}
-              isRenaming={renamingId === section.id}
-              onMoveUp={() => moveSection(section.id, "up")}
-              onMoveDown={() => moveSection(section.id, "down")}
-              onStartRename={() => setRenamingId(section.id)}
-              onCancelRename={() => setRenamingId(null)}
-              onDelete={() => {
-                setDeleteTarget(section);
-                setDeleteError(null);
-              }}
-              onRename={(fd) => {
-                run(renamePageSection, fd);
-                setRenamingId(null);
-              }}
-            />
-          ))}
+          {lockedSection && <LockedSection section={lockedSection} />}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={localSections.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {localSections.map((section) => (
+                <SortableSection
+                  key={section.id}
+                  section={section}
+                  isPending={isPending}
+                  isRenaming={renamingId === section.id}
+                  onStartRename={() => setRenamingId(section.id)}
+                  onCancelRename={() => setRenamingId(null)}
+                  onDelete={() => {
+                    setDeleteTarget(section);
+                    setDeleteError(null);
+                  }}
+                  onRename={(fd) => {
+                    run(renamePageSection, fd);
+                    setRenamingId(null);
+                  }}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </ol>
       ) : (
         <Text muted className="text-sm">

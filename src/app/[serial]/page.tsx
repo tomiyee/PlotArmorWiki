@@ -47,8 +47,10 @@ import {
   toggleTemplateInfobox,
   addTemplateSection,
   deleteTemplateSection,
+  reorderTemplateSections,
   addTemplateInfoboxSection,
   deleteTemplateInfoboxSection,
+  reorderTemplateInfoboxSections,
   addSerialAdmin,
   removeSerialAdmin,
   searchUsersForSerial,
@@ -234,12 +236,18 @@ export default async function SerialPage({ params }: Props) {
     null,
     serial.id,
   );
+  const reorderTemplateSectionsForSerial = reorderTemplateSections.bind(
+    null,
+    serial.id,
+  );
   const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(
     null,
     serial.id,
   );
   const deleteTemplateInfoboxSectionForSerial =
     deleteTemplateInfoboxSection.bind(null, serial.id);
+  const reorderTemplateInfoboxSectionsForSerial =
+    reorderTemplateInfoboxSections.bind(null, serial.id);
 
   const headChapterId = chapterList.at(-1)?.id ?? null;
   const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
@@ -647,11 +655,17 @@ export default async function SerialPage({ params }: Props) {
                       deleteTemplateSectionAction={
                         deleteTemplateSectionForSerial
                       }
+                      reorderTemplateSectionAction={
+                        reorderTemplateSectionsForSerial
+                      }
                       addTemplateInfoboxSectionAction={
                         addTemplateInfoboxSectionForSerial
                       }
                       deleteTemplateInfoboxSectionAction={
                         deleteTemplateInfoboxSectionForSerial
+                      }
+                      reorderTemplateInfoboxSectionAction={
+                        reorderTemplateInfoboxSectionsForSerial
                       }
                     />
                   </>

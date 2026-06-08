@@ -32,6 +32,15 @@ export interface Template {
 /** Shorthand for the server action signature used throughout TemplateManager. */
 export type ServerAction = (formData: FormData) => Promise<void>;
 
+/**
+ * Shorthand for the reorder server action. Receives the template id and the
+ * full ordered id array so a single bound action can serve all templates.
+ */
+export type ReorderAction = (
+  templateId: number,
+  orderedIds: number[],
+) => Promise<void>;
+
 export interface TemplateManagerProps {
   /** All templates belonging to the current serial. */
   templates: Template[];
@@ -47,8 +56,12 @@ export interface TemplateManagerProps {
   addTemplateSectionAction: ServerAction;
   /** Removes a section from a template. */
   deleteTemplateSectionAction: ServerAction;
+  /** Persists the new display order for template sections after drag-and-drop. */
+  reorderTemplateSectionAction: ReorderAction;
   /** Appends an infobox row to a template. */
   addTemplateInfoboxSectionAction: ServerAction;
   /** Removes an infobox row from a template. */
   deleteTemplateInfoboxSectionAction: ServerAction;
+  /** Persists the new display order for infobox rows after drag-and-drop. */
+  reorderTemplateInfoboxSectionAction: ReorderAction;
 }
