@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Trash2Icon,
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { useServerAction } from "@/hooks/useServerAction";
+import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { TemplateSectionList } from "./TemplateSectionList";
 import { TemplateInfoboxSectionList } from "./TemplateInfoboxSectionList";
 import type { Template, ServerAction, ReorderAction } from "./types";
@@ -140,28 +141,54 @@ export function TemplateItem(props: TemplateItemProps) {
     run(deleteTemplateInfoboxSectionAction, fd);
   }
 
+  // Memoize so the reference only changes when server data changes — not on every
+  // render triggered by reorderPending flipping. A new reference would cause
+  // useOptimisticOrder's useEffect to fire and reset the optimistic state mid-flight.
+  const sortedSections = useMemo(
+    () => [...template.sections].sort((a, b) => a.displayOrder - b.displayOrder),
+    [template.sections],
+  );
+  const sortedInfoboxSections = useMemo(
+    () => [...template.infoboxSections].sort((a, b) => a.displayOrder - b.displayOrder),
+    [template.infoboxSections],
+  );
+
+  const {
+    items: localSections,
+    applyOptimistic: applyOptimisticSections,
+    revert: revertSections,
+  } = useOptimisticOrder(sortedSections);
+  const {
+    items: localInfoboxSections,
+    applyOptimistic: applyOptimisticInfobox,
+    revert: revertInfobox,
+  } = useOptimisticOrder(sortedInfoboxSections);
+
   function handleReorderSections(orderedIds: number[]) {
+    applyOptimisticSections(orderedIds); // instant visual update before server round-trip
     startReorderTransition(async () => {
-      await reorderTemplateSectionAction(template.id, orderedIds);
-      router.refresh();
+      try {
+        await reorderTemplateSectionAction(template.id, orderedIds);
+        router.refresh();
+      } catch {
+        revertSections(); // restore server order on failure
+      }
     });
   }
 
   function handleReorderInfoboxSections(orderedIds: number[]) {
+    applyOptimisticInfobox(orderedIds); // instant visual update before server round-trip
     startReorderTransition(async () => {
-      await reorderTemplateInfoboxSectionAction(template.id, orderedIds);
-      router.refresh();
+      try {
+        await reorderTemplateInfoboxSectionAction(template.id, orderedIds);
+        router.refresh();
+      } catch {
+        revertInfobox(); // restore server order on failure
+      }
     });
   }
 
   const anyPending = isPending || reorderPending;
-
-  const sortedSections = [...template.sections].sort(
-    (a, b) => a.displayOrder - b.displayOrder,
-  );
-  const sortedInfoboxSections = [...template.infoboxSections].sort(
-    (a, b) => a.displayOrder - b.displayOrder,
-  );
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -242,7 +269,7 @@ export function TemplateItem(props: TemplateItemProps) {
             </Label>
           </Box>
           <TemplateSectionList
-            sections={sortedSections}
+            sections={localSections}
             value={addingSectionName}
             onChange={setAddingSectionName}
             onAdd={handleAddSection}
@@ -253,7 +280,7 @@ export function TemplateItem(props: TemplateItemProps) {
           />
           {template.hasInfobox && (
             <TemplateInfoboxSectionList
-              rows={sortedInfoboxSections}
+              rows={localInfoboxSections}
               value={addingInfoboxLabel}
               onChange={setAddingInfoboxLabel}
               onAdd={handleAddInfoboxSection}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { GripVerticalIcon, LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/Dialog";
 import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
+import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { useSortableSensors, makeDragEndHandler } from "@/lib/dndUtils";
@@ -174,16 +175,21 @@ export function PageSectionManager({
 
   // The first section is always locked; only sections[1+] are sortable.
   const lockedSection = sections[0] as PageSection | undefined;
-  const sortableSections = sections.slice(1);
+  // Memoized so the reference only changes when server data changes, not on every
+  // render triggered by isPending flipping — which would reset optimistic state mid-flight.
+  const sortableSections = useMemo(() => sections.slice(1), [sections]);
+
+  const { items: localSections, applyOptimistic, revert } = useOptimisticOrder(sortableSections);
 
   const sensors = useSortableSensors();
-  const handleDragEnd = makeDragEndHandler(sortableSections, (reorderedIds) => {
+  const handleDragEnd = makeDragEndHandler(localSections, (reorderedIds) => {
+    applyOptimistic(reorderedIds); // instant visual update before server round-trip
     const fd = new FormData();
     fd.set(
       "orderedIds",
       JSON.stringify(lockedSection ? [lockedSection.id, ...reorderedIds] : reorderedIds),
     );
-    run(reorderPageSections, fd);
+    run(reorderPageSections, fd, undefined, revert); // revert on server error
   });
 
   async function confirmDelete() {
@@ -208,10 +214,10 @@ export function PageSectionManager({
           {lockedSection && <LockedSection section={lockedSection} />}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext
-              items={sortableSections.map((s) => s.id)}
+              items={localSections.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
             >
-              {sortableSections.map((section) => (
+              {localSections.map((section) => (
                 <SortableSection
                   key={section.id}
                   section={section}
