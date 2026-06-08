@@ -382,7 +382,7 @@ export function PageReadView(props: PageReadViewProps) {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     onClick={() => setShowSuggestionForm(true)}
                   >
                     <FilePenLine />
