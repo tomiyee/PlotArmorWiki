@@ -515,10 +515,6 @@ export async function updatePageIntroChapter(
  * order; new infobox rows are likewise appended.
  *
  * Returns counts of added vs skipped items so the UI can surface a summary.
- *
- * @example
- * const result = await applyTemplateSections(42, 3);
- * // result: { addedSections: 2, skippedSections: 1, addedInfoboxRows: 3, skippedInfoboxRows: 0 }
  */
 export async function applyTemplateSections(
   pageId: number,
@@ -559,26 +555,26 @@ export async function applyTemplateSections(
   ]);
 
   return await db.transaction(async (tx) => {
-    // Fetch live (non-deleted) section names for this page.
-    const liveSections = await tx
-      .select({ name: pageSections.name })
-      .from(pageSections)
-      .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)));
+    // Fetch live sections and infobox rows in parallel; infobox query skipped when template has no infobox.
+    const [liveSections, liveInfoboxRows] = await Promise.all([
+      tx
+        .select({ name: pageSections.name })
+        .from(pageSections)
+        .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt))),
+      tmpl.hasInfobox
+        ? tx
+            .select({ label: pageInfoboxSections.label })
+            .from(pageInfoboxSections)
+            .where(
+              and(
+                eq(pageInfoboxSections.pageId, pageId),
+                isNull(pageInfoboxSections.deletedAt),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
 
     const liveSectionNames = new Set(liveSections.map((s) => s.name.toLowerCase()));
-
-    // Fetch live infobox rows for this page (skip when template has no infobox).
-    const liveInfoboxRows = tmpl.hasInfobox
-      ? await tx
-          .select({ label: pageInfoboxSections.label })
-          .from(pageInfoboxSections)
-          .where(
-            and(
-              eq(pageInfoboxSections.pageId, pageId),
-              isNull(pageInfoboxSections.deletedAt),
-            ),
-          )
-      : [];
 
     const liveInfoboxLabels = new Set(
       liveInfoboxRows.map((r) => r.label.toLowerCase()),

@@ -41,7 +41,8 @@ import {
   getMyPageSuggestions,
 } from "./suggestionActions";
 
-interface Props {
+interface PageViewProps {
+  /** Next.js dynamic route params: `serial` slug and `page` slug. */
   params: Promise<{ serial: string; page: string }>;
 }
 
@@ -132,7 +133,9 @@ async function fetchSerialTemplates(serialId: number) {
   }));
 }
 
-export default async function PageView({ params }: Props) {
+/** Server Component that renders a wiki page at the reader's chapter cutoff. */
+export default async function PageView(props: PageViewProps) {
+  const { params } = props;
   const { serial: serialSlug, page: pageParam } = await params;
 
   const decodedPageSlug = decodeURIComponent(pageParam);
@@ -505,17 +508,16 @@ export default async function PageView({ params }: Props) {
   // ── Suggestion data ───────────────────────────────────────────────────────
   // Fetch in parallel: pending count + full list for admins, user status for
   // non-admins. Both functions are no-ops when the user lacks permission.
-  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] =
+  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions, serialTemplates] =
     await Promise.all([
       isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
       isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
       !isAdmin && isUserAuthenticated
         ? getMyPageSuggestions(page.id)
         : Promise.resolve([]),
+      // Only fetched for admins; non-admins never see the edit panel.
+      isAdmin ? fetchSerialTemplates(serial.id) : Promise.resolve([]),
     ]);
-
-  // Only fetched when the user is an admin; non-admins never see the edit panel.
-  const serialTemplates = isAdmin ? await fetchSerialTemplates(serial.id) : [];
 
   return (
     <main>
