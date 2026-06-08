@@ -187,7 +187,11 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
           autoFocus={autoFocusAlias}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleConfirm();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              handleConfirm();
+            }
           }}
         />
         <Button
