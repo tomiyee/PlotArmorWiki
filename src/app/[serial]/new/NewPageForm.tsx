@@ -48,13 +48,20 @@ interface Template {
   infoboxSections: TemplateInfoboxSection[];
 }
 
-interface Props {
+interface NewPageFormProps {
+  /** URL slug of the serial — used to scope the `createPage` action. */
   serialSlug: string;
+  /** Label for the chapter unit (e.g. `"Chapter"`, `"Episode"`). */
   chapterType: string;
+  /** All volumes for the intro chapter grouped selector. */
   volumeList: Volume[];
+  /** All chapters for the intro chapter selector. */
   chapterList: Chapter[];
+  /** All existing pages in the serial; filtered to those visible at the selected intro chapter. */
   existingPages: PageOption[];
+  /** Pre-selected parent page id, e.g. when navigating here from a page's edit mode. */
   defaultParentPageId?: number;
+  /** Serial templates for pre-populating sections and infobox rows on the new page. */
   templates: Template[];
 }
 
@@ -69,15 +76,16 @@ interface Props {
  * @example
  * <NewPageForm serialSlug="one-piece" chapterType="Chapter" templates={[]} ... />
  */
-export function NewPageForm({
-  serialSlug,
-  chapterType,
-  volumeList,
-  chapterList,
-  existingPages,
-  defaultParentPageId,
-  templates,
-}: Props) {
+export function NewPageForm(props: NewPageFormProps) {
+  const {
+    serialSlug,
+    chapterType,
+    volumeList,
+    chapterList,
+    existingPages,
+    defaultParentPageId,
+    templates,
+  } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
 
   // Build chapter id → idx lookup for filtering.

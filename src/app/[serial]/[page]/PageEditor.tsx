@@ -15,6 +15,7 @@ import {
   savePageContent,
   getPageContentAtChapter,
   getParentPagesAtChapter,
+  getAllSerialPagesAtChapter,
   updatePageIntroChapter,
 } from "./actions";
 import { Select } from "@/components/ui/Select";
@@ -40,8 +41,10 @@ import type {
   ChapterGroupOption,
 } from "./types";
 
-interface Props {
+interface PageEditorProps {
+  /** Slug of the serial this page belongs to. */
   serialSlug: string;
+  /** URL slug of this wiki page. */
   pageSlug: string;
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
   pageId: number;
@@ -56,6 +59,7 @@ interface Props {
    * carries chapter-versioned content).
    */
   pageSectionStructure: PageSection[];
+  /** Chapter-versioned section content at the reader's current cutoff. */
   sections: SectionData[];
   /**
    * Wall-clock-versioned infobox row structure for this page, used to power
@@ -115,9 +119,10 @@ interface Props {
   parentPages: ParentPageEntry[];
   /**
    * All pages in the serial (excluding the current page) used to populate the
-   * "Add parent" dropdown in the Relationships edit panel.
+   * "Add parent" dropdown in the Relationships edit panel. Titles are resolved
+   * at the reader's chapter cutoff so the dropdown reflects temporal renames.
    */
-  allSerialPages: { id: number; name: string }[];
+  allSerialPages: { id: number; title: string }[];
   /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
@@ -222,7 +227,7 @@ interface Props {
  *   allSerialPages={[]}
  * />
  */
-export function PageEditor(props: Props) {
+export function PageEditor(props: PageEditorProps) {
   const {
     serialSlug,
     pageSlug,
@@ -289,6 +294,10 @@ export function PageEditor(props: Props) {
   const [currentParentPages, setCurrentParentPages] =
     useState<ParentPageEntry[]>(parentPages);
 
+  const [currentAllSerialPages, setCurrentAllSerialPages] = useState<
+    { id: number; title: string }[]
+  >(allSerialPages);
+
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
   );
@@ -352,6 +361,7 @@ export function PageEditor(props: Props) {
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setCurrentParentPages(parentPages);
+    setCurrentAllSerialPages(allSerialPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
     setDraftIntroChapterId(introChapterId);
   }, [
@@ -359,6 +369,7 @@ export function PageEditor(props: Props) {
     floaterImageUrl,
     floaterRows,
     parentPages,
+    allSerialPages,
     readingChapterId,
     headChapterId,
     introChapterId,
@@ -418,23 +429,7 @@ export function PageEditor(props: Props) {
     let cancelled = false;
     getPageContentAtChapter(serialSlug, pageSlug, selectedChapterId).then(
       (data) => {
-        if (!cancelled) {
-          setPreviousSectionContent(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousContent]),
-            ),
-          );
-          setPreviousSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-            ),
-          );
-          setNextSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-            ),
-          );
-        }
+        if (!cancelled) applyRevisionMetadata(data.sections);
       },
     );
     return () => {
@@ -444,6 +439,27 @@ export function PageEditor(props: Props) {
     // handleChapterChange which also updates these states.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
+
+  function applyRevisionMetadata(sections: {
+    id: number;
+    previousContent: string;
+    previousRevisionChapterIdx: number | null;
+    nextRevisionChapterIdx: number | null;
+  }[]) {
+    setPreviousSectionContent(
+      Object.fromEntries(sections.map((s) => [s.id, s.previousContent])),
+    );
+    setPreviousSectionRevisionChapterIdx(
+      Object.fromEntries(
+        sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
+      ),
+    );
+    setNextSectionRevisionChapterIdx(
+      Object.fromEntries(
+        sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
+      ),
+    );
+  }
 
   /**
    * When the editor picks a different target chapter, fetch the content that
@@ -456,9 +472,10 @@ export function PageEditor(props: Props) {
   ) {
     setSelectedChapterId(chapterId);
     startTransition(async () => {
-      const [data, parents] = await Promise.all([
+      const [data, parents, serialPages] = await Promise.all([
         getPageContentAtChapter(serialSlug, pageSlug, chapterId),
         getParentPagesAtChapter(serialSlug, pageSlug, chapterId),
+        getAllSerialPagesAtChapter(serialSlug, pageSlug, chapterId),
       ]);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
@@ -469,19 +486,7 @@ export function PageEditor(props: Props) {
           data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx]),
         ),
       );
-      setPreviousSectionContent(
-        Object.fromEntries(data.sections.map((s) => [s.id, s.previousContent])),
-      );
-      setPreviousSectionRevisionChapterIdx(
-        Object.fromEntries(
-          data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-        ),
-      );
-      setNextSectionRevisionChapterIdx(
-        Object.fromEntries(
-          data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-        ),
-      );
+      applyRevisionMetadata(data.sections);
       if (hasInfobox) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
@@ -489,6 +494,7 @@ export function PageEditor(props: Props) {
         );
       }
       setCurrentParentPages(parents);
+      setCurrentAllSerialPages(serialPages);
     });
   }
 
@@ -515,21 +521,7 @@ export function PageEditor(props: Props) {
             pageSlug,
             selectedChapterId,
           );
-          setPreviousSectionContent(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousContent]),
-            ),
-          );
-          setPreviousSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
-            ),
-          );
-          setNextSectionRevisionChapterIdx(
-            Object.fromEntries(
-              data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
-            ),
-          );
+          applyRevisionMetadata(data.sections);
         });
       }
     } else if (lastUpdatedIdx !== null) {
@@ -601,17 +593,16 @@ export function PageEditor(props: Props) {
   const selectedChapterIdx =
     allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
-  // Intro chapter selector: all chapters enabled (no cutoff restriction). An
-  // admin must be able to move the intro chapter to any chapter in the serial,
-  // including ones beyond their personal reading progress.
-  const introChapterSelectOptions: ChapterGroupOption[] = (() => {
+  function buildChapterGroupOptions(
+    isDisabled: (ch: ChapterData) => boolean,
+  ): ChapterGroupOption[] {
     const volumeMap = new Map<
       string,
       { label: string; value: number; disabled: boolean }[]
     >();
     for (const ch of allChapters) {
       const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id, disabled: false });
+      arr.push({ label: ch.displayName, value: ch.id, disabled: isDisabled(ch) });
       volumeMap.set(ch.volumeName, arr);
     }
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
@@ -619,32 +610,20 @@ export function PageEditor(props: Props) {
       value: -1 as number,
       children: chaps,
     }));
-  })();
+  }
+
+  // Intro chapter selector: all chapters enabled (no cutoff restriction). An
+  // admin must be able to move the intro chapter to any chapter in the serial,
+  // including ones beyond their personal reading progress.
+  const introChapterSelectOptions = buildChapterGroupOptions(() => false);
 
   // Chapters before the page's intro chapter are disabled - content can't predate the page.
   // Chapters beyond the reader's cutoff are also disabled - editors can't write spoilers.
-  const chapterSelectOptions: ChapterGroupOption[] = (() => {
-    const volumeMap = new Map<
-      string,
-      { label: string; value: number; idx: number }[]
-    >();
-    for (const ch of allChapters) {
-      const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id, idx: ch.idx });
-      volumeMap.set(ch.volumeName, arr);
-    }
-    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
-      label: volumeName,
-      value: -1 as number,
-      children: chaps.map((c) => ({
-        label: c.label,
-        value: c.value,
-        disabled:
-          (introChapterIdx !== null && c.idx < introChapterIdx) ||
-          (readingCutoffIdx !== null && c.idx > readingCutoffIdx),
-      })),
-    }));
-  })();
+  const chapterSelectOptions = buildChapterGroupOptions(
+    (ch) =>
+      (introChapterIdx !== null && ch.idx < introChapterIdx) ||
+      (readingCutoffIdx !== null && ch.idx > readingCutoffIdx),
+  );
 
   return (
     <Banner scrollable={false}>
@@ -722,7 +701,7 @@ export function PageEditor(props: Props) {
         <PageRelationshipsPanel
           pageId={pageId}
           parentPages={currentParentPages}
-          allSerialPages={allSerialPages}
+          allSerialPages={currentAllSerialPages}
           chapterId={selectedChapterId}
         />
       )}

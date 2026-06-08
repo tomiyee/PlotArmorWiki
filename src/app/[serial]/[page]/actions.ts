@@ -26,6 +26,7 @@ import {
   max,
   min,
   ne,
+  or,
 } from "drizzle-orm";
 import {
   requireSerialAdminBySlug,
@@ -34,6 +35,8 @@ import {
 import { applyPageContentRevisions } from "./revisionHelpers";
 import {
   resolvePageTitlesAtIdx,
+  fetchActiveParentPagesAtIdx,
+  fetchSerialPagesAtIdx,
   getSerialBySlug,
   getChapterIdxById,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
@@ -871,62 +874,54 @@ export async function getParentPagesAtChapter(
   pageSlug: string,
   chapterId: number,
 ): Promise<{ id: number; name: string; slug: string; title: string }[]> {
-  const [{ pageId }, cutoffIdxForParents] = await Promise.all([
+  const [{ pageId }, cutoffIdx] = await Promise.all([
     resolvePageIds(serialSlug, pageSlug),
     getChapterIdxById(chapterId),
   ]);
-  if (cutoffIdxForParents === null) throw new Error("Chapter not found");
+  if (cutoffIdx === null) throw new Error("Chapter not found");
 
-  const cutoffIdx = cutoffIdxForParents;
-
-  const parentRelMaxIdxSq = db
-    .select({
-      parentPageId: pageRelationships.parentPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.childPageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.parentPageId)
-    .as("parent_rel_max_idx_sq");
-
-  const parentPagesRaw = await db
-    .select({
-      id: pages.id,
-      name: pages.name,
-      slug: pages.slug,
-      isActive: pageRelationships.isActive,
-    })
-    .from(pageRelationships)
-    .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .innerJoin(
-      parentRelMaxIdxSq,
-      and(
-        eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
-        eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
-      ),
-    )
-    .where(eq(pageRelationships.childPageId, pageId));
-
-  const activeParents = parentPagesRaw.filter((r) => r.isActive);
-  if (activeParents.length === 0) return [];
-
-  const parentPageIds = activeParents.map((r) => r.id);
-
-  const titleMap = await resolvePageTitlesAtIdx(parentPageIds, cutoffIdx);
+  const activeParents = await fetchActiveParentPagesAtIdx(pageId, cutoffIdx);
+  const titleMap = await resolvePageTitlesAtIdx(
+    activeParents.map((r) => r.id),
+    cutoffIdx,
+  );
 
   return activeParents.map((r) => ({
-    id: r.id,
-    name: r.name,
-    slug: r.slug,
+    ...r,
     title: titleMap.get(r.id) ?? r.name,
   }));
+}
+
+/**
+ * Returns all pages in the serial with their titles resolved at the given
+ * chapter's cutoff, excluding the current page. Used to keep the "Add parent"
+ * dropdown in sync with the "Writing as of Chapter" selector — the same
+ * temporal title resolution applied to `getParentPagesAtChapter`.
+ *
+ * @example
+ * const allPages = await getAllSerialPagesAtChapter('one-piece', 'luffy', 7);
+ * // allPages: [{ id: 1, title: 'Nami' }, ...]
+ */
+export async function getAllSerialPagesAtChapter(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ id: number; title: string }[]> {
+  const [{ serialId, pageId }, cutoffIdx] = await Promise.all([
+    resolvePageIds(serialSlug, pageSlug),
+    getChapterIdxById(chapterId),
+  ]);
+  if (cutoffIdx === null) throw new Error("Chapter not found");
+
+  const allPages = await fetchSerialPagesAtIdx(serialId, cutoffIdx);
+  const titleMap = await resolvePageTitlesAtIdx(
+    allPages.map((p) => p.id),
+    cutoffIdx,
+  );
+
+  return allPages
+    .filter((p) => p.id !== pageId)
+    .map((p) => ({ id: p.id, title: titleMap.get(p.id) ?? p.name }));
 }
 
 /**

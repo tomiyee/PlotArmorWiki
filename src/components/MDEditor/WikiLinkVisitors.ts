@@ -12,7 +12,7 @@ import {
 import { ElementNode, $createTextNode } from "lexical";
 import type * as Mdast from "mdast";
 import { WikiLinkNode, $isWikiLinkNode } from "./WikiLinkNode";
-import { WIKI_LINK_RE } from "@/lib/wiki-links";
+import { WIKI_LINK_RE, escapeWikiAlias, unescapeWikiAlias } from "@/lib/wiki-links";
 
 // ── MDXEditor import visitor: text → WikiLinkNode ────────────────────────────
 
@@ -45,7 +45,7 @@ export const WikiLinkTextVisitor: MdastImportVisitor<Mdast.Text> = {
         before.setFormat(formatting);
         (lexicalParent as ElementNode).append(before);
       }
-      const alias = match[2]?.trim() || undefined;
+      const alias = match[2] ? unescapeWikiAlias(match[2].trim()) || undefined : undefined;
       (lexicalParent as ElementNode).append(new WikiLinkNode(match[1], alias));
       lastIndex = match.index + match[0].length;
     }
@@ -88,7 +88,7 @@ export const WikiLinkExportVisitor: LexicalExportVisitor<
 export const wikiLinkToMarkdownExtension = {
   handlers: {
     wikiLink: (node: MdastWikiLinkNode) =>
-      node.alias ? `[[${node.value}|${node.alias}]]` : `[[${node.value}]]`,
+      node.alias ? `[[${node.value}|${escapeWikiAlias(node.alias)}]]` : `[[${node.value}]]`,
   },
 } as unknown as ToMarkdownExtension;
 

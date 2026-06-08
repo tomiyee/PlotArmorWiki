@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Trash2Icon,
   PencilIcon,
@@ -13,32 +14,51 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { useServerAction } from "@/hooks/useServerAction";
+import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { TemplateSectionList } from "./TemplateSectionList";
 import { TemplateInfoboxSectionList } from "./TemplateInfoboxSectionList";
-import type { Template, ServerAction } from "./types";
+import type { Template, ServerAction, ReorderAction } from "./types";
 
 interface TemplateItemProps {
+  /** The template to display and edit. */
   template: Template;
+  /** Server action to delete this template. */
   deleteTemplateAction: ServerAction;
+  /** Server action to rename this template. */
   renameTemplateAction: ServerAction;
+  /** Server action to toggle the infobox flag on this template. */
   toggleTemplateInfoboxAction: ServerAction;
+  /** Server action to append a section to this template. */
   addTemplateSectionAction: ServerAction;
+  /** Server action to delete a section from this template. */
   deleteTemplateSectionAction: ServerAction;
+  /** Server action to persist the new section order after drag-and-drop. */
+  reorderTemplateSectionAction: ReorderAction;
+  /** Server action to append an infobox row to this template. */
   addTemplateInfoboxSectionAction: ServerAction;
+  /** Server action to delete an infobox row from this template. */
   deleteTemplateInfoboxSectionAction: ServerAction;
+  /** Server action to persist the new infobox row order after drag-and-drop. */
+  reorderTemplateInfoboxSectionAction: ReorderAction;
 }
 
-export function TemplateItem({
-  template,
-  deleteTemplateAction,
-  renameTemplateAction,
-  toggleTemplateInfoboxAction,
-  addTemplateSectionAction,
-  deleteTemplateSectionAction,
-  addTemplateInfoboxSectionAction,
-  deleteTemplateInfoboxSectionAction,
-}: TemplateItemProps) {
+export function TemplateItem(props: TemplateItemProps) {
+  const {
+    template,
+    deleteTemplateAction,
+    renameTemplateAction,
+    toggleTemplateInfoboxAction,
+    addTemplateSectionAction,
+    deleteTemplateSectionAction,
+    reorderTemplateSectionAction,
+    addTemplateInfoboxSectionAction,
+    deleteTemplateInfoboxSectionAction,
+    reorderTemplateInfoboxSectionAction,
+  } = props;
+
+  const router = useRouter();
   const { run, isPending } = useServerAction();
+  const [reorderPending, startReorderTransition] = useTransition();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState(template.name);
@@ -121,12 +141,54 @@ export function TemplateItem({
     run(deleteTemplateInfoboxSectionAction, fd);
   }
 
-  const sortedSections = [...template.sections].sort(
-    (a, b) => a.displayOrder - b.displayOrder,
+  // Memoize so the reference only changes when server data changes — not on every
+  // render triggered by reorderPending flipping. A new reference would cause
+  // useOptimisticOrder's useEffect to fire and reset the optimistic state mid-flight.
+  const sortedSections = useMemo(
+    () => [...template.sections].sort((a, b) => a.displayOrder - b.displayOrder),
+    [template.sections],
   );
-  const sortedInfoboxSections = [...template.infoboxSections].sort(
-    (a, b) => a.displayOrder - b.displayOrder,
+  const sortedInfoboxSections = useMemo(
+    () => [...template.infoboxSections].sort((a, b) => a.displayOrder - b.displayOrder),
+    [template.infoboxSections],
   );
+
+  const {
+    items: localSections,
+    applyOptimistic: applyOptimisticSections,
+    revert: revertSections,
+  } = useOptimisticOrder(sortedSections);
+  const {
+    items: localInfoboxSections,
+    applyOptimistic: applyOptimisticInfobox,
+    revert: revertInfobox,
+  } = useOptimisticOrder(sortedInfoboxSections);
+
+  function handleReorderSections(orderedIds: number[]) {
+    applyOptimisticSections(orderedIds); // instant visual update before server round-trip
+    startReorderTransition(async () => {
+      try {
+        await reorderTemplateSectionAction(template.id, orderedIds);
+        router.refresh();
+      } catch {
+        revertSections(); // restore server order on failure
+      }
+    });
+  }
+
+  function handleReorderInfoboxSections(orderedIds: number[]) {
+    applyOptimisticInfobox(orderedIds); // instant visual update before server round-trip
+    startReorderTransition(async () => {
+      try {
+        await reorderTemplateInfoboxSectionAction(template.id, orderedIds);
+        router.refresh();
+      } catch {
+        revertInfobox(); // restore server order on failure
+      }
+    });
+  }
+
+  const anyPending = isPending || reorderPending;
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -174,7 +236,7 @@ export function TemplateItem({
               setRenaming((p) => !p);
               setRenameDraft(template.name);
             }}
-            disabled={isPending}
+            disabled={anyPending}
           >
             <PencilIcon className="h-3 w-3" />
           </Button>
@@ -184,7 +246,7 @@ export function TemplateItem({
             size="icon-sm"
             title="Delete template"
             onClick={handleDelete}
-            disabled={isPending}
+            disabled={anyPending}
           >
             <Trash2Icon className="h-3 w-3 text-red-500" />
           </Button>
@@ -199,7 +261,7 @@ export function TemplateItem({
               id={`has-infobox-${template.id}`}
               checked={template.hasInfobox}
               onChange={(e) => handleToggleInfobox(e.target.checked)}
-              disabled={isPending}
+              disabled={anyPending}
               className="h-4 w-4 rounded border-border"
             />
             <Label htmlFor={`has-infobox-${template.id}`}>
@@ -207,22 +269,24 @@ export function TemplateItem({
             </Label>
           </Box>
           <TemplateSectionList
-            sections={sortedSections}
+            sections={localSections}
             value={addingSectionName}
             onChange={setAddingSectionName}
             onAdd={handleAddSection}
             onDelete={handleDeleteSection}
-            isPending={isPending}
+            onReorder={handleReorderSections}
+            isPending={anyPending}
             inputRef={sectionInputRef}
           />
           {template.hasInfobox && (
             <TemplateInfoboxSectionList
-              rows={sortedInfoboxSections}
+              rows={localInfoboxSections}
               value={addingInfoboxLabel}
               onChange={setAddingInfoboxLabel}
               onAdd={handleAddInfoboxSection}
               onDelete={handleDeleteInfoboxSection}
-              isPending={isPending}
+              onReorder={handleReorderInfoboxSections}
+              isPending={anyPending}
               inputRef={infoboxInputRef}
             />
           )}

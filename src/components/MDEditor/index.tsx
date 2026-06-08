@@ -44,7 +44,7 @@ import { InsertRefButton } from "./InsertRefButton";
 import { RefNode, $isRefNode } from "./RefNode";
 import { RefEditPopover } from "./RefEditPopover";
 import { refPlugin, refToMarkdownExtension } from "./RefVisitors";
-import { normalizeMarkdown } from "./normalizeMarkdown";
+import { normalizeMarkdown, prepareMarkdownForEditor } from "./normalizeMarkdown";
 import {
   useApplySuggestion,
   type Suggestion,
@@ -188,9 +188,12 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const isDark = hasMounted && resolvedTheme === "dark";
 
   const editorRef = useRef<MDXEditorMethods>(null);
-  // Snapshot of value on mount - used as the diff baseline so "Diff" mode shows
-  // changes made in this editing session relative to what was loaded from the server.
-  const [initialValue] = useState(() => normalizeMarkdown(value));
+  // prepareMarkdownForEditor doubles backslashes for CommonMark safety; that
+  // format must NOT be used as the diff baseline because the editor emits the
+  // un-doubled form on onChange. normalizeMarkdown(value) matches the save-path
+  // format, so the diff shows real content changes instead of escape artifacts.
+  const [initialValue] = useState(() => prepareMarkdownForEditor(value));
+  const [diffBaseline] = useState(() => normalizeMarkdown(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
 
@@ -386,7 +389,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
    * consistent with chip-click edits, which also render at this level.
    */
   const openInsertMenu = useCallback((anchorEl: HTMLElement) => {
-    setEditState({ nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false });
+    setEditState({
+      nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false,
+    });
   }, []);
 
   /**
@@ -404,7 +409,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
       if (!read) return;
       setEditState({
-        nodeKey, anchorEl, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: false,
+        nodeKey,
+        anchorEl,
+        initialToken: read.token,
+        initialAlias: read.alias,
+        autoFocusAlias: false,
       });
     },
     [],
@@ -692,11 +701,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       linkDialogPlugin(),
       tablePlugin(),
       codeBlockPlugin(),
-      diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: initialValue }),
+      diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: diffBaseline }),
     ];
     // InsertWikiLinkButton and InsertRefButton are self-contained and read all
-    // mutable data from context, so only initialValue (the diff baseline) is a real dep.
-  }, [initialValue]);
+    // mutable data from context, so only diffBaseline (the diff baseline) is a real dep.
+  }, [diffBaseline]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
 

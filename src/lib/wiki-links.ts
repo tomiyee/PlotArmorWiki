@@ -43,14 +43,58 @@ export interface WikiLinkParts {
  * Broad outer regex that matches `[[…]]` wiki link syntax, including an
  * optional `|alias` suffix. Inner contents are parsed by `parseWikiLink`.
  *
- * Group 1: inner path (everything before the optional `|`)
- * Group 2: alias (everything after `|`, if present); may contain `]` as long as
- * the sequence `]]` only appears as the closing delimiter.
+ * The leading `\[?` optionally consumes one extra `[` that can appear before
+ * `[[` in rendered text nodes (e.g. when markdown stores `\[[[token]]` — a
+ * backslash-escaped `[` followed by a wiki link — remark produces the text
+ * node `[[[token]]`). Consuming the leading `[` as part of the match prevents
+ * it from appearing as orphaned literal text before the rendered chip/link.
  *
- * Leaves room for future syntax extensions (anchors, embeds, etc.) by keeping
- * the outer match broad and delegating inner parsing to `parseWikiLink`.
+ * Group 1: inner path (everything before the optional `|`)
+ * Group 2: alias (everything after `|`, if present); `\]` is an escape
+ * sequence for a literal `]` inside the alias.
+ *
+ * Use this regex on **raw markdown** (where `\]` is still present as written).
+ * For remark plugins that receive CommonMark-decoded text (where `\]` → `]`),
+ * use `DECODED_WIKI_LINK_RE` instead.
  */
-export const WIKI_LINK_RE = /\[\[([^|]+)(?:\|((?:[^\]]|\](?!\]))*(?:\](?=\]\]))?))?\]\]/g;
+export const WIKI_LINK_RE = /\[?\[\[([^|\[\]]+)(?:\|((?:[^\]\\]|\\.)*))?\]\]/g;
+
+/**
+ * Variant of `WIKI_LINK_RE` for use in contexts where CommonMark backslash
+ * escapes have already been decoded (i.e. `\]` is already `]`).
+ *
+ * The alias group uses `[^[]` (any non-`[` char, including `]`) together
+ * with `\[(?!\[)` (a lone `[`), and relies on greedy backtracking to find
+ * the outermost `]]` closer rather than the first `]` encountered.
+ *
+ * Example: decoded text `[[page:foo|[Chief]]]`
+ * - WIKI_LINK_RE captures alias `[Chief` (stops at `]` before `]]`) → wrong
+ * - DECODED_WIKI_LINK_RE captures alias `[Chief]` (backtracks to last `]]`) → correct
+ *
+ * Group 1 / Group 2: same semantics as `WIKI_LINK_RE`.
+ */
+export const DECODED_WIKI_LINK_RE =
+  /\[?\[\[([^|\[\]]+)(?:\|((?:[^[]|\[(?!\[))*))?\]\]/g;
+
+/**
+ * Escapes an alias so it can be safely embedded in `[[token|alias]]`.
+ *
+ * Two-level scheme: `\` → `\\` first, then `]` → `\]`.
+ * Escaping `\` first prevents the already-present `\` from being confused with
+ * the `\]` escape that follows when the alias ends with a literal `\]`.
+ */
+export function escapeWikiAlias(alias: string): string {
+  return alias.replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
+}
+
+/**
+ * Reverses `escapeWikiAlias`: decodes `\\` → `\` and `\]` → `]` in a single
+ * left-to-right pass so that `\\]` (escaped backslash + escaped `]`) round-trips
+ * correctly back to `\]`.
+ */
+export function unescapeWikiAlias(raw: string): string {
+  return raw.replace(/\\([\]\\])/g, "$1");
+}
 
 /**
  * Parse the inner content of a `[[…]]` token into its structured parts.
@@ -88,7 +132,10 @@ export function parseWikiLink(
   return {
     page,
     category,
-    alias: alias?.trim() || undefined,
+    // Called from the remark plugin where text is already CommonMark-decoded —
+    // escape sequences like \] are resolved to ] before we see them, so no
+    // unescaping is needed here.
+    alias: alias ? alias.trim() || undefined : undefined,
   };
 }
 

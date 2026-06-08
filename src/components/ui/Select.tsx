@@ -8,11 +8,10 @@ import {
   useId,
   useMemo,
   type ChangeEvent,
-  type Dispatch,
   type KeyboardEvent,
   type ReactNode,
+  type RefCallback,
   type RefObject,
-  type SetStateAction,
 } from "react";
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -137,7 +136,25 @@ function useAccordionState<T>(options: Option<T>[]) {
     [allRowIds],
   );
 
-  return { effectiveExpandedIds, toggleExpand };
+  const ensureExpanded = useCallback(
+    (ids: string[]) => {
+      setExpandedIds((prev) => {
+        const base = prev ?? allRowIds;
+        const next = new Set(base);
+        let changed = false;
+        for (const id of ids) {
+          if (!next.has(id)) {
+            next.add(id);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    },
+    [allRowIds],
+  );
+
+  return { effectiveExpandedIds, toggleExpand, ensureExpanded };
 }
 
 /**
@@ -179,10 +196,10 @@ type KeyboardNavOptions<T> = {
   totalSelectableCount: number;
   /** Flat list of rendered rows, used to resolve the active index to an item on Enter. */
   selectableRows: FlatRow<T>[];
-  /** Index into `selectableRows` of the currently highlighted option. */
+  /** Index into `selectableRows` of the currently highlighted option (-1 = none). */
   activeSelectableIdx: number;
-  /** Updates the highlighted index; called on Arrow/Home/End key presses. */
-  setActiveSelectableIdx: Dispatch<SetStateAction<number>>;
+  /** Updates the highlighted row by its stable path ID; called on Arrow/Home/End key presses. */
+  setActiveRowId: (id: string | null) => void;
   /** Confirms the selection of a row; called when Enter is pressed. */
   onSelect: (row: FlatRow<T>) => void;
   /** Closes the dropdown; called when Escape is pressed. */
@@ -208,7 +225,7 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
     totalSelectableCount,
     selectableRows,
     activeSelectableIdx,
-    setActiveSelectableIdx,
+    setActiveRowId,
     onSelect,
     onClose,
   } = opts;
@@ -217,23 +234,25 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (!isOpen) return;
       switch (e.key) {
-        case "ArrowDown":
+        case "ArrowDown": {
           e.preventDefault();
-          setActiveSelectableIdx((i) =>
-            Math.min(i + 1, totalSelectableCount - 1),
-          );
+          const next = Math.min(activeSelectableIdx + 1, totalSelectableCount - 1);
+          setActiveRowId(selectableRows[next]?.id ?? null);
           break;
-        case "ArrowUp":
+        }
+        case "ArrowUp": {
           e.preventDefault();
-          setActiveSelectableIdx((i) => Math.max(i - 1, 0));
+          const prev = Math.max(activeSelectableIdx - 1, 0);
+          setActiveRowId(selectableRows[prev]?.id ?? null);
           break;
+        }
         case "Home":
           e.preventDefault();
-          setActiveSelectableIdx(0);
+          setActiveRowId(selectableRows[0]?.id ?? null);
           break;
         case "End":
           e.preventDefault();
-          setActiveSelectableIdx(Math.max(0, totalSelectableCount - 1));
+          setActiveRowId(selectableRows[totalSelectableCount - 1]?.id ?? null);
           break;
         case "Enter": {
           e.preventDefault();
@@ -252,23 +271,56 @@ function useKeyboardNav<T>(opts: KeyboardNavOptions<T>) {
       totalSelectableCount,
       selectableRows,
       activeSelectableIdx,
-      setActiveSelectableIdx,
+      setActiveRowId,
       onSelect,
       onClose,
     ],
   );
 }
 
+/**
+ * Manages scroll-into-view for the keyboard-active dropdown row.
+ *
+ * Attach `activeRowRef` to the active row. Call `onOpen()` before opening the
+ * dropdown so the first mount scrolls the row to the top of the list
+ * (`block:"start"`); keyboard-nav re-attaches use `block:"nearest"` so the
+ * item stays visible without jumping.
+ *
+ * @example
+ * const { activeRowRef, onOpen } = useScrollToActiveRow();
+ * // In handleOpen: onOpen();
+ * // In renderRow: <LeafRow activeRowRef={isActive ? activeRowRef : undefined} />
+ */
+function useScrollToActiveRow() {
+  const scrollToTopRef = useRef(false);
+
+  const activeRowRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    node.scrollIntoView({ block: scrollToTopRef.current ? "start" : "nearest" });
+    scrollToTopRef.current = false;
+  }, []);
+
+  const onOpen = useCallback(() => {
+    scrollToTopRef.current = true;
+  }, []);
+
+  return { activeRowRef, onOpen };
+}
+
 type GroupRowProps = {
   /** DOM element id for ARIA references. */
   domId: string;
+  /** Display text of the section header. */
   label: string;
+  /** Optional secondary text shown after the label. */
   description?: string;
   /** Nesting depth used to compute left-padding. */
   depth: number;
+  /** Whether this accordion section is currently expanded. */
   expanded: boolean;
   /** When false, the row is a static label with no expand/collapse behavior. */
   isAccordion: boolean;
+  /** Called when the user clicks to expand or collapse. */
   onToggle: () => void;
 };
 
@@ -326,15 +378,21 @@ function GroupRow(props: GroupRowProps) {
 type LeafRowProps = {
   /** DOM element id for ARIA references. */
   domId: string;
+  /** Display text of the option. */
   label: string;
+  /** Optional secondary text shown alongside the label. */
   description?: string;
   /** Nesting depth used to compute left-padding. */
   depth: number;
+  /** When true, the row is visually dimmed and cannot be selected. */
   disabled?: boolean;
+  /** Whether this row is currently keyboard-highlighted. */
   isActive: boolean;
+  /** Whether this row matches the current controlled value. */
   isSelected: boolean;
-  /** Attached only when this row is keyboard-active, enabling the parent's scroll-into-view effect. */
-  activeRowRef?: RefObject<HTMLDivElement | null>;
+  /** Attached only when this row is keyboard-active; fires scrollIntoView the moment the node mounts. */
+  activeRowRef?: RefObject<HTMLDivElement | null> | RefCallback<HTMLDivElement>;
+  /** Called when the user clicks or presses Enter on this row. */
   onSelect: () => void;
 };
 
@@ -402,15 +460,25 @@ function LeafRow(props: LeafRowProps) {
 }
 
 type DropdownContentProps = {
+  /** When false, the search input is hidden and options are never filtered. */
   searchable: boolean;
+  /** Current text in the search input. */
   query: string;
+  /** Called on every input event in the search box. */
   onQueryChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  /** Keyboard handler for Arrow/Enter/Escape navigation. */
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** Whether the dropdown is currently visible; triggers focus on the search input. */
   isOpen: boolean;
+  /** DOM id applied to the tree element for ARIA references. */
   treeId: string;
+  /** DOM id of the currently highlighted row for aria-activedescendant. */
   activeRowDomId: string | undefined;
+  /** When false, renders the empty-state message instead of the tree. */
   hasOptions: boolean;
+  /** Number of selectable options, used in the screen-reader live region. */
   selectableCount: number;
+  /** Rendered rows; this component does not inspect them. */
   children: ReactNode;
 };
 
@@ -573,24 +641,33 @@ function Select<T>(props: SelectProps<T>) {
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [activeSelectableIdx, setActiveSelectableIdx] = useState(0);
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const activeRowRef = useRef<HTMLDivElement>(null);
+
+  const { activeRowRef, onOpen } = useScrollToActiveRow();
 
   const hasCustomTrigger = children != null;
 
   const uid = useId();
   const treeId = `${uid}-tree`;
 
-  const { effectiveExpandedIds, toggleExpand } = useAccordionState(options);
+  const { effectiveExpandedIds, toggleExpand, ensureExpanded } = useAccordionState(options);
   const { flatRows, selectableRows, totalSelectableCount } = useFlatRows(
     options,
     effectiveExpandedIds,
     query,
     searchable,
+  );
+
+  // Derive the active index from the stable row ID so accordion
+  // collapse/expand never shifts the highlight to the wrong option.
+  const activeSelectableIdx = useMemo(
+    () =>
+      activeRowId === null ? -1 : selectableRows.findIndex((r) => r.id === activeRowId),
+    [activeRowId, selectableRows],
   );
 
   const handleClose = useCallback(() => {
@@ -613,32 +690,50 @@ function Select<T>(props: SelectProps<T>) {
   const handleOpen = useCallback(() => {
     if (disabled) return;
     setQuery("");
+    onOpen();
+    // Expand any collapsed groups that contain the selected option so the
+    // scroll target is visible on the first render.
+    const ancestorIds =
+      value !== undefined ? (findAncestorIds(options, value) ?? []) : [];
+    if (ancestorIds.length > 0) ensureExpanded(ancestorIds);
+    // Compute rows with the now-expanded state to find the right row ID.
+    // All state updates below are batched into one re-render (React 18).
+    const nextExpandedIds =
+      ancestorIds.length > 0
+        ? new Set([...effectiveExpandedIds, ...ancestorIds])
+        : effectiveExpandedIds;
+    const nextSelectableRows = buildFlatRows(options, nextExpandedIds, "").filter(
+      (r) => r.selectable,
+    );
+    const selectedRow =
+      value !== undefined
+        ? nextSelectableRows.find((r) => r.option.value === value)
+        : undefined;
+    setActiveRowId(selectedRow?.id ?? nextSelectableRows[0]?.id ?? null);
     setIsOpen(true);
-  }, [disabled]);
+  }, [disabled, onOpen, options, value, effectiveExpandedIds, ensureExpanded]);
 
   const handleQueryChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
-    setActiveSelectableIdx(0);
   }, []);
+
+  // Reset to the first matching row after each query change. Runs after render
+  // so selectableRows already reflects the new query when this fires.
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveRowId(selectableRows[0]?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only reset on query change
+  }, [query]);
 
   const handleKeyDown = useKeyboardNav({
     isOpen,
     totalSelectableCount,
     selectableRows,
     activeSelectableIdx,
-    setActiveSelectableIdx,
+    setActiveRowId,
     onSelect: handleSelect,
     onClose: handleClose,
   });
-
-  useEffect(() => {
-    if (isOpen) setActiveSelectableIdx(0);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    activeRowRef.current?.scrollIntoView({ block: "nearest" });
-  }, [activeSelectableIdx, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -863,4 +958,31 @@ function findLabel<T>(options: Option<T>[], value: T): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Returns the row IDs of every ancestor group that must be expanded to make
+ * the option matching `value` visible in the flat row list. Returns `null`
+ * when the value is not found, or `[]` when it is a root-level option.
+ *
+ * IDs use the same path-based scheme as `buildFlatRows` (e.g. `"0"`, `"0-2"`).
+ *
+ * @example
+ * const ids = findAncestorIds(options, chapterId); // ["1", "1-2"]
+ */
+function findAncestorIds<T>(
+  options: Option<T>[],
+  value: T,
+  prefix = "",
+): string[] | null {
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    const id = prefix ? `${prefix}-${i}` : `${i}`;
+    if (opt.value === value) return [];
+    if (opt.children) {
+      const childPath = findAncestorIds(opt.children, value, id);
+      if (childPath !== null) return [id, ...childPath];
+    }
+  }
+  return null;
 }

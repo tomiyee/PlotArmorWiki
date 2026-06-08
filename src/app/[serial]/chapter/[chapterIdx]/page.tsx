@@ -38,11 +38,14 @@ import {
   bulkApplyToc,
 } from "../../actions";
 
-interface Props {
+interface ChapterPageProps {
+  /** Next.js dynamic route params: `serial` slug and `chapterIdx` string. */
   params: Promise<{ serial: string; chapterIdx: string }>;
 }
 
-export default async function ChapterPage({ params }: Props) {
+/** Server Component for the chapter detail page: synopsis, introduced pages, and suggestion workflow. */
+export default async function ChapterPage(props: ChapterPageProps) {
+  const { params } = props;
   const { serial: serialSlug, chapterIdx: chapterIdxRaw } = await params;
 
   const chapterIdx = parseInt(chapterIdxRaw, 10);
@@ -243,6 +246,8 @@ export default async function ChapterPage({ params }: Props) {
     ]);
   }
 
+  const wikiChapters = chapterList.map((c) => ({ name: c.displayName, idx: c.idx }));
+
   return (
     <main>
       <EditModeAdminSetter isAdmin={isAdmin} />
@@ -318,10 +323,7 @@ export default async function ChapterPage({ params }: Props) {
                     serialSlug={serialSlug}
                     initialContent={synopsisContent}
                     wikiPages={wikiPages}
-                    wikiChapters={chapterList.map((c) => ({
-                      name: c.displayName,
-                      idx: c.idx,
-                    }))}
+                    wikiChapters={wikiChapters}
                     chapterType={serial.chapterType}
                     saveAction={boundSaveAction!}
                   />
@@ -343,10 +345,7 @@ export default async function ChapterPage({ params }: Props) {
                       mySuggestion={mySynopsisSuggestion}
                       wikiPages={wikiPages}
                       serialSlug={serialSlug}
-                      wikiChapters={chapterList.map((c) => ({
-                        name: c.displayName,
-                        idx: c.idx,
-                      }))}
+                      wikiChapters={wikiChapters}
                       chapterType={serial.chapterType}
                     />
                   )}

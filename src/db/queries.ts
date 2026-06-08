@@ -1,6 +1,7 @@
 import { db } from "@/db/index";
 import {
   chapters,
+  pages,
   pageTitles,
   pageRelationships,
   pageSectionRevisions,
@@ -8,7 +9,7 @@ import {
   serials,
   volumes,
 } from "@/db/schema";
-import { and, eq, inArray, lte, max } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 
 /** PostgreSQL INT4 max — use as cutoffIdx to mean "no chapter cutoff". */
 export const PG_INT_MAX = 2_147_483_647;
@@ -291,4 +292,87 @@ export async function getChapterBySerialAndIdx(
     .where(and(eq(volumes.serialId, serialId), eq(chapters.idx, chapterIdx)))
     .limit(1);
   return row;
+}
+
+/**
+ * Returns all pages in the serial that are visible at `cutoffIdx`: pages with
+ * no intro chapter (home page) are always included; others must have been
+ * introduced at or before `cutoffIdx`.
+ *
+ * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx`
+ * on the returned IDs and fall back to `name` when no title row exists.
+ *
+ * @example
+ * const rows = await fetchSerialPagesAtIdx(serialId, cutoffIdx);
+ * const titleMap = await resolvePageTitlesAtIdx(rows.map(r => r.id), cutoffIdx);
+ * const options = rows.map(r => ({ id: r.id, title: titleMap.get(r.id) ?? r.name }));
+ */
+export async function fetchSerialPagesAtIdx(
+  serialId: number,
+  cutoffIdx: number,
+): Promise<{ id: number; name: string }[]> {
+  return db
+    .select({ id: pages.id, name: pages.name })
+    .from(pages)
+    .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(
+      and(
+        eq(pages.serialId, serialId),
+        or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+      ),
+    )
+    .orderBy(asc(pages.name));
+}
+
+/**
+ * Returns the active parent pages for `pageId` at `cutoffIdx`: finds the
+ * latest `pageRelationships` revision per parent at or before `cutoffIdx`
+ * and keeps only those with `isActive = true`.
+ *
+ * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx`
+ * on the returned IDs and fall back to `name` when no title row exists.
+ *
+ * @example
+ * const rows = await fetchActiveParentPagesAtIdx(pageId, cutoffIdx);
+ * const titleMap = await resolvePageTitlesAtIdx(rows.map(r => r.id), cutoffIdx);
+ * const parents = rows.map(r => ({ ...r, title: titleMap.get(r.id) ?? r.name }));
+ */
+export async function fetchActiveParentPagesAtIdx(
+  pageId: number,
+  cutoffIdx: number,
+): Promise<{ id: number; name: string; slug: string }[]> {
+  const parentRelMaxIdxSq = db
+    .select({
+      parentPageId: pageRelationships.parentPageId,
+      maxIdx: max(chapters.idx).as("max_idx"),
+    })
+    .from(pageRelationships)
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .where(
+      and(
+        eq(pageRelationships.childPageId, pageId),
+        lte(chapters.idx, cutoffIdx),
+      ),
+    )
+    .groupBy(pageRelationships.parentPageId)
+    .as("parent_rel_max_idx_sq");
+
+  return db
+    .select({ id: pages.id, name: pages.name, slug: pages.slug })
+    .from(pageRelationships)
+    .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      parentRelMaxIdxSq,
+      and(
+        eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
+        eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(
+      and(
+        eq(pageRelationships.childPageId, pageId),
+        eq(pageRelationships.isActive, true),
+      ),
+    );
 }
