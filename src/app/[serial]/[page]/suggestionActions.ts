@@ -33,6 +33,7 @@ import {
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
   getChapterIdxById,
 } from "@/db/queries";
+import type { SuggestionStatus } from "@/types";
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export async function submitPageSuggestion(
 export async function getMyPageSuggestions(pageId: number): Promise<
   {
     id: number;
-    status: "pending" | "approved" | "rejected";
+    status: SuggestionStatus;
     reviewNote: string | null;
     createdAt: Date;
     targetChapterName: string;
@@ -192,7 +193,7 @@ export async function getMyPageSuggestions(pageId: number): Promise<
 
   return rows.map((row) => ({
     id: row.id,
-    status: row.status as "pending" | "approved" | "rejected",
+    status: row.status as SuggestionStatus,
     reviewNote: row.reviewNote,
     createdAt: row.createdAt,
     targetChapterName: row.targetChapterName,
