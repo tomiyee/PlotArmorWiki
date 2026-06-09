@@ -1,73 +1,27 @@
 import type {
-  MdastImportVisitor,
   LexicalExportVisitor,
   ToMarkdownExtension,
 } from "@mdxeditor/editor";
 import {
   addLexicalNode$,
-  addImportVisitor$,
   addExportVisitor$,
+  createRootEditorSubscription$,
   realmPlugin,
 } from "@mdxeditor/editor";
-import { ElementNode, $createTextNode } from "lexical";
+import {
+  TextNode,
+  $createTextNode,
+  $createParagraphNode,
+  $isParagraphNode,
+  $getSelection,
+  $isRangeSelection,
+  KEY_BACKSPACE_COMMAND,
+  COMMAND_PRIORITY_LOW,
+} from "lexical";
+import type { LexicalNode } from "lexical";
 import type * as Mdast from "mdast";
 import { RefNode, $isRefNode } from "./RefNode";
 import { RefboxNode, $isRefboxNode } from "./RefboxNode";
-
-// ── MDXEditor import visitor: text → RefNode / RefboxNode ────────────────────
-
-/**
- * Intercepts mdast text nodes that contain `{{ref|token}}` or `{{refbox}}`
- * patterns and splits them into plain TextNodes, RefNodes, and RefboxNodes.
- *
- * Priority 1 ensures this runs before MDXEditor's built-in text visitor.
- */
-export const RefTextVisitor: MdastImportVisitor<Mdast.Text> = {
-  testNode: "text",
-  priority: 1,
-  visitNode({ mdastNode, lexicalParent, actions }) {
-    const text = mdastNode.value;
-    const hasRef = text.includes("{{ref|");
-    const hasRefbox = text.includes("{{refbox}}");
-
-    if (!hasRef && !hasRefbox) {
-      actions.nextVisitor();
-      return;
-    }
-
-    const formatting = actions.getParentFormatting();
-
-    // Combined pattern — refs first so {{refbox}} is caught by its own branch.
-    const COMBINED = /\{\{ref\|([^}]+)\}\}|\{\{refbox\}\}/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    COMBINED.lastIndex = 0;
-
-    while ((match = COMBINED.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        const before = $createTextNode(text.slice(lastIndex, match.index));
-        before.setFormat(formatting);
-        (lexicalParent as ElementNode).append(before);
-      }
-
-      if (match[0].startsWith("{{ref|")) {
-        const token = match[1].trim();
-        (lexicalParent as ElementNode).append(new RefNode(token));
-      } else {
-        // {{refbox}} — block node; append inline here (Lexical will normalise).
-        (lexicalParent as ElementNode).append(new RefboxNode());
-      }
-
-      lastIndex = match.index + match[0].length;
-    }
-
-    if (lastIndex < text.length) {
-      const after = $createTextNode(text.slice(lastIndex));
-      after.setFormat(formatting);
-      (lexicalParent as ElementNode).append(after);
-    }
-  },
-};
 
 // ── MDXEditor export visitors ────────────────────────────────────────────────
 
@@ -119,8 +73,10 @@ export const refToMarkdownExtension = {
 // ── realmPlugin ──────────────────────────────────────────────────────────────
 
 /**
- * Realm plugin that registers RefNode, RefboxNode, import visitors, and export
- * visitors with the MDXEditor Lexical realm.
+ * Realm plugin that registers RefNode, RefboxNode, export visitors, a TextNode
+ * transform (auto-replaces typed `{{refbox}}` with a RefboxNode + new
+ * paragraph), and a Backspace command handler (deletes the RefboxNode paragraph
+ * when the cursor is at the start of the line after it).
  *
  * @example
  * plugins={[wikiPlugin, refPlugin, toolbarPlugin({ ... }), ...]}
@@ -129,12 +85,87 @@ export const refPlugin = realmPlugin({
   init(realm) {
     realm.pubIn({
       [addLexicalNode$]: RefNode,
-      [addImportVisitor$]: RefTextVisitor,
       [addExportVisitor$]: RefExportVisitor,
     });
     realm.pubIn({
       [addLexicalNode$]: RefboxNode,
       [addExportVisitor$]: RefboxExportVisitor,
+    });
+
+    realm.pub(createRootEditorSubscription$, (editor) => {
+      // ── TextNode transform: auto-replace typed {{refbox}} ──────────────────
+      const cleanupTransform = editor.registerNodeTransform(TextNode, (textNode) => {
+        const text = textNode.getTextContent();
+        const idx = text.indexOf("{{refbox}}");
+        if (idx === -1) return;
+
+        const before = text.slice(0, idx);
+        const after = text.slice(idx + "{{refbox}}".length);
+
+        const parentParagraph = textNode.getParent();
+        if (!$isParagraphNode(parentParagraph)) return;
+
+        const refboxParagraph = $createParagraphNode();
+        refboxParagraph.append(new RefboxNode());
+
+        const afterParagraph = $createParagraphNode();
+        if (after) afterParagraph.append($createTextNode(after));
+
+        if (before) {
+          textNode.setTextContent(before);
+          parentParagraph.insertAfter(refboxParagraph);
+        } else if (parentParagraph.getChildrenSize() === 1) {
+          // Text node is the sole child — replace the paragraph wholesale.
+          parentParagraph.replace(refboxParagraph);
+        } else {
+          // Other nodes precede the trigger; remove only the text node.
+          textNode.remove();
+          parentParagraph.insertAfter(refboxParagraph);
+        }
+        refboxParagraph.insertAfter(afterParagraph);
+        afterParagraph.selectStart();
+      });
+
+      // ── Backspace command: delete refbox when cursor is right after it ──────
+      const cleanupCommand = editor.registerCommand(
+        KEY_BACKSPACE_COMMAND,
+        (event) => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false;
+
+          const anchor = selection.anchor;
+          if (anchor.offset !== 0) return false;
+
+          // Resolve the block-level node the cursor is at the start of.
+          const anchorNode: LexicalNode = anchor.getNode();
+          let currentBlock: LexicalNode | null = null;
+          if ($isParagraphNode(anchorNode)) {
+            currentBlock = anchorNode;
+          } else {
+            const parent = anchorNode.getParent();
+            if ($isParagraphNode(parent) && anchorNode.getPreviousSibling() === null) {
+              currentBlock = parent;
+            }
+          }
+          if (!currentBlock) return false;
+
+          const prevSibling = currentBlock.getPreviousSibling();
+          if (!$isParagraphNode(prevSibling)) return false;
+
+          const prevChildren = prevSibling.getChildren();
+          if (prevChildren.length !== 1 || !$isRefboxNode(prevChildren[0])) return false;
+
+          event?.preventDefault();
+          prevSibling.remove();
+          return true;
+        },
+        COMMAND_PRIORITY_LOW,
+      );
+
+      return () => {
+        cleanupTransform();
+        cleanupCommand();
+      };
     });
   },
 })();

@@ -31,6 +31,7 @@ import {
   $getSelection,
   $isRangeSelection,
   $isTextNode,
+  $createParagraphNode,
   getNearestEditorFromDOMNode,
 } from "lexical";
 import { MDXEditorClient } from "./MDXEditor";
@@ -41,7 +42,9 @@ import { WikiLinkEditPopover } from "./WikiLinkEditPopover";
 import { wikiPlugin, wikiLinkToMarkdownExtension } from "./WikiLinkVisitors";
 import { RefContext } from "./RefContext";
 import { InsertRefButton } from "./InsertRefButton";
+import { InsertRefboxButton } from "./InsertRefboxButton";
 import { RefNode, $isRefNode } from "./RefNode";
+import { RefboxNode } from "./RefboxNode";
 import { RefEditPopover } from "./RefEditPopover";
 import { refPlugin, refToMarkdownExtension } from "./RefVisitors";
 import { normalizeMarkdown, prepareMarkdownForEditor } from "./normalizeMarkdown";
@@ -596,6 +599,35 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   );
 
   /**
+   * Inserts a `{{refbox}}` block at the current cursor position and moves focus
+   * to a new paragraph below it.
+   */
+  const insertRefbox = useCallback(() => {
+    const editorEl = containerRef.current?.querySelector<HTMLElement>(
+      '[contenteditable="true"]',
+    );
+    const lexEditor = editorEl ? getNearestEditorFromDOMNode(editorEl) : null;
+    if (!lexEditor) return;
+
+    isApplyingRef.current = true;
+    lexEditor.update(() => {
+      const sel = $getSelection();
+      if (!$isRangeSelection(sel)) return;
+
+      const refboxNode = new RefboxNode();
+      sel.insertNodes([refboxNode]);
+
+      // Ensure a paragraph follows the refbox so the cursor has somewhere to go.
+      const newParagraph = $createParagraphNode();
+      refboxNode.insertAfter(newParagraph);
+      newParagraph.selectStart();
+    });
+    requestAnimationFrame(() => {
+      isApplyingRef.current = false;
+    });
+  }, [isApplyingRef]);
+
+  /**
    * Applies the selected token to an existing RefNode in place, or inserts a
    * new one when opened from the toolbar button (nodeKey === null).
    */
@@ -693,6 +725,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
             <Separator />
             <InsertWikiLinkButton />
             <InsertRefButton />
+            <InsertRefboxButton />
           </DiffSourceToggleWrapper>
         ),
       }),
@@ -707,8 +740,8 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       codeBlockPlugin(),
       diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: diffBaseline }),
     ];
-    // InsertWikiLinkButton and InsertRefButton are self-contained and read all
-    // mutable data from context, so only diffBaseline (the diff baseline) is a real dep.
+    // Toolbar buttons are self-contained and read mutable data from context,
+    // so only diffBaseline (the diff baseline) is a real dep.
   }, [diffBaseline]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
@@ -737,6 +770,7 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
           value={{
             openRefEditMenu,
             openRefInsertMenu,
+            insertRefbox,
           }}
         >
           <MDXEditorClient

@@ -25,7 +25,13 @@ export const RefContext = createContext<{
    * Called from InsertRefButton.
    */
   openRefInsertMenu: (el: HTMLElement) => void;
+  /**
+   * Inserts a `{{refbox}}` block node at the current cursor position and moves
+   * focus to a new paragraph below it.
+   */
+  insertRefbox: () => void;
 }>({
   openRefEditMenu: () => {},
   openRefInsertMenu: () => {},
+  insertRefbox: () => {},
 });

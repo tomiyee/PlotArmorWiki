@@ -8,9 +8,7 @@ import {
   type NodeKey,
   type SerializedLexicalNode,
   type LexicalNode,
-  $getRoot,
 } from "lexical";
-import { $isRefNode } from "./RefNode";
 
 // ── RefboxNode ───────────────────────────────────────────────────────────────
 
@@ -66,8 +64,8 @@ export class RefboxNode extends DecoratorNode<ReactElement> {
     return "{{refbox}}";
   }
 
-  decorate(editor: LexicalEditor, _config: EditorConfig): ReactElement {
-    return <RefboxPreview editor={editor} />;
+  decorate(_editor: LexicalEditor, _config: EditorConfig): ReactElement {
+    return <RefboxPreview />;
   }
 }
 
@@ -79,46 +77,15 @@ export function $isRefboxNode(
 
 // ── RefboxPreview ─────────────────────────────────────────────────────────────
 
-type RefboxPreviewProps = {
-  /** The Lexical editor instance, used to read all RefNode tokens from state. */
-  editor: LexicalEditor;
-};
-
 /**
- * Live preview chip for the `{{refbox}}` block node in the WYSIWYG editor.
- *
- * Reads all `RefNode`s from the Lexical editor state at render time to
- * produce a deduplicated ordered list, matching what the remark-refs plugin
- * will render at read time.
+ * Static placeholder rendered in the WYSIWYG editor for the `{{refbox}}`
+ * block node. The actual numbered list is generated at read time by the
+ * remark-refs plugin; here we just indicate that the box will appear.
  *
  * @example
- * <RefboxPreview editor={lexicalEditor} />
+ * <RefboxPreview />
  */
-function RefboxPreview(props: RefboxPreviewProps) {
-  const { editor } = props;
-
-  // Collect unique tokens in document order.
-  const tokens: string[] = [];
-  const seen = new Set<string>();
-
-  editor.getEditorState().read(() => {
-    function collectRefs(node: LexicalNode) {
-      if ($isRefNode(node)) {
-        if (!seen.has(node.__token)) {
-          seen.add(node.__token);
-          tokens.push(node.__token);
-        }
-        return;
-      }
-      // @ts-expect-error: getChildren is available on ElementNodes
-      const children: LexicalNode[] = node.getChildren?.() ?? [];
-      for (const child of children) {
-        collectRefs(child);
-      }
-    }
-    collectRefs($getRoot());
-  });
-
+function RefboxPreview() {
   return (
     <div
       contentEditable={false}
@@ -127,28 +94,9 @@ function RefboxPreview(props: RefboxPreviewProps) {
       <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         References
       </p>
-      {tokens.length === 0 ? (
-        <p className="text-sm text-muted-foreground italic">
-          No references cited above yet.
-        </p>
-      ) : (
-        <ol className="list-decimal list-inside space-y-0.5 text-sm">
-          {tokens.map((token, i) => {
-            const colonIdx = token.indexOf(":");
-            const displayValue =
-              colonIdx !== -1 ? token.slice(colonIdx + 1) : token;
-            return (
-              <li key={token} className="text-foreground/80">
-                <span className="text-foreground font-medium">{displayValue}</span>
-                {" "}
-                <span className="text-xs text-muted-foreground">
-                  [{i + 1}]
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <p className="text-sm text-muted-foreground italic">
+        The contents of the references box will be generated dynamically.
+      </p>
     </div>
   );
 }
