@@ -104,7 +104,7 @@ export async function getMySynopsisSuggestion(chapterId: number): Promise<{
   if (!row) return null;
   return {
     id: row.id,
-    status: row.status as SuggestionStatus,
+    status: row.status,
     reviewNote: row.reviewNote,
     createdAt: row.createdAt,
   };

@@ -193,7 +193,7 @@ export async function getMyPageSuggestions(pageId: number): Promise<
 
   return rows.map((row) => ({
     id: row.id,
-    status: row.status as SuggestionStatus,
+    status: row.status,
     reviewNote: row.reviewNote,
     createdAt: row.createdAt,
     targetChapterName: row.targetChapterName,
