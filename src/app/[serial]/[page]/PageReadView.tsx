@@ -176,7 +176,11 @@ type RefboxProps = {
 /**
  * Renders an automatic reference list when the page has at least one `{{ref|…}}`.
  * Must be rendered inside `WikiPageRefsProvider`. Only shows when the global
- * ordinal map is non-empty and no section already contains an explicit `{{refbox}}`.
+ * ordinal map is non-empty.
+ *
+ * Builds an unordered-list markdown string from the ordinal map and passes it
+ * to `MarkdownRenderer` so `remarkWikiLinks` resolves each token to a hover-card
+ * link — no `{{refbox}}` syntax involved.
  *
  * @example
  * <Refbox serialSlug="one-piece" pageTitles={pageTitles} chapterType="Chapter" />
@@ -185,6 +189,15 @@ function Refbox(props: RefboxProps) {
   const { serialSlug, pageTitles, chapterType, wikiChapters } = props;
   const ordinalMap = useWikiPageOrdinalMap();
   if (ordinalMap.size === 0) return null;
+
+  // Build "- <a id="ref-N" href="#ref-cite-N">[N]</a> [[token]]" lines.
+  // remarkWikiLinks converts [[token]] to a link; rehypeRaw renders the anchor.
+  const markdown = [...ordinalMap.entries()]
+    .map(
+      ([token, n]) =>
+        `- <a id="ref-${n}" href="#ref-cite-${n}">[${n}]</a> [[${token}]]`,
+    )
+    .join("\n");
 
   return (
     <div className="clear-right mt-6 pt-6 border-t border-border">
@@ -196,9 +209,8 @@ function Refbox(props: RefboxProps) {
         pageTitles={pageTitles}
         chapterType={chapterType}
         wikiChapters={wikiChapters}
-        refOrdinalMap={ordinalMap}
       >
-        {"{{refbox}}"}
+        {markdown}
       </MarkdownRenderer>
     </div>
   );
@@ -247,11 +259,6 @@ export function PageReadView(props: PageReadViewProps) {
     ...sections.map((s) => ({ key: `section-${s.id}`, markdown: s.content })),
   ];
   const refsOrderedSectionKeys = refsOrderedSections.map((s) => s.key);
-
-  // Don't render the auto-refbox when any section already has an explicit {{refbox}}.
-  const hasExplicitRefbox = refsOrderedSections.some((s) =>
-    s.markdown.includes("{{refbox}}"),
-  );
 
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -522,14 +529,12 @@ export function PageReadView(props: PageReadViewProps) {
         )}
       </div>
 
-      {!hasExplicitRefbox && (
-        <Refbox
-          serialSlug={serialSlug}
-          pageTitles={pageTitles}
-          chapterType={chapterType}
-          wikiChapters={wikiChapters}
-        />
-      )}
+      <Refbox
+        serialSlug={serialSlug}
+        pageTitles={pageTitles}
+        chapterType={chapterType}
+        wikiChapters={wikiChapters}
+      />
 
       <div className="clear-right mt-6 pt-6 border-t border-border">
         <Text variant="h3" className="mb-3">

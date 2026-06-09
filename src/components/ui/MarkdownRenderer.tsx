@@ -297,16 +297,7 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
       }),
     );
   }
-  // remark-refs runs after remarkWikiLinks and receives the same serial context
-  // so it can emit mdast link nodes for refbox entries — makeAnchorComponent then
-  // wraps those links with hover-card previews just like wiki links.
-  remarkPlugins.push(
-    remarkRefs(serialSlug, pageTitles, {
-      chapterType,
-      chapters: wikiChapters,
-      externalOrdinalMap: refOrdinalMap,
-    }),
-  );
+  remarkPlugins.push(remarkRefs({ externalOrdinalMap: refOrdinalMap }));
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug
