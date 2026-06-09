@@ -7,6 +7,7 @@ import {
   WIKI_LINK_CHIP_DEAD,
   WIKI_LINK_CHIP_INTERACTIVE,
 } from "./wikiLinkChipClasses";
+import { cn } from "@/lib/utils";
 
 type WikiLinkChipProps = {
   /** Wiki link token in `category:value` format, resolved to a display name via WikiLinkContext. */
@@ -72,17 +73,14 @@ export function WikiLinkChip(props: WikiLinkChipProps) {
     openEditMenu(nodeKey, spanRef.current);
   }, [nodeKey, openEditMenu]);
 
-  const deadLabel =
-    category === "page" ? "Page not found" : "Chapter not found";
-
   return (
     <span
       ref={spanRef}
       contentEditable={false}
       data-wiki-key={nodeKey}
       onClick={nodeKey ? handleClick : undefined}
-      title={isDead ? deadLabel : undefined}
-      className={`${WIKI_LINK_CHIP_BASE}${nodeKey ? ` ${WIKI_LINK_CHIP_INTERACTIVE}` : ""}${isDead ? ` ${WIKI_LINK_CHIP_DEAD}` : ""}`}
+      title={isDead ? (category === "page" ? "Page not found" : "Chapter not found") : undefined}
+      className={cn(WIKI_LINK_CHIP_BASE, nodeKey && WIKI_LINK_CHIP_INTERACTIVE, isDead && WIKI_LINK_CHIP_DEAD)}
     >
       {label}
       {showActualName && (

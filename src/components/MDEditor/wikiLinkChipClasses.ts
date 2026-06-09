@@ -29,8 +29,7 @@ export const WIKI_LINK_CHIP_INTERACTIVE =
  * background). Overrides `select-none` from the base — navigable `<a>`
  * elements must allow text selection so users can copy the link label.
  */
-export const WIKI_LINK_CHIP_LINK =
-  "cursor-pointer hover:bg-accent hover:text-accent-foreground select-text";
+export const WIKI_LINK_CHIP_LINK = `${WIKI_LINK_CHIP_INTERACTIVE} select-text`;
 
 /**
  * Visual overlay applied on top of `WIKI_LINK_CHIP_BASE` (and optionally

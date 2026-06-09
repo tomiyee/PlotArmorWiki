@@ -1,14 +1,12 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { GripVerticalIcon, PenIcon, Trash2Icon } from "lucide-react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RenameForm } from "@/components/RenameForm";
+import { useSortableItem } from "@/lib/dndUtils";
 
 type SortableRenameRowProps = {
   /** Numeric id used by @dnd-kit for tracking. */
@@ -64,18 +62,11 @@ export function SortableRenameRow(props: SortableRenameRowProps) {
     onRename,
   } = props;
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled: isPending });
-
-  const style: CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1,
-  };
+  const { ref, style, attributes, listeners } = useSortableItem(id, isPending);
 
   return (
     <li
-      ref={setNodeRef}
+      ref={ref}
       style={style}
       className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50"
     >
