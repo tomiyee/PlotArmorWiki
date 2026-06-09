@@ -62,14 +62,16 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
 
   const [pos, setPos] = useState(() => {
     const r = anchorEl.getBoundingClientRect();
-    return { top: r.bottom + 4, left: r.left };
+    const vv = window.visualViewport;
+    return { top: r.bottom + 4 + (vv?.offsetTop ?? 0), left: r.left + (vv?.offsetLeft ?? 0) };
   });
 
   const updatePos = useCallback(() => {
     if (!anchorEl.isConnected) return;
     const r = anchorEl.getBoundingClientRect();
-    const nextTop = r.bottom + 4;
-    const nextLeft = r.left;
+    const vv = window.visualViewport;
+    const nextTop = r.bottom + 4 + (vv?.offsetTop ?? 0);
+    const nextLeft = r.left + (vv?.offsetLeft ?? 0);
     setPos((prev) =>
       prev.top === nextTop && prev.left === nextLeft
         ? prev
