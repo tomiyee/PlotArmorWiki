@@ -13,14 +13,12 @@ import { ElementNode, $createTextNode } from "lexical";
 import type * as Mdast from "mdast";
 import { WikiLinkNode, $isWikiLinkNode } from "./WikiLinkNode";
 import { RefNode } from "./RefNode";
-import { RefboxNode } from "./RefboxNode";
 import { escapeWikiAlias, unescapeWikiAlias } from "@/lib/wiki-links";
 
-// Combined pattern matching wiki links, ref citations, and refboxes in one pass.
+// Combined pattern matching wiki links and ref citations in one pass.
 // Groups: 1 = wikilink token, 2 = wikilink alias, 3 = ref token.
-// Refbox has no capture groups; identified by match[0] === "{{refbox}}".
 const COMBINED_RE =
-  /\[?\[\[([^|\[\]]+)(?:\|((?:[^\]\\]|\\.)*))?\]\]|\{\{ref\|([^}]+)\}\}|\{\{refbox\}\}/g;
+  /\[?\[\[([^|\[\]]+)(?:\|((?:[^\]\\]|\\.)*))?\]\]|\{\{ref\|([^}]+)\}\}/g;
 
 // ── MDXEditor import visitor: text → WikiLinkNode / RefNode / RefboxNode ────
 
@@ -46,9 +44,8 @@ export const WikiLinkTextVisitor: MdastImportVisitor<Mdast.Text> = {
     const text = mdastNode.value;
     const hasWikiLink = text.includes("[[");
     const hasRef = text.includes("{{ref|");
-    const hasRefbox = text.includes("{{refbox}}");
 
-    if (!hasWikiLink && !hasRef && !hasRefbox) {
+    if (!hasWikiLink && !hasRef) {
       actions.nextVisitor();
       return;
     }
@@ -72,9 +69,6 @@ export const WikiLinkTextVisitor: MdastImportVisitor<Mdast.Text> = {
       } else if (match[3] !== undefined) {
         // Ref citation — group 3 = token
         (lexicalParent as ElementNode).append(new RefNode(match[3].trim()));
-      } else {
-        // Refbox
-        (lexicalParent as ElementNode).append(new RefboxNode());
       }
 
       lastIndex = match.index + match[0].length;
