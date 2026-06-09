@@ -6,7 +6,7 @@ import { createContext } from "react";
  * Context that feeds ref-related callbacks into RefChip decorators and the
  * InsertRefButton toolbar component.
  *
- * Mirrors WikiLinkContext but for the {{ref|token}} / {{refbox}} system.
+ * Mirrors WikiLinkContext but for the {{ref|token}} system.
  * Wrapped around MDXEditorClient alongside WikiLinkContext.Provider.
  *
  * @example
@@ -25,13 +25,7 @@ export const RefContext = createContext<{
    * Called from InsertRefButton.
    */
   openRefInsertMenu: (el: HTMLElement) => void;
-  /**
-   * Inserts a `{{refbox}}` block node at the current cursor position and moves
-   * focus to a new paragraph below it.
-   */
-  insertRefbox: () => void;
 }>({
   openRefEditMenu: () => {},
   openRefInsertMenu: () => {},
-  insertRefbox: () => {},
 });

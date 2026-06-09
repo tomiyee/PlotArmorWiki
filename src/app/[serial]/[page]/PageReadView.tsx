@@ -11,6 +11,7 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import {
   WikiPageRefsProvider,
   useWikiPageRefOrdinals,
+  useWikiPageOrdinalMap,
 } from "@/contexts/WikiPageRefsContext";
 import { SuggestionForm } from "./SuggestionForm";
 import type { SectionData, FloaterRowData, ChapterData } from "./types";
@@ -161,6 +162,48 @@ function RefAwareMarkdown(props: RefAwareMarkdownProps) {
   );
 }
 
+type RefboxProps = {
+  /** Serial slug for link generation. */
+  serialSlug: string;
+  /** Slug → title map for page link display text. */
+  pageTitles?: Record<string, string>;
+  /** Serial's chapter type label. */
+  chapterType?: string;
+  /** Chapter name → idx map for chapter link resolution. */
+  wikiChapters?: Record<string, number>;
+};
+
+/**
+ * Renders an automatic reference list when the page has at least one `{{ref|…}}`.
+ * Must be rendered inside `WikiPageRefsProvider`. Only shows when the global
+ * ordinal map is non-empty and no section already contains an explicit `{{refbox}}`.
+ *
+ * @example
+ * <Refbox serialSlug="one-piece" pageTitles={pageTitles} chapterType="Chapter" />
+ */
+function Refbox(props: RefboxProps) {
+  const { serialSlug, pageTitles, chapterType, wikiChapters } = props;
+  const ordinalMap = useWikiPageOrdinalMap();
+  if (ordinalMap.size === 0) return null;
+
+  return (
+    <div className="clear-right mt-6 pt-6 border-t border-border">
+      <Text variant="h3" className="mb-3">
+        References
+      </Text>
+      <MarkdownRenderer
+        serialSlug={serialSlug}
+        pageTitles={pageTitles}
+        chapterType={chapterType}
+        wikiChapters={wikiChapters}
+        refOrdinalMap={ordinalMap}
+      >
+        {"{{refbox}}"}
+      </MarkdownRenderer>
+    </div>
+  );
+}
+
 /**
  * Read-mode layout for a wiki page: infobox floater, section content, and child page list.
  * Authenticated non-admins see a FilePenLine icon on hover over section headers to open the
@@ -204,6 +247,11 @@ export function PageReadView(props: PageReadViewProps) {
     ...sections.map((s) => ({ key: `section-${s.id}`, markdown: s.content })),
   ];
   const refsOrderedSectionKeys = refsOrderedSections.map((s) => s.key);
+
+  // Don't render the auto-refbox when any section already has an explicit {{refbox}}.
+  const hasExplicitRefbox = refsOrderedSections.some((s) =>
+    s.markdown.includes("{{refbox}}"),
+  );
 
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -473,6 +521,15 @@ export function PageReadView(props: PageReadViewProps) {
           />
         )}
       </div>
+
+      {!hasExplicitRefbox && (
+        <Refbox
+          serialSlug={serialSlug}
+          pageTitles={pageTitles}
+          chapterType={chapterType}
+          wikiChapters={wikiChapters}
+        />
+      )}
 
       <div className="clear-right mt-6 pt-6 border-t border-border">
         <Text variant="h3" className="mb-3">

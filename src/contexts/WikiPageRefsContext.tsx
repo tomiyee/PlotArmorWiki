@@ -149,6 +149,21 @@ export function WikiPageRefsProvider(props: WikiPageRefsProviderProps) {
 }
 
 /**
+ * Returns the current global token→ordinal map from `WikiPageRefsProvider`
+ * without registering any section tokens. Use in components that need to read
+ * the ordinal map (e.g. an automatic refbox) but don't contribute refs of their own.
+ *
+ * Must be called inside a `WikiPageRefsProvider`.
+ *
+ * @example
+ * const ordinalMap = useWikiPageOrdinalMap();
+ * if (ordinalMap.size === 0) return null;
+ */
+export function useWikiPageOrdinalMap(): Map<string, number> {
+  return useContext(WikiPageRefsContext).ordinalMap;
+}
+
+/**
  * Registers this section's ref tokens with the page-level context and returns
  * the full global ordinal map so `MarkdownRenderer` can number refs correctly
  * across all sections. Unregisters on unmount so ordinals update when sections
