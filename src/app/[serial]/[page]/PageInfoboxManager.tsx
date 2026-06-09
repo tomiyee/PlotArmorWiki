@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { CSSProperties } from "react";
-import { GripVerticalIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -19,11 +17,10 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/Dialog";
-import { RenameForm } from "@/components/RenameForm";
 import { useServerAction } from "@/hooks/useServerAction";
 import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
-import { Tooltip } from "@/components/ui/Tooltip";
 import { useSortableSensors, makeDragEndHandler } from "@/lib/dndUtils";
+import { SortableRenameRow } from "./SortableRenameRow";
 import {
   addInfoboxSection,
   deleteInfoboxSection,
@@ -40,97 +37,6 @@ export interface InfoboxSection {
 interface PageInfoboxManagerProps {
   pageId: number;
   sections: InfoboxSection[];
-}
-
-function SortableInfoboxRow({
-  section,
-  isPending,
-  isRenaming,
-  onStartRename,
-  onCancelRename,
-  onDelete,
-  onRename,
-}: {
-  section: InfoboxSection;
-  isPending: boolean;
-  isRenaming: boolean;
-  onStartRename: () => void;
-  onCancelRename: () => void;
-  onDelete: () => void;
-  onRename: (fd: FormData) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: section.id, disabled: isPending });
-
-  const style: CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1,
-  };
-
-  return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50"
-    >
-      {isRenaming ? (
-        <RenameForm
-          hiddenName="infoboxSectionId"
-          hiddenValue={section.id}
-          fieldName="label"
-          defaultValue={section.label}
-          onSave={onRename}
-          onCancel={onCancelRename}
-          inputClassName="flex-1 h-7 text-sm"
-        />
-      ) : (
-        <>
-          <span
-            {...attributes}
-            {...listeners}
-            className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
-            title="Drag to reorder"
-          >
-            <GripVerticalIcon className="h-3 w-3" />
-          </span>
-          <Text
-            as="span"
-            variant="label"
-            className="flex-1 cursor-pointer hover:text-primary transition-colors"
-            title="Click to rename"
-            onClick={onStartRename}
-          >
-            {section.label}
-          </Text>
-          <Box className="items-center gap-1">
-            <Tooltip content={`Rename ${section.label}`}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Rename ${section.label}`}
-                onClick={onStartRename}
-              >
-                <PenIcon className="h-2.5 w-2.5" />
-              </Button>
-            </Tooltip>
-            <Tooltip content={`Delete ${section.label}`}>
-              <Button
-                type="button"
-                variant="destructive"
-                size="icon-xs"
-                aria-label={`Delete ${section.label}`}
-                onClick={onDelete}
-              >
-                <Trash2Icon className="h-2.5 w-2.5" />
-              </Button>
-            </Tooltip>
-          </Box>
-        </>
-      )}
-    </li>
-  );
 }
 
 /**
@@ -190,11 +96,14 @@ export function PageInfoboxManager({
           <SortableContext items={localSections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <ol className="flex flex-col gap-1">
               {localSections.map((section) => (
-                <SortableInfoboxRow
+                <SortableRenameRow
                   key={section.id}
-                  section={section}
+                  id={section.id}
+                  displayValue={section.label}
                   isPending={isPending}
                   isRenaming={renamingId === section.id}
+                  hiddenName="infoboxSectionId"
+                  fieldName="label"
                   onStartRename={() => setRenamingId(section.id)}
                   onCancelRename={() => setRenamingId(null)}
                   onDelete={() => {

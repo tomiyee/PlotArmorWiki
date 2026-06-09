@@ -25,7 +25,7 @@ export function useOptimisticOrder<T extends { id: number }>(serverItems: T[]) {
 
   /** Immediately reorder by ID list — call before the server action fires. */
   function applyOptimistic(reorderedIds: number[]) {
-    setItems(reorderedIds.map((id) => items.find((item) => item.id === id)!));
+    setItems(reorderedIds.flatMap((id) => items.filter((item) => item.id === id)));
   }
 
   /** Restore server state — call in the server action's onError handler. */
