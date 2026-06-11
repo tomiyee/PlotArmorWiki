@@ -169,7 +169,7 @@ export function SuggestionReviewPanel(props: SuggestionReviewPanelProps) {
               label={change.sectionName}
               currentContent={change.currentContent}
               proposedContent={change.proposedContent}
-              minH="min-h-[60px]"
+              minH="min-h-60px"
               serialSlug={serialSlug}
             />
           ))}
@@ -181,7 +181,7 @@ export function SuggestionReviewPanel(props: SuggestionReviewPanelProps) {
               label={`Infobox: ${change.infoboxSectionLabel}`}
               currentContent={change.currentContent}
               proposedContent={change.proposedContent}
-              minH="min-h-[40px]"
+              minH="min-h-40px"
               serialSlug={serialSlug}
             />
           ))}
