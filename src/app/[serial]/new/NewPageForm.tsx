@@ -91,20 +91,12 @@ export function NewPageForm(props: NewPageFormProps) {
   } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
 
-  // Build chapter id → idx lookup for filtering.
-  const chapterIdxById: Record<number, number> = {};
-  chapterList.forEach((c) => {
-    chapterIdxById[c.id] = c.idx;
-  });
+  const chapterIdxById = Object.fromEntries(chapterList.map((c) => [c.id, c.idx]));
 
-  // Build grouped chapter options.
-  const chaptersByVolume: Record<number, Chapter[]> = {};
-  volumeList.forEach((v) => {
-    chaptersByVolume[v.id] = [];
-  });
-  chapterList.forEach((c) => {
-    chaptersByVolume[c.volumeId]?.push(c);
-  });
+  const chaptersByVolume = chapterList.reduce<Record<number, Chapter[]>>((acc, c) => {
+    (acc[c.volumeId] ??= []).push(c);
+    return acc;
+  }, {});
 
   const firstChapterId = chapterList[0]?.id ?? 0;
   // Default to the user's reading cutoff so the intro chapter matches where they are.
@@ -172,17 +164,14 @@ export function NewPageForm(props: NewPageFormProps) {
     ...templates.map((t) => ({ label: t.name, value: t.id })),
   ];
 
+  const byDisplayOrder = <T extends { displayOrder: number }>(arr: T[]) =>
+    [...arr].sort((a, b) => a.displayOrder - b.displayOrder);
+
   const selectedTemplate =
     templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const sortedTemplateSections = selectedTemplate
-    ? [...selectedTemplate.sections].sort(
-        (a, b) => a.displayOrder - b.displayOrder,
-      )
-    : [];
+  const sortedTemplateSections = selectedTemplate ? byDisplayOrder(selectedTemplate.sections) : [];
   const sortedTemplateInfoboxSections = selectedTemplate
-    ? [...selectedTemplate.infoboxSections].sort(
-        (a, b) => a.displayOrder - b.displayOrder,
-      )
+    ? byDisplayOrder(selectedTemplate.infoboxSections)
     : [];
 
   const createPageAction = createPage.bind(null, serialSlug);
