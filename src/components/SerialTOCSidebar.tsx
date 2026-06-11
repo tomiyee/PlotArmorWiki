@@ -133,7 +133,7 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
             {volumeType}s &amp; {chapterType}s
           </DialogTitle>
         </DialogHeader>
-        <DialogBody className="max-h-[70vh]">
+        <DialogBody className="max-h-70vh">
           <SerialEditor
             serialId={serialId}
             volumes={volumes}
