@@ -17,10 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
-import {
-  submitPageSuggestion,
-  getSectionsAtChapter,
-} from "./suggestionActions";
+import { submitPageSuggestion } from "./suggestionActions";
+import { getSectionsAtChapter } from "./actions";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { ChapterData, ChapterGroupOption } from "./types";
