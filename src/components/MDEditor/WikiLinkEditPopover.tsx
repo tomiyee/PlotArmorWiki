@@ -58,19 +58,19 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
 
   const [selectedToken, setSelectedToken] = useState<string | undefined>(initialToken);
   const [alias, setAlias] = useState(initialAlias);
-  // Tracks the name of the currently-selected page/chapter to show as a placeholder.
+  // Derived from selectedToken — shows the current page/chapter name as a hint.
   // We intentionally do NOT set `alias` on selection — an empty alias produces a live
   // link `[[page:slug]]` that follows page renames, while a non-empty alias freezes the
   // display text to whatever the user typed. See issue #202.
-  const [aliasPlaceholder, setAliasPlaceholder] = useState<string>(() => {
-    if (!initialToken) return "Leave blank for live title";
-    const pageMatch = wikiPages.find((p) => `page:${p.slug}` === initialToken);
+  const aliasPlaceholder = useMemo(() => {
+    if (!selectedToken) return "Leave blank for live title";
+    const pageMatch = wikiPages.find((p) => `page:${p.slug}` === selectedToken);
     const chapterMatch = wikiChapters.find(
-      (c) => `${chapterType}:${c.name}` === initialToken,
+      (c) => `${chapterType}:${c.name}` === selectedToken,
     );
     const name = pageMatch?.name ?? chapterMatch?.name;
     return name ? `${name} (leave blank for live title)` : "Leave blank for live title";
-  });
+  }, [selectedToken, wikiPages, wikiChapters, chapterType]);
   const aliasInputRef = useRef<HTMLInputElement>(null);
 
   const [pos, setPos] = useState(() => {
@@ -146,17 +146,6 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
 
   function handleTokenChange(token: string) {
     setSelectedToken(token);
-    const pageMatch = wikiPages.find((p) => `page:${p.slug}` === token);
-    const chapterMatch = wikiChapters.find(
-      (c) => `${chapterType}:${c.name}` === token,
-    );
-    const name = pageMatch?.name ?? chapterMatch?.name;
-    // Update the placeholder to the selected page/chapter name but do NOT touch
-    // the alias value — the user may have already typed something, and we don't
-    // want to clobber it. An empty alias means "live link", which is the default.
-    setAliasPlaceholder(
-      name ? `${name} (leave blank for live title)` : "Leave blank for live title",
-    );
   }
 
   function handleConfirm() {
