@@ -522,10 +522,9 @@ export async function getSectionsAtChapter(
   }[];
   infoboxSections: { id: number; label: string; content: string }[];
 }> {
-  const cutoffIdxResult = await getChapterIdxById(chapterId);
+  const cutoffIdx = await getChapterIdxById(chapterId);
 
-  if (cutoffIdxResult === null) throw new Error("Chapter not found");
-  const cutoffIdx = cutoffIdxResult;
+  if (cutoffIdx === null) throw new Error("Chapter not found");
 
   const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
   const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
