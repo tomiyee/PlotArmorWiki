@@ -58,6 +58,19 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
 
   const [selectedToken, setSelectedToken] = useState<string | undefined>(initialToken);
   const [alias, setAlias] = useState(initialAlias);
+  // Tracks the name of the currently-selected page/chapter to show as a placeholder.
+  // We intentionally do NOT set `alias` on selection — an empty alias produces a live
+  // link `[[page:slug]]` that follows page renames, while a non-empty alias freezes the
+  // display text to whatever the user typed. See issue #202.
+  const [aliasPlaceholder, setAliasPlaceholder] = useState<string>(() => {
+    if (!initialToken) return "Leave blank for live title";
+    const pageMatch = wikiPages.find((p) => `page:${p.slug}` === initialToken);
+    const chapterMatch = wikiChapters.find(
+      (c) => `${chapterType}:${c.name}` === initialToken,
+    );
+    const name = pageMatch?.name ?? chapterMatch?.name;
+    return name ? `${name} (leave blank for live title)` : "Leave blank for live title";
+  });
   const aliasInputRef = useRef<HTMLInputElement>(null);
 
   const [pos, setPos] = useState(() => {
@@ -137,7 +150,13 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
     const chapterMatch = wikiChapters.find(
       (c) => `${chapterType}:${c.name}` === token,
     );
-    setAlias(pageMatch?.name ?? chapterMatch?.name ?? "");
+    const name = pageMatch?.name ?? chapterMatch?.name;
+    // Update the placeholder to the selected page/chapter name but do NOT touch
+    // the alias value — the user may have already typed something, and we don't
+    // want to clobber it. An empty alias means "live link", which is the default.
+    setAliasPlaceholder(
+      name ? `${name} (leave blank for live title)` : "Leave blank for live title",
+    );
   }
 
   function handleConfirm() {
@@ -185,7 +204,7 @@ export function WikiLinkEditPopover(props: WikiLinkEditPopoverProps) {
           ref={aliasInputRef}
           value={alias}
           onChange={(e) => setAlias(e.target.value)}
-          placeholder="Link text"
+          placeholder={aliasPlaceholder}
           autoFocus={autoFocusAlias}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
