@@ -29,7 +29,7 @@ export function UnauthMenu() {
             Help
           </MenuItem>
           <ThemeMenuItem />
-          <MenuItem href="/api/auth/signin" onClick={() => setOpen(false)}>
+          <MenuItem href="/signin" onClick={() => setOpen(false)}>
             <LogInIcon className="size-4" />
             Sign in
           </MenuItem>
