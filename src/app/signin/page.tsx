@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import { headers } from "next/headers";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 
@@ -25,8 +26,10 @@ export default async function SignInPage({
 }) {
   const isPreview = process.env.VERCEL_ENV === "preview";
 
-  const { callbackUrl } = await searchParams;
-  const redirectTo = callbackUrl ?? "/";
+  const [{ callbackUrl }, hdrs] = await Promise.all([searchParams, headers()]);
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
+  const proto = (hdrs.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
+  const redirectTo = callbackUrl ?? (host ? `${proto}://${host}/` : "/");
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-4">
