@@ -8,6 +8,7 @@ import { remarkWikiLinks } from "@/lib/remark-wiki-links";
 import { remarkRefs } from "@/lib/remark-refs";
 import { WikiLinkPreview } from "@/components/WikiLinkPreview";
 import { ChapterLinkPreview } from "@/components/ChapterLinkPreview";
+import { RefCitationSup } from "@/components/RefCitationSup";
 
 type MarkdownRendererProps = {
   /** Raw markdown string to render. */
@@ -258,6 +259,42 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
 }
 
 /**
+ * Returns a `sup` component override that renders ref citation superscripts
+ * (those with `data-ref-token` from `remarkRefs`) as hover-card previews.
+ * Non-ref `<sup>` elements fall through as plain superscripts.
+ */
+function makeSupComponent(
+  serialSlug: string,
+  pageTitles?: Record<string, string>,
+  chapterType?: string,
+  wikiChapters?: Record<string, number>,
+): Components["sup"] {
+  return function RefSup(props) {
+    const { id, children } = props;
+    const rawToken = (props as Record<string, unknown>)["data-ref-token"];
+    if (typeof rawToken !== "string" || !id) {
+      return <sup id={id}>{children}</sup>;
+    }
+    const token = decodeURIComponent(rawToken);
+    const match = /^ref-cite-(\d+)$/.exec(id);
+    if (!match) {
+      return <sup id={id}>{children}</sup>;
+    }
+    return (
+      <RefCitationSup
+        n={parseInt(match[1], 10)}
+        id={id}
+        token={token}
+        serialSlug={serialSlug}
+        pageTitles={pageTitles}
+        chapterType={chapterType}
+        wikiChapters={wikiChapters}
+      />
+    );
+  };
+}
+
+/**
  * Renders a markdown string as styled HTML using explicit Tailwind utility
  * classes on each element - does not depend on @tailwindcss/typography so
  * heading sizes and weights are always correct.
@@ -301,7 +338,11 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug
-    ? { ...baseComponents, a: makeAnchorComponent(serialSlug) }
+    ? {
+        ...baseComponents,
+        a: makeAnchorComponent(serialSlug),
+        sup: makeSupComponent(serialSlug, pageTitles, chapterType, wikiChapters),
+      }
     : baseComponents;
 
   return (

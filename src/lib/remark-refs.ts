@@ -76,7 +76,7 @@ export function remarkRefs(options?: {
         const n = ordinalMap.get(token) ?? ordinalMap.size + 1;
         return {
           type: "html",
-          value: `<sup id="ref-cite-${n}"><a href="#ref-${n}">[${n}]</a></sup>`,
+          value: `<sup id="ref-cite-${n}" data-ref-token="${encodeURIComponent(token)}">[${n}]</sup>`,
         } as Html;
       },
     ]);
