@@ -349,6 +349,16 @@ export function PageEditor(props: PageEditorProps) {
     return () => setIsDirty(false);
   }, [isDirty, setIsDirty]);
 
+  // Re-sync the "Writing as of:" chapter to the reader's cutoff whenever it changes
+  // outside of an active edit session. Without this, the useState init only runs on
+  // first mount — subsequent cutoff changes via ChapterSelector (which triggers a
+  // router.refresh()) would leave selectedChapterId stale until the user discards.
+  useEffect(() => {
+    if (!isEditing) {
+      setSelectedChapterId(readingChapterId ?? headChapterId);
+    }
+  }, [readingChapterId, headChapterId, isEditing]);
+
   const handleDiscard = useCallback(() => {
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),

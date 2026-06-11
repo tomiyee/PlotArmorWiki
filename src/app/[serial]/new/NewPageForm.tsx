@@ -61,6 +61,8 @@ interface NewPageFormProps {
   existingPages: PageOption[];
   /** Pre-selected parent page id, e.g. when navigating here from a page's edit mode. */
   defaultParentPageId?: number;
+  /** The user's current reading chapter cutoff; pre-selects the intro chapter and disables future chapters. */
+  defaultIntroChapterId?: number;
   /** Serial templates for pre-populating sections and infobox rows on the new page. */
   templates: Template[];
 }
@@ -84,6 +86,7 @@ export function NewPageForm(props: NewPageFormProps) {
     chapterList,
     existingPages,
     defaultParentPageId,
+    defaultIntroChapterId,
     templates,
   } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
@@ -104,12 +107,20 @@ export function NewPageForm(props: NewPageFormProps) {
   });
 
   const firstChapterId = chapterList[0]?.id ?? 0;
+  // Default to the user's reading cutoff so the intro chapter matches where they are.
+  // Falls back to chapter 1 when no cutoff is available (e.g. no progress cookie).
   const [selectedIntroChapterId, setSelectedIntroChapterId] =
-    useState<number>(firstChapterId);
+    useState<number>(defaultIntroChapterId ?? firstChapterId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
   const [selectedParentPageId, setSelectedParentPageId] = useState<
     number | undefined
   >(undefined);
+
+  // The idx of the user's reading cutoff chapter, used to gate the chapter options.
+  const cutoffIdx =
+    defaultIntroChapterId !== undefined
+      ? (chapterIdxById[defaultIntroChapterId] ?? Infinity)
+      : Infinity;
 
   const chapterOptions = volumeList
     .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
@@ -119,6 +130,8 @@ export function NewPageForm(props: NewPageFormProps) {
       children: (chaptersByVolume[v.id] ?? []).map((c) => ({
         label: c.displayName,
         value: c.id,
+        // Disable chapters beyond the user's cutoff to prevent accidental spoilers.
+        disabled: c.idx > cutoffIdx,
       })),
     }));
 
