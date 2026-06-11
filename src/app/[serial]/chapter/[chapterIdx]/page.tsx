@@ -25,6 +25,7 @@ import {
   getMySynopsisSuggestion,
   getPendingSynopsisSuggestions,
 } from "./synopsisSuggestionActions";
+import type { SuggestionStatus } from "@/types";
 import {
   addChapter,
   addVolume,
@@ -158,7 +159,7 @@ export default async function ChapterPage(props: ChapterPageProps) {
   let boundSaveAction: ((content: string) => Promise<void>) | null = null;
   let mySynopsisSuggestion: {
     id: number;
-    status: "pending" | "approved" | "rejected";
+    status: SuggestionStatus;
     reviewNote: string | null;
     createdAt: Date;
   } | null = null;
