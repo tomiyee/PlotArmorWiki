@@ -1,5 +1,4 @@
 import { auth } from "@/auth";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { UserMenu } from "@/components/navbar/UserMenu";
@@ -19,17 +18,12 @@ import { UnauthMenu } from "@/components/navbar/UnauthMenu";
  * <AuthControls />
  */
 export async function AuthControls() {
-  const [session, hdrs] = await Promise.all([auth(), headers()]);
+  const session = await auth();
 
   if (!session?.user) {
-    const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
-    const proto = (hdrs.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
-    const signInHref = host
-      ? `/signin?callbackUrl=${encodeURIComponent(`${proto}://${host}/`)}`
-      : "/signin";
     return (
       <>
-        <Link href={signInHref} className="hidden sm:block">
+        <Link href="/signin" className="hidden sm:block">
           <Button size="sm">Sign in</Button>
         </Link>
         <UnauthMenu />
