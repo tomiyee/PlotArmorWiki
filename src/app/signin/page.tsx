@@ -10,12 +10,23 @@ import { Text } from "@/components/ui/Text";
  * can test auth-dependent features without Google OAuth (which does not
  * support wildcard preview URLs).
  *
+ * `callbackUrl` is forwarded to `signIn()` so that after authentication
+ * the user is returned to the page they came from — including the correct
+ * preview origin — instead of being redirected to the production URL.
+ *
  * @example
  * // Linked from AuthControls and UnauthMenu as "/signin"
  * <Link href="/signin">Sign in</Link>
  */
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
   const isPreview = process.env.VERCEL_ENV === "preview";
+
+  const { callbackUrl } = await searchParams;
+  const redirectTo = callbackUrl ?? "/";
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-4">
@@ -32,7 +43,7 @@ export default function SignInPage() {
           <form
             action={async () => {
               "use server";
-              await signIn("google", { redirectTo: "/" });
+              await signIn("google", { redirectTo });
             }}
           >
             <Button type="submit" className="w-full" variant="outline">
@@ -55,7 +66,7 @@ export default function SignInPage() {
               <form
                 action={async () => {
                   "use server";
-                  await signIn("credentials", { redirectTo: "/" });
+                  await signIn("credentials", { redirectTo });
                 }}
               >
                 <Button
