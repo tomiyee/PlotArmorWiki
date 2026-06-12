@@ -626,6 +626,121 @@ export async function applyTemplateSections(
   });
 }
 
+/**
+ * Resolves the active sections and infobox rows with their current content at a
+ * given chapter cutoff, for pre-filling the suggestion form and the editor.
+ * Co-located with `getPageContentAtChapter` since both read the same tables.
+ *
+ * @example
+ * const { sections, infoboxSections } = await getSectionsAtChapter(42, chapterId);
+ */
+export async function getSectionsAtChapter(
+  pageId: number,
+  chapterId: number,
+): Promise<{
+  sections: {
+    id: number;
+    name: string;
+    content: string;
+    lastUpdatedChapterIdx: number | null;
+  }[];
+  infoboxSections: { id: number; label: string; content: string }[];
+}> {
+  const cutoffIdxResult = await getChapterIdxById(chapterId);
+
+  if (cutoffIdxResult === null) throw new Error("Chapter not found");
+  const cutoffIdx = cutoffIdxResult;
+
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
+  const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
+
+  const [activeSections, sectionVersions, activeInfoboxSections, ibVersions] =
+    await Promise.all([
+      db
+        .select({ id: pageSections.id, name: pageSections.name })
+        .from(pageSections)
+        .where(
+          and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
+        )
+        .orderBy(asc(pageSections.displayOrder)),
+      db
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          content: pageSectionRevisions.content,
+          lastUpdatedChapterIdx: sectionMaxIdxSq.maxIdx,
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .innerJoin(
+          sectionMaxIdxSq,
+          and(
+            eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+            eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageSectionRevisions.pageId, pageId)),
+      db
+        .select({
+          id: pageInfoboxSections.id,
+          label: pageInfoboxSections.label,
+        })
+        .from(pageInfoboxSections)
+        .where(
+          and(
+            eq(pageInfoboxSections.pageId, pageId),
+            isNull(pageInfoboxSections.deletedAt),
+          ),
+        )
+        .orderBy(asc(pageInfoboxSections.displayOrder)),
+      db
+        .select({
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          content: pageInfoboxRevisions.content,
+        })
+        .from(pageInfoboxRevisions)
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+        .innerJoin(
+          ibMaxIdxSq,
+          and(
+            eq(
+              pageInfoboxRevisions.infoboxSectionId,
+              ibMaxIdxSq.infoboxSectionId,
+            ),
+            eq(chapters.idx, ibMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageInfoboxRevisions.pageId, pageId)),
+    ]);
+
+  const versionBySectionId = new Map(
+    sectionVersions.map((v) => [
+      v.sectionId,
+      {
+        content: v.content ?? "",
+        lastUpdatedChapterIdx: v.lastUpdatedChapterIdx ?? null,
+      },
+    ]),
+  );
+  const ibContentById = new Map(
+    ibVersions.map((v) => [v.infoboxSectionId, v.content ?? ""]),
+  );
+
+  return {
+    sections: activeSections.map((s) => ({
+      id: s.id,
+      name: s.name,
+      content: versionBySectionId.get(s.id)?.content ?? "",
+      lastUpdatedChapterIdx:
+        versionBySectionId.get(s.id)?.lastUpdatedChapterIdx ?? null,
+    })),
+    infoboxSections: activeInfoboxSections.map((s) => ({
+      id: s.id,
+      label: s.label,
+      content: ibContentById.get(s.id) ?? "",
+    })),
+  };
+}
+
 // ── Page section structure management ────────────────────────────────────────
 // These actions manage the wall-clock-versioned `page_sections` rows (add,
 // delete, rename, reorder). Content is managed separately via savePageContent.

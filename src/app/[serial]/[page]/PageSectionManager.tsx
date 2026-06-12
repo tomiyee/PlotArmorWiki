@@ -207,6 +207,8 @@ export function PageSectionManager(props: PageSectionManagerProps) {
 
   const { items: localSections, applyOptimistic, revert } = useOptimisticOrder(sortableSections);
 
+  const localSectionIds = useMemo(() => localSections.map((s) => s.id), [localSections]);
+
   const sensors = useSortableSensors();
   const handleDragEnd = makeDragEndHandler(localSections, (reorderedIds) => {
     applyOptimistic(reorderedIds); // instant visual update before server round-trip
@@ -292,7 +294,7 @@ export function PageSectionManager(props: PageSectionManagerProps) {
           {lockedSection && <LockedSection section={lockedSection} />}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext
-              items={localSections.map((s) => s.id)}
+              items={localSectionIds}
               strategy={verticalListSortingStrategy}
             >
               {localSections.map((section) => (

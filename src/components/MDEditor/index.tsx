@@ -376,9 +376,9 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
    * Rendering happens here (outside MDXEditor's DOM) so popover styling is
    * consistent with chip-click edits, which also render at this level.
    */
-  const openInsertMenu = useCallback((anchorEl: HTMLElement) => {
+  const openInsertMenu = useCallback((anchorEl: HTMLElement, selectedText = "") => {
     setEditState({
-      nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false,
+      nodeKey: null, anchorEl, initialToken: "", initialAlias: selectedText, autoFocusAlias: false,
     });
   }, []);
 
@@ -536,6 +536,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       case "Enter":
         e.preventDefault();
         e.stopPropagation();
+        // Stop the native event too; Lexical registers its own keydown listener
+        // on the contenteditable and doesn't check defaultPrevented, so without
+        // this it would still insert a newline after the chip is inserted.
+        e.nativeEvent.stopImmediatePropagation();
         applySuggestion(suggestions[activeIndex]);
         break;
       case "Escape":

@@ -1,3 +1,10 @@
+/**
+ * The possible lifecycle states of a user suggestion (page or synopsis).
+ * Mirrors the Drizzle `text({ enum })` columns on `pageSuggestions.status`
+ * and `chapterSynopsisSuggestions.status`.
+ */
+export type SuggestionStatus = "pending" | "approved" | "rejected";
+
 export interface ChapterData {
   id: number;
   displayName: string;
