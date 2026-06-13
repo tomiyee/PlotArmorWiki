@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { createPage } from "./actions";
 import { Text } from "@/components/ui/Text";
@@ -48,6 +49,27 @@ interface Template {
   infoboxSections: TemplateInfoboxSection[];
 }
 
+type SubmitButtonProps = {
+  /** When true, disables the button regardless of form-pending state. */
+  disabled: boolean;
+};
+
+/**
+ * Submit button that disables itself while its parent `<form>` is pending.
+ * Must be rendered inside a `<form>` to receive `useFormStatus` context.
+ * Prevents double-click races by locking out further clicks as soon as the
+ * first submission is in-flight.
+ */
+function SubmitButton(props: SubmitButtonProps) {
+  const { disabled } = props;
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" className="mt-2" disabled={disabled || pending}>
+      {pending ? "Creating…" : "Create page"}
+    </Button>
+  );
+}
+
 interface NewPageFormProps {
   /** URL slug of the serial — used to scope the `createPage` action. */
   serialSlug: string;
@@ -74,9 +96,6 @@ interface NewPageFormProps {
  * When templates are defined for the serial, a "Use template" dropdown lets the
  * user pre-populate sections and infobox rows; a preview shows the resulting
  * structure before submitting.
- *
- * @example
- * <NewPageForm serialSlug="one-piece" chapterType="Chapter" templates={[]} ... />
  */
 export function NewPageForm(props: NewPageFormProps) {
   const {
@@ -91,22 +110,31 @@ export function NewPageForm(props: NewPageFormProps) {
   } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
 
-  const chapterIdxById = Object.fromEntries(chapterList.map((c) => [c.id, c.idx]));
+  const chapterIdxById = Object.fromEntries(
+    chapterList.map((c) => [c.id, c.idx]),
+  );
 
-  const chaptersByVolume = chapterList.reduce<Record<number, Chapter[]>>((acc, c) => {
-    (acc[c.volumeId] ??= []).push(c);
-    return acc;
-  }, {});
+  const chaptersByVolume = chapterList.reduce<Record<number, Chapter[]>>(
+    (acc, c) => {
+      (acc[c.volumeId] ??= []).push(c);
+      return acc;
+    },
+    {},
+  );
 
   const firstChapterId = chapterList[0]?.id ?? 0;
   // Default to the user's reading cutoff so the intro chapter matches where they are.
   // Falls back to chapter 1 when no cutoff is available (e.g. no progress cookie).
-  const [selectedIntroChapterId, setSelectedIntroChapterId] =
-    useState<number>(defaultIntroChapterId ?? firstChapterId);
+  const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<number>(
+    defaultIntroChapterId ?? firstChapterId,
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
   const [selectedParentPageId, setSelectedParentPageId] = useState<
     number | undefined
   >(undefined);
+  // Generated once per form mount. Sent as a hidden field so the server can
+  // detect retried submissions and redirect to the already-created page.
+  const [idempotencyKey] = useState<string>(() => crypto.randomUUID());
 
   // The idx of the user's reading cutoff chapter, used to gate the chapter options.
   const cutoffIdx =
@@ -169,7 +197,9 @@ export function NewPageForm(props: NewPageFormProps) {
 
   const selectedTemplate =
     templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const sortedTemplateSections = selectedTemplate ? byDisplayOrder(selectedTemplate.sections) : [];
+  const sortedTemplateSections = selectedTemplate
+    ? byDisplayOrder(selectedTemplate.sections)
+    : [];
   const sortedTemplateInfoboxSections = selectedTemplate
     ? byDisplayOrder(selectedTemplate.infoboxSections)
     : [];
@@ -179,6 +209,8 @@ export function NewPageForm(props: NewPageFormProps) {
 
   return (
     <form action={createPageAction} className="flex flex-col gap-5">
+      {/* Idempotency key — generated once per form mount to deduplicate retries. */}
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {/* Page name */}
       <Box col className="gap-1">
         <Label htmlFor="name">
@@ -317,9 +349,7 @@ export function NewPageForm(props: NewPageFormProps) {
         </Box>
       )}
 
-      <Button type="submit" className="mt-2" disabled={!hasChapters}>
-        Create page
-      </Button>
+      <SubmitButton disabled={!hasChapters} />
     </form>
   );
 }
