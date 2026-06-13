@@ -11,9 +11,6 @@ import {
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 
-/** PostgreSQL INT4 max — use as cutoffIdx to mean "no chapter cutoff". */
-export const PG_INT_MAX = 2_147_483_647;
-
 /**
  * Resolves chapter-versioned display titles for a set of pages at a given reading position.
  *
@@ -198,8 +195,9 @@ export function infoboxRowMaxIdxSq(pageId: number, cutoffIdx: number) {
  * exists. Callers join this to `pageRelationships` + `chapters` to obtain the
  * latest active/inactive state per child at the reader's cutoff.
  *
- * Pass `PG_INT_MAX` as `cutoffIdx` to get the latest state across all chapters
- * (no cutoff), as used in the navbar where spoiler filtering is not applied.
+ * Omit `cutoffIdx` (or pass `undefined`) to get the latest state across all
+ * chapters with no cutoff, as used in the navbar where spoiler filtering is
+ * not applied.
  *
  * @example
  * const sq = childRelMaxIdxSq(homePage.id, cutoffIdx);
@@ -211,7 +209,7 @@ export function infoboxRowMaxIdxSq(pageId: number, cutoffIdx: number) {
  *   .innerJoin(sq, and(eq(pageRelationships.childPageId, sq.childPageId), eq(chapters.idx, sq.maxIdx)))
  *   .where(eq(pageRelationships.parentPageId, homePage.id));
  */
-export function childRelMaxIdxSq(parentPageId: number, cutoffIdx: number) {
+export function childRelMaxIdxSq(parentPageId: number, cutoffIdx?: number) {
   return db
     .select({
       childPageId: pageRelationships.childPageId,
@@ -222,7 +220,7 @@ export function childRelMaxIdxSq(parentPageId: number, cutoffIdx: number) {
     .where(
       and(
         eq(pageRelationships.parentPageId, parentPageId),
-        lte(chapters.idx, cutoffIdx),
+        cutoffIdx !== undefined ? lte(chapters.idx, cutoffIdx) : undefined,
       ),
     )
     .groupBy(pageRelationships.childPageId)

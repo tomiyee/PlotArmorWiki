@@ -447,7 +447,9 @@ export function PageEditor(props: PageEditorProps) {
     let cancelled = false;
     getPageContentAtChapter(serialSlug, pageSlug, selectedChapterId).then(
       (data) => {
-        if (!cancelled) applyRevisionMetadata(data.sections);
+        if (!cancelled) {
+          applyRevisionMetadata(data);
+        }
       },
     );
     return () => {
@@ -458,23 +460,20 @@ export function PageEditor(props: PageEditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
-  function applyRevisionMetadata(sections: {
-    id: number;
-    previousContent: string;
-    previousRevisionChapterIdx: number | null;
-    nextRevisionChapterIdx: number | null;
-  }[]) {
+  function applyRevisionMetadata(
+    data: Awaited<ReturnType<typeof getPageContentAtChapter>>,
+  ) {
     setPreviousSectionContent(
-      Object.fromEntries(sections.map((s) => [s.id, s.previousContent])),
+      Object.fromEntries(data.sections.map((s) => [s.id, s.previousContent])),
     );
     setPreviousSectionRevisionChapterIdx(
       Object.fromEntries(
-        sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
+        data.sections.map((s) => [s.id, s.previousRevisionChapterIdx]),
       ),
     );
     setNextSectionRevisionChapterIdx(
       Object.fromEntries(
-        sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
+        data.sections.map((s) => [s.id, s.nextRevisionChapterIdx]),
       ),
     );
   }
@@ -504,7 +503,7 @@ export function PageEditor(props: PageEditorProps) {
           data.sections.map((s) => [s.id, s.lastUpdatedChapterIdx]),
         ),
       );
-      applyRevisionMetadata(data.sections);
+      applyRevisionMetadata(data);
       if (hasInfobox) {
         setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
         setDraftFloaterRowContent(
@@ -539,7 +538,7 @@ export function PageEditor(props: PageEditorProps) {
             pageSlug,
             selectedChapterId,
           );
-          applyRevisionMetadata(data.sections);
+          applyRevisionMetadata(data);
         });
       }
     } else if (lastUpdatedIdx !== null) {
