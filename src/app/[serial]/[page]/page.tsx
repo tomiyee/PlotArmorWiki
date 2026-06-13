@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db/index";
@@ -32,6 +33,7 @@ import {
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { PageEditor } from "./PageEditor";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin, isAuthenticated } from "@/lib/auth-guard";
@@ -40,6 +42,7 @@ import {
   getPendingSuggestions,
   getMyPageSuggestions,
 } from "./suggestionActions";
+import { restorePage } from "./actions";
 
 interface PageViewProps {
   /** Next.js dynamic route params: `serial` slug and `page` slug. */
@@ -190,6 +193,7 @@ export default async function PageView(props: PageViewProps) {
 
   // Wiki pages visible at the reader's cutoff. Pages with null introChapterId
   // (the home page) are always included since they predate any chapters.
+  // Deleted pages are excluded from the editor autocomplete list.
   const rawWikiPages = await db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
@@ -197,6 +201,7 @@ export default async function PageView(props: PageViewProps) {
     .where(
       and(
         eq(pages.serialId, serial.id),
+        isNull(pages.deletedAt),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
       ),
     )
@@ -228,6 +233,62 @@ export default async function PageView(props: PageViewProps) {
   // The home page is canonical at /{serial}; visiting /{serial}/home redirects there.
   if (page.isHomePage) {
     redirect(`/${serialSlug}`);
+  }
+
+  // Soft-deleted pages: admins see a restore banner; everyone else gets 404.
+  if (page.deletedAt) {
+    if (!isAdmin) {
+      notFound();
+    }
+    return (
+      <main>
+        <PageContainer>
+          <Box col className="gap-6">
+            <Text muted className="text-sm">
+              <Link href={`/${serialSlug}`} className="hover:underline">
+                {serial.title}
+              </Link>
+            </Text>
+            <Box col className="gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+              <Text variant="h1" className="text-destructive">
+                {page.name}
+              </Text>
+              <Text variant="body" className="text-destructive/80">
+                This page was deleted on{" "}
+                {page.deletedAt.toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+                . All versioned content is preserved and will be visible once
+                the page is restored.
+              </Text>
+              {page.deletionReason && (
+                <div>
+                  <Text variant="label" className="mb-1 block text-destructive/70">
+                    Reason for deletion
+                  </Text>
+                  <MarkdownRenderer sm serialSlug={serialSlug} className="text-destructive/70">
+                    {page.deletionReason}
+                  </MarkdownRenderer>
+                </div>
+              )}
+              <form
+                action={async () => {
+                  "use server";
+                  await restorePage(serialSlug, decodedPageSlug);
+                  redirect(`/${serialSlug}/${decodedPageSlug}`);
+                }}
+              >
+                <Button type="submit" variant="outline">
+                  Restore page
+                </Button>
+              </form>
+            </Box>
+          </Box>
+        </PageContainer>
+      </main>
+    );
   }
 
   const introChapter = page.introChapterId
@@ -423,7 +484,7 @@ export default async function PageView(props: PageViewProps) {
             eq(chapters.idx, relMaxIdxSq.maxIdx),
           ),
         )
-        .where(eq(pageRelationships.parentPageId, page.id)),
+        .where(and(eq(pageRelationships.parentPageId, page.id), isNull(pages.deletedAt))),
       fetchActiveParentPagesAtIdx(page.id, cutoffIdx),
       fetchSerialPagesAtIdx(serial.id, cutoffIdx),
     ]);

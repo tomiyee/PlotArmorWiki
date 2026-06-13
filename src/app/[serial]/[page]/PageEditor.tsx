@@ -18,6 +18,7 @@ import {
   getAllSerialPagesAtChapter,
   updatePageIntroChapter,
 } from "./actions";
+import { DeletePageButton } from "./DeletePageButton";
 import { Select } from "@/components/ui/Select";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Banner } from "@/components/ui/Banner";
@@ -142,6 +143,8 @@ interface PageEditorProps {
    * TemplateManager above the content editors.
    */
   editModeHeader?: ReactNode;
+  /** Optional element rendered next to the "Sub-pages" heading in read mode, visible only on hover. */
+  subPagesAdornment?: ReactNode;
   /**
    * Whether the current user is an admin of this serial. When `false`, the
    * component always renders in read mode - edit controls and the edit FAB
@@ -260,6 +263,7 @@ export function PageEditor(props: PageEditorProps) {
     serialTemplates = [],
     isHomePage = false,
     editModeHeader,
+    subPagesAdornment,
     isAdmin = false,
     isAuthenticated = false,
     pendingSuggestionCount: _pendingSuggestionCount = 0,
@@ -602,6 +606,7 @@ export function PageEditor(props: PageEditorProps) {
                 }
               : undefined
           }
+          subPagesAdornment={subPagesAdornment}
         />
       </Box>
     );
@@ -771,6 +776,12 @@ export function PageEditor(props: PageEditorProps) {
         wikiChapters={wikiChapters}
         chapterType={chapterType}
       />
+
+      {!isHomePage && (
+        <Box className="border-t pt-4">
+          <DeletePageButton serialSlug={serialSlug} pageSlug={pageSlug} wikiPages={wikiPages} />
+        </Box>
+      )}
 
     </Box>
     </Banner>

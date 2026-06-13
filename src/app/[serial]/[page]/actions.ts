@@ -15,6 +15,7 @@ import {
   templates,
   templateSections,
   templateInfoboxSections,
+  chapterSynopses,
 } from "@/db/schema";
 import {
   and,
@@ -29,6 +30,8 @@ import {
   max,
   min,
   ne,
+  or,
+  sql,
 } from "drizzle-orm";
 import {
   requireSerialAdminBySlug,
@@ -739,6 +742,213 @@ export async function getSectionsAtChapter(
       content: ibContentById.get(s.id) ?? "",
     })),
   };
+}
+
+// ── Page deletion / restore ───────────────────────────────────────────────────
+
+/**
+ * Returns every live section revision that contains a wiki link referencing the
+ * given page by name. Used as a pre-delete guard: the admin must remove all
+ * outgoing wiki links before the page can be deleted.
+ *
+ * The check is a case-insensitive `ILIKE` scan on `page_section_revisions.content`.
+ * This is a full-table scan over the revisions for the serial — acceptable for
+ * typical wiki sizes and intentionally simple to ship.
+ *
+ * @example
+ * const refs = await getPageWikiLinkReferences('my-serial', 'luffy');
+ * if (refs.length > 0) { // show blocking dialog }
+ */
+export async function getPageWikiLinkReferences(
+  serialSlug: string,
+  pageSlug: string,
+): Promise<
+  {
+    /** Slug of the page that contains the reference. */
+    pageSlug: string;
+    /** Display name of the page that contains the reference. */
+    pageName: string;
+    /** Name of the section containing the link. */
+    sectionName: string;
+  }[]
+> {
+  await requireSerialAdminBySlug(serialSlug);
+
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) throw new Error("Serial not found");
+
+  // Look up the target page to get its name for the ILIKE pattern.
+  const [targetPage] = await db
+    .select({ id: pages.id, name: pages.name })
+    .from(pages)
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
+    .limit(1);
+  if (!targetPage) throw new Error("Page not found");
+
+  // Search all revisions in this serial for wiki links to this page.
+  // The editor stores links as `[[page:slug]]`; bare `[[Name]]` is also valid syntax.
+  const slugPattern = `%[[page:${pageSlug}%`;
+  const namePattern = `%[[${targetPage.name}%`;
+
+  const rows = await db
+    .select({
+      pageSlug: pages.slug,
+      pageName: pages.name,
+      sectionName: pageSections.name,
+    })
+    .from(pageSectionRevisions)
+    .innerJoin(pageSections, eq(pageSectionRevisions.sectionId, pageSections.id))
+    .innerJoin(pages, eq(pageSectionRevisions.pageId, pages.id))
+    .where(
+      and(
+        eq(pages.serialId, serial.id),
+        isNull(pageSections.deletedAt),
+        or(
+          sql`${pageSectionRevisions.content} ILIKE ${slugPattern}`,
+          sql`${pageSectionRevisions.content} ILIKE ${namePattern}`,
+        ),
+      ),
+    )
+    .orderBy(asc(pages.name), asc(pageSections.displayOrder));
+
+  // Deduplicate: one row per (pageSlug, sectionName) is enough for display.
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const key = `${r.pageSlug}::${r.sectionName}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Finds chapter synopsis pages that contain a wiki link to the given page.
+ * Used to warn admins before deletion about chapter synopses that will have broken links.
+ *
+ * @example
+ * const refs = await getPageChapterSynopsisReferences('my-serial', 'luffy');
+ */
+export async function getPageChapterSynopsisReferences(
+  serialSlug: string,
+  pageSlug: string,
+): Promise<
+  {
+    /** The chapter's sort index, used to build the chapter page URL. */
+    chapterIdx: number;
+    /** Human-readable chapter display name. */
+    chapterDisplayName: string;
+    /** Human-readable volume display name. */
+    volumeName: string;
+  }[]
+> {
+  await requireSerialAdminBySlug(serialSlug);
+
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) throw new Error("Serial not found");
+
+  const [targetPage] = await db
+    .select({ name: pages.name })
+    .from(pages)
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
+    .limit(1);
+  if (!targetPage) throw new Error("Page not found");
+
+  // The editor stores links as `[[page:slug]]`; bare `[[Name]]` is also valid syntax.
+  const slugPattern = `%[[page:${pageSlug}%`;
+  const namePattern = `%[[${targetPage.name}%`;
+
+  return db
+    .select({
+      chapterIdx: chapters.idx,
+      chapterDisplayName: chapters.displayName,
+      volumeName: volumes.displayName,
+    })
+    .from(chapterSynopses)
+    .innerJoin(chapters, eq(chapterSynopses.chapterId, chapters.id))
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .where(
+      and(
+        eq(volumes.serialId, serial.id),
+        or(
+          sql`${chapterSynopses.content} ILIKE ${slugPattern}`,
+          sql`${chapterSynopses.content} ILIKE ${namePattern}`,
+        ),
+      ),
+    )
+    .orderBy(asc(chapters.idx));
+}
+
+/**
+ * Soft-deletes a wiki page by setting `pages.deleted_at = NOW()`.
+ * Blocked only for the home page and already-deleted pages.
+ * The caller is responsible for warning the admin about incoming wiki links
+ * via `getPageWikiLinkReferences` and `getPageChapterSynopsisReferences`.
+ *
+ * @example
+ * const result = await deletePage('my-serial', 'luffy');
+ * if (result.error) { alert(result.error); }
+ */
+export async function deletePage(
+  serialSlug: string,
+  pageSlug: string,
+  reason?: string,
+): Promise<{ error?: string }> {
+  await requireSerialAdminBySlug(serialSlug);
+  const { pageId } = await resolvePageIds(serialSlug, pageSlug);
+
+  const [pageRow] = await db
+    .select({ isHomePage: pages.isHomePage, deletedAt: pages.deletedAt })
+    .from(pages)
+    .where(eq(pages.id, pageId))
+    .limit(1);
+
+  if (pageRow?.isHomePage) {
+    return { error: "The home page cannot be deleted." };
+  }
+  if (pageRow?.deletedAt) {
+    return { error: "Page is already deleted." };
+  }
+
+  await db
+    .update(pages)
+    .set({ deletedAt: new Date(), deletionReason: reason?.trim() || null })
+    .where(eq(pages.id, pageId));
+
+  return {};
+}
+
+/**
+ * Restores a soft-deleted wiki page by clearing `pages.deleted_at`.
+ *
+ * @example
+ * const result = await restorePage('my-serial', 'luffy');
+ * if (result.error) { alert(result.error); }
+ */
+export async function restorePage(
+  serialSlug: string,
+  pageSlug: string,
+): Promise<{ error?: string }> {
+  await requireSerialAdminBySlug(serialSlug);
+
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) throw new Error("Serial not found");
+
+  // Resolve page WITHOUT the isNull(deletedAt) guard — we need to find deleted pages.
+  const [page] = await db
+    .select({ id: pages.id, deletedAt: pages.deletedAt })
+    .from(pages)
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
+    .limit(1);
+
+  if (!page) return { error: "Page not found." };
+  if (!page.deletedAt) return { error: "Page is not deleted." };
+
+  await db
+    .update(pages)
+    .set({ deletedAt: null })
+    .where(eq(pages.id, page.id));
+
+  return {};
 }
 
 // ── Page section structure management ────────────────────────────────────────

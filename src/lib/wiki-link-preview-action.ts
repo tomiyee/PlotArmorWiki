@@ -69,7 +69,8 @@ export async function getWikiLinkPreview(
     }
   }
 
-  // Resolve page by slug within the serial
+  // Resolve page by slug within the serial. Deleted pages return null so that
+  // wiki links pointing to them render as plain text with no hover preview.
   const [page] = await db
     .select({
       id: pages.id,
@@ -77,7 +78,13 @@ export async function getWikiLinkPreview(
       introChapterId: pages.introChapterId,
     })
     .from(pages)
-    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
+    .where(
+      and(
+        eq(pages.serialId, serial.id),
+        eq(pages.slug, pageSlug),
+        isNull(pages.deletedAt),
+      ),
+    )
     .limit(1);
   if (!page) return null;
 

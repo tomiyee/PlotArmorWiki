@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { FilePenLine, ChevronLeft, ChevronRight, Folder, FileText } from "lucide-react";
@@ -69,6 +70,8 @@ type PageReadViewProps = {
    * Omit for anonymous users or when the page is rendered in edit mode.
    */
   suggestionContext?: SuggestionContext;
+  /** Optional element rendered next to the "Sub-pages" heading, visible only on hover. */
+  subPagesAdornment?: ReactNode;
 };
 
 type SubPageListProps = {
@@ -157,6 +160,7 @@ export function PageReadView(props: PageReadViewProps) {
     wikiChapters,
     chapterType,
     suggestionContext,
+    subPagesAdornment,
   } = props;
 
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
@@ -430,9 +434,14 @@ export function PageReadView(props: PageReadViewProps) {
       </div>
 
       <div className="clear-right mt-6 pt-6 border-t border-border">
-        <Text variant="h3" className="mb-3">
-          Sub-pages
-        </Text>
+        <div className="group flex items-center gap-2 mb-3">
+          <Text variant="h3">Sub-pages</Text>
+          {subPagesAdornment && (
+            <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              {subPagesAdornment}
+            </span>
+          )}
+        </div>
         {childPages.length > 0 ? (
           <div className="border border-border rounded-lg overflow-hidden max-w-sm">
             <div className="border-b border-border">
