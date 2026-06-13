@@ -76,6 +76,10 @@ export const chapters = pgTable("chapters", {
  *
  * `isHomePage` marks the single automatically-created root page for a serial.
  * Every serial has exactly one home page.
+ *
+ * `deletedAt` supports soft-delete so that deleted pages can be restored. A
+ * non-null value hides the page from readers and excludes it from search and
+ * wiki-link resolution, but the row (and all its versioned content) is preserved.
  */
 export const pages = pgTable(
   "pages",
@@ -91,6 +95,8 @@ export const pages = pgTable(
     introChapterId: integer("intro_chapter_id").references(() => chapters.id),
     /** True for the single automatically-created root page per serial. */
     isHomePage: boolean("is_home_page").notNull().default(false),
+    /** Non-null when the page has been soft-deleted. Null for live pages. */
+    deletedAt: timestamp("deleted_at"),
   },
   (t) => [uniqueIndex("pages_serial_id_slug_idx").on(t.serialId, t.slug)],
 );
