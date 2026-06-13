@@ -143,6 +143,8 @@ interface PageEditorProps {
    * TemplateManager above the content editors.
    */
   editModeHeader?: ReactNode;
+  /** Optional element rendered next to the "Sub-pages" heading in read mode, visible only on hover. */
+  subPagesAdornment?: ReactNode;
   /**
    * Whether the current user is an admin of this serial. When `false`, the
    * component always renders in read mode - edit controls and the edit FAB
@@ -261,6 +263,7 @@ export function PageEditor(props: PageEditorProps) {
     serialTemplates = [],
     isHomePage = false,
     editModeHeader,
+    subPagesAdornment,
     isAdmin = false,
     isAuthenticated = false,
     pendingSuggestionCount: _pendingSuggestionCount = 0,
@@ -603,6 +606,7 @@ export function PageEditor(props: PageEditorProps) {
                 }
               : undefined
           }
+          subPagesAdornment={subPagesAdornment}
         />
       </Box>
     );

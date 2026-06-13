@@ -623,19 +623,6 @@ export default async function SerialPage(props: SerialPageProps) {
                 );
               })()}
 
-            {isAdmin && deletedPages.length > 0 && (
-              <DeletedPagesButton
-                serialSlug={serialSlug}
-                deletedPages={deletedPages.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                  slug: p.slug,
-                  deletedAt: p.deletedAt!,
-                  deletionReason: p.deletionReason ?? null,
-                }))}
-              />
-            )}
-
             {homePage ? (
               <PageEditor
                 serialSlug={serialSlug}
@@ -665,6 +652,20 @@ export default async function SerialPage(props: SerialPageProps) {
                 isHomePage
                 isAdmin={isAdmin}
                 isAuthenticated={isUserAuthenticated}
+                subPagesAdornment={
+                  isAdmin && deletedPages.length > 0 ? (
+                    <DeletedPagesButton
+                      serialSlug={serialSlug}
+                      deletedPages={deletedPages.map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        slug: p.slug,
+                        deletedAt: p.deletedAt!,
+                        deletionReason: p.deletionReason ?? null,
+                      }))}
+                    />
+                  ) : undefined
+                }
                 editModeHeader={
                   <>
                     <AdminManager

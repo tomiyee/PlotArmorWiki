@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { ArchiveXIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   Dialog,
   DialogBody,
@@ -47,14 +49,17 @@ export function DeletedPagesButton(props: DeletedPagesButtonProps) {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="text-muted-foreground"
-        onClick={() => setIsOpen(true)}
-      >
-        {count} deleted {count === 1 ? "page" : "pages"}
-      </Button>
+      <Tooltip content={`${count} deleted ${count === 1 ? "page" : "pages"}`} side="right">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          onClick={() => setIsOpen(true)}
+          aria-label={`${count} deleted ${count === 1 ? "page" : "pages"}`}
+        >
+          <ArchiveXIcon className="h-4 w-4" />
+        </Button>
+      </Tooltip>
 
       <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} popupClassName="sm:max-w-lg">
         <DialogHeader>
