@@ -59,9 +59,6 @@ type SubmitButtonProps = {
  * Must be rendered inside a `<form>` to receive `useFormStatus` context.
  * Prevents double-click races by locking out further clicks as soon as the
  * first submission is in-flight.
- *
- * @example
- * <SubmitButton disabled={!hasChapters} />
  */
 function SubmitButton(props: SubmitButtonProps) {
   const { disabled } = props;
@@ -99,9 +96,6 @@ interface NewPageFormProps {
  * When templates are defined for the serial, a "Use template" dropdown lets the
  * user pre-populate sections and infobox rows; a preview shows the resulting
  * structure before submitting.
- *
- * @example
- * <NewPageForm serialSlug="one-piece" chapterType="Chapter" templates={[]} ... />
  */
 export function NewPageForm(props: NewPageFormProps) {
   const {
@@ -116,18 +110,24 @@ export function NewPageForm(props: NewPageFormProps) {
   } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
 
-  const chapterIdxById = Object.fromEntries(chapterList.map((c) => [c.id, c.idx]));
+  const chapterIdxById = Object.fromEntries(
+    chapterList.map((c) => [c.id, c.idx]),
+  );
 
-  const chaptersByVolume = chapterList.reduce<Record<number, Chapter[]>>((acc, c) => {
-    (acc[c.volumeId] ??= []).push(c);
-    return acc;
-  }, {});
+  const chaptersByVolume = chapterList.reduce<Record<number, Chapter[]>>(
+    (acc, c) => {
+      (acc[c.volumeId] ??= []).push(c);
+      return acc;
+    },
+    {},
+  );
 
   const firstChapterId = chapterList[0]?.id ?? 0;
   // Default to the user's reading cutoff so the intro chapter matches where they are.
   // Falls back to chapter 1 when no cutoff is available (e.g. no progress cookie).
-  const [selectedIntroChapterId, setSelectedIntroChapterId] =
-    useState<number>(defaultIntroChapterId ?? firstChapterId);
+  const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<number>(
+    defaultIntroChapterId ?? firstChapterId,
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
   const [selectedParentPageId, setSelectedParentPageId] = useState<
     number | undefined
@@ -197,7 +197,9 @@ export function NewPageForm(props: NewPageFormProps) {
 
   const selectedTemplate =
     templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const sortedTemplateSections = selectedTemplate ? byDisplayOrder(selectedTemplate.sections) : [];
+  const sortedTemplateSections = selectedTemplate
+    ? byDisplayOrder(selectedTemplate.sections)
+    : [];
   const sortedTemplateInfoboxSections = selectedTemplate
     ? byDisplayOrder(selectedTemplate.infoboxSections)
     : [];
