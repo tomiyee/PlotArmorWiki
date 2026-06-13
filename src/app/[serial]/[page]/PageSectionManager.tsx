@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { CSSProperties } from "react";
 import { GripVerticalIcon, LayoutTemplateIcon, LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -25,7 +23,7 @@ import { useServerAction } from "@/hooks/useServerAction";
 import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { InfoIcon } from "@/components/ui/InfoIcon";
-import { useSortableSensors, makeDragEndHandler } from "@/lib/dndUtils";
+import { useSortableSensors, makeDragEndHandler, useSortableItem } from "@/lib/dndUtils";
 import {
   addPageSection,
   deletePageSection,
@@ -98,18 +96,11 @@ function SortableSection({
   onDelete: () => void;
   onRename: (fd: FormData) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: section.id, disabled: isPending });
-
-  const style: CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1,
-  };
+  const { ref, style, dragHandleProps } = useSortableItem(section.id, isPending);
 
   return (
     <li
-      ref={setNodeRef}
+      ref={ref}
       style={style}
       className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted/50"
     >
@@ -126,8 +117,7 @@ function SortableSection({
       ) : (
         <>
           <span
-            {...attributes}
-            {...listeners}
+            {...dragHandleProps}
             className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
             title="Drag to reorder"
           >
