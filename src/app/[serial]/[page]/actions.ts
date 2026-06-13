@@ -12,6 +12,9 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
   pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
 } from "@/db/schema";
 import {
   and,
@@ -500,6 +503,127 @@ export async function updatePageIntroChapter(
     .update(pages)
     .set({ introChapterId: chapterId })
     .where(eq(pages.id, pageId));
+}
+
+// ── Template application ───────────────────────────────────────────────────────
+
+/**
+ * Applies a template's section and infobox structure to an existing page.
+ * Skips any sections/infobox rows whose name/label already exists on the page
+ * (case-insensitive comparison) to avoid creating duplicates.
+ * New sections are appended after the current live sections in template display
+ * order; new infobox rows are likewise appended.
+ *
+ * Returns counts of added vs skipped items so the UI can surface a summary.
+ */
+export async function applyTemplateSections(
+  pageId: number,
+  templateId: number,
+): Promise<{
+  addedSections: number;
+  skippedSections: number;
+  addedInfoboxRows: number;
+  skippedInfoboxRows: number;
+}> {
+  await requireSerialAdminByPageId(pageId);
+
+  // Verify the template exists and belongs to the same serial as the page.
+  const [tmpl] = await db
+    .select({ id: templates.id, hasInfobox: templates.hasInfobox })
+    .from(templates)
+    .innerJoin(pages, and(eq(pages.serialId, templates.serialId), eq(pages.id, pageId)))
+    .where(eq(templates.id, templateId))
+    .limit(1);
+  if (!tmpl) throw new Error("Template not found");
+
+  const [tmplSections, tmplInfoboxSections] = await Promise.all([
+    db
+      .select({ name: templateSections.name, displayOrder: templateSections.displayOrder })
+      .from(templateSections)
+      .where(eq(templateSections.templateId, tmpl.id))
+      .orderBy(asc(templateSections.displayOrder)),
+    tmpl.hasInfobox
+      ? db
+          .select({
+            label: templateInfoboxSections.label,
+            displayOrder: templateInfoboxSections.displayOrder,
+          })
+          .from(templateInfoboxSections)
+          .where(eq(templateInfoboxSections.templateId, tmpl.id))
+          .orderBy(asc(templateInfoboxSections.displayOrder))
+      : Promise.resolve([]),
+  ]);
+
+  return await db.transaction(async (tx) => {
+    // Fetch live sections and infobox rows in parallel; infobox query skipped when template has no infobox.
+    const [liveSections, liveInfoboxRows] = await Promise.all([
+      tx
+        .select({ name: pageSections.name })
+        .from(pageSections)
+        .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt))),
+      tmpl.hasInfobox
+        ? tx
+            .select({ label: pageInfoboxSections.label })
+            .from(pageInfoboxSections)
+            .where(
+              and(
+                eq(pageInfoboxSections.pageId, pageId),
+                isNull(pageInfoboxSections.deletedAt),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+
+    const liveSectionNames = new Set(liveSections.map((s) => s.name.toLowerCase()));
+
+    const liveInfoboxLabels = new Set(
+      liveInfoboxRows.map((r) => r.label.toLowerCase()),
+    );
+
+    // Partition template sections into add vs skip.
+    const sectionsToAdd = tmplSections.filter(
+      (s) => !liveSectionNames.has(s.name.toLowerCase()),
+    );
+    const skippedSections = tmplSections.length - sectionsToAdd.length;
+
+    // Insert new sections with displayOrder continuing from the current max.
+    if (sectionsToAdd.length > 0) {
+      const cnt = liveSections.length;
+
+      await tx.insert(pageSections).values(
+        sectionsToAdd.map((s, i) => ({
+          pageId,
+          name: s.name,
+          displayOrder: cnt + i,
+        })),
+      );
+    }
+
+    // Partition template infobox rows into add vs skip.
+    const infoboxRowsToAdd = tmplInfoboxSections.filter(
+      (s) => !liveInfoboxLabels.has(s.label.toLowerCase()),
+    );
+    const skippedInfoboxRows = tmplInfoboxSections.length - infoboxRowsToAdd.length;
+
+    if (infoboxRowsToAdd.length > 0) {
+      const cnt = liveInfoboxRows.length;
+
+      await tx.insert(pageInfoboxSections).values(
+        infoboxRowsToAdd.map((s, i) => ({
+          pageId,
+          label: s.label,
+          displayOrder: cnt + i,
+        })),
+      );
+    }
+
+    return {
+      addedSections: sectionsToAdd.length,
+      skippedSections,
+      addedInfoboxRows: infoboxRowsToAdd.length,
+      skippedInfoboxRows,
+    };
+  });
 }
 
 /**

@@ -22,7 +22,7 @@ import { Select } from "@/components/ui/Select";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Banner } from "@/components/ui/Banner";
 import { WritingAsOfBanner } from "./WritingAsOfBanner";
-import { PageSectionManager, type PageSection } from "./PageSectionManager";
+import { PageSectionManager, type PageSection, type SerialTemplate } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
 import { PageReadView } from "./PageReadView";
 import { PageTitlesPanel } from "./PageTitlesPanel";
@@ -124,6 +124,12 @@ interface PageEditorProps {
    * at the reader's chapter cutoff so the dropdown reflects temporal renames.
    */
   allSerialPages: { id: number; title: string }[];
+  /**
+   * Templates defined for this serial, passed to PageSectionManager to power
+   * the "Apply template" feature. Empty when the serial has no templates or the
+   * current user is not an admin.
+   */
+  serialTemplates?: SerialTemplate[];
   /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
@@ -251,6 +257,7 @@ export function PageEditor(props: PageEditorProps) {
     childPages,
     parentPages,
     allSerialPages,
+    serialTemplates = [],
     isHomePage = false,
     editModeHeader,
     isAdmin = false,
@@ -717,7 +724,11 @@ export function PageEditor(props: PageEditorProps) {
         />
       )}
 
-      <PageSectionManager pageId={pageId} sections={pageSectionStructure} />
+      <PageSectionManager
+        pageId={pageId}
+        sections={pageSectionStructure}
+        serialTemplates={serialTemplates}
+      />
 
       {sections.map((section, i) => (
         <SectionContentEditor

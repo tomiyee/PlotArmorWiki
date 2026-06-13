@@ -14,8 +14,11 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
   pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
 } from "@/db/schema";
-import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import {
   resolvePageTitlesAtIdx,
   resolveHasChildrenSet,
@@ -69,6 +72,65 @@ async function getChapterCutoff(
 
   if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
   return { cutoffIdx: idx, readingChapterId: chapterId };
+}
+
+function groupByTemplateId<T extends { templateId: number }>(items: T[]): Map<number, T[]> {
+  const map = new Map<number, T[]>();
+  for (const item of items) {
+    const arr = map.get(item.templateId) ?? [];
+    arr.push(item);
+    map.set(item.templateId, arr);
+  }
+  return map;
+}
+
+async function fetchSerialTemplates(serialId: number) {
+  const tmplRows = await db
+    .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
+    .from(templates)
+    .where(eq(templates.serialId, serialId))
+    .orderBy(asc(templates.name));
+
+  if (tmplRows.length === 0) return [];
+
+  const tmplIds = tmplRows.map((t) => t.id);
+
+  // Fetch all section/infobox rows for every template in this serial in two
+  // queries, then group in JS. Templates per serial are a small set so this
+  // is always fast.
+  const [allTmplSections, allTmplInfoboxSections] = await Promise.all([
+    db
+      .select({
+        templateId: templateSections.templateId,
+        id: templateSections.id,
+        name: templateSections.name,
+        displayOrder: templateSections.displayOrder,
+      })
+      .from(templateSections)
+      .where(inArray(templateSections.templateId, tmplIds))
+      .orderBy(asc(templateSections.displayOrder)),
+    db
+      .select({
+        templateId: templateInfoboxSections.templateId,
+        id: templateInfoboxSections.id,
+        label: templateInfoboxSections.label,
+        displayOrder: templateInfoboxSections.displayOrder,
+      })
+      .from(templateInfoboxSections)
+      .where(inArray(templateInfoboxSections.templateId, tmplIds))
+      .orderBy(asc(templateInfoboxSections.displayOrder)),
+  ]);
+
+  const sectionsByTemplate = groupByTemplateId(allTmplSections);
+  const infoboxByTemplate = groupByTemplateId(allTmplInfoboxSections);
+
+  return tmplRows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    hasInfobox: t.hasInfobox,
+    sections: sectionsByTemplate.get(t.id) ?? [],
+    infoboxSections: infoboxByTemplate.get(t.id) ?? [],
+  }));
 }
 
 /** Server Component that renders a wiki page at the reader's chapter cutoff. */
@@ -446,13 +508,15 @@ export default async function PageView(props: PageViewProps) {
   // ── Suggestion data ───────────────────────────────────────────────────────
   // Fetch in parallel: pending count + full list for admins, user status for
   // non-admins. Both functions are no-ops when the user lacks permission.
-  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] =
+  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions, serialTemplates] =
     await Promise.all([
       isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
       isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
       !isAdmin && isUserAuthenticated
         ? getMyPageSuggestions(page.id)
         : Promise.resolve([]),
+      // Only fetched for admins; non-admins never see the edit panel.
+      isAdmin ? fetchSerialTemplates(serial.id) : Promise.resolve([]),
     ]);
 
   return (
@@ -516,6 +580,7 @@ export default async function PageView(props: PageViewProps) {
               childPages={childPages}
               parentPages={parentPages}
               allSerialPages={allSerialPages}
+              serialTemplates={serialTemplates}
               isAdmin={isAdmin}
               isAuthenticated={isUserAuthenticated}
               pendingSuggestionCount={pendingSuggestionCount}
