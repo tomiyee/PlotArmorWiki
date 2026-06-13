@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { db } from "@/db/index";
 import {
   volumes,
@@ -9,28 +8,22 @@ import {
   templateInfoboxSections,
 } from "@/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
-import { getChapterIdxById } from "@/db/queries";
+import { getChapterCutoff as dalGetChapterCutoff } from "@/db/queries";
 
 /**
  * Reads the user's chapter cutoff for a given serial from the progress cookie
  * set by `<ChapterSelector>`. Returns the chapter id so it can be passed to
  * `<NewPageForm>` as the default intro chapter selection.
  *
+ * Delegates to the shared DAL implementation in `@/db/queries` which is the
+ * single source of truth for cookie-based cutoff resolution.
+ *
  * @example
  * const readingChapterId = await getChapterCutoff(serial.id);
  */
 export async function getChapterCutoff(serialId: number): Promise<number | null> {
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serialId}`)?.value;
-  if (!raw) return null;
-
-  const chapterId = parseInt(raw, 10);
-  if (isNaN(chapterId)) return null;
-
-  const idx = await getChapterIdxById(chapterId);
-  if (idx === null) return null;
-
-  return chapterId;
+  const { readingChapterId } = await dalGetChapterCutoff(serialId);
+  return readingChapterId;
 }
 
 /**

@@ -1,16 +1,19 @@
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db/index";
 import {
-  serials,
   volumes,
   chapters,
   chapterSynopses,
   pages,
 } from "@/db/schema";
 import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
-import { resolvePageTitlesAtIdx } from "@/db/queries";
+import {
+  getSerialBySlug,
+  getChapterCutoff,
+  getSerialVolumesAndChapters,
+  resolvePageTitlesAtIdx,
+} from "@/db/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -54,38 +57,17 @@ export default async function ChapterPage(props: ChapterPageProps) {
     notFound();
   }
 
-  const [serial] = await db
-    .select()
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
 
   if (!serial) {
     notFound();
   }
 
-  const [isAdmin, authenticatedUserId, [volumeList, chapterList]] =
+  const [isAdmin, authenticatedUserId, { volumeList, chapterList }] =
     await Promise.all([
       isSerialAdmin(serial.id),
       isAuthenticated(),
-      Promise.all([
-        db
-          .select()
-          .from(volumes)
-          .where(eq(volumes.serialId, serial.id))
-          .orderBy(volumes.idx),
-        db
-          .select({
-            id: chapters.id,
-            displayName: chapters.displayName,
-            idx: chapters.idx,
-            volumeId: chapters.volumeId,
-          })
-          .from(chapters)
-          .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-          .where(eq(volumes.serialId, serial.id))
-          .orderBy(chapters.idx),
-      ]),
+      getSerialVolumesAndChapters(serial.id),
     ]);
 
   const chaptersByVolume: Record<
@@ -116,19 +98,8 @@ export default async function ChapterPage(props: ChapterPageProps) {
     notFound();
   }
 
-  // Check the user's reading progress cookie against this chapter's idx
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
-  const chapterId = raw ? parseInt(raw, 10) : NaN;
-  let cutoffIdx = 0;
-  if (!isNaN(chapterId)) {
-    const [row] = await db
-      .select({ idx: chapters.idx })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .limit(1);
-    cutoffIdx = row?.idx ?? 0;
-  }
+  // Check the user's reading progress cookie against this chapter's idx.
+  const { cutoffIdx } = await getChapterCutoff(serial.id);
 
   const spoilered = chapter.idx > cutoffIdx;
 

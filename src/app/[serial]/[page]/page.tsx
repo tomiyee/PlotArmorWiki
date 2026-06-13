@@ -1,10 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db/index";
 import {
-  serials,
   pages,
   chapters,
   volumes,
@@ -15,17 +13,18 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
   pageTitles,
-  templates,
-  templateSections,
-  templateInfoboxSections,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, max, or } from "drizzle-orm";
 import {
+  getSerialBySlug,
+  getChapterCutoff,
+  getSerialVolumesAndChapters,
+  fetchPageAtSlug,
+  fetchSerialTemplates,
   resolvePageTitlesAtIdx,
   resolveHasChildrenSet,
   fetchActiveParentPagesAtIdx,
   fetchSerialPagesAtIdx,
-  getChapterIdxById,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
   childRelMaxIdxSq as buildChildRelMaxIdxSq,
@@ -49,93 +48,6 @@ interface PageViewProps {
   params: Promise<{ serial: string; page: string }>;
 }
 
-/**
- * Reads the user's chapter cutoff for a given serial from the progress
- * cookie set by <ChapterSelector>. Returns both the chapter id (DB PK)
- * and idx (global ordering integer) so callers can pass the id to
- * PageEditor as the default "Writing as of" selection.
- *
- * Falls back to idx=0 / id=null when no cookie is present - the subquery
- * finds no revision with idx ≤ 0, so all sections render empty.
- *
- * @example
- * const { cutoffIdx, readingChapterId } = await getChapterCutoff(serial.id);
- */
-async function getChapterCutoff(
-  serialId: number,
-): Promise<{ cutoffIdx: number; readingChapterId: number | null }> {
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serialId}`)?.value;
-  if (!raw) return { cutoffIdx: 0, readingChapterId: null };
-
-  const chapterId = parseInt(raw, 10);
-  if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
-
-  const idx = await getChapterIdxById(chapterId);
-
-  if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
-  return { cutoffIdx: idx, readingChapterId: chapterId };
-}
-
-function groupByTemplateId<T extends { templateId: number }>(items: T[]): Map<number, T[]> {
-  const map = new Map<number, T[]>();
-  for (const item of items) {
-    const arr = map.get(item.templateId) ?? [];
-    arr.push(item);
-    map.set(item.templateId, arr);
-  }
-  return map;
-}
-
-async function fetchSerialTemplates(serialId: number) {
-  const tmplRows = await db
-    .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
-    .from(templates)
-    .where(eq(templates.serialId, serialId))
-    .orderBy(asc(templates.name));
-
-  if (tmplRows.length === 0) return [];
-
-  const tmplIds = tmplRows.map((t) => t.id);
-
-  // Fetch all section/infobox rows for every template in this serial in two
-  // queries, then group in JS. Templates per serial are a small set so this
-  // is always fast.
-  const [allTmplSections, allTmplInfoboxSections] = await Promise.all([
-    db
-      .select({
-        templateId: templateSections.templateId,
-        id: templateSections.id,
-        name: templateSections.name,
-        displayOrder: templateSections.displayOrder,
-      })
-      .from(templateSections)
-      .where(inArray(templateSections.templateId, tmplIds))
-      .orderBy(asc(templateSections.displayOrder)),
-    db
-      .select({
-        templateId: templateInfoboxSections.templateId,
-        id: templateInfoboxSections.id,
-        label: templateInfoboxSections.label,
-        displayOrder: templateInfoboxSections.displayOrder,
-      })
-      .from(templateInfoboxSections)
-      .where(inArray(templateInfoboxSections.templateId, tmplIds))
-      .orderBy(asc(templateInfoboxSections.displayOrder)),
-  ]);
-
-  const sectionsByTemplate = groupByTemplateId(allTmplSections);
-  const infoboxByTemplate = groupByTemplateId(allTmplInfoboxSections);
-
-  return tmplRows.map((t) => ({
-    id: t.id,
-    name: t.name,
-    hasInfobox: t.hasInfobox,
-    sections: sectionsByTemplate.get(t.id) ?? [],
-    infoboxSections: infoboxByTemplate.get(t.id) ?? [],
-  }));
-}
-
 /** Server Component that renders a wiki page at the reader's chapter cutoff. */
 export default async function PageView(props: PageViewProps) {
   const { params } = props;
@@ -143,35 +55,16 @@ export default async function PageView(props: PageViewProps) {
 
   const decodedPageSlug = decodeURIComponent(pageParam);
 
-  const [serial] = await db
-    .select()
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
 
   if (!serial) {
     notFound();
   }
 
-  const [chapterCutoff, volumeList, chapterList, adminStatus, authUserId] =
+  const [chapterCutoff, { volumeList, chapterList }, adminStatus, authUserId] =
     await Promise.all([
       getChapterCutoff(serial.id),
-      db
-        .select({ id: volumes.id, displayName: volumes.displayName })
-        .from(volumes)
-        .where(eq(volumes.serialId, serial.id))
-        .orderBy(asc(volumes.idx)),
-      db
-        .select({
-          id: chapters.id,
-          displayName: chapters.displayName,
-          idx: chapters.idx,
-          volumeId: chapters.volumeId,
-        })
-        .from(chapters)
-        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-        .where(eq(volumes.serialId, serial.id))
-        .orderBy(asc(chapters.idx)),
+      getSerialVolumesAndChapters(serial.id),
       isSerialAdmin(serial.id),
       isAuthenticated(),
     ]);
@@ -194,18 +87,25 @@ export default async function PageView(props: PageViewProps) {
   // Wiki pages visible at the reader's cutoff. Pages with null introChapterId
   // (the home page) are always included since they predate any chapters.
   // Deleted pages are excluded from the editor autocomplete list.
-  const rawWikiPages = await db
-    .select({ id: pages.id, name: pages.name, slug: pages.slug })
-    .from(pages)
-    .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
-    .where(
-      and(
-        eq(pages.serialId, serial.id),
-        isNull(pages.deletedAt),
-        or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
-      ),
-    )
-    .orderBy(asc(pages.name));
+  const [rawWikiPages, page] = await Promise.all([
+    db
+      .select({ id: pages.id, name: pages.name, slug: pages.slug })
+      .from(pages)
+      .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+      .where(
+        and(
+          eq(pages.serialId, serial.id),
+          isNull(pages.deletedAt),
+          or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+        ),
+      )
+      .orderBy(asc(pages.name)),
+    fetchPageAtSlug(serial.id, decodedPageSlug),
+  ]);
+
+  if (!page) {
+    notFound();
+  }
 
   // Resolve chapter-versioned titles for all wiki pages at the reader's cutoff.
   const wikiPageIds = rawWikiPages.map((p) => p.id);
@@ -219,16 +119,6 @@ export default async function PageView(props: PageViewProps) {
     name: wikiTitleByPageId.get(p.id) ?? p.name,
     slug: p.slug,
   }));
-
-  const [page] = await db
-    .select()
-    .from(pages)
-    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, decodedPageSlug)))
-    .limit(1);
-
-  if (!page) {
-    notFound();
-  }
 
   // The home page is canonical at /{serial}; visiting /{serial}/home redirects there.
   if (page.isHomePage) {

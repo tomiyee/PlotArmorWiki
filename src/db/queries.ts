@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { cookies } from "next/headers";
 import { db } from "@/db/index";
 import {
   chapters,
@@ -8,6 +10,9 @@ import {
   pageInfoboxRevisions,
   serials,
   volumes,
+  templates,
+  templateSections,
+  templateInfoboxSections,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 
@@ -230,36 +235,45 @@ export function childRelMaxIdxSq(parentPageId: number, cutoffIdx: number) {
 }
 
 /**
- * Fetches a serial row by its URL slug. Returns `undefined` when no serial
- * matches, so callers can short-circuit with `notFound()` or return `null`.
+ * Fetches the full serial row by its URL slug. Returns `undefined` when no
+ * serial matches, so callers can call `notFound()` immediately.
  *
- * Includes `chapterType` alongside `id` because most callsites that look up
- * a serial also need `chapterType` for display labels ("Chapter 5", "Episode 5").
+ * Wrapped in `React.cache()` so that when the layout and its nested page both
+ * call this function in the same request they share a single DB round-trip.
  *
  * @example
  * const serial = await getSerialBySlug("one-piece");
- * if (!serial) return null;
+ * if (!serial) return notFound();
  */
-export async function getSerialBySlug(
+export const getSerialBySlug = cache(async function getSerialBySlug(
   serialSlug: string,
-): Promise<{ id: number; chapterType: "Chapter" | "Episode" | "Issue" | "Part" } | undefined> {
-  const [row] = await db
-    .select({ id: serials.id, chapterType: serials.chapterType })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+): Promise<
+  | {
+      id: number;
+      title: string;
+      slug: string;
+      splashArtUrl: string | null;
+      chapterType: "Chapter" | "Episode" | "Issue" | "Part";
+      volumeType: "Volume" | "Season" | "Arc" | "Book";
+    }
+  | undefined
+> {
+  const [row] = await db.select().from(serials).where(eq(serials.slug, serialSlug)).limit(1);
   return row;
-}
+});
 
 /**
  * Fetches the `idx` for a chapter by its primary key. Returns `null` when the
  * chapter does not exist, so callers can fall back to a default cutoff of 0.
  *
+ * Wrapped in `React.cache()` so repeated calls within a single request (e.g.
+ * from `getChapterCutoff` and from an action) share one DB hit.
+ *
  * @example
  * const idx = await getChapterIdxById(chapterId);
  * const cutoffIdx = idx ?? 0;
  */
-export async function getChapterIdxById(
+export const getChapterIdxById = cache(async function getChapterIdxById(
   chapterId: number,
 ): Promise<number | null> {
   const [row] = await db
@@ -268,7 +282,7 @@ export async function getChapterIdxById(
     .where(eq(chapters.id, chapterId))
     .limit(1);
   return row?.idx ?? null;
-}
+});
 
 /**
  * Fetches the chapter id for a given serial + chapter idx combination.
@@ -375,4 +389,186 @@ export async function fetchActiveParentPagesAtIdx(
         eq(pageRelationships.isActive, true),
       ),
     );
+}
+
+// ── Shared infrastructure queries ────────────────────────────────────────────
+// These functions replace duplicated inline queries scattered across Server
+// Components. Each is wrapped in React.cache() so that the layout and its
+// nested page component share one DB hit per request when they call the same
+// function (e.g. both need the volumes + chapters list to render the sidebar
+// and the editor chapter selector).
+
+/**
+ * Reads the user's chapter cutoff for a given serial from the progress cookie
+ * set by `<ChapterSelector>`. Returns both the chapter id (DB PK) and idx
+ * (global ordering integer).
+ *
+ * Falls back to `{ cutoffIdx: 0, readingChapterId: null }` when no cookie is
+ * present — the subquery finds no revision with idx ≤ 0, so all sections
+ * render empty (pre-chapter-1 state).
+ *
+ * This is the single source of truth for cookie-based cutoff resolution;
+ * previously duplicated between `[page]/page.tsx` and
+ * `chapter/[chapterIdx]/page.tsx`.
+ *
+ * @example
+ * const { cutoffIdx, readingChapterId } = await getChapterCutoff(serial.id);
+ */
+export async function getChapterCutoff(
+  serialId: number,
+): Promise<{ cutoffIdx: number; readingChapterId: number | null }> {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(`plotarmor_chapter_${serialId}`)?.value;
+  if (!raw) return { cutoffIdx: 0, readingChapterId: null };
+
+  const chapterId = parseInt(raw, 10);
+  if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
+
+  const idx = await getChapterIdxById(chapterId);
+  if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
+
+  return { cutoffIdx: idx, readingChapterId: chapterId };
+}
+
+/**
+ * Fetches all volumes and chapters for a serial in a single parallel query pair,
+ * ordered for display in the chapter selector and TOC sidebar.
+ *
+ * Wrapped in `React.cache()` so the serial layout (which renders the chapter
+ * selector) and the nested wiki page (which renders the edit-mode chapter
+ * selector) share one DB round-trip per request.
+ *
+ * @example
+ * const { volumeList, chapterList } = await getSerialVolumesAndChapters(serial.id);
+ */
+export const getSerialVolumesAndChapters = cache(
+  async function getSerialVolumesAndChapters(serialId: number) {
+    const [volumeList, chapterList] = await Promise.all([
+      db
+        .select({
+          id: volumes.id,
+          displayName: volumes.displayName,
+          idx: volumes.idx,
+          serialId: volumes.serialId,
+        })
+        .from(volumes)
+        .where(eq(volumes.serialId, serialId))
+        .orderBy(asc(volumes.idx)),
+      db
+        .select({
+          id: chapters.id,
+          displayName: chapters.displayName,
+          idx: chapters.idx,
+          volumeId: chapters.volumeId,
+        })
+        .from(chapters)
+        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+        .where(eq(volumes.serialId, serialId))
+        .orderBy(asc(chapters.idx)),
+    ]);
+    return { volumeList, chapterList };
+  },
+);
+
+/**
+ * Fetches a wiki page by serial id + slug. Returns `undefined` when no page
+ * matches, so callers can call `notFound()` immediately.
+ *
+ * @example
+ * const page = await fetchPageAtSlug(serial.id, decodedSlug);
+ * if (!page) notFound();
+ */
+export async function fetchPageAtSlug(
+  serialId: number,
+  slug: string,
+): Promise<
+  | {
+      id: number;
+      name: string;
+      slug: string;
+      serialId: number;
+      introChapterId: number | null;
+      isHomePage: boolean;
+      deletedAt: Date | null;
+      deletionReason: string | null;
+      idempotencyKey: string | null;
+    }
+  | undefined
+> {
+  const [row] = await db
+    .select()
+    .from(pages)
+    .where(and(eq(pages.serialId, serialId), eq(pages.slug, slug)))
+    .limit(1);
+  return row;
+}
+
+function groupByTemplateId<T extends { templateId: number }>(items: T[]): Map<number, T[]> {
+  const map = new Map<number, T[]>();
+  for (const item of items) {
+    const arr = map.get(item.templateId) ?? [];
+    arr.push(item);
+    map.set(item.templateId, arr);
+  }
+  return map;
+}
+
+/**
+ * Fetches all templates for a serial with their sections and infobox rows,
+ * ordered alphabetically. Returns `[]` when the serial has no templates.
+ *
+ * Runs three queries (templates → sections + infobox rows in parallel) and
+ * groups in JS; templates per serial are a small set so this is always fast.
+ *
+ * This is the single source of truth for template data; previously duplicated
+ * as a local `fetchSerialTemplates` function inside `[page]/page.tsx` and
+ * `[serial]/new/queries.ts`.
+ *
+ * @example
+ * const serialTemplates = await fetchSerialTemplates(serial.id);
+ */
+export async function fetchSerialTemplates(serialId: number) {
+  const tmplRows = await db
+    .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
+    .from(templates)
+    .where(eq(templates.serialId, serialId))
+    .orderBy(asc(templates.name));
+
+  if (tmplRows.length === 0) return [];
+
+  const tmplIds = tmplRows.map((t) => t.id);
+
+  const [allTmplSections, allTmplInfoboxSections] = await Promise.all([
+    db
+      .select({
+        templateId: templateSections.templateId,
+        id: templateSections.id,
+        name: templateSections.name,
+        displayOrder: templateSections.displayOrder,
+      })
+      .from(templateSections)
+      .where(inArray(templateSections.templateId, tmplIds))
+      .orderBy(asc(templateSections.displayOrder)),
+    db
+      .select({
+        templateId: templateInfoboxSections.templateId,
+        id: templateInfoboxSections.id,
+        label: templateInfoboxSections.label,
+        displayOrder: templateInfoboxSections.displayOrder,
+      })
+      .from(templateInfoboxSections)
+      .where(inArray(templateInfoboxSections.templateId, tmplIds))
+      .orderBy(asc(templateInfoboxSections.displayOrder)),
+  ]);
+
+  const sectionsByTemplate = groupByTemplateId(allTmplSections);
+  const infoboxByTemplate = groupByTemplateId(allTmplInfoboxSections);
+
+  return tmplRows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    hasInfobox: t.hasInfobox,
+    sections: sectionsByTemplate.get(t.id) ?? [],
+    infoboxSections: infoboxByTemplate.get(t.id) ?? [],
+  }));
 }

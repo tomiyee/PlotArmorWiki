@@ -1,15 +1,18 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/index";
 import {
-  serials,
-  volumes,
-  chapters,
   pages,
   pageRelationships,
+  chapters,
   userProgress,
 } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
-import { childRelMaxIdxSq as buildChildRelMaxIdxSq, PG_INT_MAX } from "@/db/queries";
+import {
+  getSerialBySlug,
+  getSerialVolumesAndChapters,
+  childRelMaxIdxSq as buildChildRelMaxIdxSq,
+  PG_INT_MAX,
+} from "@/db/queries";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
@@ -35,11 +38,7 @@ export default async function SerialLayout(props: SerialLayoutProps) {
   const { children, params } = props;
   const { serial: serialSlug } = await params;
 
-  const [serial] = await db
-    .select()
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
 
   if (!serial) {
     notFound();
@@ -49,24 +48,7 @@ export default async function SerialLayout(props: SerialLayoutProps) {
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
-  const [volumeList, chapterList] = await Promise.all([
-    db
-      .select()
-      .from(volumes)
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(volumes.idx),
-    db
-      .select({
-        id: chapters.id,
-        displayName: chapters.displayName,
-        idx: chapters.idx,
-        volumeId: chapters.volumeId,
-      })
-      .from(chapters)
-      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-      .where(eq(volumes.serialId, serial.id))
-      .orderBy(chapters.idx),
-  ]);
+  const { volumeList, chapterList } = await getSerialVolumesAndChapters(serial.id);
 
   const chaptersByVolume: Partial<Record<number, ChapterData[]>> = {
     ...Object.groupBy(chapterList, (c) => c.volumeId),
