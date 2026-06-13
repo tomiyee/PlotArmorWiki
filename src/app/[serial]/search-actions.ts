@@ -51,6 +51,7 @@ export async function getVisiblePages(
   }
 
   // Step 1: pages visible at the cutoff (same filter as page rendering).
+  // Deleted pages are excluded so they do not appear in search results.
   const rawPages = await db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
@@ -60,6 +61,7 @@ export async function getVisiblePages(
         eq(pages.serialId, serial.id),
         // Exclude the home page - users navigate to it via the serial breadcrumb.
         eq(pages.isHomePage, false),
+        isNull(pages.deletedAt),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
       ),
     )

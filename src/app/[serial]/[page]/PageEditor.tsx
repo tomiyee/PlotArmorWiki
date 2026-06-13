@@ -18,6 +18,7 @@ import {
   getAllSerialPagesAtChapter,
   updatePageIntroChapter,
 } from "./actions";
+import { DeletePageButton } from "./DeletePageButton";
 import { Select } from "@/components/ui/Select";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Banner } from "@/components/ui/Banner";
@@ -771,6 +772,12 @@ export function PageEditor(props: PageEditorProps) {
         wikiChapters={wikiChapters}
         chapterType={chapterType}
       />
+
+      {!isHomePage && (
+        <Box className="border-t pt-4">
+          <DeletePageButton serialSlug={serialSlug} pageSlug={pageSlug} />
+        </Box>
+      )}
 
     </Box>
     </Banner>
