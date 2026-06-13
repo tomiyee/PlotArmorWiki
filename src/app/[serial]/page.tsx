@@ -20,7 +20,7 @@ import {
   serialAdmins,
   users,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, max, or } from "drizzle-orm";
 import {
   resolvePageTitlesAtIdx,
   resolveHasChildrenSet,
@@ -73,6 +73,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/Accordion";
+import { DeletedPagesButton } from "@/components/DeletedPagesButton";
 
 interface SerialPageProps {
   /** Next.js dynamic route params containing the `serial` slug. */
@@ -197,6 +198,20 @@ export default async function SerialPage(props: SerialPageProps) {
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
   const isUserAuthenticated = !!session?.user?.id;
+
+  const deletedPages = isAdmin
+    ? await db
+        .select({
+          id: pages.id,
+          name: pages.name,
+          slug: pages.slug,
+          deletedAt: pages.deletedAt,
+          deletionReason: pages.deletionReason,
+        })
+        .from(pages)
+        .where(and(eq(pages.serialId, serial.id), isNotNull(pages.deletedAt)))
+        .orderBy(desc(pages.deletedAt))
+    : [];
 
   const chaptersByVolume: Record<
     number,
@@ -470,7 +485,7 @@ export default async function SerialPage(props: SerialPageProps) {
           eq(chapters.idx, relMaxIdxSq.maxIdx),
         ),
       )
-      .where(eq(pageRelationships.parentPageId, homePage.id));
+      .where(and(eq(pageRelationships.parentPageId, homePage.id), isNull(pages.deletedAt)));
 
     const activeChildPages = childPagesRaw.filter((r) => r.isActive);
     const childPageIds = activeChildPages.map((r) => r.id);
@@ -607,6 +622,19 @@ export default async function SerialPage(props: SerialPageProps) {
                   </Accordion>
                 );
               })()}
+
+            {isAdmin && deletedPages.length > 0 && (
+              <DeletedPagesButton
+                serialSlug={serialSlug}
+                deletedPages={deletedPages.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  slug: p.slug,
+                  deletedAt: p.deletedAt!,
+                  deletionReason: p.deletionReason ?? null,
+                }))}
+              />
+            )}
 
             {homePage ? (
               <PageEditor

@@ -97,6 +97,8 @@ export const pages = pgTable(
     isHomePage: boolean("is_home_page").notNull().default(false),
     /** Non-null when the page has been soft-deleted. Null for live pages. */
     deletedAt: timestamp("deleted_at"),
+    /** Admin-supplied markdown reason for the deletion. Null when no reason was given. */
+    deletionReason: text("deletion_reason"),
   },
   (t) => [uniqueIndex("pages_serial_id_slug_idx").on(t.serialId, t.slug)],
 );

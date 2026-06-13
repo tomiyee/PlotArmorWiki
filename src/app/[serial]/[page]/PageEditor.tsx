@@ -775,7 +775,7 @@ export function PageEditor(props: PageEditorProps) {
 
       {!isHomePage && (
         <Box className="border-t pt-4">
-          <DeletePageButton serialSlug={serialSlug} pageSlug={pageSlug} />
+          <DeletePageButton serialSlug={serialSlug} pageSlug={pageSlug} wikiPages={wikiPages} />
         </Box>
       )}
 

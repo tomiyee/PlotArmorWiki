@@ -15,6 +15,7 @@ import {
   templates,
   templateSections,
   templateInfoboxSections,
+  chapterSynopses,
 } from "@/db/schema";
 import {
   and,
@@ -29,6 +30,7 @@ import {
   max,
   min,
   ne,
+  or,
   sql,
 } from "drizzle-orm";
 import {
@@ -783,9 +785,10 @@ export async function getPageWikiLinkReferences(
     .limit(1);
   if (!targetPage) throw new Error("Page not found");
 
-  // Search all revisions in this serial for `[[PageName` (case-insensitive).
-  // We join back to pages/pageSections so we can return human-readable labels.
-  const pattern = `%[[${targetPage.name}%`;
+  // Search all revisions in this serial for wiki links to this page.
+  // The editor stores links as `[[page:slug]]`; bare `[[Name]]` is also valid syntax.
+  const slugPattern = `%[[page:${pageSlug}%`;
+  const namePattern = `%[[${targetPage.name}%`;
 
   const rows = await db
     .select({
@@ -800,7 +803,10 @@ export async function getPageWikiLinkReferences(
       and(
         eq(pages.serialId, serial.id),
         isNull(pageSections.deletedAt),
-        sql`${pageSectionRevisions.content} ILIKE ${pattern}`,
+        or(
+          sql`${pageSectionRevisions.content} ILIKE ${slugPattern}`,
+          sql`${pageSectionRevisions.content} ILIKE ${namePattern}`,
+        ),
       ),
     )
     .orderBy(asc(pages.name), asc(pageSections.displayOrder));
@@ -816,9 +822,67 @@ export async function getPageWikiLinkReferences(
 }
 
 /**
- * Soft-deletes a wiki page by setting `pages.deleted_at = NOW()`. Blocked for
- * home pages and when any live section revision links to the page via a wiki
- * link (use `getPageWikiLinkReferences` to surface these to the admin first).
+ * Finds chapter synopsis pages that contain a wiki link to the given page.
+ * Used to warn admins before deletion about chapter synopses that will have broken links.
+ *
+ * @example
+ * const refs = await getPageChapterSynopsisReferences('my-serial', 'luffy');
+ */
+export async function getPageChapterSynopsisReferences(
+  serialSlug: string,
+  pageSlug: string,
+): Promise<
+  {
+    /** The chapter's sort index, used to build the chapter page URL. */
+    chapterIdx: number;
+    /** Human-readable chapter display name. */
+    chapterDisplayName: string;
+    /** Human-readable volume display name. */
+    volumeName: string;
+  }[]
+> {
+  await requireSerialAdminBySlug(serialSlug);
+
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) throw new Error("Serial not found");
+
+  const [targetPage] = await db
+    .select({ name: pages.name })
+    .from(pages)
+    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
+    .limit(1);
+  if (!targetPage) throw new Error("Page not found");
+
+  // The editor stores links as `[[page:slug]]`; bare `[[Name]]` is also valid syntax.
+  const slugPattern = `%[[page:${pageSlug}%`;
+  const namePattern = `%[[${targetPage.name}%`;
+
+  return db
+    .select({
+      chapterIdx: chapters.idx,
+      chapterDisplayName: chapters.displayName,
+      volumeName: volumes.displayName,
+    })
+    .from(chapterSynopses)
+    .innerJoin(chapters, eq(chapterSynopses.chapterId, chapters.id))
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .where(
+      and(
+        eq(volumes.serialId, serial.id),
+        or(
+          sql`${chapterSynopses.content} ILIKE ${slugPattern}`,
+          sql`${chapterSynopses.content} ILIKE ${namePattern}`,
+        ),
+      ),
+    )
+    .orderBy(asc(chapters.idx));
+}
+
+/**
+ * Soft-deletes a wiki page by setting `pages.deleted_at = NOW()`.
+ * Blocked only for the home page and already-deleted pages.
+ * The caller is responsible for warning the admin about incoming wiki links
+ * via `getPageWikiLinkReferences` and `getPageChapterSynopsisReferences`.
  *
  * @example
  * const result = await deletePage('my-serial', 'luffy');
@@ -827,11 +891,11 @@ export async function getPageWikiLinkReferences(
 export async function deletePage(
   serialSlug: string,
   pageSlug: string,
+  reason?: string,
 ): Promise<{ error?: string }> {
   await requireSerialAdminBySlug(serialSlug);
   const { pageId } = await resolvePageIds(serialSlug, pageSlug);
 
-  // Guard: home page cannot be deleted.
   const [pageRow] = await db
     .select({ isHomePage: pages.isHomePage, deletedAt: pages.deletedAt })
     .from(pages)
@@ -845,18 +909,9 @@ export async function deletePage(
     return { error: "Page is already deleted." };
   }
 
-  // Guard: block deletion when other pages link to this one.
-  const refs = await getPageWikiLinkReferences(serialSlug, pageSlug);
-  if (refs.length > 0) {
-    return {
-      error:
-        "This page is referenced by wiki links in other pages. Remove those links first.",
-    };
-  }
-
   await db
     .update(pages)
-    .set({ deletedAt: new Date() })
+    .set({ deletedAt: new Date(), deletionReason: reason?.trim() || null })
     .where(eq(pages.id, pageId));
 
   return {};

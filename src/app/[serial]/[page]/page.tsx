@@ -33,6 +33,7 @@ import {
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { PageEditor } from "./PageEditor";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin, isAuthenticated } from "@/lib/auth-guard";
@@ -262,6 +263,16 @@ export default async function PageView(props: PageViewProps) {
                 . All versioned content is preserved and will be visible once
                 the page is restored.
               </Text>
+              {page.deletionReason && (
+                <div>
+                  <Text variant="label" className="mb-1 block text-destructive/70">
+                    Reason for deletion
+                  </Text>
+                  <MarkdownRenderer sm serialSlug={serialSlug} className="text-destructive/70">
+                    {page.deletionReason}
+                  </MarkdownRenderer>
+                </div>
+              )}
               <form
                 action={async () => {
                   "use server";
@@ -473,7 +484,7 @@ export default async function PageView(props: PageViewProps) {
             eq(chapters.idx, relMaxIdxSq.maxIdx),
           ),
         )
-        .where(eq(pageRelationships.parentPageId, page.id)),
+        .where(and(eq(pageRelationships.parentPageId, page.id), isNull(pages.deletedAt))),
       fetchActiveParentPagesAtIdx(page.id, cutoffIdx),
       fetchSerialPagesAtIdx(serial.id, cutoffIdx),
     ]);
