@@ -26,8 +26,8 @@ export type {
 /**
  * Manages the set of reusable page templates for a serial. Only renders the
  * editing controls when the global edit mode is active (i.e., an admin is
- * editing). Supports create, rename, delete, section management, and infobox
- * toggle per template.
+ * editing). Supports create, rename, delete, section management, infobox
+ * toggle, and drag-and-drop reorder per template.
  *
  * @example
  * <TemplateManager
@@ -38,21 +38,27 @@ export type {
  *   toggleTemplateInfoboxAction={toggleTemplateInfoboxAction}
  *   addTemplateSectionAction={addTemplateSectionAction}
  *   deleteTemplateSectionAction={deleteTemplateSectionAction}
+ *   reorderTemplateSectionAction={reorderTemplateSectionAction}
  *   addTemplateInfoboxSectionAction={addTemplateInfoboxSectionAction}
  *   deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionAction}
+ *   reorderTemplateInfoboxSectionAction={reorderTemplateInfoboxSectionAction}
  * />
  */
-export function TemplateManager({
-  templates,
-  createTemplateAction,
-  deleteTemplateAction,
-  renameTemplateAction,
-  toggleTemplateInfoboxAction,
-  addTemplateSectionAction,
-  deleteTemplateSectionAction,
-  addTemplateInfoboxSectionAction,
-  deleteTemplateInfoboxSectionAction,
-}: TemplateManagerProps) {
+export function TemplateManager(props: TemplateManagerProps) {
+  const {
+    templates,
+    createTemplateAction,
+    deleteTemplateAction,
+    renameTemplateAction,
+    toggleTemplateInfoboxAction,
+    addTemplateSectionAction,
+    deleteTemplateSectionAction,
+    reorderTemplateSectionAction,
+    addTemplateInfoboxSectionAction,
+    deleteTemplateInfoboxSectionAction,
+    reorderTemplateInfoboxSectionAction,
+  } = props;
+
   const { isEditing } = useEditMode();
   const { run, isPending } = useServerAction();
   const [creating, setCreating] = useState(false);
@@ -88,11 +94,15 @@ export function TemplateManager({
                   toggleTemplateInfoboxAction={toggleTemplateInfoboxAction}
                   addTemplateSectionAction={addTemplateSectionAction}
                   deleteTemplateSectionAction={deleteTemplateSectionAction}
+                  reorderTemplateSectionAction={reorderTemplateSectionAction}
                   addTemplateInfoboxSectionAction={
                     addTemplateInfoboxSectionAction
                   }
                   deleteTemplateInfoboxSectionAction={
                     deleteTemplateInfoboxSectionAction
+                  }
+                  reorderTemplateInfoboxSectionAction={
+                    reorderTemplateInfoboxSectionAction
                   }
                 />
               ))}

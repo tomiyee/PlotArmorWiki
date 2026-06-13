@@ -1,13 +1,67 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Box } from "@/components/ui/Box";
-import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
-import { Textarea } from "@/components/ui/Textarea";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import { SuggestionCard } from "@/components/SuggestionCard";
 import { approveSuggestion, rejectSuggestion } from "./suggestionActions";
+
+type DiffRowProps = {
+  /** Heading shown above the two-column diff (section name or infobox label). */
+  label: string;
+  /** Current stored markdown at the target chapter. */
+  currentContent: string;
+  /** Proposed replacement markdown. */
+  proposedContent: string;
+  /** Tailwind min-height class for the content boxes. */
+  minH: string;
+  /** Serial slug forwarded to MarkdownRenderer for wiki-link resolution. */
+  serialSlug: string;
+};
+
+function DiffRow(props: DiffRowProps) {
+  const { label, currentContent, proposedContent, minH, serialSlug } = props;
+  return (
+    <Box col className="gap-2">
+      <Text variant="h4">{label}</Text>
+      <Box className="gap-3 items-stretch flex-col sm:flex-row">
+        <Box col className="flex-1 gap-1 min-w-0">
+          <Text muted className="text-xs font-medium uppercase tracking-wide">
+            Current
+          </Text>
+          <Box
+            className={`flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm ${minH} overflow-auto`}
+          >
+            {currentContent ? (
+              <MarkdownRenderer serialSlug={serialSlug} sm>
+                {currentContent}
+              </MarkdownRenderer>
+            ) : (
+              <Text muted className="text-sm">
+                (empty)
+              </Text>
+            )}
+          </Box>
+        </Box>
+        <Box col className="flex-1 gap-1 min-w-0">
+          <Text
+            className="text-xs font-medium uppercase tracking-wide"
+            style={{ color: "var(--color-primary)" }}
+          >
+            Proposed
+          </Text>
+          <Box
+            className={`flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm ${minH} overflow-auto`}
+          >
+            <MarkdownRenderer serialSlug={serialSlug} sm>
+              {proposedContent}
+            </MarkdownRenderer>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
 
 /** A proposed change to a single body section of the wiki page. */
 type SectionChange = {
@@ -94,237 +148,45 @@ export function SuggestionReviewPanel(props: SuggestionReviewPanelProps) {
       {suggestions.map((suggestion) => (
         <SuggestionCard
           key={suggestion.id}
-          suggestion={suggestion}
-          serialSlug={serialSlug}
-        />
-      ))}
-    </Box>
-  );
-}
-
-type SuggestionCardProps = {
-  suggestion: PendingSuggestion;
-  serialSlug: string;
-};
-
-function SuggestionCard(props: SuggestionCardProps) {
-  const { suggestion, serialSlug } = props;
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [showRejectForm, setShowRejectForm] = useState(false);
-  const [reviewNote, setReviewNote] = useState("");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [resolved, setResolved] = useState(false);
-
-  if (resolved) return null;
-
-  const submittedAt = new Date(suggestion.createdAt).toLocaleDateString(
-    "en-US",
-    {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    },
-  );
-
-  function handleApprove() {
-    setActionError(null);
-    startTransition(async () => {
-      const result = await approveSuggestion(
-        suggestion.id,
-        reviewNote || undefined,
-      );
-      if (result.error) {
-        setActionError(result.error);
-      } else {
-        setResolved(true);
-        router.refresh();
-      }
-    });
-  }
-
-  function handleReject() {
-    setActionError(null);
-    startTransition(async () => {
-      const result = await rejectSuggestion(
-        suggestion.id,
-        reviewNote || undefined,
-      );
-      if (result.error) {
-        setActionError(result.error);
-      } else {
-        setResolved(true);
-        router.refresh();
-      }
-    });
-  }
-
-  return (
-    <Box
-      col
-      className="gap-4 rounded-lg border border-border bg-background p-4"
-    >
-      {/* Header */}
-      <Box className="items-start justify-between gap-2 flex-wrap">
-        <Box col className="gap-1">
-          <Text variant="body" className="font-medium">
-            Suggested by {suggestion.proposerUsername ?? "unknown user"}
-          </Text>
-          <Text muted className="text-sm">
-            Submitted {submittedAt} · Target {suggestion.targetChapterName}
-          </Text>
-        </Box>
-      </Box>
-
-      {/* Citation */}
-      <Box col className="gap-1">
-        <Text className="text-sm font-medium text-muted-foreground">
-          Citation
-        </Text>
-        <Text className="text-sm italic">{suggestion.citation}</Text>
-      </Box>
-
-      {/* Section diffs */}
-      {suggestion.sectionChanges.map((change) => (
-        <Box col key={change.sectionId} className="gap-2">
-          <Text variant="h4">{change.sectionName}</Text>
-          <Box className="gap-3 items-stretch flex-col sm:flex-row">
-            {/* Current */}
-            <Box col className="flex-1 gap-1 min-w-0">
-              <Text
-                muted
-                className="text-xs font-medium uppercase tracking-wide"
-              >
-                Current
-              </Text>
-              <Box className="flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm min-h-60px overflow-auto">
-                {change.currentContent ? (
-                  <MarkdownRenderer serialSlug={serialSlug} sm>
-                    {change.currentContent}
-                  </MarkdownRenderer>
-                ) : (
-                  <Text muted className="text-sm">
-                    (empty)
-                  </Text>
-                )}
-              </Box>
-            </Box>
-            {/* Proposed */}
-            <Box col className="flex-1 gap-1 min-w-0">
-              <Text
-                className="text-xs font-medium uppercase tracking-wide"
-                style={{ color: "var(--color-primary)" }}
-              >
-                Proposed
-              </Text>
-              <Box className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-60px overflow-auto">
-                <MarkdownRenderer serialSlug={serialSlug} sm>
-                  {change.proposedContent}
-                </MarkdownRenderer>
-              </Box>
-            </Box>
+          proposerUsername={suggestion.proposerUsername}
+          createdAt={suggestion.createdAt}
+          targetChapterName={suggestion.targetChapterName}
+          onApprove={(note) => approveSuggestion(suggestion.id, note)}
+          onReject={(note) => rejectSuggestion(suggestion.id, note)}
+        >
+          {/* Citation */}
+          <Box col className="gap-1">
+            <Text className="text-sm font-medium text-muted-foreground">
+              Citation
+            </Text>
+            <Text className="text-sm italic">{suggestion.citation}</Text>
           </Box>
-        </Box>
+
+          {/* Section diffs */}
+          {suggestion.sectionChanges.map((change) => (
+            <DiffRow
+              key={change.sectionId}
+              label={change.sectionName}
+              currentContent={change.currentContent}
+              proposedContent={change.proposedContent}
+              minH="min-h-60px"
+              serialSlug={serialSlug}
+            />
+          ))}
+
+          {/* Infobox diffs */}
+          {suggestion.infoboxChanges.map((change) => (
+            <DiffRow
+              key={change.infoboxSectionId}
+              label={`Infobox: ${change.infoboxSectionLabel}`}
+              currentContent={change.currentContent}
+              proposedContent={change.proposedContent}
+              minH="min-h-40px"
+              serialSlug={serialSlug}
+            />
+          ))}
+        </SuggestionCard>
       ))}
-
-      {/* Infobox diffs */}
-      {suggestion.infoboxChanges.map((change) => (
-        <Box col key={change.infoboxSectionId} className="gap-2">
-          <Text variant="h4">Infobox: {change.infoboxSectionLabel}</Text>
-          <Box className="gap-3 items-stretch flex-col sm:flex-row">
-            <Box col className="flex-1 gap-1 min-w-0">
-              <Text
-                muted
-                className="text-xs font-medium uppercase tracking-wide"
-              >
-                Current
-              </Text>
-              <Box className="flex-1 rounded-md border border-border bg-muted/30 p-3 text-sm min-h-40px overflow-auto">
-                {change.currentContent ? (
-                  <MarkdownRenderer serialSlug={serialSlug} sm>
-                    {change.currentContent}
-                  </MarkdownRenderer>
-                ) : (
-                  <Text muted className="text-sm">
-                    (empty)
-                  </Text>
-                )}
-              </Box>
-            </Box>
-            <Box col className="flex-1 gap-1 min-w-0">
-              <Text
-                className="text-xs font-medium uppercase tracking-wide"
-                style={{ color: "var(--color-primary)" }}
-              >
-                Proposed
-              </Text>
-              <Box className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm min-h-40px overflow-auto">
-                <MarkdownRenderer serialSlug={serialSlug} sm>
-                  {change.proposedContent}
-                </MarkdownRenderer>
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      ))}
-
-      {/* Reject note form */}
-      {showRejectForm && (
-        <Box col className="gap-2">
-          <Text className="text-sm text-muted-foreground">
-            Optional: explain why this suggestion was not accepted.
-          </Text>
-          <Textarea
-            value={reviewNote}
-            onChange={(e) => setReviewNote(e.target.value)}
-            placeholder="Review note (optional)"
-            rows={3}
-            disabled={isPending}
-          />
-        </Box>
-      )}
-
-      {actionError && (
-        <Text className="text-sm text-destructive">{actionError}</Text>
-      )}
-
-      {/* Actions */}
-      <Box className="gap-2 flex-wrap justify-end">
-        {!showRejectForm ? (
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setShowRejectForm(true)}
-              disabled={isPending}
-            >
-              Reject
-            </Button>
-            <Button onClick={handleApprove} disabled={isPending}>
-              Approve
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowRejectForm(false);
-                setReviewNote("");
-              }}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleReject}
-              disabled={isPending}
-            >
-              {isPending ? "Rejecting…" : "Confirm rejection"}
-            </Button>
-          </>
-        )}
-      </Box>
     </Box>
   );
 }

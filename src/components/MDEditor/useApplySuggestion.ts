@@ -7,7 +7,7 @@ import {
   getNearestEditorFromDOMNode,
 } from "lexical";
 import { WikiLinkNode } from "./WikiLinkNode";
-import { normalizeMarkdown } from "./normalizeMarkdown";
+import { normalizeMarkdown, prepareMarkdownForEditor } from "./normalizeMarkdown";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ export function useApplySuggestion(params: UseApplySuggestionParams) {
     if (value !== prevValueRef.current) {
       prevValueRef.current = value;
       lastEmittedRef.current = normalizeMarkdown(value);
-      editorRef.current?.setMarkdown(normalizeMarkdown(value));
+      editorRef.current?.setMarkdown(prepareMarkdownForEditor(value));
     }
   }, [value, editorRef]);
 

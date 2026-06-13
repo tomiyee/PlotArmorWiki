@@ -1,28 +1,25 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/index";
-import {
-  serials,
-  volumes,
-  chapters,
-  pages,
-  templates,
-  templateSections,
-  templateInfoboxSections,
-} from "@/db/schema";
-import { asc, eq, inArray } from "drizzle-orm";
+import { serials } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { NewPageForm } from "./NewPageForm";
+import { getChapterCutoff, getNewPageFormData } from "./queries";
 
-interface Props {
+interface NewPagePageProps {
+  /** Next.js dynamic route params containing the `serial` slug. */
   params: Promise<{ serial: string }>;
+  /** Query params; `parentPageId` pre-selects the parent in the new-page form. */
   searchParams: Promise<{ parentPageId?: string }>;
 }
 
-export default async function NewPagePage({ params, searchParams }: Props) {
+/** Server Component for the new-page creation form. */
+export default async function NewPagePage(props: NewPagePageProps) {
+  const { params, searchParams } = props;
   const { serial: serialSlug } = await params;
   const { parentPageId: parentPageIdParam } = await searchParams;
   const defaultParentPageId = parentPageIdParam
@@ -44,67 +41,10 @@ export default async function NewPagePage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [volumeList, chapterList, existingPages, serialTemplates] =
+  const [readingChapterId, { volumeList, chapterList, existingPages, serialTemplates }] =
     await Promise.all([
-      db
-        .select()
-        .from(volumes)
-        .where(eq(volumes.serialId, serial.id))
-        .orderBy(volumes.idx),
-      db
-        .select({
-          id: chapters.id,
-          displayName: chapters.displayName,
-          idx: chapters.idx,
-          volumeId: chapters.volumeId,
-        })
-        .from(chapters)
-        .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-        .where(eq(volumes.serialId, serial.id))
-        .orderBy(chapters.idx),
-      // All pages in this serial for the parent dropdown (with introChapterId for filtering).
-      db
-        .select({
-          id: pages.id,
-          name: pages.name,
-          introChapterId: pages.introChapterId,
-        })
-        .from(pages)
-        .where(eq(pages.serialId, serial.id))
-        .orderBy(asc(pages.name)),
-      // Templates for this serial so the new-page form can seed sections.
-      db
-        .select({
-          id: templates.id,
-          name: templates.name,
-          hasInfobox: templates.hasInfobox,
-        })
-        .from(templates)
-        .where(eq(templates.serialId, serial.id))
-        .orderBy(asc(templates.name))
-        .then(async (rows) => {
-          if (rows.length === 0) return [];
-          const templateIds = rows.map((r) => r.id);
-          const [sectionRows, infoboxRows] = await Promise.all([
-            db
-              .select()
-              .from(templateSections)
-              .where(inArray(templateSections.templateId, templateIds))
-              .orderBy(asc(templateSections.displayOrder)),
-            db
-              .select()
-              .from(templateInfoboxSections)
-              .where(inArray(templateInfoboxSections.templateId, templateIds))
-              .orderBy(asc(templateInfoboxSections.displayOrder)),
-          ]);
-          return rows.map((t) => ({
-            id: t.id,
-            name: t.name,
-            hasInfobox: t.hasInfobox,
-            sections: sectionRows.filter((s) => s.templateId === t.id),
-            infoboxSections: infoboxRows.filter((s) => s.templateId === t.id),
-          }));
-        }),
+      getChapterCutoff(serial.id),
+      getNewPageFormData(serial.id),
     ]);
 
   return (
@@ -129,6 +69,7 @@ export default async function NewPagePage({ params, searchParams }: Props) {
             chapterList={chapterList}
             existingPages={existingPages}
             defaultParentPageId={defaultParentPageId}
+            defaultIntroChapterId={readingChapterId ?? undefined}
             templates={serialTemplates}
           />
         </Box>

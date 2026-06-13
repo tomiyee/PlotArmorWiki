@@ -15,11 +15,14 @@ import {
   savePageContent,
   getPageContentAtChapter,
   getParentPagesAtChapter,
+  getAllSerialPagesAtChapter,
+  updatePageIntroChapter,
 } from "./actions";
+import { Select } from "@/components/ui/Select";
 import { useEditMode } from "@/contexts/EditModeContext";
 import { Banner } from "@/components/ui/Banner";
 import { WritingAsOfBanner } from "./WritingAsOfBanner";
-import { PageSectionManager, type PageSection } from "./PageSectionManager";
+import { PageSectionManager, type PageSection, type SerialTemplate } from "./PageSectionManager";
 import { type InfoboxSection } from "./PageInfoboxManager";
 import { PageReadView } from "./PageReadView";
 import { PageTitlesPanel } from "./PageTitlesPanel";
@@ -37,9 +40,12 @@ import type {
   PageTitleEntry,
   ChapterGroupOption,
 } from "./types";
+import type { SuggestionStatus } from "@/types";
 
-interface Props {
+interface PageEditorProps {
+  /** Slug of the serial this page belongs to. */
   serialSlug: string;
+  /** URL slug of this wiki page. */
   pageSlug: string;
   /** The DB id of this page, forwarded to the new-page form as the default parent. */
   pageId: number;
@@ -54,6 +60,7 @@ interface Props {
    * carries chapter-versioned content).
    */
   pageSectionStructure: PageSection[];
+  /** Chapter-versioned section content at the reader's current cutoff. */
   sections: SectionData[];
   /**
    * Wall-clock-versioned infobox row structure for this page, used to power
@@ -91,6 +98,12 @@ interface Props {
    * and routing in the editor preview.
    */
   chapterType?: string;
+  /**
+   * The DB id of the chapter this page was introduced in. Passed alongside
+   * `introChapterIdx` so the admin intro-chapter selector can write back to
+   * the server via `updatePageIntroChapter`.
+   */
+  introChapterId: number | null;
   /** The idx of the chapter this page was introduced in. Chapters before this are disabled in the "Writing as of:" selector. */
   introChapterIdx: number | null;
   /**
@@ -107,9 +120,16 @@ interface Props {
   parentPages: ParentPageEntry[];
   /**
    * All pages in the serial (excluding the current page) used to populate the
-   * "Add parent" dropdown in the Relationships edit panel.
+   * "Add parent" dropdown in the Relationships edit panel. Titles are resolved
+   * at the reader's chapter cutoff so the dropdown reflects temporal renames.
    */
-  allSerialPages: { id: number; name: string }[];
+  allSerialPages: { id: number; title: string }[];
+  /**
+   * Templates defined for this serial, passed to PageSectionManager to power
+   * the "Apply template" feature. Empty when the serial has no templates or the
+   * current user is not an admin.
+   */
+  serialTemplates?: SerialTemplate[];
   /**
    * When true, hides the Titles and Relationships panels in edit mode. The home
    * page has a fixed name/slug (cannot be renamed) and is the DAG root (no
@@ -170,7 +190,7 @@ interface Props {
    */
   myPageSuggestions?: {
     id: number;
-    status: "pending" | "approved" | "rejected";
+    status: SuggestionStatus;
     reviewNote: string | null;
     createdAt: Date;
     targetChapterName: string;
@@ -214,7 +234,7 @@ interface Props {
  *   allSerialPages={[]}
  * />
  */
-export function PageEditor(props: Props) {
+export function PageEditor(props: PageEditorProps) {
   const {
     serialSlug,
     pageSlug,
@@ -232,10 +252,12 @@ export function PageEditor(props: Props) {
     pageTitles,
     wikiChapters,
     chapterType,
+    introChapterId,
     introChapterIdx,
     childPages,
     parentPages,
     allSerialPages,
+    serialTemplates = [],
     isHomePage = false,
     editModeHeader,
     isAdmin = false,
@@ -280,6 +302,10 @@ export function PageEditor(props: Props) {
   const [currentParentPages, setCurrentParentPages] =
     useState<ParentPageEntry[]>(parentPages);
 
+  const [currentAllSerialPages, setCurrentAllSerialPages] = useState<
+    { id: number; title: string }[]
+  >(allSerialPages);
+
   const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
     floaterImageUrl ?? "",
   );
@@ -291,6 +317,12 @@ export function PageEditor(props: Props) {
   // the reader just read. Falls back to headChapterId when no reading chapter is set.
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
     readingChapterId ?? headChapterId,
+  );
+
+  // Tracks the currently selected intro chapter in edit mode. Initialises from
+  // the prop so the selector shows the current value before any changes.
+  const [draftIntroChapterId, setDraftIntroChapterId] = useState<number | null>(
+    introChapterId,
   );
 
   const hasInfobox = infoboxSectionStructure.length > 0;
@@ -325,6 +357,16 @@ export function PageEditor(props: Props) {
     return () => setIsDirty(false);
   }, [isDirty, setIsDirty]);
 
+  // Re-sync the "Writing as of:" chapter to the reader's cutoff whenever it changes
+  // outside of an active edit session. Without this, the useState init only runs on
+  // first mount — subsequent cutoff changes via ChapterSelector (which triggers a
+  // router.refresh()) would leave selectedChapterId stale until the user discards.
+  useEffect(() => {
+    if (!isEditing) {
+      setSelectedChapterId(readingChapterId ?? headChapterId);
+    }
+  }, [readingChapterId, headChapterId, isEditing]);
+
   const handleDiscard = useCallback(() => {
     setDraftSectionContent(
       Object.fromEntries(sections.map((s) => [s.id, s.content])),
@@ -337,14 +379,18 @@ export function PageEditor(props: Props) {
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
     setCurrentParentPages(parentPages);
+    setCurrentAllSerialPages(allSerialPages);
     setSelectedChapterId(readingChapterId ?? headChapterId);
+    setDraftIntroChapterId(introChapterId);
   }, [
     sections,
     floaterImageUrl,
     floaterRows,
     parentPages,
+    allSerialPages,
     readingChapterId,
     headChapterId,
+    introChapterId,
   ]);
 
   const handleSave = useCallback(() => {
@@ -374,6 +420,24 @@ export function PageEditor(props: Props) {
   useEffect(() => {
     return registerHandlers({ onSave: handleSave, onDiscard: handleDiscard });
   }, [registerHandlers, handleSave, handleDiscard]);
+
+  /**
+   * Persists the intro chapter change immediately (not deferred to the page
+   * save) so the spoiler gate updates as soon as the admin confirms. A
+   * router.refresh() revalidates the SSR view to reflect the new gate.
+   */
+  function handleIntroChapterChange(chapterId: number) {
+    const previousId = draftIntroChapterId;
+    setDraftIntroChapterId(chapterId);
+    startTransition(async () => {
+      try {
+        await updatePageIntroChapter(pageId, chapterId);
+        router.refresh();
+      } catch {
+        setDraftIntroChapterId(previousId);
+      }
+    });
+  }
 
   // When entering edit mode, prime previousSectionContent and nextSectionRevisionChapterIdx
   // for the initial chapter so the "Remove revision" button is available without needing
@@ -425,9 +489,10 @@ export function PageEditor(props: Props) {
   ) {
     setSelectedChapterId(chapterId);
     startTransition(async () => {
-      const [data, parents] = await Promise.all([
+      const [data, parents, serialPages] = await Promise.all([
         getPageContentAtChapter(serialSlug, pageSlug, chapterId),
         getParentPagesAtChapter(serialSlug, pageSlug, chapterId),
+        getAllSerialPagesAtChapter(serialSlug, pageSlug, chapterId),
       ]);
       const newContent = Object.fromEntries(
         data.sections.map((s) => [s.id, s.content]),
@@ -446,6 +511,7 @@ export function PageEditor(props: Props) {
         );
       }
       setCurrentParentPages(parents);
+      setCurrentAllSerialPages(serialPages);
     });
   }
 
@@ -544,30 +610,37 @@ export function PageEditor(props: Props) {
   const selectedChapterIdx =
     allChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
 
-  // Chapters before the page's intro chapter are disabled - content can't predate the page.
-  // Chapters beyond the reader's cutoff are also disabled - editors can't write spoilers.
-  const chapterSelectOptions: ChapterGroupOption[] = (() => {
+  function buildChapterGroupOptions(
+    isDisabled: (ch: ChapterData) => boolean,
+  ): ChapterGroupOption[] {
     const volumeMap = new Map<
       string,
-      { label: string; value: number; idx: number }[]
+      { label: string; value: number; disabled: boolean }[]
     >();
     for (const ch of allChapters) {
       const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id, idx: ch.idx });
+      arr.push({ label: ch.displayName, value: ch.id, disabled: isDisabled(ch) });
       volumeMap.set(ch.volumeName, arr);
     }
     return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
       label: volumeName,
       value: -1 as number,
-      children: chaps.map((c) => ({
-        label: c.label,
-        value: c.value,
-        disabled:
-          (introChapterIdx !== null && c.idx < introChapterIdx) ||
-          (readingCutoffIdx !== null && c.idx > readingCutoffIdx),
-      })),
+      children: chaps,
     }));
-  })();
+  }
+
+  // Intro chapter selector: all chapters enabled (no cutoff restriction). An
+  // admin must be able to move the intro chapter to any chapter in the serial,
+  // including ones beyond their personal reading progress.
+  const introChapterSelectOptions = buildChapterGroupOptions(() => false);
+
+  // Chapters before the page's intro chapter are disabled - content can't predate the page.
+  // Chapters beyond the reader's cutoff are also disabled - editors can't write spoilers.
+  const chapterSelectOptions = buildChapterGroupOptions(
+    (ch) =>
+      (introChapterIdx !== null && ch.idx < introChapterIdx) ||
+      (readingCutoffIdx !== null && ch.idx > readingCutoffIdx),
+  );
 
   return (
     <Banner scrollable={false}>
@@ -618,6 +691,19 @@ export function PageEditor(props: Props) {
         </Link>
       </Text>
 
+      {!isHomePage && allChapters.length > 0 && (
+        <Box col className="gap-2">
+          <Text variant="label">Introduced in {chapterType ?? "Chapter"}</Text>
+          <Select<number>
+            options={introChapterSelectOptions}
+            placeholder="Select a chapter…"
+            value={draftIntroChapterId ?? undefined}
+            onChange={handleIntroChapterChange}
+            disabled={isPending}
+          />
+        </Box>
+      )}
+
       {!isHomePage && (
         <PageTitlesPanel
           serialSlug={serialSlug}
@@ -632,12 +718,16 @@ export function PageEditor(props: Props) {
         <PageRelationshipsPanel
           pageId={pageId}
           parentPages={currentParentPages}
-          allSerialPages={allSerialPages}
+          allSerialPages={currentAllSerialPages}
           chapterId={selectedChapterId}
         />
       )}
 
-      <PageSectionManager pageId={pageId} sections={pageSectionStructure} />
+      <PageSectionManager
+        pageId={pageId}
+        sections={pageSectionStructure}
+        serialTemplates={serialTemplates}
+      />
 
       {sections.map((section, i) => (
         <SectionContentEditor

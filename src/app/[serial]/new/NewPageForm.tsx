@@ -48,13 +48,22 @@ interface Template {
   infoboxSections: TemplateInfoboxSection[];
 }
 
-interface Props {
+interface NewPageFormProps {
+  /** URL slug of the serial — used to scope the `createPage` action. */
   serialSlug: string;
+  /** Label for the chapter unit (e.g. `"Chapter"`, `"Episode"`). */
   chapterType: string;
+  /** All volumes for the intro chapter grouped selector. */
   volumeList: Volume[];
+  /** All chapters for the intro chapter selector. */
   chapterList: Chapter[];
+  /** All existing pages in the serial; filtered to those visible at the selected intro chapter. */
   existingPages: PageOption[];
+  /** Pre-selected parent page id, e.g. when navigating here from a page's edit mode. */
   defaultParentPageId?: number;
+  /** The user's current reading chapter cutoff; pre-selects the intro chapter and disables future chapters. */
+  defaultIntroChapterId?: number;
+  /** Serial templates for pre-populating sections and infobox rows on the new page. */
   templates: Template[];
 }
 
@@ -69,39 +78,41 @@ interface Props {
  * @example
  * <NewPageForm serialSlug="one-piece" chapterType="Chapter" templates={[]} ... />
  */
-export function NewPageForm({
-  serialSlug,
-  chapterType,
-  volumeList,
-  chapterList,
-  existingPages,
-  defaultParentPageId,
-  templates,
-}: Props) {
+export function NewPageForm(props: NewPageFormProps) {
+  const {
+    serialSlug,
+    chapterType,
+    volumeList,
+    chapterList,
+    existingPages,
+    defaultParentPageId,
+    defaultIntroChapterId,
+    templates,
+  } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
 
-  // Build chapter id → idx lookup for filtering.
-  const chapterIdxById: Record<number, number> = {};
-  chapterList.forEach((c) => {
-    chapterIdxById[c.id] = c.idx;
-  });
+  const chapterIdxById = Object.fromEntries(chapterList.map((c) => [c.id, c.idx]));
 
-  // Build grouped chapter options.
-  const chaptersByVolume: Record<number, Chapter[]> = {};
-  volumeList.forEach((v) => {
-    chaptersByVolume[v.id] = [];
-  });
-  chapterList.forEach((c) => {
-    chaptersByVolume[c.volumeId]?.push(c);
-  });
+  const chaptersByVolume = chapterList.reduce<Record<number, Chapter[]>>((acc, c) => {
+    (acc[c.volumeId] ??= []).push(c);
+    return acc;
+  }, {});
 
   const firstChapterId = chapterList[0]?.id ?? 0;
+  // Default to the user's reading cutoff so the intro chapter matches where they are.
+  // Falls back to chapter 1 when no cutoff is available (e.g. no progress cookie).
   const [selectedIntroChapterId, setSelectedIntroChapterId] =
-    useState<number>(firstChapterId);
+    useState<number>(defaultIntroChapterId ?? firstChapterId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
   const [selectedParentPageId, setSelectedParentPageId] = useState<
     number | undefined
   >(undefined);
+
+  // The idx of the user's reading cutoff chapter, used to gate the chapter options.
+  const cutoffIdx =
+    defaultIntroChapterId !== undefined
+      ? (chapterIdxById[defaultIntroChapterId] ?? Infinity)
+      : Infinity;
 
   const chapterOptions = volumeList
     .filter((v) => (chaptersByVolume[v.id]?.length ?? 0) > 0)
@@ -111,6 +122,8 @@ export function NewPageForm({
       children: (chaptersByVolume[v.id] ?? []).map((c) => ({
         label: c.displayName,
         value: c.id,
+        // Disable chapters beyond the user's cutoff to prevent accidental spoilers.
+        disabled: c.idx > cutoffIdx,
       })),
     }));
 
@@ -151,17 +164,14 @@ export function NewPageForm({
     ...templates.map((t) => ({ label: t.name, value: t.id })),
   ];
 
+  const byDisplayOrder = <T extends { displayOrder: number }>(arr: T[]) =>
+    [...arr].sort((a, b) => a.displayOrder - b.displayOrder);
+
   const selectedTemplate =
     templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const sortedTemplateSections = selectedTemplate
-    ? [...selectedTemplate.sections].sort(
-        (a, b) => a.displayOrder - b.displayOrder,
-      )
-    : [];
+  const sortedTemplateSections = selectedTemplate ? byDisplayOrder(selectedTemplate.sections) : [];
   const sortedTemplateInfoboxSections = selectedTemplate
-    ? [...selectedTemplate.infoboxSections].sort(
-        (a, b) => a.displayOrder - b.displayOrder,
-      )
+    ? byDisplayOrder(selectedTemplate.infoboxSections)
     : [];
 
   const createPageAction = createPage.bind(null, serialSlug);

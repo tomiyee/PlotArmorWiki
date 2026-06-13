@@ -14,11 +14,17 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
   pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
 } from "@/db/schema";
 import { and, asc, eq, inArray, isNull, lte, max, or } from "drizzle-orm";
 import {
   resolvePageTitlesAtIdx,
   resolveHasChildrenSet,
+  fetchActiveParentPagesAtIdx,
+  fetchSerialPagesAtIdx,
+  getChapterIdxById,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
   childRelMaxIdxSq as buildChildRelMaxIdxSq,
@@ -35,7 +41,8 @@ import {
   getMyPageSuggestions,
 } from "./suggestionActions";
 
-interface Props {
+interface PageViewProps {
+  /** Next.js dynamic route params: `serial` slug and `page` slug. */
   params: Promise<{ serial: string; page: string }>;
 }
 
@@ -61,17 +68,74 @@ async function getChapterCutoff(
   const chapterId = parseInt(raw, 10);
   if (isNaN(chapterId)) return { cutoffIdx: 0, readingChapterId: null };
 
-  const [row] = await db
-    .select({ idx: chapters.idx })
-    .from(chapters)
-    .where(eq(chapters.id, chapterId))
-    .limit(1);
+  const idx = await getChapterIdxById(chapterId);
 
-  if (!row) return { cutoffIdx: 0, readingChapterId: null };
-  return { cutoffIdx: row.idx, readingChapterId: chapterId };
+  if (idx === null) return { cutoffIdx: 0, readingChapterId: null };
+  return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function PageView({ params }: Props) {
+function groupByTemplateId<T extends { templateId: number }>(items: T[]): Map<number, T[]> {
+  const map = new Map<number, T[]>();
+  for (const item of items) {
+    const arr = map.get(item.templateId) ?? [];
+    arr.push(item);
+    map.set(item.templateId, arr);
+  }
+  return map;
+}
+
+async function fetchSerialTemplates(serialId: number) {
+  const tmplRows = await db
+    .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
+    .from(templates)
+    .where(eq(templates.serialId, serialId))
+    .orderBy(asc(templates.name));
+
+  if (tmplRows.length === 0) return [];
+
+  const tmplIds = tmplRows.map((t) => t.id);
+
+  // Fetch all section/infobox rows for every template in this serial in two
+  // queries, then group in JS. Templates per serial are a small set so this
+  // is always fast.
+  const [allTmplSections, allTmplInfoboxSections] = await Promise.all([
+    db
+      .select({
+        templateId: templateSections.templateId,
+        id: templateSections.id,
+        name: templateSections.name,
+        displayOrder: templateSections.displayOrder,
+      })
+      .from(templateSections)
+      .where(inArray(templateSections.templateId, tmplIds))
+      .orderBy(asc(templateSections.displayOrder)),
+    db
+      .select({
+        templateId: templateInfoboxSections.templateId,
+        id: templateInfoboxSections.id,
+        label: templateInfoboxSections.label,
+        displayOrder: templateInfoboxSections.displayOrder,
+      })
+      .from(templateInfoboxSections)
+      .where(inArray(templateInfoboxSections.templateId, tmplIds))
+      .orderBy(asc(templateInfoboxSections.displayOrder)),
+  ]);
+
+  const sectionsByTemplate = groupByTemplateId(allTmplSections);
+  const infoboxByTemplate = groupByTemplateId(allTmplInfoboxSections);
+
+  return tmplRows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    hasInfobox: t.hasInfobox,
+    sections: sectionsByTemplate.get(t.id) ?? [],
+    infoboxSections: infoboxByTemplate.get(t.id) ?? [],
+  }));
+}
+
+/** Server Component that renders a wiki page at the reader's chapter cutoff. */
+export default async function PageView(props: PageViewProps) {
+  const { params } = props;
   const { serial: serialSlug, page: pageParam } = await params;
 
   const decodedPageSlug = decodeURIComponent(pageParam);
@@ -340,78 +404,41 @@ export default async function PageView({ params }: Props) {
   // ── Child pages (active at the user's cutoff) ──────────────────────────────
   const relMaxIdxSq = buildChildRelMaxIdxSq(page.id, cutoffIdx);
 
-  // ── Parent pages (active at the user's cutoff) ─────────────────────────────
-  // Same max-idx pattern, but from child's perspective: find latest row per
-  // (parent, child) pair where child = page.id, and keep is_active = true.
-  const parentRelMaxIdxSq = db
-    .select({
-      parentPageId: pageRelationships.parentPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.childPageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.parentPageId)
-    .as("parent_rel_max_idx_sq");
-
-  const [childPagesRaw, parentPagesRaw, allSerialPagesRaw] = await Promise.all([
-    db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        slug: pages.slug,
-        isActive: pageRelationships.isActive,
-      })
-      .from(pageRelationships)
-      .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .innerJoin(
-        relMaxIdxSq,
-        and(
-          eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
-          eq(chapters.idx, relMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageRelationships.parentPageId, page.id)),
-    db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        slug: pages.slug,
-        isActive: pageRelationships.isActive,
-      })
-      .from(pageRelationships)
-      .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .innerJoin(
-        parentRelMaxIdxSq,
-        and(
-          eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
-          eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageRelationships.childPageId, page.id)),
-    // All pages in the serial for the "Add parent" dropdown in edit mode.
-    db
-      .select({ id: pages.id, name: pages.name })
-      .from(pages)
-      .where(eq(pages.serialId, serial.id))
-      .orderBy(asc(pages.name)),
-  ]);
+  const [childPagesRaw, activeParentPagesRaw, allSerialPagesRaw] =
+    await Promise.all([
+      db
+        .select({
+          id: pages.id,
+          name: pages.name,
+          slug: pages.slug,
+          isActive: pageRelationships.isActive,
+        })
+        .from(pageRelationships)
+        .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
+        .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+        .innerJoin(
+          relMaxIdxSq,
+          and(
+            eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+            eq(chapters.idx, relMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageRelationships.parentPageId, page.id)),
+      fetchActiveParentPagesAtIdx(page.id, cutoffIdx),
+      fetchSerialPagesAtIdx(serial.id, cutoffIdx),
+    ]);
 
   const activeChildPages = childPagesRaw.filter((r) => r.isActive);
-  const activeParentPagesRaw = parentPagesRaw.filter((r) => r.isActive);
 
-  // Resolve temporal titles and folder/leaf classification for active child pages.
   const childPageIds = activeChildPages.map((r) => r.id);
-  const [childTitleMap, hasChildrenSet] = await Promise.all([
+  const allSerialPageIds = allSerialPagesRaw.map((r) => r.id);
+
+  // allSerialPageIds is a superset of parentPageIds (parents are visible serial pages),
+  // so one resolvePageTitlesAtIdx call covers both parent and serial-list lookups.
+  const [childTitleMap, hasChildrenSet, allSerialTitleMap] = await Promise.all([
     resolvePageTitlesAtIdx(childPageIds, cutoffIdx),
     resolveHasChildrenSet(childPageIds, cutoffIdx),
+    resolvePageTitlesAtIdx(allSerialPageIds, cutoffIdx),
   ]);
 
   const childPages = activeChildPages.map((r) => ({
@@ -422,15 +449,17 @@ export default async function PageView({ params }: Props) {
     hasChildren: hasChildrenSet.has(r.id),
   }));
 
-  // Resolve temporal titles for each active parent page at the reader's cutoff.
-  const parentPageIds = activeParentPagesRaw.map((r) => r.id);
-  const parentTitleMap = await resolvePageTitlesAtIdx(parentPageIds, cutoffIdx);
-
   const parentPages = activeParentPagesRaw.map((r) => ({
     id: r.id,
     name: r.name,
     slug: r.slug,
-    title: parentTitleMap.get(r.id) ?? r.name,
+    title: allSerialTitleMap.get(r.id) ?? r.name,
+  }));
+
+  // All pages in the serial with chapter-versioned titles for the "Add parent" dropdown.
+  const allSerialPages = allSerialPagesRaw.map((r) => ({
+    id: r.id,
+    title: allSerialTitleMap.get(r.id) ?? r.name,
   }));
 
   // ── Temporal title resolution ──────────────────────────────────────────────
@@ -479,13 +508,15 @@ export default async function PageView({ params }: Props) {
   // ── Suggestion data ───────────────────────────────────────────────────────
   // Fetch in parallel: pending count + full list for admins, user status for
   // non-admins. Both functions are no-ops when the user lacks permission.
-  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions] =
+  const [pendingSuggestionCount, pendingSuggestions, myPageSuggestions, serialTemplates] =
     await Promise.all([
       isAdmin ? getPendingSuggestionCount(page.id) : Promise.resolve(0),
       isAdmin ? getPendingSuggestions(page.id) : Promise.resolve([]),
       !isAdmin && isUserAuthenticated
         ? getMyPageSuggestions(page.id)
         : Promise.resolve([]),
+      // Only fetched for admins; non-admins never see the edit panel.
+      isAdmin ? fetchSerialTemplates(serial.id) : Promise.resolve([]),
     ]);
 
   return (
@@ -544,10 +575,12 @@ export default async function PageView({ params }: Props) {
                 idx: c.idx,
               }))}
               chapterType={serial.chapterType}
+              introChapterId={page.introChapterId ?? null}
               introChapterIdx={introChapter?.idx ?? null}
               childPages={childPages}
               parentPages={parentPages}
-              allSerialPages={allSerialPagesRaw}
+              allSerialPages={allSerialPages}
+              serialTemplates={serialTemplates}
               isAdmin={isAdmin}
               isAuthenticated={isUserAuthenticated}
               pendingSuggestionCount={pendingSuggestionCount}

@@ -47,8 +47,10 @@ import {
   toggleTemplateInfobox,
   addTemplateSection,
   deleteTemplateSection,
+  reorderTemplateSections,
   addTemplateInfoboxSection,
   deleteTemplateInfoboxSection,
+  reorderTemplateInfoboxSections,
   addSerialAdmin,
   removeSerialAdmin,
   searchUsersForSerial,
@@ -72,7 +74,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/Accordion";
 
-interface Props {
+interface SerialPageProps {
+  /** Next.js dynamic route params containing the `serial` slug. */
   params: Promise<{ serial: string }>;
 }
 
@@ -92,7 +95,9 @@ async function getChapterCutoff(
   return { cutoffIdx: idx, readingChapterId: chapterId };
 }
 
-export default async function SerialPage({ params }: Props) {
+/** Serial home page: metadata editor, home wiki page content, template manager, and admin controls. */
+export default async function SerialPage(props: SerialPageProps) {
+  const { params } = props;
   const { serial: serialSlug } = await params;
 
   const [serial] = await db
@@ -234,12 +239,18 @@ export default async function SerialPage({ params }: Props) {
     null,
     serial.id,
   );
+  const reorderTemplateSectionsForSerial = reorderTemplateSections.bind(
+    null,
+    serial.id,
+  );
   const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(
     null,
     serial.id,
   );
   const deleteTemplateInfoboxSectionForSerial =
     deleteTemplateInfoboxSection.bind(null, serial.id);
+  const reorderTemplateInfoboxSectionsForSerial =
+    reorderTemplateInfoboxSections.bind(null, serial.id);
 
   const headChapterId = chapterList.at(-1)?.id ?? null;
   const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
@@ -617,6 +628,7 @@ export default async function SerialPage({ params }: Props) {
                   idx: c.idx,
                 }))}
                 chapterType={serial.chapterType}
+                introChapterId={null}
                 introChapterIdx={null}
                 childPages={childPages}
                 parentPages={[]}
@@ -646,11 +658,17 @@ export default async function SerialPage({ params }: Props) {
                       deleteTemplateSectionAction={
                         deleteTemplateSectionForSerial
                       }
+                      reorderTemplateSectionAction={
+                        reorderTemplateSectionsForSerial
+                      }
                       addTemplateInfoboxSectionAction={
                         addTemplateInfoboxSectionForSerial
                       }
                       deleteTemplateInfoboxSectionAction={
                         deleteTemplateInfoboxSectionForSerial
+                      }
+                      reorderTemplateInfoboxSectionAction={
+                        reorderTemplateInfoboxSectionsForSerial
                       }
                     />
                   </>

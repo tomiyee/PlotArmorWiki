@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth, PREVIEW_USER } from "@/auth";
 import { db } from "@/db/index";
 import { serialAdmins, pages } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -19,6 +19,7 @@ import { getSerialBySlug } from "@/db/queries";
 export async function isSerialAdmin(serialId: number): Promise<boolean> {
   const session = await auth();
   if (!session?.user?.id) return false;
+  if (session.user.id === PREVIEW_USER.id) return true;
 
   const [row] = await db
     .select({ userId: serialAdmins.userId })
@@ -53,6 +54,7 @@ export async function requireSerialAdmin(serialId: number): Promise<string> {
     throw new Error("Unauthorized: sign in to perform this action.");
 
   const userId = session.user.id;
+  if (userId === PREVIEW_USER.id) return userId;
 
   const [row] = await db
     .select({ userId: serialAdmins.userId })

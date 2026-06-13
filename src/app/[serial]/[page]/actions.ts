@@ -12,6 +12,9 @@ import {
   pageInfoboxImageRevisions,
   pageRelationships,
   pageTitles,
+  templates,
+  templateSections,
+  templateInfoboxSections,
 } from "@/db/schema";
 import {
   and,
@@ -34,6 +37,8 @@ import {
 import { applyPageContentRevisions } from "./revisionHelpers";
 import {
   resolvePageTitlesAtIdx,
+  fetchActiveParentPagesAtIdx,
+  fetchSerialPagesAtIdx,
   getSerialBySlug,
   getChapterIdxById,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
@@ -465,6 +470,277 @@ export async function deletePageTitle(
   return {};
 }
 
+/**
+ * Updates the chapter in which a page was introduced. Only admins of the
+ * serial that owns the page may call this. Intended for correcting a wrong
+ * intro chapter set at page-creation time.
+ *
+ * The updated value immediately changes the spoiler-gate: readers whose
+ * chapter cutoff is below the new intro chapter will no longer see the page.
+ *
+ * @example
+ * await updatePageIntroChapter(42, 7);
+ */
+export async function updatePageIntroChapter(
+  pageId: number,
+  chapterId: number,
+): Promise<void> {
+  await requireSerialAdminByPageId(pageId);
+
+  // Verify the chapter exists AND belongs to the same serial as the page.
+  // chapters.idx is serial-scoped; a cross-serial intro chapter would corrupt
+  // the spoiler gate (idx values are meaningless across serials).
+  const [chapterRow] = await db
+    .select({ id: chapters.id })
+    .from(chapters)
+    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+    .innerJoin(pages, and(eq(volumes.serialId, pages.serialId), eq(pages.id, pageId)))
+    .where(eq(chapters.id, chapterId))
+    .limit(1);
+  if (!chapterRow) throw new Error("Chapter not found");
+
+  await db
+    .update(pages)
+    .set({ introChapterId: chapterId })
+    .where(eq(pages.id, pageId));
+}
+
+// ── Template application ───────────────────────────────────────────────────────
+
+/**
+ * Applies a template's section and infobox structure to an existing page.
+ * Skips any sections/infobox rows whose name/label already exists on the page
+ * (case-insensitive comparison) to avoid creating duplicates.
+ * New sections are appended after the current live sections in template display
+ * order; new infobox rows are likewise appended.
+ *
+ * Returns counts of added vs skipped items so the UI can surface a summary.
+ */
+export async function applyTemplateSections(
+  pageId: number,
+  templateId: number,
+): Promise<{
+  addedSections: number;
+  skippedSections: number;
+  addedInfoboxRows: number;
+  skippedInfoboxRows: number;
+}> {
+  await requireSerialAdminByPageId(pageId);
+
+  // Verify the template exists and belongs to the same serial as the page.
+  const [tmpl] = await db
+    .select({ id: templates.id, hasInfobox: templates.hasInfobox })
+    .from(templates)
+    .innerJoin(pages, and(eq(pages.serialId, templates.serialId), eq(pages.id, pageId)))
+    .where(eq(templates.id, templateId))
+    .limit(1);
+  if (!tmpl) throw new Error("Template not found");
+
+  const [tmplSections, tmplInfoboxSections] = await Promise.all([
+    db
+      .select({ name: templateSections.name, displayOrder: templateSections.displayOrder })
+      .from(templateSections)
+      .where(eq(templateSections.templateId, tmpl.id))
+      .orderBy(asc(templateSections.displayOrder)),
+    tmpl.hasInfobox
+      ? db
+          .select({
+            label: templateInfoboxSections.label,
+            displayOrder: templateInfoboxSections.displayOrder,
+          })
+          .from(templateInfoboxSections)
+          .where(eq(templateInfoboxSections.templateId, tmpl.id))
+          .orderBy(asc(templateInfoboxSections.displayOrder))
+      : Promise.resolve([]),
+  ]);
+
+  return await db.transaction(async (tx) => {
+    // Fetch live sections and infobox rows in parallel; infobox query skipped when template has no infobox.
+    const [liveSections, liveInfoboxRows] = await Promise.all([
+      tx
+        .select({ name: pageSections.name })
+        .from(pageSections)
+        .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt))),
+      tmpl.hasInfobox
+        ? tx
+            .select({ label: pageInfoboxSections.label })
+            .from(pageInfoboxSections)
+            .where(
+              and(
+                eq(pageInfoboxSections.pageId, pageId),
+                isNull(pageInfoboxSections.deletedAt),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+
+    const liveSectionNames = new Set(liveSections.map((s) => s.name.toLowerCase()));
+
+    const liveInfoboxLabels = new Set(
+      liveInfoboxRows.map((r) => r.label.toLowerCase()),
+    );
+
+    // Partition template sections into add vs skip.
+    const sectionsToAdd = tmplSections.filter(
+      (s) => !liveSectionNames.has(s.name.toLowerCase()),
+    );
+    const skippedSections = tmplSections.length - sectionsToAdd.length;
+
+    // Insert new sections with displayOrder continuing from the current max.
+    if (sectionsToAdd.length > 0) {
+      const cnt = liveSections.length;
+
+      await tx.insert(pageSections).values(
+        sectionsToAdd.map((s, i) => ({
+          pageId,
+          name: s.name,
+          displayOrder: cnt + i,
+        })),
+      );
+    }
+
+    // Partition template infobox rows into add vs skip.
+    const infoboxRowsToAdd = tmplInfoboxSections.filter(
+      (s) => !liveInfoboxLabels.has(s.label.toLowerCase()),
+    );
+    const skippedInfoboxRows = tmplInfoboxSections.length - infoboxRowsToAdd.length;
+
+    if (infoboxRowsToAdd.length > 0) {
+      const cnt = liveInfoboxRows.length;
+
+      await tx.insert(pageInfoboxSections).values(
+        infoboxRowsToAdd.map((s, i) => ({
+          pageId,
+          label: s.label,
+          displayOrder: cnt + i,
+        })),
+      );
+    }
+
+    return {
+      addedSections: sectionsToAdd.length,
+      skippedSections,
+      addedInfoboxRows: infoboxRowsToAdd.length,
+      skippedInfoboxRows,
+    };
+  });
+}
+
+/**
+ * Resolves the active sections and infobox rows with their current content at a
+ * given chapter cutoff, for pre-filling the suggestion form and the editor.
+ * Co-located with `getPageContentAtChapter` since both read the same tables.
+ *
+ * @example
+ * const { sections, infoboxSections } = await getSectionsAtChapter(42, chapterId);
+ */
+export async function getSectionsAtChapter(
+  pageId: number,
+  chapterId: number,
+): Promise<{
+  sections: {
+    id: number;
+    name: string;
+    content: string;
+    lastUpdatedChapterIdx: number | null;
+  }[];
+  infoboxSections: { id: number; label: string; content: string }[];
+}> {
+  const cutoffIdxResult = await getChapterIdxById(chapterId);
+
+  if (cutoffIdxResult === null) throw new Error("Chapter not found");
+  const cutoffIdx = cutoffIdxResult;
+
+  const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
+  const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
+
+  const [activeSections, sectionVersions, activeInfoboxSections, ibVersions] =
+    await Promise.all([
+      db
+        .select({ id: pageSections.id, name: pageSections.name })
+        .from(pageSections)
+        .where(
+          and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
+        )
+        .orderBy(asc(pageSections.displayOrder)),
+      db
+        .select({
+          sectionId: pageSectionRevisions.sectionId,
+          content: pageSectionRevisions.content,
+          lastUpdatedChapterIdx: sectionMaxIdxSq.maxIdx,
+        })
+        .from(pageSectionRevisions)
+        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+        .innerJoin(
+          sectionMaxIdxSq,
+          and(
+            eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
+            eq(chapters.idx, sectionMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageSectionRevisions.pageId, pageId)),
+      db
+        .select({
+          id: pageInfoboxSections.id,
+          label: pageInfoboxSections.label,
+        })
+        .from(pageInfoboxSections)
+        .where(
+          and(
+            eq(pageInfoboxSections.pageId, pageId),
+            isNull(pageInfoboxSections.deletedAt),
+          ),
+        )
+        .orderBy(asc(pageInfoboxSections.displayOrder)),
+      db
+        .select({
+          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+          content: pageInfoboxRevisions.content,
+        })
+        .from(pageInfoboxRevisions)
+        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+        .innerJoin(
+          ibMaxIdxSq,
+          and(
+            eq(
+              pageInfoboxRevisions.infoboxSectionId,
+              ibMaxIdxSq.infoboxSectionId,
+            ),
+            eq(chapters.idx, ibMaxIdxSq.maxIdx),
+          ),
+        )
+        .where(eq(pageInfoboxRevisions.pageId, pageId)),
+    ]);
+
+  const versionBySectionId = new Map(
+    sectionVersions.map((v) => [
+      v.sectionId,
+      {
+        content: v.content ?? "",
+        lastUpdatedChapterIdx: v.lastUpdatedChapterIdx ?? null,
+      },
+    ]),
+  );
+  const ibContentById = new Map(
+    ibVersions.map((v) => [v.infoboxSectionId, v.content ?? ""]),
+  );
+
+  return {
+    sections: activeSections.map((s) => ({
+      id: s.id,
+      name: s.name,
+      content: versionBySectionId.get(s.id)?.content ?? "",
+      lastUpdatedChapterIdx:
+        versionBySectionId.get(s.id)?.lastUpdatedChapterIdx ?? null,
+    })),
+    infoboxSections: activeInfoboxSections.map((s) => ({
+      id: s.id,
+      label: s.label,
+      content: ibContentById.get(s.id) ?? "",
+    })),
+  };
+}
+
 // ── Page section structure management ────────────────────────────────────────
 // These actions manage the wall-clock-versioned `page_sections` rows (add,
 // delete, rename, reorder). Content is managed separately via savePageContent.
@@ -836,62 +1112,54 @@ export async function getParentPagesAtChapter(
   pageSlug: string,
   chapterId: number,
 ): Promise<{ id: number; name: string; slug: string; title: string }[]> {
-  const [{ pageId }, cutoffIdxForParents] = await Promise.all([
+  const [{ pageId }, cutoffIdx] = await Promise.all([
     resolvePageIds(serialSlug, pageSlug),
     getChapterIdxById(chapterId),
   ]);
-  if (cutoffIdxForParents === null) throw new Error("Chapter not found");
+  if (cutoffIdx === null) throw new Error("Chapter not found");
 
-  const cutoffIdx = cutoffIdxForParents;
-
-  const parentRelMaxIdxSq = db
-    .select({
-      parentPageId: pageRelationships.parentPageId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageRelationships)
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageRelationships.childPageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageRelationships.parentPageId)
-    .as("parent_rel_max_idx_sq");
-
-  const parentPagesRaw = await db
-    .select({
-      id: pages.id,
-      name: pages.name,
-      slug: pages.slug,
-      isActive: pageRelationships.isActive,
-    })
-    .from(pageRelationships)
-    .innerJoin(pages, eq(pageRelationships.parentPageId, pages.id))
-    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-    .innerJoin(
-      parentRelMaxIdxSq,
-      and(
-        eq(pageRelationships.parentPageId, parentRelMaxIdxSq.parentPageId),
-        eq(chapters.idx, parentRelMaxIdxSq.maxIdx),
-      ),
-    )
-    .where(eq(pageRelationships.childPageId, pageId));
-
-  const activeParents = parentPagesRaw.filter((r) => r.isActive);
-  if (activeParents.length === 0) return [];
-
-  const parentPageIds = activeParents.map((r) => r.id);
-
-  const titleMap = await resolvePageTitlesAtIdx(parentPageIds, cutoffIdx);
+  const activeParents = await fetchActiveParentPagesAtIdx(pageId, cutoffIdx);
+  const titleMap = await resolvePageTitlesAtIdx(
+    activeParents.map((r) => r.id),
+    cutoffIdx,
+  );
 
   return activeParents.map((r) => ({
-    id: r.id,
-    name: r.name,
-    slug: r.slug,
+    ...r,
     title: titleMap.get(r.id) ?? r.name,
   }));
+}
+
+/**
+ * Returns all pages in the serial with their titles resolved at the given
+ * chapter's cutoff, excluding the current page. Used to keep the "Add parent"
+ * dropdown in sync with the "Writing as of Chapter" selector — the same
+ * temporal title resolution applied to `getParentPagesAtChapter`.
+ *
+ * @example
+ * const allPages = await getAllSerialPagesAtChapter('one-piece', 'luffy', 7);
+ * // allPages: [{ id: 1, title: 'Nami' }, ...]
+ */
+export async function getAllSerialPagesAtChapter(
+  serialSlug: string,
+  pageSlug: string,
+  chapterId: number,
+): Promise<{ id: number; title: string }[]> {
+  const [{ serialId, pageId }, cutoffIdx] = await Promise.all([
+    resolvePageIds(serialSlug, pageSlug),
+    getChapterIdxById(chapterId),
+  ]);
+  if (cutoffIdx === null) throw new Error("Chapter not found");
+
+  const allPages = await fetchSerialPagesAtIdx(serialId, cutoffIdx);
+  const titleMap = await resolvePageTitlesAtIdx(
+    allPages.map((p) => p.id),
+    cutoffIdx,
+  );
+
+  return allPages
+    .filter((p) => p.id !== pageId)
+    .map((p) => ({ id: p.id, title: titleMap.get(p.id) ?? p.name }));
 }
 
 /**

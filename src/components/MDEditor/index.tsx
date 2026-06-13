@@ -39,7 +39,7 @@ import { InsertWikiLinkButton } from "./InsertWikiLinkButton";
 import { WikiLinkNode, $isWikiLinkNode } from "./WikiLinkNode";
 import { WikiLinkEditPopover } from "./WikiLinkEditPopover";
 import { wikiPlugin, wikiLinkToMarkdownExtension } from "./WikiLinkVisitors";
-import { normalizeMarkdown } from "./normalizeMarkdown";
+import { normalizeMarkdown, prepareMarkdownForEditor } from "./normalizeMarkdown";
 import {
   useApplySuggestion,
   type Suggestion,
@@ -183,9 +183,12 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
   const isDark = hasMounted && resolvedTheme === "dark";
 
   const editorRef = useRef<MDXEditorMethods>(null);
-  // Snapshot of value on mount - used as the diff baseline so "Diff" mode shows
-  // changes made in this editing session relative to what was loaded from the server.
-  const [initialValue] = useState(() => normalizeMarkdown(value));
+  // prepareMarkdownForEditor doubles backslashes for CommonMark safety; that
+  // format must NOT be used as the diff baseline because the editor emits the
+  // un-doubled form on onChange. normalizeMarkdown(value) matches the save-path
+  // format, so the diff shows real content changes instead of escape artifacts.
+  const [initialValue] = useState(() => prepareMarkdownForEditor(value));
+  const [diffBaseline] = useState(() => normalizeMarkdown(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
 
@@ -373,8 +376,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
    * Rendering happens here (outside MDXEditor's DOM) so popover styling is
    * consistent with chip-click edits, which also render at this level.
    */
-  const openInsertMenu = useCallback((anchorEl: HTMLElement) => {
-    setEditState({ nodeKey: null, anchorEl, initialToken: "", initialAlias: "", autoFocusAlias: false });
+  const openInsertMenu = useCallback((anchorEl: HTMLElement, selectedText = "") => {
+    setEditState({
+      nodeKey: null, anchorEl, initialToken: "", initialAlias: selectedText, autoFocusAlias: false,
+    });
   }, []);
 
   /**
@@ -392,7 +397,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       const read = readWikiLinkTokenAlias(lexEditor, nodeKey);
       if (!read) return;
       setEditState({
-        nodeKey, anchorEl, initialToken: read.token, initialAlias: read.alias, autoFocusAlias: false,
+        nodeKey,
+        anchorEl,
+        initialToken: read.token,
+        initialAlias: read.alias,
+        autoFocusAlias: false,
       });
     },
     [],
@@ -527,6 +536,10 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       case "Enter":
         e.preventDefault();
         e.stopPropagation();
+        // Stop the native event too; Lexical registers its own keydown listener
+        // on the contenteditable and doesn't check defaultPrevented, so without
+        // this it would still insert a newline after the chip is inserted.
+        e.nativeEvent.stopImmediatePropagation();
         applySuggestion(suggestions[activeIndex]);
         break;
       case "Escape":
@@ -569,11 +582,11 @@ export function WikiLinkMDEditor(props: WikiLinkMDEditorProps) {
       linkDialogPlugin(),
       tablePlugin(),
       codeBlockPlugin(),
-      diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: initialValue }),
+      diffSourcePlugin({ viewMode: "rich-text", diffMarkdown: diffBaseline }),
     ];
     // InsertWikiLinkButton is self-contained and reads all mutable data from
-    // WikiLinkContext, so only initialValue (the diff baseline) is a real dep.
-  }, [initialValue]);
+    // WikiLinkContext, so only diffBaseline (the diff baseline) is a real dep.
+  }, [diffBaseline]);
 
   const pos = dropdownPos ?? { top: 0, left: 0 };
 

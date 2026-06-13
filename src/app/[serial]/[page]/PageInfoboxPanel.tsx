@@ -1,8 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useServerAction } from "@/hooks/useServerAction";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -14,13 +13,20 @@ import { addInfoboxSection } from "./actions";
 import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
 import type { FloaterRowData } from "./types";
 
-interface Props {
+interface PageInfoboxPanelProps {
+  /** DB id of the page this infobox belongs to. */
   pageId: number;
+  /** Wall-clock-versioned infobox row structure for the management panel. */
   infoboxSectionStructure: InfoboxSection[];
+  /** Infobox rows at the reader's current chapter cutoff, used to seed draft state. */
   floaterRows: FloaterRowData[];
+  /** Controlled draft value for the floater image URL, owned by `PageEditor`. */
   draftFloaterImageUrl: string;
+  /** Setter for `draftFloaterImageUrl`, owned by `PageEditor`. */
   setDraftFloaterImageUrl: Dispatch<SetStateAction<string>>;
+  /** Controlled draft content keyed by infobox section id, owned by `PageEditor`. */
   draftFloaterRowContent: Record<number, string>;
+  /** Setter for `draftFloaterRowContent`, owned by `PageEditor`. */
   setDraftFloaterRowContent: Dispatch<SetStateAction<Record<number, string>>>;
   /** Whether the parent editor is pending a transition (disables inputs). */
   isPending: boolean;
@@ -53,7 +59,7 @@ interface Props {
  *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  * />
  */
-export function PageInfoboxPanel(props: Props) {
+export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
   const {
     pageId,
     infoboxSectionStructure,
@@ -68,8 +74,7 @@ export function PageInfoboxPanel(props: Props) {
     wikiChapters,
     chapterType,
   } = props;
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { runAsync, isPending } = useServerAction();
 
   const disabled = isPending || externalIsPending;
 
@@ -92,13 +97,10 @@ export function PageInfoboxPanel(props: Props) {
             className="self-start"
             disabled={disabled}
             onClick={() => {
-              startTransition(async () => {
-                const fd = new FormData();
-                fd.set("pageId", String(pageId));
-                fd.set("label", "Overview");
-                await addInfoboxSection(fd);
-                router.refresh();
-              });
+              const fd = new FormData();
+              fd.set("pageId", String(pageId));
+              fd.set("label", "Overview");
+              runAsync(() => addInfoboxSection(fd));
             }}
           >
             Enable infobox

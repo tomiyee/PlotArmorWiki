@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useServerAction } from "@/hooks/useServerAction";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Box } from "@/components/ui/Box";
@@ -17,10 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
-import {
-  submitPageSuggestion,
-  getSectionsAtChapter,
-} from "./suggestionActions";
+import { submitPageSuggestion } from "./suggestionActions";
+import { getSectionsAtChapter } from "./actions";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { LastUpdatedTag } from "./LastUpdatedTag";
 import type { ChapterData, ChapterGroupOption } from "./types";
@@ -94,8 +92,9 @@ export function SuggestionForm(props: SuggestionFormProps) {
     onClose,
   } = props;
 
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { runAsync, isPending: isSubmitPending } = useServerAction();
+  const [isFetchPending, startTransition] = useTransition();
+  const isPending = isFetchPending || isSubmitPending;
 
   // Restrict available chapters to those at or before the user's reading cutoff.
   const readingChapterIdx =
@@ -198,22 +197,13 @@ export function SuggestionForm(props: SuggestionFormProps) {
       return;
     }
     setSubmitError(null);
-    startTransition(async () => {
-      const result = await submitPageSuggestion(
-        pageId,
-        selectedChapterId,
-        citation,
-        changes,
-        infoboxChanges,
-      );
-      if (result.error) {
-        setSubmitError(result.error);
-      } else {
-        router.refresh();
-        setShowSuccessDialog(true);
-      }
-    });
+    runAsync(
+      () => submitPageSuggestion(pageId, selectedChapterId, citation, changes, infoboxChanges),
+      () => setShowSuccessDialog(true),
+      (err) => setSubmitError(err),
+    );
   }, [
+    runAsync,
     selectedChapterId,
     citation,
     sections,
@@ -221,7 +211,6 @@ export function SuggestionForm(props: SuggestionFormProps) {
     draftContent,
     infoboxDraftContent,
     pageId,
-    router,
   ]);
 
   // Build chapter selector options from filtered available chapters only.

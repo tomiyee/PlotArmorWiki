@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/Input";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { SuggestionForm } from "./SuggestionForm";
 import type { SectionData, FloaterRowData, ChapterData } from "./types";
+import type { SuggestionStatus } from "@/types";
 
 type MyPageSuggestion = {
   id: number;
-  status: "pending" | "approved" | "rejected";
+  status: SuggestionStatus;
   reviewNote: string | null;
   createdAt: Date;
   targetChapterName: string;
@@ -382,7 +383,7 @@ export function PageReadView(props: PageReadViewProps) {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     onClick={() => setShowSuggestionForm(true)}
                   >
                     <FilePenLine />
