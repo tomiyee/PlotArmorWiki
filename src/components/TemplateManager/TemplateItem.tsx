@@ -15,8 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { useServerAction } from "@/hooks/useServerAction";
 import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
-import { TemplateSectionList } from "./TemplateSectionList";
-import { TemplateInfoboxSectionList } from "./TemplateInfoboxSectionList";
+import { SortableAddList } from "./SortableAddList";
 import type { Template, ServerAction, ReorderAction } from "./types";
 
 interface TemplateItemProps {
@@ -268,8 +267,9 @@ export function TemplateItem(props: TemplateItemProps) {
               Has infobox sidebar
             </Label>
           </Box>
-          <TemplateSectionList
-            sections={localSections}
+          <SortableAddList
+            heading="Sections"
+            items={localSections.map((s) => ({ id: s.id, label: s.name }))}
             value={addingSectionName}
             onChange={setAddingSectionName}
             onAdd={handleAddSection}
@@ -277,10 +277,14 @@ export function TemplateItem(props: TemplateItemProps) {
             onReorder={handleReorderSections}
             isPending={anyPending}
             inputRef={sectionInputRef}
+            placeholder="Section name…"
+            emptyLabel="No sections yet."
+            deleteTitle="Remove section"
           />
           {template.hasInfobox && (
-            <TemplateInfoboxSectionList
-              rows={localInfoboxSections}
+            <SortableAddList
+              heading="Infobox rows"
+              items={localInfoboxSections}
               value={addingInfoboxLabel}
               onChange={setAddingInfoboxLabel}
               onAdd={handleAddInfoboxSection}
@@ -288,6 +292,9 @@ export function TemplateItem(props: TemplateItemProps) {
               onReorder={handleReorderInfoboxSections}
               isPending={anyPending}
               inputRef={infoboxInputRef}
+              placeholder="Row label…"
+              emptyLabel="No infobox rows yet."
+              deleteTitle="Remove infobox row"
             />
           )}
         </div>

@@ -1,12 +1,10 @@
 "use client";
 
 import { GripVerticalIcon, Trash2Icon } from "lucide-react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import type { CSSProperties } from "react";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
+import { useSortableItem } from "@/lib/dndUtils";
 
 type SortableRowProps = {
   /** Unique numeric id tracked by @dnd-kit. */
@@ -30,25 +28,16 @@ type SortableRowProps = {
  */
 export function SortableRow(props: SortableRowProps) {
   const { id, label, isPending, deleteTitle, onDelete } = props;
-
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled: isPending });
-
-  const style: CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1,
-  };
+  const { ref, style, dragHandleProps } = useSortableItem(id, isPending);
 
   return (
     <Box
-      ref={setNodeRef}
+      ref={ref}
       style={style}
       className="items-center gap-2 rounded border border-border px-2 py-1"
     >
       <span
-        {...attributes}
-        {...listeners}
+        {...dragHandleProps}
         className="text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
         title="Drag to reorder"
       >
