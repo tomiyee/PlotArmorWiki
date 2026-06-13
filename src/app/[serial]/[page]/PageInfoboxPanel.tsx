@@ -1,8 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useServerAction } from "@/hooks/useServerAction";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -75,8 +74,7 @@ export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
     wikiChapters,
     chapterType,
   } = props;
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { runAsync, isPending } = useServerAction();
 
   const disabled = isPending || externalIsPending;
 
@@ -99,13 +97,10 @@ export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
             className="self-start"
             disabled={disabled}
             onClick={() => {
-              startTransition(async () => {
-                const fd = new FormData();
-                fd.set("pageId", String(pageId));
-                fd.set("label", "Overview");
-                await addInfoboxSection(fd);
-                router.refresh();
-              });
+              const fd = new FormData();
+              fd.set("pageId", String(pageId));
+              fd.set("label", "Overview");
+              runAsync(() => addInfoboxSection(fd));
             }}
           >
             Enable infobox

@@ -40,6 +40,7 @@ import type {
   PageTitleEntry,
   ChapterGroupOption,
 } from "./types";
+import type { SuggestionStatus } from "@/types";
 
 interface PageEditorProps {
   /** Slug of the serial this page belongs to. */
@@ -183,7 +184,7 @@ interface PageEditorProps {
    */
   myPageSuggestions?: {
     id: number;
-    status: "pending" | "approved" | "rejected";
+    status: SuggestionStatus;
     reviewNote: string | null;
     createdAt: Date;
     targetChapterName: string;
