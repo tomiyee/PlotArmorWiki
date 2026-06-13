@@ -190,6 +190,7 @@ export default async function ChapterPage(props: ChapterPageProps) {
       .where(
         and(
           eq(pages.serialId, serial.id),
+          isNull(pages.deletedAt),
           or(isNull(pages.introChapterId), lte(chapters.idx, chapter.idx)),
         ),
       )

@@ -270,6 +270,7 @@ export default async function SerialPage(props: SerialPageProps) {
     .where(
       and(
         eq(pages.serialId, serial.id),
+        isNull(pages.deletedAt),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
       ),
     )
