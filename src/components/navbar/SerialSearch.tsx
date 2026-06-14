@@ -107,7 +107,7 @@ export function SerialSearch(props: SerialSearchProps) {
    * Three states: no query typed yet → prompt; loading → searching; no matches → not found.
    */
   function emptyMessage(): string {
-    if (!query.trim()) return "Search for a page — type a name to find it";
+    if (!query.trim()) return "Search for a page - type a name to find it";
     if (isLoading) return "Searching…";
     return "No pages found.";
   }
@@ -124,7 +124,11 @@ export function SerialSearch(props: SerialSearchProps) {
           <SearchIcon className="size-4" />
         </Button>
       </Tooltip>
-      <Dialog isOpen={open} onClose={() => setOpen(false)} showCloseButton={false}>
+      <Dialog
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        showCloseButton={false}
+      >
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search pages…"
