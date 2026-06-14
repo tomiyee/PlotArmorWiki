@@ -100,11 +100,12 @@ export function SerialSearch(props: SerialSearchProps) {
   );
 
   const handleCreatePage = useCallback(() => {
-    router.push(
+    window.open(
       `/${serialSlug}/new?name=${encodeURIComponent(query.trim())}`,
+      "_blank",
     );
     setOpen(false);
-  }, [router, serialSlug, query]);
+  }, [serialSlug, query]);
 
   return (
     <>
