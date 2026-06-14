@@ -24,6 +24,8 @@ const DEBOUNCE_MS = 300;
 type SerialSearchProps = {
   /** The slug of the currently active serial, used to scope the page search. */
   serialSlug: string;
+  /** When true, shows a "+ Page {query}" option so admins can jump directly to the new-page form. */
+  isAdmin: boolean;
 };
 
 /**
@@ -37,10 +39,10 @@ type SerialSearchProps = {
  * Also responds to Cmd+K / Ctrl+K.
  *
  * @example
- * <SerialSearch serialSlug="my-serial" />
+ * <SerialSearch serialSlug="my-serial" isAdmin={false} />
  */
 export function SerialSearch(props: SerialSearchProps) {
-  const { serialSlug } = props;
+  const { serialSlug, isAdmin } = props;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PageSearchResult[]>([]);
@@ -48,11 +50,6 @@ export function SerialSearch(props: SerialSearchProps) {
   const router = useRouter();
   /** Ref to track the debounce timer so we can cancel it on each keystroke. */
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Reset query each time the dialog closes; the search effect handles clearing results.
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
 
   // Debounced server-side search: fires 300 ms after the user stops typing.
   // Clears results immediately on empty query so the empty-state prompt appears.
@@ -98,19 +95,19 @@ export function SerialSearch(props: SerialSearchProps) {
     (slug: string) => {
       router.push(`/${serialSlug}/${slug}`);
       setOpen(false);
+      setQuery("");
     },
     [router, serialSlug],
   );
 
-  /**
-   * Resolves the message shown in the empty slot of the command list.
-   * Three states: no query typed yet → prompt; loading → searching; no matches → not found.
-   */
-  function emptyMessage(): string {
-    if (!query.trim()) return "Search for a page - type a name to find it";
-    if (isLoading) return "Searching…";
-    return "No pages found.";
-  }
+  const handleCreatePage = useCallback(() => {
+    window.open(
+      `/${serialSlug}/new?name=${encodeURIComponent(query.trim())}`,
+      "_blank",
+    );
+    setOpen(false);
+    setQuery("");
+  }, [serialSlug, query]);
 
   return (
     <>
@@ -126,7 +123,7 @@ export function SerialSearch(props: SerialSearchProps) {
       </Tooltip>
       <Dialog
         isOpen={open}
-        onClose={() => setOpen(false)}
+        onClose={() => { setOpen(false); setQuery(""); }}
         showCloseButton={false}
       >
         <Command shouldFilter={false}>
@@ -137,7 +134,13 @@ export function SerialSearch(props: SerialSearchProps) {
             onValueChange={setQuery}
           />
           <CommandList>
-            <CommandEmpty>{emptyMessage()}</CommandEmpty>
+            <CommandEmpty>
+              {!query.trim()
+                ? "Search for a page - type a name to find it"
+                : isLoading
+                  ? "Searching…"
+                  : "No pages found."}
+            </CommandEmpty>
             {results.map((page) => (
               <CommandItem
                 key={page.id}
@@ -147,6 +150,14 @@ export function SerialSearch(props: SerialSearchProps) {
                 {page.name}
               </CommandItem>
             ))}
+            {isAdmin && query.trim() && (
+              <CommandItem
+                value={`+ Page ${query.trim()}`}
+                onSelect={handleCreatePage}
+              >
+                + Page &ldquo;{query.trim()}&rdquo;
+              </CommandItem>
+            )}
           </CommandList>
         </Command>
       </Dialog>

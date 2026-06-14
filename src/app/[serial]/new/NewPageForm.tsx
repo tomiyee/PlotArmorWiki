@@ -59,6 +59,8 @@ interface NewPageFormProps {
   defaultParentPageId?: number;
   /** The user's current reading chapter cutoff; pre-selects the intro chapter and disables future chapters. */
   defaultIntroChapterId?: number;
+  /** Pre-filled page name, e.g. when navigating here from the search palette's "+ Page" option. */
+  defaultName?: string;
   /** Serial templates for pre-populating sections and infobox rows on the new page. */
   templates: Template[];
 }
@@ -80,6 +82,7 @@ export function NewPageForm(props: NewPageFormProps) {
     existingPages,
     defaultParentPageId,
     defaultIntroChapterId,
+    defaultName,
     templates,
   } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
@@ -196,6 +199,7 @@ export function NewPageForm(props: NewPageFormProps) {
           required
           placeholder="e.g. Monkey D. Luffy"
           autoFocus
+          defaultValue={defaultName}
         />
       </Box>
 

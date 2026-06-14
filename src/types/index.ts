@@ -265,6 +265,8 @@ export interface NavbarSerialData {
   serialSlug: string;
   serialTitle: string;
   categories: CategoryNavData[];
+  /** True when the current viewer is a serial admin; gates the "+ Page" create option in search. */
+  isAdmin: boolean;
 }
 
 // ── Display-only narrower types ───────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
 import { and, asc, eq } from "drizzle-orm";
 import { getSerialBySlug } from "@/data/serials/queries";
 import { getSerialVolumesAndChapters } from "@/data/chapters/queries";
+import { isSerialAdmin } from "@/lib/auth-guard";
 import { childRelMaxIdxSq as buildChildRelMaxIdxSq, PG_INT_MAX } from "@/data/pages/queries";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
@@ -45,7 +46,10 @@ export default async function SerialLayout(props: SerialLayoutProps) {
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
-  const { volumeList, chapterList } = await getSerialVolumesAndChapters(serial.id);
+  const [{ volumeList, chapterList }, adminStatus] = await Promise.all([
+    getSerialVolumesAndChapters(serial.id),
+    isSerialAdmin(serial.id),
+  ]);
 
   const chaptersByVolume: Partial<Record<number, ChapterRow[]>> = {
     ...Object.groupBy(chapterList, (c) => c.volumeId),
@@ -111,6 +115,7 @@ export default async function SerialLayout(props: SerialLayoutProps) {
     serialSlug,
     serialTitle: serial.title,
     categories: navPages,
+    isAdmin: adminStatus,
   };
 
   const tocContent = (
