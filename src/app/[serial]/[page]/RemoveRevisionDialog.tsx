@@ -634,7 +634,7 @@ export function RemoveRevisionDialog(props: RemoveRevisionDialogProps) {
             </Text>
             {!hasChanges ? (
               <Text className="text-sm text-muted-foreground italic">
-                The previous revision has identical content — no visible change
+                The previous revision has identical content - no visible change
                 to readers.
               </Text>
             ) : (

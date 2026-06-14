@@ -14,7 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
-import { deletePage, getPageWikiLinkReferences, getPageChapterSynopsisReferences } from "./actions";
+import {
+  deletePage,
+  getPageWikiLinkReferences,
+  getPageChapterSynopsisReferences,
+} from "./actions";
 
 const WikiLinkMDEditor = dynamic(
   () => import("@/components/MDEditor").then((m) => m.WikiLinkMDEditor),
@@ -65,7 +69,11 @@ export function DeletePageButton(props: DeletePageButtonProps) {
   const [reason, setReason] = useState("");
   const [dialogState, setDialogState] = useState<
     | { kind: "closed" }
-    | { kind: "confirm"; wikiRefs: WikiLinkRef[]; chapterRefs: ChapterSynopsisRef[] }
+    | {
+        kind: "confirm";
+        wikiRefs: WikiLinkRef[];
+        chapterRefs: ChapterSynopsisRef[];
+      }
     | { kind: "error"; message: string }
   >({ kind: "closed" });
 
@@ -125,7 +133,7 @@ export function DeletePageButton(props: DeletePageButtonProps) {
         <DialogBody>
           <Text variant="body">
             This will hide the page from all readers and remove it from search
-            results. All versioned content is preserved — an admin can restore
+            results. All versioned content is preserved - an admin can restore
             the page at any time by visiting its URL.
           </Text>
 
@@ -142,60 +150,65 @@ export function DeletePageButton(props: DeletePageButtonProps) {
             />
           </div>
 
-          {dialogState.kind === "confirm" && dialogState.wikiRefs.length > 0 && (
-            <div className="mt-4">
-              <Text variant="label" className="mb-2 block text-destructive">
-                Wiki links that will break ({dialogState.wikiRefs.length})
-              </Text>
-              <ul className="space-y-1 text-sm">
-                {dialogState.wikiRefs.map((ref, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-muted-foreground">•</span>
-                    <span>
+          {dialogState.kind === "confirm" &&
+            dialogState.wikiRefs.length > 0 && (
+              <div className="mt-4">
+                <Text variant="label" className="mb-2 block text-destructive">
+                  Wiki links that will break ({dialogState.wikiRefs.length})
+                </Text>
+                <ul className="space-y-1 text-sm">
+                  {dialogState.wikiRefs.map((ref, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-muted-foreground">•</span>
+                      <span>
+                        <a
+                          href={`/${serialSlug}/${ref.pageSlug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium hover:underline"
+                        >
+                          {ref.pageName}
+                        </a>
+                        {" - "}
+                        <span className="text-muted-foreground">
+                          {ref.sectionName}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+          {dialogState.kind === "confirm" &&
+            dialogState.chapterRefs.length > 0 && (
+              <div className="mt-4">
+                <Text variant="label" className="mb-2 block text-destructive">
+                  Chapter synopses that will break (
+                  {dialogState.chapterRefs.length})
+                </Text>
+                <ul className="space-y-1 text-sm">
+                  {dialogState.chapterRefs.map((ref, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-muted-foreground">•</span>
                       <a
-                        href={`/${serialSlug}/${ref.pageSlug}`}
+                        href={`/${serialSlug}/chapter/${ref.chapterIdx}`}
                         target="_blank"
                         rel="noreferrer"
                         className="font-medium hover:underline"
                       >
-                        {ref.pageName}
+                        {ref.volumeName} - {ref.chapterDisplayName}
                       </a>
-                      {" — "}
-                      <span className="text-muted-foreground">
-                        {ref.sectionName}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {dialogState.kind === "confirm" && dialogState.chapterRefs.length > 0 && (
-            <div className="mt-4">
-              <Text variant="label" className="mb-2 block text-destructive">
-                Chapter synopses that will break ({dialogState.chapterRefs.length})
-              </Text>
-              <ul className="space-y-1 text-sm">
-                {dialogState.chapterRefs.map((ref, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-muted-foreground">•</span>
-                    <a
-                      href={`/${serialSlug}/chapter/${ref.chapterIdx}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      {ref.volumeName} — {ref.chapterDisplayName}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
         </DialogBody>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" disabled={isPending} />}>
+          <DialogClose
+            render={<Button variant="outline" disabled={isPending} />}
+          >
             Cancel
           </DialogClose>
           <Button
@@ -209,10 +222,7 @@ export function DeletePageButton(props: DeletePageButtonProps) {
       </Dialog>
 
       {/* Error dialog */}
-      <Dialog
-        isOpen={dialogState.kind === "error"}
-        onClose={handleClose}
-      >
+      <Dialog isOpen={dialogState.kind === "error"} onClose={handleClose}>
         <DialogHeader>
           <DialogTitle>Error</DialogTitle>
         </DialogHeader>

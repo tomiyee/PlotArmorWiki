@@ -83,7 +83,7 @@ export default async function ChapterPage(props: ChapterPageProps) {
     notFound();
   }
 
-  // Derive the volume name from the already-fetched volumeList — no extra query needed.
+  // Derive the volume name from the already-fetched volumeList - no extra query needed.
   const volume = volumeList.find((v) => v.id === chapter.volumeId);
 
   // Check the user's reading progress cookie against this chapter's idx.
@@ -124,14 +124,19 @@ export default async function ChapterPage(props: ChapterPageProps) {
   }[] = [];
 
   if (!spoilered) {
-    const [synopsis, rawWikiPages, introducedPages, mySuggestion, pendingSuggestions] =
-      await Promise.all([
-        fetchChapterSynopsis(chapter.id),
-        fetchSerialPagesAtIdx(serial.id, chapter.idx),
-        fetchPagesIntroducedInChapter(serial.id, chapter.id),
-        getMySynopsisSuggestion(chapter.id),
-        getPendingSynopsisSuggestions(chapter.id),
-      ]);
+    const [
+      synopsis,
+      rawWikiPages,
+      introducedPages,
+      mySuggestion,
+      pendingSuggestions,
+    ] = await Promise.all([
+      fetchChapterSynopsis(chapter.id),
+      fetchSerialPagesAtIdx(serial.id, chapter.idx),
+      fetchPagesIntroducedInChapter(serial.id, chapter.id),
+      getMySynopsisSuggestion(chapter.id),
+      getPendingSynopsisSuggestions(chapter.id),
+    ]);
 
     synopsisContent = synopsis ?? "";
 
@@ -165,7 +170,10 @@ export default async function ChapterPage(props: ChapterPageProps) {
     pendingSynopsisSuggestions = pendingSuggestions;
   }
 
-  const wikiChapters = chapterList.map((c) => ({ name: c.displayName, idx: c.idx }));
+  const wikiChapters = chapterList.map((c) => ({
+    name: c.displayName,
+    idx: c.idx,
+  }));
 
   return (
     <main>
