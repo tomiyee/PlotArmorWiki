@@ -95,6 +95,7 @@ export function SerialSearch(props: SerialSearchProps) {
     (slug: string) => {
       router.push(`/${serialSlug}/${slug}`);
       setOpen(false);
+      setQuery("");
     },
     [router, serialSlug],
   );
@@ -105,6 +106,7 @@ export function SerialSearch(props: SerialSearchProps) {
       "_blank",
     );
     setOpen(false);
+    setQuery("");
   }, [serialSlug, query]);
 
   return (
