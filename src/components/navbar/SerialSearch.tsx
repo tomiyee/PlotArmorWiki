@@ -51,11 +51,6 @@ export function SerialSearch(props: SerialSearchProps) {
   /** Ref to track the debounce timer so we can cancel it on each keystroke. */
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset query each time the dialog closes; the search effect handles clearing results.
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
-
   // Debounced server-side search: fires 300 ms after the user stops typing.
   // Clears results immediately on empty query so the empty-state prompt appears.
   useEffect(() => {
@@ -111,16 +106,6 @@ export function SerialSearch(props: SerialSearchProps) {
     setOpen(false);
   }, [router, serialSlug, query]);
 
-  /**
-   * Resolves the message shown in the empty slot of the command list.
-   * Three states: no query typed yet → prompt; loading → searching; no matches → not found.
-   */
-  function emptyMessage(): string {
-    if (!query.trim()) return "Search for a page - type a name to find it";
-    if (isLoading) return "Searching…";
-    return "No pages found.";
-  }
-
   return (
     <>
       <Tooltip content="Search pages (Ctrl+K)" side="bottom">
@@ -135,7 +120,7 @@ export function SerialSearch(props: SerialSearchProps) {
       </Tooltip>
       <Dialog
         isOpen={open}
-        onClose={() => setOpen(false)}
+        onClose={() => { setOpen(false); setQuery(""); }}
         showCloseButton={false}
       >
         <Command shouldFilter={false}>
@@ -146,7 +131,13 @@ export function SerialSearch(props: SerialSearchProps) {
             onValueChange={setQuery}
           />
           <CommandList>
-            <CommandEmpty>{emptyMessage()}</CommandEmpty>
+            <CommandEmpty>
+              {!query.trim()
+                ? "Search for a page - type a name to find it"
+                : isLoading
+                  ? "Searching…"
+                  : "No pages found."}
+            </CommandEmpty>
             {results.map((page) => (
               <CommandItem
                 key={page.id}

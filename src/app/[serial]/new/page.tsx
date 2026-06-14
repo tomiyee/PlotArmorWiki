@@ -24,7 +24,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
   const defaultParentPageId = parentPageIdParam
     ? parseInt(parentPageIdParam, 10)
     : undefined;
-  const defaultName = nameParam?.trim() || undefined;
+  const defaultName = nameParam || undefined;
 
   const serial = await getSerialBySlug(serialSlug);
 
