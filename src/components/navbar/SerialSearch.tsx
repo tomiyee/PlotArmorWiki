@@ -48,14 +48,9 @@ export function SerialSearch(props: SerialSearchProps) {
   /** Ref to track the debounce timer so we can cancel it on each keystroke. */
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset query and results each time the dialog closes.
+  // Reset query each time the dialog closes; the search effect handles clearing results.
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      setResults([]);
-      setIsLoading(false);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    }
+    if (!open) setQuery("");
   }, [open]);
 
   // Debounced server-side search: fires 300 ms after the user stops typing.
@@ -69,21 +64,19 @@ export function SerialSearch(props: SerialSearchProps) {
       return;
     }
 
+    let cancelled = false;
     setIsLoading(true);
     debounceRef.current = setTimeout(() => {
-      let cancelled = false;
       searchPages(serialSlug, query).then((data) => {
         if (!cancelled) {
           setResults(data);
           setIsLoading(false);
         }
       });
-      return () => {
-        cancelled = true;
-      };
     }, DEBOUNCE_MS);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, serialSlug]);

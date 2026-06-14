@@ -696,7 +696,8 @@ export async function searchPagesByNameAtIdx(
   cutoffIdx: number,
   query: string,
 ): Promise<PageStub[]> {
-  if (!query.trim()) return [];
+  const trimmed = query.trim();
+  if (!trimmed) return [];
 
   return db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
@@ -708,7 +709,7 @@ export async function searchPagesByNameAtIdx(
         eq(pages.isHomePage, false),
         isNull(pages.deletedAt),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
-        ilike(pages.name, `%${query.trim()}%`),
+        ilike(pages.name, `%${trimmed}%`),
       ),
     )
     .orderBy(asc(pages.name))
