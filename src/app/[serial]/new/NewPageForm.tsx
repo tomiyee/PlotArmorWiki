@@ -20,6 +20,7 @@ import type {
 interface PageOption {
   id: number;
   name: string;
+  slug: string;
   introChapterId: number | null;
 }
 
@@ -112,6 +113,8 @@ export function NewPageForm(props: NewPageFormProps) {
   // Generated once per form mount. Sent as a hidden field so the server can
   // detect retried submissions and redirect to the already-created page.
   const [idempotencyKey] = useState<string>(() => crypto.randomUUID());
+  // Controlled name value so we can react to the user's input for similarity checks.
+  const [name, setName] = useState<string>(defaultName ?? "");
 
   // The idx of the user's reading cutoff chapter, used to gate the chapter options.
   const cutoffIdx =
@@ -181,6 +184,18 @@ export function NewPageForm(props: NewPageFormProps) {
     ? byDisplayOrder(selectedTemplate.infoboxSections)
     : [];
 
+  // Pages whose names overlap with what the user is typing, to warn against duplicates.
+  // Matches when either string case-insensitively contains the other (at least 2 chars).
+  const trimmedName = name.trim();
+  const similarPages =
+    trimmedName.length >= 2
+      ? existingPages.filter((p) => {
+          const lower = p.name.toLowerCase();
+          const query = trimmedName.toLowerCase();
+          return lower.includes(query) || query.includes(lower);
+        })
+      : [];
+
   const createPageAction = createPage.bind(null, serialSlug);
   const hasChapters = chapterList.length > 0;
 
@@ -199,8 +214,28 @@ export function NewPageForm(props: NewPageFormProps) {
           required
           placeholder="e.g. Monkey D. Luffy"
           autoFocus
-          defaultValue={defaultName}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
+        {/* Warn the admin when existing pages have similar names to prevent accidental duplicates. */}
+        {similarPages.length > 0 && (
+          <div className="mt-1 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-600 p-3">
+            <Text variant="label" className="text-yellow-800 dark:text-yellow-300 text-xs mb-1">
+              Similar pages already exist:
+            </Text>
+            <Box col className="gap-0.5">
+              {similarPages.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/${serialSlug}/${p.slug}`}
+                  className="text-sm text-yellow-700 dark:text-yellow-400 hover:underline"
+                >
+                  {p.name}
+                </Link>
+              ))}
+            </Box>
+          </div>
+        )}
       </Box>
 
       {/* Intro chapter */}

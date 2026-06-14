@@ -24,6 +24,7 @@ export async function getNewPageFormData(serialId: number) {
       .select({
         id: pages.id,
         name: pages.name,
+        slug: pages.slug,
         introChapterId: pages.introChapterId,
       })
       .from(pages)
