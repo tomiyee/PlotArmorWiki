@@ -1,19 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { db } from "@/db/index";
+import { getSerialBySlug } from "@/data/serials/queries";
 import {
-  volumes,
-  chapters,
-  chapterSynopses,
-  pages,
-} from "@/db/schema";
-import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
-import {
-  getSerialBySlug,
   getChapterCutoff,
   getSerialVolumesAndChapters,
+  getChapterBySerialAndIdx,
+  fetchChapterSynopsis,
+} from "@/data/chapters/queries";
+import {
   resolvePageTitlesAtIdx,
-} from "@/db/queries";
+  fetchSerialPagesAtIdx,
+  fetchPagesIntroducedInChapter,
+} from "@/data/pages/queries";
+import type { ChapterRow } from "@/types";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -70,10 +69,7 @@ export default async function ChapterPage(props: ChapterPageProps) {
       getSerialVolumesAndChapters(serial.id),
     ]);
 
-  const chaptersByVolume: Record<
-    number,
-    { id: number; displayName: string; idx: number; volumeId: number }[]
-  > = {};
+  const chaptersByVolume: Record<number, ChapterRow[]> = {};
   volumeList.forEach((v) => {
     chaptersByVolume[v.id] = [];
   });
@@ -81,34 +77,19 @@ export default async function ChapterPage(props: ChapterPageProps) {
     chaptersByVolume[c.volumeId]?.push(c);
   });
 
-  // Resolve the chapter by serial + idx
-  const [chapter] = await db
-    .select({
-      id: chapters.id,
-      displayName: chapters.displayName,
-      idx: chapters.idx,
-      volumeId: chapters.volumeId,
-    })
-    .from(chapters)
-    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-    .where(and(eq(volumes.serialId, serial.id), eq(chapters.idx, chapterIdx)))
-    .limit(1);
+  const chapter = await getChapterBySerialAndIdx(serial.id, chapterIdx);
 
   if (!chapter) {
     notFound();
   }
 
+  // Derive the volume name from the already-fetched volumeList — no extra query needed.
+  const volume = volumeList.find((v) => v.id === chapter.volumeId);
+
   // Check the user's reading progress cookie against this chapter's idx.
   const { cutoffIdx } = await getChapterCutoff(serial.id);
 
   const spoilered = chapter.idx > cutoffIdx;
-
-  // Fetch the volume this chapter belongs to
-  const [volume] = await db
-    .select({ displayName: volumes.displayName })
-    .from(volumes)
-    .where(eq(volumes.id, chapter.volumeId))
-    .limit(1);
 
   const addChapterForSerial = addChapter.bind(null, serial.id);
   const addVolumeForSerial = addVolume.bind(null, serial.id);
@@ -143,80 +124,45 @@ export default async function ChapterPage(props: ChapterPageProps) {
   }[] = [];
 
   if (!spoilered) {
-    // Fetch synopsis
-    const [synopsisRow] = await db
-      .select({ content: chapterSynopses.content })
-      .from(chapterSynopses)
-      .where(eq(chapterSynopses.chapterId, chapter.id))
-      .limit(1);
+    const [synopsis, rawWikiPages, introducedPages, mySuggestion, pendingSuggestions] =
+      await Promise.all([
+        fetchChapterSynopsis(chapter.id),
+        fetchSerialPagesAtIdx(serial.id, chapter.idx),
+        fetchPagesIntroducedInChapter(serial.id, chapter.id),
+        getMySynopsisSuggestion(chapter.id),
+        getPendingSynopsisSuggestions(chapter.id),
+      ]);
 
-    synopsisContent = synopsisRow?.content ?? "";
+    synopsisContent = synopsis ?? "";
 
-    // Fetch wiki pages introduced at or before this chapter, then resolve their
-    // chapter-versioned titles (same pattern as the page editor).
-    const rawWikiPages = await db
-      .select({ id: pages.id, name: pages.name, slug: pages.slug })
-      .from(pages)
-      .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
-      .where(
-        and(
-          eq(pages.serialId, serial.id),
-          isNull(pages.deletedAt),
-          or(isNull(pages.introChapterId), lte(chapters.idx, chapter.idx)),
-        ),
-      )
-      .orderBy(asc(pages.name));
-
-    const wikiPageIds = rawWikiPages.map((p) => p.id);
-    const wikiTitleByPageId = await resolvePageTitlesAtIdx(wikiPageIds, chapter.idx);
-
+    // Resolve chapter-versioned titles for wiki pages (for the MDEditor autocomplete).
+    const wikiTitleByPageId = await resolvePageTitlesAtIdx(
+      rawWikiPages.map((p) => p.id),
+      chapter.idx,
+    );
     wikiPages = rawWikiPages.map((p) => ({
       name: wikiTitleByPageId.get(p.id) ?? p.name,
       slug: p.slug,
     }));
 
-    // Fetch all pages introduced in this chapter
-    const introducedPages = await db
-      .select({
-        pageId: pages.id,
-        pageName: pages.name,
-        pageSlug: pages.slug,
-      })
-      .from(pages)
-      .where(
-        and(
-          eq(pages.serialId, serial.id),
-          eq(pages.introChapterId, chapter.id),
-        ),
-      )
-      .orderBy(pages.name);
-
-    const introducedPageIds = introducedPages.map((r) => r.pageId);
-    const introTitleByPageId = await resolvePageTitlesAtIdx(introducedPageIds, cutoffIdx);
-
     if (introducedPages.length > 0) {
+      const introTitleByPageId = await resolvePageTitlesAtIdx(
+        introducedPages.map((p) => p.id),
+        cutoffIdx,
+      );
       const resolvedPages = introducedPages
-        .map((r) => ({
-          id: r.pageId,
-          name: introTitleByPageId.get(r.pageId) ?? r.pageName,
-          slug: r.pageSlug,
+        .map((p) => ({
+          id: p.id,
+          name: introTitleByPageId.get(p.id) ?? p.name,
+          slug: p.slug,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      groupedIntroductions = [
-        {
-          categoryName: "",
-          pages: resolvedPages,
-        },
-      ];
+      groupedIntroductions = [{ categoryName: "", pages: resolvedPages }];
     }
 
     boundSaveAction = saveChapterSynopsis.bind(null, serialSlug, chapterIdx);
-
-    // Fetch suggestion data in parallel.
-    [mySynopsisSuggestion, pendingSynopsisSuggestions] = await Promise.all([
-      getMySynopsisSuggestion(chapter.id),
-      getPendingSynopsisSuggestions(chapter.id),
-    ]);
+    mySynopsisSuggestion = mySuggestion;
+    pendingSynopsisSuggestions = pendingSuggestions;
   }
 
   const wikiChapters = chapterList.map((c) => ({ name: c.displayName, idx: c.idx }));

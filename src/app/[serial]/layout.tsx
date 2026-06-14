@@ -7,17 +7,14 @@ import {
   userProgress,
 } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
-import {
-  getSerialBySlug,
-  getSerialVolumesAndChapters,
-  childRelMaxIdxSq as buildChildRelMaxIdxSq,
-  PG_INT_MAX,
-} from "@/db/queries";
+import { getSerialBySlug } from "@/data/serials/queries";
+import { getSerialVolumesAndChapters } from "@/data/chapters/queries";
+import { childRelMaxIdxSq as buildChildRelMaxIdxSq, PG_INT_MAX } from "@/data/pages/queries";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
 import { SerialTOCDrawer } from "@/components/SerialTOCDrawer";
-import { ChapterData, NavbarSerialData } from "@/types";
+import { ChapterRow, NavbarSerialData } from "@/types";
 import { auth } from "@/auth";
 
 interface SerialLayoutProps {
@@ -50,7 +47,7 @@ export default async function SerialLayout(props: SerialLayoutProps) {
 
   const { volumeList, chapterList } = await getSerialVolumesAndChapters(serial.id);
 
-  const chaptersByVolume: Partial<Record<number, ChapterData[]>> = {
+  const chaptersByVolume: Partial<Record<number, ChapterRow[]>> = {
     ...Object.groupBy(chapterList, (c) => c.volumeId),
   };
 

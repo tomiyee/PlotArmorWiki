@@ -87,6 +87,21 @@ First-time visitors default to chapter 1 with a callout to update.
 - Pages with `intro_chapter_id` > cutoff: fully hidden, title withheld.
 - Search: excludes those pages server-side (same SQL filter).
 
+### Data Access Layer (DAL)
+
+All DB read queries live in `src/data/`, organized by domain. **Before writing a raw `db.select()` anywhere outside this directory, check whether a DAL function already covers the need.**
+
+| File                              | Domain queries                                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `src/data/serials/queries.ts`     | `getSerialBySlug`, `fetchSerialAuthors`, `fetchSerialAdmins`, `fetchAllSerials`, `checkSerialAdminMembership` |
+| `src/data/chapters/queries.ts`    | `getChapterIdxById`, `getChapterBySerialAndIdx`, `getSerialVolumesAndChapters`, `getChapterCutoff`, `fetchChapterById`, `fetchChapterSynopsis`, `fetchVolumeById` |
+| `src/data/pages/queries.ts`       | `PG_INT_MAX`, `resolvePageTitlesAtIdx`, `resolveHasChildrenSet`, `sectionMaxIdxSq`, `infoboxRowMaxIdxSq`, `childRelMaxIdxSq`, `fetchSerialPagesAtIdx`, `fetchActiveParentPagesAtIdx`, `fetchPageAtSlug`, `fetchLivePageAtSlug`, `fetchSerialHomePage`, `fetchDeletedPages`, `fetchPageSectionsAtIdx`, `fetchPageInfoboxAtIdx`, `fetchPageChildPagesAtIdx`, `fetchPageTitleEntries`, `fetchPageTitleEntriesAtIdx`, `fetchPagesIntroducedInChapter`, `fetchAllSerialPageStubs`, `fetchFirstSectionAtIdx`, `fetchPageSerialId`, `fetchSearchablePagesAtIdx` |
+| `src/data/templates/queries.ts`   | `fetchSerialTemplates`                                                                            |
+
+**Adding a new query:** place it in the file whose domain it belongs to (e.g. a new page lookup goes in `src/data/pages/queries.ts`). Add a JSDoc block with `@example`. Import types from `@/types`, not from the DAL files themselves.
+
+Write mutations (inserts/updates/deletes) directly in the Server Action that owns the operation — they are not centralized in the DAL.
+
 ### Key files
 
 | File                                      | Purpose / non-obvious notes                                                                                                                                           |

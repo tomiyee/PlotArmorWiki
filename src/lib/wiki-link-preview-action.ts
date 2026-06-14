@@ -1,26 +1,20 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { db } from "@/db/index";
+import { getSerialBySlug } from "@/data/serials/queries";
 import {
-  pages,
-  chapters,
-  chapterSynopses,
-  volumes,
-  pageInfoboxSections,
-  pageInfoboxRevisions,
-  pageInfoboxImageRevisions,
-  pageSections,
-  pageSectionRevisions,
-} from "@/db/schema";
-import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
+  getChapterBySerialAndIdx,
+  getChapterCutoff,
+  fetchChapterById,
+  fetchChapterSynopsis,
+  fetchVolumeById,
+} from "@/data/chapters/queries";
 import {
+  fetchLivePageAtSlug,
+  fetchAllSerialPageStubs,
+  fetchFirstSectionAtIdx,
+  fetchPageInfoboxAtIdx,
   resolvePageTitlesAtIdx,
-  getSerialBySlug,
-  getChapterIdxById,
-  sectionMaxIdxSq,
-  infoboxRowMaxIdxSq,
-} from "@/db/queries";
+} from "@/data/pages/queries";
 
 export interface WikiLinkPreviewData {
   pageName: string;
@@ -53,72 +47,37 @@ export async function getWikiLinkPreview(
   serialSlug: string,
   pageSlug: string,
 ): Promise<WikiLinkPreviewData | null> {
-  // Resolve serial
   const serial = await getSerialBySlug(serialSlug);
   if (!serial) return null;
 
-  // Read chapter cutoff from cookie (same pattern as page.tsx)
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
-  let cutoffIdx = 0;
-  if (raw) {
-    const chapterId = parseInt(raw, 10);
-    if (!isNaN(chapterId)) {
-      const idx = await getChapterIdxById(chapterId);
-      if (idx !== null) cutoffIdx = idx;
-    }
-  }
+  const { cutoffIdx } = await getChapterCutoff(serial.id);
 
-  // Resolve page by slug within the serial. Deleted pages return null so that
-  // wiki links pointing to them render as plain text with no hover preview.
-  const [page] = await db
-    .select({
-      id: pages.id,
-      name: pages.name,
-      introChapterId: pages.introChapterId,
-    })
-    .from(pages)
-    .where(
-      and(
-        eq(pages.serialId, serial.id),
-        eq(pages.slug, pageSlug),
-        isNull(pages.deletedAt),
-      ),
-    )
-    .limit(1);
+  // Deleted pages return null so wiki links pointing to them render as plain text.
+  const page = await fetchLivePageAtSlug(serial.id, pageSlug);
   if (!page) return null;
 
-  // Resolve intro chapter name (introChapterId is null for the home page)
+  // Resolve intro chapter name (introChapterId is null for the home page).
   const introChapterRow = page.introChapterId
-    ? await db
-        .select({ displayName: chapters.displayName, idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, page.introChapterId))
-        .limit(1)
-        .then((rows) => rows[0] ?? null)
+    ? await fetchChapterById(page.introChapterId)
     : null;
 
   const introChapterName = introChapterRow
     ? `${serial.chapterType} ${introChapterRow.displayName}`
     : null;
 
-  // Fetch slug → title map for all visible pages at the cutoff (used by MarkdownRenderer
-  // to resolve [[slug]] display text inside the preview content and floater rows).
-  const allPageRows = await db
-    .select({ id: pages.id, slug: pages.slug, name: pages.name })
-    .from(pages)
-    .where(eq(pages.serialId, serial.id));
-
+  // Build slug → title map for all pages (used by MarkdownRenderer to resolve
+  // [[slug]] display text inside the preview content and floater rows).
+  const allPageStubs = await fetchAllSerialPageStubs(serial.id);
   let resolvedPageTitles: Record<string, string> = {};
-  if (allPageRows.length > 0) {
-    const pageIds = allPageRows.map((p) => p.id);
+  if (allPageStubs.length > 0) {
+    const pageIds = allPageStubs.map((p) => p.id);
     const titleByPageId = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
     resolvedPageTitles = Object.fromEntries(
-      allPageRows.map((p) => [p.slug, titleByPageId.get(p.id) ?? p.name]),
+      allPageStubs.map((p) => [p.slug, titleByPageId.get(p.id) ?? p.name]),
     );
   }
 
-  // Check spoiler visibility
+  // Check spoiler visibility.
   if (introChapterRow && introChapterRow.idx > cutoffIdx) {
     return {
       pageName: page.name,
@@ -131,105 +90,13 @@ export async function getWikiLinkPreview(
     };
   }
 
-  // Fetch the first section content at the user's cutoff
-  const secMaxIdxSq = sectionMaxIdxSq(page.id, cutoffIdx);
+  const [firstSectionContent, infobox] = await Promise.all([
+    fetchFirstSectionAtIdx(page.id, cutoffIdx),
+    fetchPageInfoboxAtIdx(page.id, cutoffIdx),
+  ]);
 
-  const [firstSection] = await db
-    .select({ content: pageSectionRevisions.content })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .innerJoin(
-      pageSections,
-      eq(pageSectionRevisions.sectionId, pageSections.id),
-    )
-    .innerJoin(
-      secMaxIdxSq,
-      and(
-        eq(pageSectionRevisions.sectionId, secMaxIdxSq.sectionId),
-        eq(chapters.idx, secMaxIdxSq.maxIdx),
-      ),
-    )
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, page.id),
-        isNull(pageSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageSections.displayOrder))
-    .limit(1);
-
-  const firstSectionContent = firstSection?.content ?? "";
-
-  // Fetch infobox data
-  const activeInfoboxRows = await db
-    .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
-    .from(pageInfoboxSections)
-    .where(
-      and(
-        eq(pageInfoboxSections.pageId, page.id),
-        isNull(pageInfoboxSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageInfoboxSections.displayOrder));
-
-  let floaterImageUrl: string | null = null;
-  let floaterRows: { label: string; content: string }[] = [];
-
-  if (activeInfoboxRows.length > 0) {
-    const floaterMaxIdxSq = db
-      .select({ maxIdx: max(chapters.idx).as("max_idx") })
-      .from(pageInfoboxImageRevisions)
-      .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageInfoboxImageRevisions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .as("floater_max_idx_sq");
-
-    const ibRowMaxIdxSq = infoboxRowMaxIdxSq(page.id, cutoffIdx);
-
-    const [[floaterVersion], infoboxRowVersions] = await Promise.all([
-      db
-        .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
-        .from(pageInfoboxImageRevisions)
-        .innerJoin(
-          chapters,
-          eq(pageInfoboxImageRevisions.chapterId, chapters.id),
-        )
-        .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
-        .where(eq(pageInfoboxImageRevisions.pageId, page.id))
-        .limit(1),
-      db
-        .select({
-          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-          content: pageInfoboxRevisions.content,
-        })
-        .from(pageInfoboxRevisions)
-        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-        .innerJoin(
-          ibRowMaxIdxSq,
-          and(
-            eq(
-              pageInfoboxRevisions.infoboxSectionId,
-              ibRowMaxIdxSq.infoboxSectionId,
-            ),
-            eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
-          ),
-        )
-        .where(eq(pageInfoboxRevisions.pageId, page.id)),
-    ]);
-
-    floaterImageUrl = floaterVersion?.imageUrl ?? null;
-    const rowContentMap = new Map(
-      infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]),
-    );
-    floaterRows = activeInfoboxRows.map((r) => ({
-      label: r.label,
-      content: rowContentMap.get(r.id) ?? "",
-    }));
-  }
+  const floaterImageUrl = infobox.floaterImageUrl ?? null;
+  const floaterRows = infobox.rows.map((r) => ({ label: r.label, content: r.content }));
 
   return {
     pageName: page.name,
@@ -270,43 +137,15 @@ export async function getChapterLinkPreview(
   serialSlug: string,
   chapterIdx: number,
 ): Promise<ChapterLinkPreviewData | null> {
-  // Resolve serial
   const serial = await getSerialBySlug(serialSlug);
   if (!serial) return null;
 
-  // Read chapter cutoff from cookie
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
-  let cutoffIdx = 0;
-  if (raw) {
-    const chapterId = parseInt(raw, 10);
-    if (!isNaN(chapterId)) {
-      const idx = await getChapterIdxById(chapterId);
-      if (idx !== null) cutoffIdx = idx;
-    }
-  }
+  const { cutoffIdx } = await getChapterCutoff(serial.id);
 
-  // Resolve chapter by serial + idx — need full row for displayName/idx/volumeId
-  const [chapter] = await db
-    .select({
-      id: chapters.id,
-      displayName: chapters.displayName,
-      idx: chapters.idx,
-      volumeId: chapters.volumeId,
-    })
-    .from(chapters)
-    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-    .where(and(eq(volumes.serialId, serial.id), eq(chapters.idx, chapterIdx)))
-    .limit(1);
+  const chapter = await getChapterBySerialAndIdx(serial.id, chapterIdx);
   if (!chapter) return null;
 
-  // Resolve volume name
-  const [volume] = await db
-    .select({ displayName: volumes.displayName })
-    .from(volumes)
-    .where(eq(volumes.id, chapter.volumeId))
-    .limit(1);
-
+  const volume = await fetchVolumeById(chapter.volumeId);
   const hidden = chapter.idx > cutoffIdx;
 
   if (hidden) {
@@ -319,14 +158,7 @@ export async function getChapterLinkPreview(
     };
   }
 
-  // Fetch synopsis snippet
-  const [synopsisRow] = await db
-    .select({ content: chapterSynopses.content })
-    .from(chapterSynopses)
-    .where(eq(chapterSynopses.chapterId, chapter.id))
-    .limit(1);
-
-  const synopsis = synopsisRow?.content ?? "";
+  const synopsis = (await fetchChapterSynopsis(chapter.id)) ?? "";
   const synopsisSnippet =
     synopsis.length > 200 ? synopsis.slice(0, 200).trimEnd() + "…" : synopsis;
 

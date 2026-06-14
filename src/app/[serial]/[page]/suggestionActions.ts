@@ -30,7 +30,7 @@ import { applyPageContentRevisions } from "./revisionHelpers";
 import {
   sectionMaxIdxSq as buildSectionMaxIdxSq,
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
-} from "@/db/queries";
+} from "@/data/pages/queries";
 import type { SuggestionStatus } from "@/types";
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
