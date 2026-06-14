@@ -18,7 +18,11 @@ import type { SerialRow, SerialAdminStub } from "@/types";
 export const getSerialBySlug = cache(async function getSerialBySlug(
   serialSlug: string,
 ): Promise<SerialRow | undefined> {
-  const [row] = await db.select().from(serials).where(eq(serials.slug, serialSlug)).limit(1);
+  const [row] = await db
+    .select()
+    .from(serials)
+    .where(eq(serials.slug, serialSlug))
+    .limit(1);
   return row;
 });
 
@@ -46,7 +50,9 @@ export async function fetchSerialAuthors(serialId: number): Promise<string[]> {
  * const admins = await fetchSerialAdmins(serial.id);
  * // [{ userId: "abc123", username: "tommy" }]
  */
-export async function fetchSerialAdmins(serialId: number): Promise<SerialAdminStub[]> {
+export async function fetchSerialAdmins(
+  serialId: number,
+): Promise<SerialAdminStub[]> {
   return db
     .select({ userId: serialAdmins.userId, username: users.username })
     .from(serialAdmins)
@@ -81,7 +87,9 @@ export async function checkSerialAdminMembership(
   const [row] = await db
     .select({ userId: serialAdmins.userId })
     .from(serialAdmins)
-    .where(and(eq(serialAdmins.userId, userId), eq(serialAdmins.serialId, serialId)))
+    .where(
+      and(eq(serialAdmins.userId, userId), eq(serialAdmins.serialId, serialId)),
+    )
     .limit(1);
   return !!row;
 }

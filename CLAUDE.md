@@ -89,7 +89,7 @@ First-time visitors default to chapter 1 with a callout to update.
 
 ### Data Access Layer (DAL)
 
-All DB read queries live in `src/data/`, organized by domain. **Before writing a raw `db.select()` anywhere outside this directory, check whether a DAL function already covers the need.**
+All DB read queries live in `src/data/`, organized by domain. **Never write a raw `db.select()` directly in a page or layout component — always go through a DAL function.** Before adding a new query, check whether a DAL function already covers the need.
 
 Each domain lives in `src/data/<domain>/queries.ts`:
 
