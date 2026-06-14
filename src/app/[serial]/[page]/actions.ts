@@ -38,15 +38,15 @@ import {
   requireSerialAdminByPageId,
 } from "@/lib/auth-guard";
 import { applyPageContentRevisions } from "./revisionHelpers";
+import { getSerialBySlug } from "@/data/serials/queries";
+import { getChapterIdxById } from "@/data/chapters/queries";
 import {
   resolvePageTitlesAtIdx,
   fetchActiveParentPagesAtIdx,
   fetchSerialPagesAtIdx,
-  getSerialBySlug,
-  getChapterIdxById,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
-} from "@/db/queries";
+} from "@/data/pages/queries";
 
 /**
  * Resolves the latest chapter (highest idx) for a given serial.

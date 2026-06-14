@@ -17,7 +17,7 @@ import { and, asc, eq, like } from "drizzle-orm";
 import type { PostgresError } from "postgres";
 import { titleToSlug } from "@/lib/slug";
 import { requireSerialAdminBySlug } from "@/lib/auth-guard";
-import { getSerialBySlug } from "@/db/queries";
+import { getSerialBySlug } from "@/data/serials/queries";
 
 /**
  * Generates a slug unique within the serial. If `titleToSlug(name)` already

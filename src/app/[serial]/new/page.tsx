@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { db } from "@/db/index";
-import { serials } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { NewPageForm } from "./NewPageForm";
-import { getChapterCutoff, getNewPageFormData } from "./queries";
+import { getSerialBySlug } from "@/data/serials/queries";
+import { getChapterCutoff } from "@/data/chapters/queries";
+import { getNewPageFormData } from "./queries";
 
 interface NewPagePageProps {
   /** Next.js dynamic route params containing the `serial` slug. */
@@ -26,11 +25,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
     ? parseInt(parentPageIdParam, 10)
     : undefined;
 
-  const [serial] = await db
-    .select()
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
 
   if (!serial) {
     notFound();
@@ -41,7 +36,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
     notFound();
   }
 
-  const [readingChapterId, { volumeList, chapterList, existingPages, serialTemplates }] =
+  const [{ readingChapterId }, { volumeList, chapterList, existingPages, serialTemplates }] =
     await Promise.all([
       getChapterCutoff(serial.id),
       getNewPageFormData(serial.id),

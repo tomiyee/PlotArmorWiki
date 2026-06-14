@@ -11,42 +11,16 @@ import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
-interface Chapter {
-  id: number;
-  displayName: string;
-  idx: number;
-  volumeId: number;
-}
-
-interface Volume {
-  id: number;
-  displayName: string;
-}
+import type {
+  ChapterRow as Chapter,
+  VolumeRow as Volume,
+  TemplateSummary as Template,
+} from "@/types";
 
 interface PageOption {
   id: number;
   name: string;
   introChapterId: number | null;
-}
-
-interface TemplateSection {
-  id: number;
-  name: string;
-  displayOrder: number;
-}
-
-interface TemplateInfoboxSection {
-  id: number;
-  label: string;
-  displayOrder: number;
-}
-
-interface Template {
-  id: number;
-  name: string;
-  hasInfobox: boolean;
-  sections: TemplateSection[];
-  infoboxSections: TemplateInfoboxSection[];
 }
 
 type SubmitButtonProps = {
