@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   Command,
   CommandEmpty,
@@ -113,18 +114,16 @@ export function SerialSearch(props: SerialSearchProps) {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Search pages (Ctrl+K)"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5"
-      >
-        <SearchIcon className="size-4" />
-        <kbd className="hidden rounded border border-border bg-muted px-1 py-0.5 font-mono text-xs text-muted-foreground sm:inline">
-          Ctrl+K
-        </kbd>
-      </Button>
+      <Tooltip content="Search pages (Ctrl+K)" side="bottom">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Search pages (Ctrl+K)"
+          onClick={() => setOpen(true)}
+        >
+          <SearchIcon className="size-4" />
+        </Button>
+      </Tooltip>
       <Dialog isOpen={open} onClose={() => setOpen(false)} showCloseButton={false}>
         <Command shouldFilter={false}>
           <CommandInput

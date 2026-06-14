@@ -1,9 +1,19 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { GripVerticalIcon, LayoutTemplateIcon, LockIcon, PenIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  GripVerticalIcon,
+  LayoutTemplateIcon,
+  LockIcon,
+  PenIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
@@ -23,7 +33,11 @@ import { useServerAction } from "@/hooks/useServerAction";
 import { useOptimisticOrder } from "@/hooks/useOptimisticOrder";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { InfoIcon } from "@/components/ui/InfoIcon";
-import { useSortableSensors, makeDragEndHandler, useSortableItem } from "@/lib/dndUtils";
+import {
+  useSortableSensors,
+  makeDragEndHandler,
+  useSortableItem,
+} from "@/lib/dndUtils";
 import {
   addPageSection,
   deletePageSection,
@@ -96,7 +110,10 @@ function SortableSection({
   onDelete: () => void;
   onRename: (fd: FormData) => void;
 }) {
-  const { ref, style, dragHandleProps } = useSortableItem(section.id, isPending);
+  const { ref, style, dragHandleProps } = useSortableItem(
+    section.id,
+    isPending,
+  );
 
   return (
     <li
@@ -195,9 +212,16 @@ export function PageSectionManager(props: PageSectionManagerProps) {
   // render triggered by isPending flipping — which would reset optimistic state mid-flight.
   const sortableSections = useMemo(() => sections.slice(1), [sections]);
 
-  const { items: localSections, applyOptimistic, revert } = useOptimisticOrder(sortableSections);
+  const {
+    items: localSections,
+    applyOptimistic,
+    revert,
+  } = useOptimisticOrder(sortableSections);
 
-  const localSectionIds = useMemo(() => localSections.map((s) => s.id), [localSections]);
+  const localSectionIds = useMemo(
+    () => localSections.map((s) => s.id),
+    [localSections],
+  );
 
   const sensors = useSortableSensors();
   const handleDragEnd = makeDragEndHandler(localSections, (reorderedIds) => {
@@ -205,7 +229,9 @@ export function PageSectionManager(props: PageSectionManagerProps) {
     const fd = new FormData();
     fd.set(
       "orderedIds",
-      JSON.stringify(lockedSection ? [lockedSection.id, ...reorderedIds] : reorderedIds),
+      JSON.stringify(
+        lockedSection ? [lockedSection.id, ...reorderedIds] : reorderedIds,
+      ),
     );
     run(reorderPageSections, fd, undefined, revert); // revert on server error
   });
@@ -222,7 +248,8 @@ export function PageSectionManager(props: PageSectionManagerProps) {
     skippedInfoboxRows: number;
   } | null>(null);
 
-  const selectedTemplate = serialTemplates.find((t) => t.id === selectedTemplateId) ?? null;
+  const selectedTemplate =
+    serialTemplates.find((t) => t.id === selectedTemplateId) ?? null;
 
   // Compute live section names for the preview (case-insensitive).
   const liveSectionNames = new Set(sections.map((s) => s.name.toLowerCase()));
@@ -282,7 +309,11 @@ export function PageSectionManager(props: PageSectionManagerProps) {
       {sections.length > 0 ? (
         <ol className="flex flex-col gap-1">
           {lockedSection && <LockedSection section={lockedSection} />}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext
               items={localSectionIds}
               strategy={verticalListSortingStrategy}
@@ -426,9 +457,7 @@ export function PageSectionManager(props: PageSectionManagerProps) {
         <DialogBody>
           {applyResult ? (
             <Box col className="gap-3">
-              <Text variant="body">
-                Template applied successfully.
-              </Text>
+              <Text variant="body">Template applied successfully.</Text>
               <Box col className="gap-1 text-sm">
                 <Text>
                   Sections added:{" "}
@@ -476,7 +505,10 @@ export function PageSectionManager(props: PageSectionManagerProps) {
               </Box>
 
               {selectedTemplate && (
-                <Box col className="gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                <Box
+                  col
+                  className="gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm"
+                >
                   <Text variant="label">Preview</Text>
 
                   {selectedTemplate.sections.length > 0 ? (
@@ -508,7 +540,7 @@ export function PageSectionManager(props: PageSectionManagerProps) {
                                   as="span"
                                   className="text-xs text-muted-foreground"
                                 >
-                                  (duplicate — will skip)
+                                  (duplicate - will skip)
                                 </Text>
                               )}
                             </Box>

@@ -236,7 +236,7 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
       .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
   ]);
 
-  // Batch current-content lookups by target chapter idx — one pair of queries
+  // Batch current-content lookups by target chapter idx - one pair of queries
   // per distinct cutoff instead of one pair per suggestion.
   const distinctCutoffs = [
     ...new Set(suggestionRows.map((s) => s.targetChapterIdx)),
