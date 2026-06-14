@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -13,9 +13,12 @@ import {
   CommandList,
 } from "@/components/ui/Command";
 import {
-  getVisiblePages,
+  searchPages,
   type PageSearchResult,
 } from "@/app/[serial]/search-actions";
+
+/** Debounce delay in milliseconds before firing the server-side search. */
+const DEBOUNCE_MS = 300;
 
 type SerialSearchProps = {
   /** The slug of the currently active serial, used to scope the page search. */
@@ -24,9 +27,11 @@ type SerialSearchProps = {
 
 /**
  * Search icon button + command-palette dialog for the navbar. Only rendered
- * when inside a serial route. Opens a list of all wiki pages visible at the
- * user's current chapter cutoff (spoiler-safe), with client-side fuzzy
- * filtering as the user types.
+ * when inside a serial route. Performs debounced server-side search filtered
+ * to pages visible at the user's current chapter cutoff (spoiler-safe).
+ *
+ * Shows a "Type to search" prompt on open so the palette is never populated
+ * by an expensive fetch-all. Results are capped at 20 rows server-side.
  *
  * Also responds to Cmd+K / Ctrl+K.
  *
@@ -36,24 +41,52 @@ type SerialSearchProps = {
 export function SerialSearch(props: SerialSearchProps) {
   const { serialSlug } = props;
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<PageSearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  /** Ref to track the debounce timer so we can cancel it on each keystroke. */
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch visible pages (spoiler-filtered) each time the dialog opens.
-  // Reset on close so the next open gets fresh data if the cutoff changed.
+  // Reset query and results each time the dialog closes.
   useEffect(() => {
     if (!open) {
+      setQuery("");
       setResults([]);
+      setIsLoading(false);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    }
+  }, [open]);
+
+  // Debounced server-side search: fires 300 ms after the user stops typing.
+  // Clears results immediately on empty query so the empty-state prompt appears.
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!query.trim()) {
+      setResults([]);
+      setIsLoading(false);
       return;
     }
-    let cancelled = false;
-    getVisiblePages(serialSlug).then((data) => {
-      if (!cancelled) setResults(data);
-    });
+
+    setIsLoading(true);
+    debounceRef.current = setTimeout(() => {
+      let cancelled = false;
+      searchPages(serialSlug, query).then((data) => {
+        if (!cancelled) {
+          setResults(data);
+          setIsLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, DEBOUNCE_MS);
+
     return () => {
-      cancelled = true;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [open, serialSlug]);
+  }, [query, serialSlug]);
 
   // Keyboard shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -75,23 +108,40 @@ export function SerialSearch(props: SerialSearchProps) {
     [router, serialSlug],
   );
 
+  /**
+   * Resolves the message shown in the empty slot of the command list.
+   * Three states: no query typed yet → prompt; loading → searching; no matches → not found.
+   */
+  function emptyMessage(): string {
+    if (!query.trim()) return "Search for a page — type a name to find it";
+    if (isLoading) return "Searching…";
+    return "No pages found.";
+  }
+
   return (
     <>
       <Button
         variant="ghost"
-        size="icon"
+        size="sm"
         aria-label="Search pages (Ctrl+K)"
         onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5"
       >
         <SearchIcon className="size-4" />
+        <kbd className="hidden rounded border border-border bg-muted px-1 py-0.5 font-mono text-xs text-muted-foreground sm:inline">
+          Ctrl+K
+        </kbd>
       </Button>
       <Dialog isOpen={open} onClose={() => setOpen(false)} showCloseButton={false}>
-        <Command>
-          <CommandInput placeholder="Search pages…" autoFocus />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search pages…"
+            autoFocus
+            value={query}
+            onValueChange={setQuery}
+          />
           <CommandList>
-            <CommandEmpty>
-              {results.length === 0 ? "Loading…" : "No pages found."}
-            </CommandEmpty>
+            <CommandEmpty>{emptyMessage()}</CommandEmpty>
             {results.map((page) => (
               <CommandItem
                 key={page.id}

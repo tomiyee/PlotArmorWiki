@@ -11,7 +11,7 @@ import {
   pageInfoboxImageRevisions,
   volumes,
 } from "@/db/schema";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or } from "drizzle-orm";
 import type {
   PageStub,
   ParentPageStub,
@@ -671,6 +671,48 @@ export async function fetchPageTitleEntriesAtIdx(
     })),
     resolvedTitle: resolvedTitleRow?.title ?? null,
   };
+}
+
+/** Maximum number of rows returned by `searchPagesByNameAtIdx`. */
+export const SEARCH_RESULT_LIMIT = 20;
+
+/**
+ * Returns up to 20 visible, non-home pages whose canonical name matches `query`
+ * (case-insensitive substring) at `cutoffIdx`. Returns an empty array when `query`
+ * is blank so callers can skip the network round-trip entirely.
+ *
+ * Spoiler rule: pages with an intro chapter index beyond `cutoffIdx` are excluded
+ * (same filter as `fetchSearchablePagesAtIdx`).
+ *
+ * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx` on the
+ * returned IDs and fall back to `name` when no title row exists.
+ *
+ * @example
+ * const rawPages = await searchPagesByNameAtIdx(serial.id, cutoffIdx, "luffy");
+ * const titleMap = await resolvePageTitlesAtIdx(rawPages.map(p => p.id), cutoffIdx);
+ */
+export async function searchPagesByNameAtIdx(
+  serialId: number,
+  cutoffIdx: number,
+  query: string,
+): Promise<PageStub[]> {
+  if (!query.trim()) return [];
+
+  return db
+    .select({ id: pages.id, name: pages.name, slug: pages.slug })
+    .from(pages)
+    .leftJoin(chapters, eq(pages.introChapterId, chapters.id))
+    .where(
+      and(
+        eq(pages.serialId, serialId),
+        eq(pages.isHomePage, false),
+        isNull(pages.deletedAt),
+        or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
+        ilike(pages.name, `%${query.trim()}%`),
+      ),
+    )
+    .orderBy(asc(pages.name))
+    .limit(SEARCH_RESULT_LIMIT);
 }
 
 /**
