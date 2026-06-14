@@ -24,6 +24,8 @@ const DEBOUNCE_MS = 300;
 type SerialSearchProps = {
   /** The slug of the currently active serial, used to scope the page search. */
   serialSlug: string;
+  /** When true, shows a "+ Page {query}" option so admins can jump directly to the new-page form. */
+  isAdmin: boolean;
 };
 
 /**
@@ -37,10 +39,10 @@ type SerialSearchProps = {
  * Also responds to Cmd+K / Ctrl+K.
  *
  * @example
- * <SerialSearch serialSlug="my-serial" />
+ * <SerialSearch serialSlug="my-serial" isAdmin={false} />
  */
 export function SerialSearch(props: SerialSearchProps) {
-  const { serialSlug } = props;
+  const { serialSlug, isAdmin } = props;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PageSearchResult[]>([]);
@@ -102,6 +104,13 @@ export function SerialSearch(props: SerialSearchProps) {
     [router, serialSlug],
   );
 
+  const handleCreatePage = useCallback(() => {
+    router.push(
+      `/${serialSlug}/new?name=${encodeURIComponent(query.trim())}`,
+    );
+    setOpen(false);
+  }, [router, serialSlug, query]);
+
   /**
    * Resolves the message shown in the empty slot of the command list.
    * Three states: no query typed yet → prompt; loading → searching; no matches → not found.
@@ -147,6 +156,14 @@ export function SerialSearch(props: SerialSearchProps) {
                 {page.name}
               </CommandItem>
             ))}
+            {isAdmin && query.trim() && (
+              <CommandItem
+                value={`+ Page ${query.trim()}`}
+                onSelect={handleCreatePage}
+              >
+                + Page &ldquo;{query.trim()}&rdquo;
+              </CommandItem>
+            )}
           </CommandList>
         </Command>
       </Dialog>

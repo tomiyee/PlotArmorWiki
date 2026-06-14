@@ -12,18 +12,19 @@ import { getNewPageFormData } from "./queries";
 interface NewPagePageProps {
   /** Next.js dynamic route params containing the `serial` slug. */
   params: Promise<{ serial: string }>;
-  /** Query params; `parentPageId` pre-selects the parent in the new-page form. */
-  searchParams: Promise<{ parentPageId?: string }>;
+  /** Query params; `parentPageId` pre-selects the parent; `name` pre-fills the page name field. */
+  searchParams: Promise<{ parentPageId?: string; name?: string }>;
 }
 
 /** Server Component for the new-page creation form. */
 export default async function NewPagePage(props: NewPagePageProps) {
   const { params, searchParams } = props;
   const { serial: serialSlug } = await params;
-  const { parentPageId: parentPageIdParam } = await searchParams;
+  const { parentPageId: parentPageIdParam, name: nameParam } = await searchParams;
   const defaultParentPageId = parentPageIdParam
     ? parseInt(parentPageIdParam, 10)
     : undefined;
+  const defaultName = nameParam?.trim() || undefined;
 
   const serial = await getSerialBySlug(serialSlug);
 
@@ -65,6 +66,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
             existingPages={existingPages}
             defaultParentPageId={defaultParentPageId}
             defaultIntroChapterId={readingChapterId ?? undefined}
+            defaultName={defaultName}
             templates={serialTemplates}
           />
         </Box>
