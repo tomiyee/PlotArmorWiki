@@ -49,12 +49,13 @@ export default async function SerialLayout(props: SerialLayoutProps) {
 
   // Priority (1): authenticated user's DB progress for this serial.
   // Priority (2): cookie/localStorage handled client-side by ChapterSelector.
-  const dbChapterId = userId ? await getUserProgress(userId, serial.id) : null;
-
   // Navbar "Pages" dropdown: immediate children of the Home page.
   // Uses the max-idx pattern to get each child's latest relationship state
   // with no chapter cutoff applied - navigation shows all current children.
-  const homePage = await fetchSerialHomePage(serial.id);
+  const [dbChapterId, homePage] = await Promise.all([
+    userId ? getUserProgress(userId, serial.id) : null,
+    fetchSerialHomePage(serial.id),
+  ]);
   const navPages = homePage ? await getHomePageChildren(homePage.id) : [];
 
   const serialNavData: NavbarSerialData = {

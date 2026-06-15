@@ -382,12 +382,11 @@ export async function getHomePageChildren(
 ): Promise<{ id: number; name: string; slug: string }[]> {
   const relMaxIdxSq = childRelMaxIdxSq(homePageId, PG_INT_MAX);
 
-  const rawChildren = await db
+  return db
     .select({
       id: pages.id,
       name: pages.name,
       slug: pages.slug,
-      isActive: pageRelationships.isActive,
     })
     .from(pageRelationships)
     .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
@@ -399,12 +398,14 @@ export async function getHomePageChildren(
         eq(chapters.idx, relMaxIdxSq.maxIdx),
       ),
     )
-    .where(eq(pageRelationships.parentPageId, homePageId))
+    .where(
+      and(
+        eq(pageRelationships.parentPageId, homePageId),
+        eq(pageRelationships.isActive, true),
+        isNull(pages.deletedAt),
+      ),
+    )
     .orderBy(asc(pages.name));
-
-  return rawChildren
-    .filter((r) => r.isActive)
-    .map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
 }
 
 /**
@@ -857,21 +858,20 @@ export async function fetchFirstSectionAtIdx(
  * in a subsequent query.
  *
  * Used by the new-page form to populate the parent-page dropdown and the
- * similar-pages warning — both of which need the full unfiltered list to handle
- * their own spoiler logic.
+ * similar-pages warning. Soft-deleted pages are excluded — they are not valid
+ * targets for parent assignment or name-collision checks.
  *
  * @example
  * const existingPages = await getSerialPages(serial.id);
- * // [{ id: 1, name: "Characters", slug: "characters", introChapterId: null }, …]
+ * // [{ id: 1, name: "Characters", introChapterId: null }, …]
  */
 export async function getSerialPages(
   serialId: number,
-): Promise<{ id: number; name: string; slug: string; introChapterId: number | null }[]> {
+): Promise<{ id: number; name: string; introChapterId: number | null }[]> {
   return db
     .select({
       id: pages.id,
       name: pages.name,
-      slug: pages.slug,
       introChapterId: pages.introChapterId,
     })
     .from(pages)
