@@ -10,19 +10,15 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { SimilarPagesWarning } from "./SimilarPagesWarning";
+import { TemplateSelector } from "./TemplateSelector";
 
 import type {
   ChapterRow as Chapter,
   VolumeRow as Volume,
   TemplateSummary as Template,
 } from "@/types";
-
-interface PageOption {
-  id: number;
-  name: string;
-  slug: string;
-  introChapterId: number | null;
-}
+import type { PageOption } from "./SimilarPagesWarning";
 
 type SubmitButtonProps = {
   /** When true, disables the button regardless of form-pending state. */
@@ -106,7 +102,6 @@ export function NewPageForm(props: NewPageFormProps) {
   const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<number>(
     defaultIntroChapterId ?? firstChapterId,
   );
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
   const [selectedParentPageId, setSelectedParentPageId] = useState<
     number | undefined
   >(undefined);
@@ -166,55 +161,6 @@ export function NewPageForm(props: NewPageFormProps) {
       ? selectedParentPageId
       : (visibleParentDefault ?? parentPageOptions[0]?.value);
 
-  // Template options - 0 means "no template".
-  const templateOptions = [
-    { label: "None (default sections)", value: 0 },
-    ...templates.map((t) => ({ label: t.name, value: t.id })),
-  ];
-
-  const byDisplayOrder = <T extends { displayOrder: number }>(arr: T[]) =>
-    [...arr].sort((a, b) => a.displayOrder - b.displayOrder);
-
-  const selectedTemplate =
-    templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const sortedTemplateSections = selectedTemplate
-    ? byDisplayOrder(selectedTemplate.sections)
-    : [];
-  const sortedTemplateInfoboxSections = selectedTemplate
-    ? byDisplayOrder(selectedTemplate.infoboxSections)
-    : [];
-
-  // Build a lookup map for chapter display names — used for the "introduced in …" note.
-  const chapterById = new Map(chapterList.map((c) => [c.id, c]));
-
-  // Pages whose names overlap with what the user is typing, to warn against duplicates.
-  // Requires 4+ chars typed and the existing page name must also be 4+ chars, to
-  // suppress noise from very short shared substrings.
-  const SIMILARITY_MIN_CHARS = 4;
-  const trimmedName = name.trim();
-  const similarPages =
-    trimmedName.length >= SIMILARITY_MIN_CHARS
-      ? existingPages.filter((p) => {
-          const lower = p.name.toLowerCase();
-          const query = trimmedName.toLowerCase();
-          if (lower.length < SIMILARITY_MIN_CHARS) return false;
-          return lower.includes(query) || query.includes(lower);
-        })
-      : [];
-
-  // Split similar pages into those the user can already see vs. those introduced
-  // past their current chapter cutoff.
-  const visibleSimilarPages = similarPages.filter(
-    (p) =>
-      p.introChapterId === null ||
-      (chapterIdxById[p.introChapterId] ?? 0) <= cutoffIdx,
-  );
-  const futureSimilarPages = similarPages.filter(
-    (p) =>
-      p.introChapterId !== null &&
-      (chapterIdxById[p.introChapterId] ?? 0) > cutoffIdx,
-  );
-
   const createPageAction = createPage.bind(null, serialSlug);
   const hasChapters = chapterList.length > 0;
 
@@ -237,35 +183,13 @@ export function NewPageForm(props: NewPageFormProps) {
           onChange={(e) => setName(e.target.value)}
         />
         {/* Warn the admin when existing pages have similar names to prevent accidental duplicates. */}
-        {similarPages.length > 0 && (
-          <div className="mt-1 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-600 p-3">
-            <Text variant="label" className="text-yellow-800 dark:text-yellow-300 text-xs mb-1">
-              Similar pages already exist:
-            </Text>
-            <Box col className="gap-0.5">
-              {visibleSimilarPages.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/${serialSlug}/${p.slug}`}
-                  className="text-sm text-yellow-700 dark:text-yellow-400 hover:underline"
-                >
-                  {p.name}
-                </Link>
-              ))}
-              {futureSimilarPages.map((p) => (
-                <Text
-                  key={p.id}
-                  className="text-sm text-yellow-700 dark:text-yellow-400"
-                >
-                  {p.name}{" "}
-                  <span className="opacity-70">
-                    (introduced in {chapterById.get(p.introChapterId!)?.displayName ?? "a future chapter"})
-                  </span>
-                </Text>
-              ))}
-            </Box>
-          </div>
-        )}
+        <SimilarPagesWarning
+          name={name}
+          serialSlug={serialSlug}
+          existingPages={existingPages}
+          chapterList={chapterList}
+          cutoffIdx={cutoffIdx}
+        />
       </Box>
 
       {/* Intro chapter */}
@@ -321,76 +245,7 @@ export function NewPageForm(props: NewPageFormProps) {
       </Box>
 
       {/* Template selection (only shown when templates exist) */}
-      {templates.length > 0 && (
-        <Box col className="gap-1">
-          <Label htmlFor="templateId">Use template</Label>
-          {/* Hidden input so the form always submits a templateId value */}
-          <input
-            type="hidden"
-            name="templateId"
-            value={selectedTemplateId > 0 ? selectedTemplateId : ""}
-          />
-          <Select<number>
-            id="templateId"
-            options={templateOptions}
-            value={selectedTemplateId}
-            onChange={setSelectedTemplateId}
-          />
-
-          {/* Preview of what the template will create */}
-          {selectedTemplate && (
-            <div className="mt-2 rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-3 text-sm">
-              <Text variant="label">Template preview</Text>
-
-              {sortedTemplateSections.length > 0 ? (
-                <div>
-                  <Text muted className="text-xs mb-1">
-                    Sections
-                  </Text>
-                  <Box col className="gap-0.5">
-                    {sortedTemplateSections.map((s) => (
-                      <Text
-                        key={s.id}
-                        className="text-sm pl-2 border-l-2 border-border"
-                      >
-                        {s.name}
-                      </Text>
-                    ))}
-                  </Box>
-                </div>
-              ) : (
-                <Text muted className="text-xs">
-                  No sections defined - will use default Summary section.
-                </Text>
-              )}
-
-              {selectedTemplate.hasInfobox && (
-                <div>
-                  <Text muted className="text-xs mb-1">
-                    Infobox rows
-                  </Text>
-                  {sortedTemplateInfoboxSections.length > 0 ? (
-                    <Box col className="gap-0.5">
-                      {sortedTemplateInfoboxSections.map((s) => (
-                        <Text
-                          key={s.id}
-                          className="text-sm pl-2 border-l-2 border-border"
-                        >
-                          {s.label}
-                        </Text>
-                      ))}
-                    </Box>
-                  ) : (
-                    <Text muted className="text-xs">
-                      No infobox rows defined.
-                    </Text>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </Box>
-      )}
+      <TemplateSelector templates={templates} />
 
       <SubmitButton disabled={!hasChapters} />
     </form>
