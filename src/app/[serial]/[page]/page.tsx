@@ -14,6 +14,7 @@ import {
   fetchPageTitleEntriesAtIdx,
 } from "@/data/pages/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
+import { fetchGalleryImages } from "@/data/images/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -192,6 +193,7 @@ export default async function PageView(props: PageViewProps) {
     pendingSuggestions,
     myPageSuggestions,
     serialTemplates,
+    galleryImages,
   ] = await Promise.all([
     fetchPageSectionsAtIdx(page.id, cutoffIdx),
     fetchPageInfoboxAtIdx(page.id, cutoffIdx),
@@ -205,10 +207,13 @@ export default async function PageView(props: PageViewProps) {
       : Promise.resolve([]),
     // Only fetched for admins; non-admins never see the edit panel.
     isAdmin ? fetchSerialTemplates(serial.id) : Promise.resolve([]),
+    // Gallery images only needed by admins for the infobox picker.
+    isAdmin ? fetchGalleryImages(serial.id, cutoffIdx) : Promise.resolve([]),
   ]);
 
   const infoboxSectionStructure = infobox.structure;
   const floaterImageUrl = infobox.floaterImageUrl;
+  const floaterImageId = infobox.floaterImageId;
   const floaterRows = infobox.rows;
   const { entries: pageTitleEntries, resolvedTitle } = pageTitlesData;
   const displayTitle = resolvedTitle ?? page.name;
@@ -273,7 +278,9 @@ export default async function PageView(props: PageViewProps) {
               sections={rawSections}
               infoboxSectionStructure={infoboxSectionStructure}
               floaterImageUrl={floaterImageUrl}
+              floaterImageId={floaterImageId}
               floaterRows={floaterRows}
+              galleryImages={galleryImages}
               allChapters={allChapters}
               headChapterId={headChapterId}
               readingChapterId={readingChapterId}

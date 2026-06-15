@@ -9,6 +9,7 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  serialImages,
   volumes,
 } from "@/db/schema";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or } from "drizzle-orm";
@@ -479,7 +480,12 @@ export async function fetchPageInfoboxAtIdx(
     .orderBy(asc(pageInfoboxSections.displayOrder));
 
   if (activeInfoboxRows.length === 0) {
-    return { structure: activeInfoboxRows as InfoboxSectionStructure[], floaterImageUrl: undefined, rows: [] };
+    return {
+      structure: activeInfoboxRows as InfoboxSectionStructure[],
+      floaterImageUrl: undefined,
+      floaterImageId: undefined,
+      rows: [],
+    };
   }
 
   const floaterMaxIdxSq = db
@@ -495,10 +501,14 @@ export async function fetchPageInfoboxAtIdx(
 
   const [[floaterVersion], infoboxRowVersions] = await Promise.all([
     db
-      .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
+      .select({
+        imageId: pageInfoboxImageRevisions.imageId,
+        imageUrl: serialImages.imageUrl,
+      })
       .from(pageInfoboxImageRevisions)
       .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
       .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
+      .leftJoin(serialImages, eq(pageInfoboxImageRevisions.imageId, serialImages.id))
       .where(eq(pageInfoboxImageRevisions.pageId, pageId))
       .limit(1),
     db
@@ -531,6 +541,7 @@ export async function fetchPageInfoboxAtIdx(
   return {
     structure: activeInfoboxRows,
     floaterImageUrl: floaterVersion?.imageUrl ?? null,
+    floaterImageId: floaterVersion?.imageId ?? null,
     rows,
   };
 }

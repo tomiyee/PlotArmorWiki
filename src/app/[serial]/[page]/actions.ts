@@ -10,6 +10,7 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  serialImages,
   pageRelationships,
   pageTitles,
   templates,
@@ -110,7 +111,7 @@ export async function savePageContent(
   pageSlug: string,
   _summaryContent: string,
   sectionContent: Record<number, string>,
-  floaterImageUrl: string | null,
+  floaterImageId: number | null,
   floaterRowContent: Record<number, string>,
   targetChapterId?: number,
 ): Promise<void> {
@@ -138,16 +139,16 @@ export async function savePageContent(
       /* deleteIfEmpty */ true,
     );
 
-    if (floaterImageUrl !== null || Object.keys(floaterRowContent).length > 0) {
+    if (floaterImageId !== null || Object.keys(floaterRowContent).length > 0) {
       await tx
         .insert(pageInfoboxImageRevisions)
-        .values({ pageId, chapterId: headChapterId, imageUrl: floaterImageUrl })
+        .values({ pageId, chapterId: headChapterId, imageId: floaterImageId })
         .onConflictDoUpdate({
           target: [
             pageInfoboxImageRevisions.pageId,
             pageInfoboxImageRevisions.chapterId,
           ],
-          set: { imageUrl: floaterImageUrl },
+          set: { imageId: floaterImageId },
         });
 
       await applyPageContentRevisions(
@@ -200,6 +201,9 @@ export async function getPageContentAtChapter(
      */
     nextRevisionChapterIdx: number | null;
   }[];
+  /** Gallery image id assigned at this chapter; null when no image assigned. */
+  floaterImageId: number | null;
+  /** Resolved image URL from the gallery entry; null when no image assigned. */
   floaterImageUrl: string | null;
   floaterRows: { id: number; content: string }[];
 }> {
@@ -359,13 +363,17 @@ export async function getPageContentAtChapter(
   const [[floaterVersion], activeInfoboxRows, infoboxRowVersions] =
     await Promise.all([
       db
-        .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
+        .select({
+          imageId: pageInfoboxImageRevisions.imageId,
+          imageUrl: serialImages.imageUrl,
+        })
         .from(pageInfoboxImageRevisions)
         .innerJoin(
           chapters,
           eq(pageInfoboxImageRevisions.chapterId, chapters.id),
         )
         .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
+        .leftJoin(serialImages, eq(pageInfoboxImageRevisions.imageId, serialImages.id))
         .where(eq(pageInfoboxImageRevisions.pageId, pageId))
         .limit(1),
       db
@@ -406,6 +414,7 @@ export async function getPageContentAtChapter(
     summaryContent: "",
     summaryLastUpdatedChapterIdx: null,
     sections,
+    floaterImageId: floaterVersion?.imageId ?? null,
     floaterImageUrl: floaterVersion?.imageUrl ?? null,
     floaterRows: activeInfoboxRows.map((r) => ({
       id: r.id,
@@ -1496,4 +1505,36 @@ export async function removePageRelationship(
     });
 
   return {};
+}
+
+// ── Gallery image management ──────────────────────────────────────────────────
+
+/**
+ * Inserts a new image into the serial gallery and optionally links it to the
+ * given wiki page. Returns the new gallery image id so the caller can
+ * immediately set it as the infobox image.
+ *
+ * @example
+ * const imageId = await createGalleryImage('one-piece', 'https://...', 'Artist', null, 42);
+ */
+export async function createGalleryImage(
+  serialSlug: string,
+  imageUrl: string,
+  artist: string | null,
+  spoilerChapterId: number | null,
+  linkedPageId?: number,
+): Promise<number> {
+  await requireSerialAdminBySlug(serialSlug);
+
+  const serial = await getSerialBySlug(serialSlug);
+  if (!serial) throw new Error("Serial not found");
+
+  const { addGalleryImage } = await import("@/data/images/queries");
+  return addGalleryImage(
+    serial.id,
+    imageUrl,
+    artist,
+    spoilerChapterId,
+    linkedPageId !== undefined ? [linkedPageId] : [],
+  );
 }

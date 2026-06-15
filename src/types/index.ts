@@ -217,6 +217,11 @@ export type PageInfoboxAtIdx = {
   structure: InfoboxSectionStructure[];
   /** CDN URL of the floater image; undefined = no infobox, null = infobox but no image. */
   floaterImageUrl: string | null | undefined;
+  /**
+   * Gallery image id assigned to the infobox at the reader's cutoff.
+   * Undefined = no infobox, null = infobox but no image assigned.
+   */
+  floaterImageId: number | null | undefined;
   /** Chapter-versioned row content for rendering. */
   rows: InfoboxRowAtIdx[];
 };
@@ -251,6 +256,22 @@ export type PageTitlesAtIdx = {
   entries: PageTitleEntry[];
   /** The title the reader should see: the entry with the highest chapter idx ≤ cutoff. Null when no entry exists. */
   resolvedTitle: string | null;
+};
+
+/** A single image in the serial gallery, with optional artist credit and spoiler chapter. */
+export type GalleryImage = {
+  /** DB primary key. */
+  id: number;
+  /** CDN or direct URL to the image. */
+  imageUrl: string;
+  /** Free-text artist attribution; null when not provided. */
+  artist: string | null;
+  /** FK to the chapter this image first becomes safe to show; null = always safe. */
+  spoilerChapterId: number | null;
+  /** Chapter idx of `spoilerChapterId`; null when `spoilerChapterId` is null. */
+  spoilerChapterIdx: number | null;
+  /** Insertion timestamp. */
+  createdAt: Date;
 };
 
 // ── Navbar / layout types ────────────────────────────────────────────────────

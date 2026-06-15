@@ -204,8 +204,46 @@ export const pageInfoboxRevisions = pgTable(
 );
 
 /**
+ * Serial-scoped image gallery.
+ *
+ * Each entry holds a URL, optional artist credit, and an optional spoiler
+ * chapter: images whose `spoilerChapterId` idx exceeds the reader's cutoff
+ * are suppressed at render time. Null = safe for all readers.
+ */
+export const serialImages = pgTable("serial_images", {
+  id: serial("id").primaryKey(),
+  serialId: integer("serial_id")
+    .notNull()
+    .references(() => serials.id),
+  imageUrl: text("image_url").notNull(),
+  artist: text("artist"),
+  spoilerChapterId: integer("spoiler_chapter_id").references(() => chapters.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/**
+ * Many-to-many link: a gallery image ↔ the wiki pages it depicts.
+ * Optional tagging so admins can surface an image when editing a related page.
+ */
+export const serialImagePageLinks = pgTable(
+  "serial_image_page_links",
+  {
+    imageId: integer("image_id")
+      .notNull()
+      .references(() => serialImages.id),
+    pageId: integer("page_id")
+      .notNull()
+      .references(() => pages.id),
+  },
+  (t) => [primaryKey({ columns: [t.imageId, t.pageId] })],
+);
+
+/**
  * Chapter-versioned infobox image per page.
  * Read pattern: max `chapters.idx` ≤ cutoff per `page_id`.
+ *
+ * `imageId` references `serialImages` (the gallery entry). Null means the
+ * infobox exists but no image has been assigned at this revision.
  */
 export const pageInfoboxImageRevisions = pgTable(
   "page_infobox_image_revisions",
@@ -216,7 +254,7 @@ export const pageInfoboxImageRevisions = pgTable(
     chapterId: integer("chapter_id")
       .notNull()
       .references(() => chapters.id),
-    imageUrl: text("image_url"),
+    imageId: integer("image_id").references(() => serialImages.id),
   },
   (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
 );
