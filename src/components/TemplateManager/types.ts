@@ -14,6 +14,8 @@ export interface TemplateInfoboxSection {
   label: string;
   /** 0-based ordering index among sibling infobox rows. */
   displayOrder: number;
+  /** When true, page infobox content for this row is included in full-text search. */
+  includeInSearch: boolean;
 }
 
 export interface Template {
@@ -64,4 +66,6 @@ export interface TemplateManagerProps {
   deleteTemplateInfoboxSectionAction: ServerAction;
   /** Persists the new display order for infobox rows after drag-and-drop. */
   reorderTemplateInfoboxSectionAction: ReorderAction;
+  /** Toggles whether a template infobox row's content is included in search. */
+  toggleTemplateInfoboxSectionSearchAction: ServerAction;
 }
