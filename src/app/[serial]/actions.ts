@@ -994,6 +994,48 @@ export async function deleteTemplateInfoboxSection(
     .where(eq(templateInfoboxSections.id, infoboxSectionId));
 }
 
+/**
+ * Toggles the `includeInSearch` flag on a template infobox section.
+ * When true, the content of page infobox rows with this label will be matched
+ * during full-text search, enabling alias / alternate-name discovery.
+ *
+ * @example
+ * await toggleTemplateInfoboxSectionSearch(42, new FormData()); // formData has "infoboxSectionId" and "includeInSearch" fields
+ */
+export async function toggleTemplateInfoboxSectionSearch(
+  serialId: number,
+  formData: FormData,
+) {
+  await requireSerialAdmin(serialId);
+  const infoboxSectionIdRaw = formData.get("infoboxSectionId");
+  const includeInSearchRaw = formData.get("includeInSearch");
+  if (!infoboxSectionIdRaw || typeof infoboxSectionIdRaw !== "string")
+    throw new Error("Infobox section ID is required");
+
+  const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
+  if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
+
+  const includeInSearch = includeInSearchRaw === "true";
+
+  // Verify the infobox section's template belongs to this serial.
+  const [target] = await db
+    .select({ id: templateInfoboxSections.id })
+    .from(templateInfoboxSections)
+    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
+    .where(
+      and(
+        eq(templateInfoboxSections.id, infoboxSectionId),
+        eq(templates.serialId, serialId),
+      ),
+    );
+  if (!target) throw new Error("Infobox section not found");
+
+  await db
+    .update(templateInfoboxSections)
+    .set({ includeInSearch })
+    .where(eq(templateInfoboxSections.id, infoboxSectionId));
+}
+
 // ── Admin management ─────────────────────────────────────────────────────────
 
 /**
