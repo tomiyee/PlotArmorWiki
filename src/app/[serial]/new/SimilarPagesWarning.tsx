@@ -84,13 +84,14 @@ export function SimilarPagesWarning(props: SimilarPagesWarningProps) {
           </Link>
         ))}
         {futureSimilarPages.map((p) => (
-          <Text
+          <Link
             key={p.id}
-            className="text-sm text-yellow-700 dark:text-yellow-400 italic"
+            href={`/${serialSlug}/${p.slug}`}
+            className="text-sm text-yellow-700 dark:text-yellow-400 italic hover:underline"
           >
             A page introduced in{" "}
             {chapterById.get(p.introChapterId!)?.displayName ?? "a future chapter"}
-          </Text>
+          </Link>
         ))}
       </Box>
     </div>
