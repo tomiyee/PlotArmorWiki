@@ -1,16 +1,8 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db/index";
-import {
-  pages,
-  pageRelationships,
-  chapters,
-  userProgress,
-} from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
 import { getSerialBySlug } from "@/data/serials/queries";
-import { getSerialVolumesAndChapters } from "@/data/chapters/queries";
+import { getSerialVolumesAndChapters, getUserProgress } from "@/data/chapters/queries";
 import { isSerialAdmin } from "@/lib/auth-guard";
-import { childRelMaxIdxSq as buildChildRelMaxIdxSq, PG_INT_MAX } from "@/data/pages/queries";
+import { fetchSerialHomePage, getHomePageChildren } from "@/data/pages/queries";
 import { ChapterSelector } from "@/components/ChapterSelector";
 import { SerialNavInjector } from "@/components/SerialNavInjector";
 import { SerialTOC } from "@/components/SerialTOC";
@@ -57,59 +49,13 @@ export default async function SerialLayout(props: SerialLayoutProps) {
 
   // Priority (1): authenticated user's DB progress for this serial.
   // Priority (2): cookie/localStorage handled client-side by ChapterSelector.
-  let dbChapterId: number | null = null;
-  if (userId) {
-    const [progressRow] = await db
-      .select({ chapterId: userProgress.chapterId })
-      .from(userProgress)
-      .where(
-        and(
-          eq(userProgress.userId, userId),
-          eq(userProgress.serialId, serial.id),
-        ),
-      )
-      .limit(1);
-    dbChapterId = progressRow?.chapterId ?? null;
-  }
+  const dbChapterId = userId ? await getUserProgress(userId, serial.id) : null;
 
   // Navbar "Pages" dropdown: immediate children of the Home page.
   // Uses the max-idx pattern to get each child's latest relationship state
   // with no chapter cutoff applied - navigation shows all current children.
-  const [homePage] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .where(and(eq(pages.serialId, serial.id), eq(pages.isHomePage, true)))
-    .limit(1);
-
-  let navPages: { id: number; name: string; slug: string }[] = [];
-  if (homePage) {
-    // No chapter cutoff for the navbar — show all current children regardless of reader position.
-    const relMaxIdxSq = buildChildRelMaxIdxSq(homePage.id, PG_INT_MAX);
-
-    const rawChildren = await db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        slug: pages.slug,
-        isActive: pageRelationships.isActive,
-      })
-      .from(pageRelationships)
-      .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
-      .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
-      .innerJoin(
-        relMaxIdxSq,
-        and(
-          eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
-          eq(chapters.idx, relMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageRelationships.parentPageId, homePage.id))
-      .orderBy(asc(pages.name));
-
-    navPages = rawChildren
-      .filter((r) => r.isActive)
-      .map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
-  }
+  const homePage = await fetchSerialHomePage(serial.id);
+  const navPages = homePage ? await getHomePageChildren(homePage.id) : [];
 
   const serialNavData: NavbarSerialData = {
     serialSlug,

@@ -1,8 +1,6 @@
-import { db } from "@/db/index";
-import { pages } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
 import { getSerialVolumesAndChapters } from "@/data/chapters/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
+import { getSerialPages } from "@/data/pages/queries";
 
 /**
  * Fetches all data needed to render the new-page creation form for a given serial.
@@ -20,15 +18,7 @@ import { fetchSerialTemplates } from "@/data/templates/queries";
 export async function getNewPageFormData(serialId: number) {
   const [{ volumeList, chapterList }, existingPages, serialTemplates] = await Promise.all([
     getSerialVolumesAndChapters(serialId),
-    db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        introChapterId: pages.introChapterId,
-      })
-      .from(pages)
-      .where(eq(pages.serialId, serialId))
-      .orderBy(asc(pages.name)),
+    getSerialPages(serialId),
     fetchSerialTemplates(serialId),
   ]);
 
