@@ -50,7 +50,7 @@ interface NewPageFormProps {
   volumeList: Volume[];
   /** All chapters for the intro chapter selector. */
   chapterList: Chapter[];
-  /** All existing pages in the serial; filtered to those visible at the selected intro chapter. */
+  /** All existing pages in the serial. Future pages carry `introChapterLabel`; visible pages do not. */
   existingPages: PageOption[];
   /** Pre-selected parent page id, e.g. when navigating here from a page's edit mode. */
   defaultParentPageId?: number;

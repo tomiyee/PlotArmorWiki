@@ -7,6 +7,11 @@ export interface PageOption {
   name: string;
   slug: string;
   introChapterId: number | null;
+  /**
+   * When present, this page is beyond the reader's cutoff.
+   * The name is not displayed; the page is shown as "A page introduced in chapter {introChapterLabel}".
+   */
+  introChapterLabel?: string;
 }
 
 type SimilarPagesWarningProps = {
@@ -15,8 +20,8 @@ type SimilarPagesWarningProps = {
   /** URL slug of the serial — used to build links to similar pages. */
   serialSlug: string;
   /**
-   * Visible non-deleted pages at the user's chapter cutoff, pre-filtered server-side.
-   * Future pages are excluded so their names never reach the client payload.
+   * All non-deleted pages for the serial. Visible pages are matched by name;
+   * future pages (those with `introChapterLabel` set) are shown without revealing their name.
    */
   existingPages: PageOption[];
 };
@@ -60,7 +65,9 @@ export function SimilarPagesWarning(props: SimilarPagesWarningProps) {
             href={`/${serialSlug}/${p.slug}`}
             className="text-sm text-yellow-700 dark:text-yellow-400 hover:underline"
           >
-            {p.name}
+            {p.introChapterLabel
+              ? `A page introduced in ${p.introChapterLabel}`
+              : p.name}
           </Link>
         ))}
       </Box>
