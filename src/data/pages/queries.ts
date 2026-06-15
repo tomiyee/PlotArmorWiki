@@ -366,6 +366,48 @@ export async function fetchSerialHomePage(serialId: number): Promise<WikiPageRow
 }
 
 /**
+ * Returns the active, immediate child pages of `homePageId` with no chapter
+ * cutoff applied. Used exclusively by the navbar dropdown, which should show
+ * all current top-level categories regardless of the reader's reading position.
+ *
+ * Applies `PG_INT_MAX` as the cutoff so the max-idx subquery finds the latest
+ * relationship revision across all chapters, then filters to `isActive = true`.
+ *
+ * @example
+ * const navPages = await getHomePageChildren(homePage.id);
+ * // [{ id: 1, name: "Characters", slug: "characters" }, …]
+ */
+export async function getHomePageChildren(
+  homePageId: number,
+): Promise<{ id: number; name: string; slug: string }[]> {
+  const relMaxIdxSq = childRelMaxIdxSq(homePageId, PG_INT_MAX);
+
+  const rawChildren = await db
+    .select({
+      id: pages.id,
+      name: pages.name,
+      slug: pages.slug,
+      isActive: pageRelationships.isActive,
+    })
+    .from(pageRelationships)
+    .innerJoin(pages, eq(pageRelationships.childPageId, pages.id))
+    .innerJoin(chapters, eq(pageRelationships.chapterId, chapters.id))
+    .innerJoin(
+      relMaxIdxSq,
+      and(
+        eq(pageRelationships.childPageId, relMaxIdxSq.childPageId),
+        eq(chapters.idx, relMaxIdxSq.maxIdx),
+      ),
+    )
+    .where(eq(pageRelationships.parentPageId, homePageId))
+    .orderBy(asc(pages.name));
+
+  return rawChildren
+    .filter((r) => r.isActive)
+    .map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+}
+
+/**
  * Returns all soft-deleted pages for a serial, ordered newest deletion first.
  * Only call this after confirming the caller is an admin — this function has no
  * auth check itself.
@@ -807,6 +849,34 @@ export async function fetchFirstSectionAtIdx(
     .orderBy(asc(pageSections.displayOrder))
     .limit(1);
   return firstSection?.content ?? "";
+}
+
+/**
+ * Returns all non-deleted pages for a serial ordered by name, including their
+ * `introChapterId` so callers can apply a chapter cutoff filter client-side or
+ * in a subsequent query.
+ *
+ * Used by the new-page form to populate the parent-page dropdown and the
+ * similar-pages warning — both of which need the full unfiltered list to handle
+ * their own spoiler logic.
+ *
+ * @example
+ * const existingPages = await getSerialPages(serial.id);
+ * // [{ id: 1, name: "Characters", slug: "characters", introChapterId: null }, …]
+ */
+export async function getSerialPages(
+  serialId: number,
+): Promise<{ id: number; name: string; slug: string; introChapterId: number | null }[]> {
+  return db
+    .select({
+      id: pages.id,
+      name: pages.name,
+      slug: pages.slug,
+      introChapterId: pages.introChapterId,
+    })
+    .from(pages)
+    .where(and(eq(pages.serialId, serialId), isNull(pages.deletedAt)))
+    .orderBy(asc(pages.name));
 }
 
 /**

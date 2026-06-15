@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { db } from "@/db/index";
-import { chapters, volumes, chapterSynopses } from "@/db/schema";
+import { chapters, volumes, chapterSynopses, userProgress } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import type { ChapterRow, SerialVolumesAndChapters, ChapterCutoff } from "@/types";
 
@@ -153,6 +153,28 @@ export const getSerialVolumesAndChapters = cache(
     return { volumeList, chapterList };
   },
 );
+
+/**
+ * Returns the chapter id stored in the user_progress table for a given
+ * authenticated user + serial pair, or `null` when no progress row exists.
+ *
+ * Intentionally avoids any auth check — callers must ensure `userId` is from a
+ * verified session before passing it in.
+ *
+ * @example
+ * const dbChapterId = userId ? await getUserProgress(userId, serial.id) : null;
+ */
+export async function getUserProgress(
+  userId: string,
+  serialId: number,
+): Promise<number | null> {
+  const [row] = await db
+    .select({ chapterId: userProgress.chapterId })
+    .from(userProgress)
+    .where(and(eq(userProgress.userId, userId), eq(userProgress.serialId, serialId)))
+    .limit(1);
+  return row?.chapterId ?? null;
+}
 
 /**
  * Reads the user's chapter cutoff for a given serial from the progress cookie
