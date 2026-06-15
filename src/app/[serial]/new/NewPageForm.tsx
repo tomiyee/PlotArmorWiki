@@ -10,18 +10,15 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { SimilarPagesWarning } from "./SimilarPagesWarning";
+import { TemplateSelector } from "./TemplateSelector";
 
 import type {
   ChapterRow as Chapter,
   VolumeRow as Volume,
   TemplateSummary as Template,
 } from "@/types";
-
-interface PageOption {
-  id: number;
-  name: string;
-  introChapterId: number | null;
-}
+import type { PageOption } from "./SimilarPagesWarning";
 
 type SubmitButtonProps = {
   /** When true, disables the button regardless of form-pending state. */
@@ -53,7 +50,7 @@ interface NewPageFormProps {
   volumeList: Volume[];
   /** All chapters for the intro chapter selector. */
   chapterList: Chapter[];
-  /** All existing pages in the serial; filtered to those visible at the selected intro chapter. */
+  /** All existing pages in the serial. Future pages carry `introChapterLabel`; visible pages do not. */
   existingPages: PageOption[];
   /** Pre-selected parent page id, e.g. when navigating here from a page's edit mode. */
   defaultParentPageId?: number;
@@ -105,13 +102,14 @@ export function NewPageForm(props: NewPageFormProps) {
   const [selectedIntroChapterId, setSelectedIntroChapterId] = useState<number>(
     defaultIntroChapterId ?? firstChapterId,
   );
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
   const [selectedParentPageId, setSelectedParentPageId] = useState<
     number | undefined
   >(undefined);
   // Generated once per form mount. Sent as a hidden field so the server can
   // detect retried submissions and redirect to the already-created page.
   const [idempotencyKey] = useState<string>(() => crypto.randomUUID());
+  // Controlled name value so we can react to the user's input for similarity checks.
+  const [name, setName] = useState<string>(defaultName ?? "");
 
   // The idx of the user's reading cutoff chapter, used to gate the chapter options.
   const cutoffIdx =
@@ -163,24 +161,6 @@ export function NewPageForm(props: NewPageFormProps) {
       ? selectedParentPageId
       : (visibleParentDefault ?? parentPageOptions[0]?.value);
 
-  // Template options - 0 means "no template".
-  const templateOptions = [
-    { label: "None (default sections)", value: 0 },
-    ...templates.map((t) => ({ label: t.name, value: t.id })),
-  ];
-
-  const byDisplayOrder = <T extends { displayOrder: number }>(arr: T[]) =>
-    [...arr].sort((a, b) => a.displayOrder - b.displayOrder);
-
-  const selectedTemplate =
-    templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const sortedTemplateSections = selectedTemplate
-    ? byDisplayOrder(selectedTemplate.sections)
-    : [];
-  const sortedTemplateInfoboxSections = selectedTemplate
-    ? byDisplayOrder(selectedTemplate.infoboxSections)
-    : [];
-
   const createPageAction = createPage.bind(null, serialSlug);
   const hasChapters = chapterList.length > 0;
 
@@ -199,7 +179,14 @@ export function NewPageForm(props: NewPageFormProps) {
           required
           placeholder="e.g. Monkey D. Luffy"
           autoFocus
-          defaultValue={defaultName}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        {/* Warn the admin when existing pages have similar names to prevent accidental duplicates. */}
+        <SimilarPagesWarning
+          name={name}
+          serialSlug={serialSlug}
+          existingPages={existingPages}
         />
       </Box>
 
@@ -256,76 +243,7 @@ export function NewPageForm(props: NewPageFormProps) {
       </Box>
 
       {/* Template selection (only shown when templates exist) */}
-      {templates.length > 0 && (
-        <Box col className="gap-1">
-          <Label htmlFor="templateId">Use template</Label>
-          {/* Hidden input so the form always submits a templateId value */}
-          <input
-            type="hidden"
-            name="templateId"
-            value={selectedTemplateId > 0 ? selectedTemplateId : ""}
-          />
-          <Select<number>
-            id="templateId"
-            options={templateOptions}
-            value={selectedTemplateId}
-            onChange={setSelectedTemplateId}
-          />
-
-          {/* Preview of what the template will create */}
-          {selectedTemplate && (
-            <div className="mt-2 rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-3 text-sm">
-              <Text variant="label">Template preview</Text>
-
-              {sortedTemplateSections.length > 0 ? (
-                <div>
-                  <Text muted className="text-xs mb-1">
-                    Sections
-                  </Text>
-                  <Box col className="gap-0.5">
-                    {sortedTemplateSections.map((s) => (
-                      <Text
-                        key={s.id}
-                        className="text-sm pl-2 border-l-2 border-border"
-                      >
-                        {s.name}
-                      </Text>
-                    ))}
-                  </Box>
-                </div>
-              ) : (
-                <Text muted className="text-xs">
-                  No sections defined - will use default Summary section.
-                </Text>
-              )}
-
-              {selectedTemplate.hasInfobox && (
-                <div>
-                  <Text muted className="text-xs mb-1">
-                    Infobox rows
-                  </Text>
-                  {sortedTemplateInfoboxSections.length > 0 ? (
-                    <Box col className="gap-0.5">
-                      {sortedTemplateInfoboxSections.map((s) => (
-                        <Text
-                          key={s.id}
-                          className="text-sm pl-2 border-l-2 border-border"
-                        >
-                          {s.label}
-                        </Text>
-                      ))}
-                    </Box>
-                  ) : (
-                    <Text muted className="text-xs">
-                      No infobox rows defined.
-                    </Text>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </Box>
-      )}
+      <TemplateSelector templates={templates} />
 
       <SubmitButton disabled={!hasChapters} />
     </form>

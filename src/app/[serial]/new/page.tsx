@@ -43,6 +43,24 @@ export default async function NewPagePage(props: NewPagePageProps) {
       getNewPageFormData(serial.id),
     ]);
 
+  const cutoffIdx = chapterList.find((c) => c.id === readingChapterId)?.idx ?? 0;
+  const chapterIdxById = new Map(chapterList.map((c) => [c.id, c.idx]));
+  const chapterLabelById = new Map(
+    chapterList.map((c) => [c.id, `${serial.chapterType} ${c.displayName}`]),
+  );
+
+  // Annotate future pages with their intro chapter label so the similarity warning
+  // can display "A page introduced in chapter X" without spoiling the name.
+  const allExistingPages = existingPages.map((p) => {
+    if (
+      p.introChapterId !== null &&
+      (chapterIdxById.get(p.introChapterId) ?? Infinity) > cutoffIdx
+    ) {
+      return { ...p, introChapterLabel: chapterLabelById.get(p.introChapterId) };
+    }
+    return p;
+  });
+
   return (
     <main>
       <PageContainer className="max-w-lg">
@@ -63,7 +81,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
             chapterType={serial.chapterType}
             volumeList={volumeList}
             chapterList={chapterList}
-            existingPages={existingPages}
+            existingPages={allExistingPages}
             defaultParentPageId={defaultParentPageId}
             defaultIntroChapterId={readingChapterId ?? undefined}
             defaultName={defaultName}
