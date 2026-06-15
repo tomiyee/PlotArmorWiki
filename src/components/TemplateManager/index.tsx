@@ -27,7 +27,8 @@ export type {
  * Manages the set of reusable page templates for a serial. Only renders the
  * editing controls when the global edit mode is active (i.e., an admin is
  * editing). Supports create, rename, delete, section management, infobox
- * toggle, and drag-and-drop reorder per template.
+ * toggle, search-include toggle per infobox row, and drag-and-drop reorder
+ * per template.
  *
  * @example
  * <TemplateManager
@@ -42,6 +43,7 @@ export type {
  *   addTemplateInfoboxSectionAction={addTemplateInfoboxSectionAction}
  *   deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionAction}
  *   reorderTemplateInfoboxSectionAction={reorderTemplateInfoboxSectionAction}
+ *   toggleTemplateInfoboxSectionSearchAction={toggleTemplateInfoboxSectionSearchAction}
  * />
  */
 export function TemplateManager(props: TemplateManagerProps) {
@@ -57,6 +59,7 @@ export function TemplateManager(props: TemplateManagerProps) {
     addTemplateInfoboxSectionAction,
     deleteTemplateInfoboxSectionAction,
     reorderTemplateInfoboxSectionAction,
+    toggleTemplateInfoboxSectionSearchAction,
   } = props;
 
   const { isEditing } = useEditMode();
@@ -103,6 +106,9 @@ export function TemplateManager(props: TemplateManagerProps) {
                   }
                   reorderTemplateInfoboxSectionAction={
                     reorderTemplateInfoboxSectionAction
+                  }
+                  toggleTemplateInfoboxSectionSearchAction={
+                    toggleTemplateInfoboxSectionSearchAction
                   }
                 />
               ))}

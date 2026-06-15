@@ -42,6 +42,7 @@ import {
   addTemplateInfoboxSection,
   deleteTemplateInfoboxSection,
   reorderTemplateInfoboxSections,
+  toggleTemplateInfoboxSectionSearch,
   addSerialAdmin,
   removeSerialAdmin,
   searchUsersForSerial,
@@ -144,6 +145,10 @@ export default async function SerialPage(props: SerialPageProps) {
   const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(null, serial.id);
   const deleteTemplateInfoboxSectionForSerial = deleteTemplateInfoboxSection.bind(null, serial.id);
   const reorderTemplateInfoboxSectionsForSerial = reorderTemplateInfoboxSections.bind(
+    null,
+    serial.id,
+  );
+  const toggleTemplateInfoboxSectionSearchForSerial = toggleTemplateInfoboxSectionSearch.bind(
     null,
     serial.id,
   );
@@ -359,6 +364,7 @@ export default async function SerialPage(props: SerialPageProps) {
                       addTemplateInfoboxSectionAction={addTemplateInfoboxSectionForSerial}
                       deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionForSerial}
                       reorderTemplateInfoboxSectionAction={reorderTemplateInfoboxSectionsForSerial}
+                      toggleTemplateInfoboxSectionSearchAction={toggleTemplateInfoboxSectionSearchForSerial}
                     />
                   </>
                 }
