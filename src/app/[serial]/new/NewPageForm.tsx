@@ -187,8 +187,6 @@ export function NewPageForm(props: NewPageFormProps) {
           name={name}
           serialSlug={serialSlug}
           existingPages={existingPages}
-          chapterList={chapterList}
-          cutoffIdx={cutoffIdx}
         />
       </Box>
 

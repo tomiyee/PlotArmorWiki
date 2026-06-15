@@ -43,6 +43,15 @@ export default async function NewPagePage(props: NewPagePageProps) {
       getNewPageFormData(serial.id),
     ]);
 
+  // Filter to pages visible at the admin's cutoff so spoiler names never ship in the RSC payload.
+  const cutoffIdx = chapterList.find((c) => c.id === readingChapterId)?.idx ?? 0;
+  const chapterIdxById = new Map(chapterList.map((c) => [c.id, c.idx]));
+  const visibleExistingPages = existingPages.filter(
+    (p) =>
+      p.introChapterId === null ||
+      (chapterIdxById.get(p.introChapterId) ?? Infinity) <= cutoffIdx,
+  );
+
   return (
     <main>
       <PageContainer className="max-w-lg">
@@ -63,7 +72,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
             chapterType={serial.chapterType}
             volumeList={volumeList}
             chapterList={chapterList}
-            existingPages={existingPages}
+            existingPages={visibleExistingPages}
             defaultParentPageId={defaultParentPageId}
             defaultIntroChapterId={readingChapterId ?? undefined}
             defaultName={defaultName}

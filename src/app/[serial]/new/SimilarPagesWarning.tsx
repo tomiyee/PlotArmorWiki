@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
-import type { ChapterRow as Chapter } from "@/types";
 
 export interface PageOption {
   id: number;
@@ -13,33 +12,25 @@ export interface PageOption {
 type SimilarPagesWarningProps = {
   /** The page name currently typed by the user. */
   name: string;
-  /** URL slug of the serial — used to build links to visible similar pages. */
+  /** URL slug of the serial — used to build links to similar pages. */
   serialSlug: string;
-  /** All existing non-deleted pages in the serial. */
-  existingPages: PageOption[];
-  /** All chapters in the serial — used to resolve display names and idx ordering. */
-  chapterList: Chapter[];
   /**
-   * The idx of the user's reading-cutoff chapter. Pages introduced after this
-   * are shown spoiler-free (name hidden).
+   * Visible non-deleted pages at the user's chapter cutoff, pre-filtered server-side.
+   * Future pages are excluded so their names never reach the client payload.
    */
-  cutoffIdx: number;
+  existingPages: PageOption[];
 };
 
 const SIMILARITY_MIN_CHARS = 4;
 
 /**
- * Warns against creating a duplicate page by listing existing pages whose names
- * overlap with what the user is typing. Future pages (introduced past the user's
- * chapter cutoff) are shown without their name to avoid spoilers.
+ * Warns against creating a duplicate page by listing existing visible pages whose names
+ * overlap with what the user is typing.
  *
  * Returns null when there are no similar pages, so callers need no visibility guard.
  */
 export function SimilarPagesWarning(props: SimilarPagesWarningProps) {
-  const { name, serialSlug, existingPages, chapterList, cutoffIdx } = props;
-
-  const chapterIdxById = Object.fromEntries(chapterList.map((c) => [c.id, c.idx]));
-  const chapterById = new Map(chapterList.map((c) => [c.id, c]));
+  const { name, serialSlug, existingPages } = props;
 
   const trimmedName = name.trim();
   const similarPages =
@@ -54,17 +45,6 @@ export function SimilarPagesWarning(props: SimilarPagesWarningProps) {
 
   if (similarPages.length === 0) return null;
 
-  const visibleSimilarPages = similarPages.filter(
-    (p) =>
-      p.introChapterId === null ||
-      (chapterIdxById[p.introChapterId] ?? 0) <= cutoffIdx,
-  );
-  const futureSimilarPages = similarPages.filter(
-    (p) =>
-      p.introChapterId !== null &&
-      (chapterIdxById[p.introChapterId] ?? 0) > cutoffIdx,
-  );
-
   return (
     <div className="mt-1 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-600 p-3">
       <Text
@@ -74,23 +54,13 @@ export function SimilarPagesWarning(props: SimilarPagesWarningProps) {
         Similar pages:
       </Text>
       <Box col className="gap-0.5">
-        {visibleSimilarPages.map((p) => (
+        {similarPages.map((p) => (
           <Link
             key={p.id}
             href={`/${serialSlug}/${p.slug}`}
             className="text-sm text-yellow-700 dark:text-yellow-400 hover:underline"
           >
             {p.name}
-          </Link>
-        ))}
-        {futureSimilarPages.map((p) => (
-          <Link
-            key={p.id}
-            href={`/${serialSlug}/${p.slug}`}
-            className="text-sm text-yellow-700 dark:text-yellow-400 italic hover:underline"
-          >
-            A page introduced in{" "}
-            {chapterById.get(p.introChapterId!)?.displayName ?? "a future chapter"}
           </Link>
         ))}
       </Box>
