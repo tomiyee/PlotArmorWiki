@@ -278,6 +278,7 @@ export const templateInfoboxSections = pgTable("template_infobox_sections", {
     .references(() => templates.id),
   label: text("label").notNull(),
   displayOrder: integer("display_order").notNull(),
+  includeInSearch: boolean("include_in_search").notNull().default(false),
 });
 
 export const chapterSynopses = pgTable("chapter_synopses", {
