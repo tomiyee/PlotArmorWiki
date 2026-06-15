@@ -12,6 +12,7 @@ import {
   fetchPageTitleEntries,
 } from "@/data/pages/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
+import { fetchGalleryImages } from "@/data/images/queries";
 import type {
   ChapterRow,
   PageSectionAtIdx,
@@ -181,25 +182,31 @@ export default async function SerialPage(props: SerialPageProps) {
   let sections: PageSectionAtIdx[] = [];
   let infoboxSectionStructure: InfoboxSectionStructure[] = [];
   let floaterImageUrl: string | null | undefined = undefined;
+  let floaterImageId: number | null | undefined = undefined;
   let floaterRows: InfoboxRowAtIdx[] = [];
   let childPages: ChildPageStub[] = [];
   let homePageTitleEntries: PageTitleEntry[] = [];
+  let galleryImages: import("@/types").GalleryImage[] = [];
 
   if (homePage) {
-    const [rawSections, infobox, fetchedChildPages, titleEntries] = await Promise.all([
-      fetchPageSectionsAtIdx(homePage.id, cutoffIdx),
-      fetchPageInfoboxAtIdx(homePage.id, cutoffIdx),
-      fetchPageChildPagesAtIdx(homePage.id, cutoffIdx),
-      fetchPageTitleEntries(homePage.id),
-    ]);
+    const [rawSections, infobox, fetchedChildPages, titleEntries, fetchedGallery] =
+      await Promise.all([
+        fetchPageSectionsAtIdx(homePage.id, cutoffIdx),
+        fetchPageInfoboxAtIdx(homePage.id, cutoffIdx),
+        fetchPageChildPagesAtIdx(homePage.id, cutoffIdx),
+        fetchPageTitleEntries(homePage.id),
+        isAdmin ? fetchGalleryImages(serial.id, cutoffIdx) : Promise.resolve([]),
+      ]);
 
     pageSectionStructure = rawSections;
     sections = rawSections;
     infoboxSectionStructure = infobox.structure;
     floaterImageUrl = infobox.floaterImageUrl;
+    floaterImageId = infobox.floaterImageId;
     floaterRows = infobox.rows;
     childPages = fetchedChildPages;
     homePageTitleEntries = titleEntries;
+    galleryImages = fetchedGallery;
   }
 
   return (
@@ -304,7 +311,9 @@ export default async function SerialPage(props: SerialPageProps) {
                 sections={sections}
                 infoboxSectionStructure={infoboxSectionStructure}
                 floaterImageUrl={floaterImageUrl}
+                floaterImageId={floaterImageId}
                 floaterRows={floaterRows}
+                galleryImages={galleryImages}
                 allChapters={allChapters}
                 headChapterId={headChapterId}
                 readingChapterId={readingChapterId}

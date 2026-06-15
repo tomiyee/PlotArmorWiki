@@ -41,7 +41,7 @@ import type {
   PageTitleEntry,
   ChapterGroupOption,
 } from "./types";
-import type { SuggestionStatus } from "@/types";
+import type { SuggestionStatus, GalleryImage } from "@/types";
 
 interface PageEditorProps {
   /** Slug of the serial this page belongs to. */
@@ -70,7 +70,17 @@ interface PageEditorProps {
   infoboxSectionStructure: InfoboxSection[];
   /** null when the page has no infobox */
   floaterImageUrl: string | null | undefined;
+  /**
+   * Gallery image id currently assigned to the infobox at the reader's cutoff.
+   * Null when the infobox has no image. Used to pre-select the image in the picker.
+   */
+  floaterImageId: number | null | undefined;
   floaterRows: FloaterRowData[];
+  /**
+   * Gallery images available for the infobox picker, spoiler-filtered to the
+   * admin's reading cutoff. Only populated when `isAdmin` is true.
+   */
+  galleryImages?: GalleryImage[];
   /** All chapters for this serial, used to populate the "Writing as of:" selector. */
   allChapters: ChapterData[];
   /** The id of the head chapter (highest idx). Used as the fallback default target for saves. */
@@ -247,6 +257,7 @@ export function PageEditor(props: PageEditorProps) {
     sections,
     infoboxSectionStructure,
     floaterImageUrl,
+    floaterImageId,
     floaterRows,
     allChapters,
     headChapterId,
@@ -261,6 +272,7 @@ export function PageEditor(props: PageEditorProps) {
     parentPages,
     allSerialPages,
     serialTemplates = [],
+    galleryImages = [],
     isHomePage = false,
     editModeHeader,
     subPagesAdornment,
@@ -310,8 +322,8 @@ export function PageEditor(props: PageEditorProps) {
     { id: number; title: string }[]
   >(allSerialPages);
 
-  const [draftFloaterImageUrl, setDraftFloaterImageUrl] = useState<string>(
-    floaterImageUrl ?? "",
+  const [draftFloaterImageId, setDraftFloaterImageId] = useState<number | null>(
+    floaterImageId ?? null,
   );
   const [draftFloaterRowContent, setDraftFloaterRowContent] = useState<
     Record<number, string>
@@ -350,7 +362,7 @@ export function PageEditor(props: PageEditorProps) {
   // Compute dirty state: true when any draft differs from the server-provided value.
   const isDirty =
     sections.some((s) => draftSectionContent[s.id] !== s.content) ||
-    (hasInfobox && draftFloaterImageUrl !== (floaterImageUrl ?? "")) ||
+    (hasInfobox && draftFloaterImageId !== (floaterImageId ?? null)) ||
     (hasInfobox &&
       floaterRows.some((r) => draftFloaterRowContent[r.id] !== r.content));
 
@@ -378,7 +390,7 @@ export function PageEditor(props: PageEditorProps) {
     setCurrentSectionLastUpdatedIdx(
       Object.fromEntries(sections.map((s) => [s.id, s.lastUpdatedChapterIdx])),
     );
-    setDraftFloaterImageUrl(floaterImageUrl ?? "");
+    setDraftFloaterImageId(floaterImageId ?? null);
     setDraftFloaterRowContent(
       Object.fromEntries(floaterRows.map((r) => [r.id, r.content])),
     );
@@ -388,7 +400,7 @@ export function PageEditor(props: PageEditorProps) {
     setDraftIntroChapterId(introChapterId);
   }, [
     sections,
-    floaterImageUrl,
+    floaterImageId,
     floaterRows,
     parentPages,
     allSerialPages,
@@ -404,7 +416,7 @@ export function PageEditor(props: PageEditorProps) {
         pageSlug,
         "",
         draftSectionContent,
-        hasInfobox ? draftFloaterImageUrl.trim() || null : null,
+        hasInfobox ? draftFloaterImageId : null,
         hasInfobox ? draftFloaterRowContent : {},
         selectedChapterId ?? undefined,
       );
@@ -415,7 +427,7 @@ export function PageEditor(props: PageEditorProps) {
     pageSlug,
     draftSectionContent,
     hasInfobox,
-    draftFloaterImageUrl,
+    draftFloaterImageId,
     draftFloaterRowContent,
     selectedChapterId,
     router,
@@ -510,7 +522,7 @@ export function PageEditor(props: PageEditorProps) {
       );
       applyRevisionMetadata(data.sections);
       if (hasInfobox) {
-        setDraftFloaterImageUrl(data.floaterImageUrl ?? "");
+        setDraftFloaterImageId(data.floaterImageId ?? null);
         setDraftFloaterRowContent(
           Object.fromEntries(data.floaterRows.map((r) => [r.id, r.content])),
         );
@@ -766,8 +778,8 @@ export function PageEditor(props: PageEditorProps) {
         pageId={pageId}
         infoboxSectionStructure={infoboxSectionStructure}
         floaterRows={floaterRows}
-        draftFloaterImageUrl={draftFloaterImageUrl}
-        setDraftFloaterImageUrl={setDraftFloaterImageUrl}
+        draftFloaterImageId={draftFloaterImageId}
+        setDraftFloaterImageId={setDraftFloaterImageId}
         draftFloaterRowContent={draftFloaterRowContent}
         setDraftFloaterRowContent={setDraftFloaterRowContent}
         isPending={isPending}
@@ -775,6 +787,7 @@ export function PageEditor(props: PageEditorProps) {
         wikiPages={wikiPages}
         wikiChapters={wikiChapters}
         chapterType={chapterType}
+        galleryImages={galleryImages}
       />
 
       {!isHomePage && (

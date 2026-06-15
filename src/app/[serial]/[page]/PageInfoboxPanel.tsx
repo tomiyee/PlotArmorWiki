@@ -4,26 +4,30 @@ import type { Dispatch, SetStateAction } from "react";
 import { useServerAction } from "@/hooks/useServerAction";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
-import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { InfoIcon } from "@/components/ui/InfoIcon";
 import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 import { addInfoboxSection } from "./actions";
 import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
+import { GalleryImagePicker } from "./GalleryImagePicker";
 import type { FloaterRowData } from "./types";
+import type { GalleryImage } from "@/types";
 
-interface PageInfoboxPanelProps {
+type PageInfoboxPanelProps = {
   /** DB id of the page this infobox belongs to. */
   pageId: number;
   /** Wall-clock-versioned infobox row structure for the management panel. */
   infoboxSectionStructure: InfoboxSection[];
   /** Infobox rows at the reader's current chapter cutoff, used to seed draft state. */
   floaterRows: FloaterRowData[];
-  /** Controlled draft value for the floater image URL, owned by `PageEditor`. */
-  draftFloaterImageUrl: string;
-  /** Setter for `draftFloaterImageUrl`, owned by `PageEditor`. */
-  setDraftFloaterImageUrl: Dispatch<SetStateAction<string>>;
+  /**
+   * Controlled draft value for the selected gallery image id, owned by `PageEditor`.
+   * Null when no image is selected.
+   */
+  draftFloaterImageId: number | null;
+  /** Setter for `draftFloaterImageId`, owned by `PageEditor`. */
+  setDraftFloaterImageId: Dispatch<SetStateAction<number | null>>;
   /** Controlled draft content keyed by infobox section id, owned by `PageEditor`. */
   draftFloaterRowContent: Record<number, string>;
   /** Setter for `draftFloaterRowContent`, owned by `PageEditor`. */
@@ -38,11 +42,16 @@ interface PageInfoboxPanelProps {
   wikiChapters?: { name: string; idx: number }[];
   /** The serial's chapter type label (e.g. `"Chapter"`). */
   chapterType?: string;
-}
+  /**
+   * Spoiler-filtered gallery images available for the infobox picker.
+   * Empty when no images have been uploaded to the serial gallery yet.
+   */
+  galleryImages?: GalleryImage[];
+};
 
 /**
  * Edit-mode panel for the page infobox: enables/disables it, manages row structure,
- * and edits the image URL and per-row content draft.
+ * and edits the gallery image selection and per-row content draft.
  * Draft state is owned by `PageEditor` so it can be included in the save payload.
  *
  * @example
@@ -50,8 +59,8 @@ interface PageInfoboxPanelProps {
  *   pageId={42}
  *   infoboxSectionStructure={[]}
  *   floaterRows={[]}
- *   draftFloaterImageUrl=""
- *   setDraftFloaterImageUrl={setUrl}
+ *   draftFloaterImageId={null}
+ *   setDraftFloaterImageId={setId}
  *   draftFloaterRowContent={{}}
  *   setDraftFloaterRowContent={setContent}
  *   isPending={false}
@@ -64,8 +73,8 @@ export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
     pageId,
     infoboxSectionStructure,
     floaterRows,
-    draftFloaterImageUrl,
-    setDraftFloaterImageUrl,
+    draftFloaterImageId,
+    setDraftFloaterImageId,
     draftFloaterRowContent,
     setDraftFloaterRowContent,
     isPending: externalIsPending,
@@ -73,6 +82,7 @@ export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
     wikiPages,
     wikiChapters,
     chapterType,
+    galleryImages = [],
   } = props;
   const { runAsync, isPending } = useServerAction();
 
@@ -114,12 +124,13 @@ export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
           />
 
           <Box col className="gap-1.5">
-            <Label htmlFor="floater-image-url">Image URL</Label>
-            <Input
-              id="floater-image-url"
-              value={draftFloaterImageUrl}
-              onChange={(e) => setDraftFloaterImageUrl(e.target.value)}
-              placeholder="https://…"
+            <Label>Image</Label>
+            <GalleryImagePicker
+              serialSlug={serialSlug}
+              pageId={pageId}
+              galleryImages={galleryImages}
+              selectedImageId={draftFloaterImageId}
+              onSelect={setDraftFloaterImageId}
               disabled={disabled}
             />
           </Box>
