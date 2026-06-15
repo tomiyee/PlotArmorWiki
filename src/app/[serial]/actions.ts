@@ -1015,6 +1015,7 @@ export async function toggleTemplateInfoboxSectionSearch(
   const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
   if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
 
+  if (includeInSearchRaw === null) throw new Error("includeInSearch is required");
   const includeInSearch = includeInSearchRaw === "true";
 
   // Verify the infobox section's template belongs to this serial.
