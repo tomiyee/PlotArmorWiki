@@ -1,7 +1,7 @@
 import { db } from "@/db/index";
 import { templates, templateSections, templateInfoboxSections } from "@/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
-import type { TemplateSectionRow, TemplateInfoboxSectionRow, TemplateSummary } from "@/types";
+import type { TemplateSummary } from "@/types";
 
 /**
  * Fetches all templates for a serial with their sections and infobox rows,
@@ -45,6 +45,7 @@ export async function fetchSerialTemplates(serialId: number): Promise<TemplateSu
         id: templateInfoboxSections.id,
         label: templateInfoboxSections.label,
         displayOrder: templateInfoboxSections.displayOrder,
+        includeInSearch: templateInfoboxSections.includeInSearch,
       })
       .from(templateInfoboxSections)
       .where(inArray(templateInfoboxSections.templateId, tmplIds))
