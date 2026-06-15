@@ -184,17 +184,36 @@ export function NewPageForm(props: NewPageFormProps) {
     ? byDisplayOrder(selectedTemplate.infoboxSections)
     : [];
 
+  // Build a lookup map for chapter display names — used for the "introduced in …" note.
+  const chapterById = new Map(chapterList.map((c) => [c.id, c]));
+
   // Pages whose names overlap with what the user is typing, to warn against duplicates.
-  // Matches when either string case-insensitively contains the other (at least 2 chars).
+  // Requires 4+ chars typed and the existing page name must also be 4+ chars, to
+  // suppress noise from very short shared substrings.
+  const SIMILARITY_MIN_CHARS = 4;
   const trimmedName = name.trim();
   const similarPages =
-    trimmedName.length >= 2
+    trimmedName.length >= SIMILARITY_MIN_CHARS
       ? existingPages.filter((p) => {
           const lower = p.name.toLowerCase();
           const query = trimmedName.toLowerCase();
+          if (lower.length < SIMILARITY_MIN_CHARS) return false;
           return lower.includes(query) || query.includes(lower);
         })
       : [];
+
+  // Split similar pages into those the user can already see vs. those introduced
+  // past their current chapter cutoff.
+  const visibleSimilarPages = similarPages.filter(
+    (p) =>
+      p.introChapterId === null ||
+      (chapterIdxById[p.introChapterId] ?? 0) <= cutoffIdx,
+  );
+  const futureSimilarPages = similarPages.filter(
+    (p) =>
+      p.introChapterId !== null &&
+      (chapterIdxById[p.introChapterId] ?? 0) > cutoffIdx,
+  );
 
   const createPageAction = createPage.bind(null, serialSlug);
   const hasChapters = chapterList.length > 0;
@@ -224,7 +243,7 @@ export function NewPageForm(props: NewPageFormProps) {
               Similar pages already exist:
             </Text>
             <Box col className="gap-0.5">
-              {similarPages.map((p) => (
+              {visibleSimilarPages.map((p) => (
                 <Link
                   key={p.id}
                   href={`/${serialSlug}/${p.slug}`}
@@ -232,6 +251,17 @@ export function NewPageForm(props: NewPageFormProps) {
                 >
                   {p.name}
                 </Link>
+              ))}
+              {futureSimilarPages.map((p) => (
+                <Text
+                  key={p.id}
+                  className="text-sm text-yellow-700 dark:text-yellow-400"
+                >
+                  {p.name}{" "}
+                  <span className="opacity-70">
+                    (introduced in {chapterById.get(p.introChapterId!)?.displayName ?? "a future chapter"})
+                  </span>
+                </Text>
               ))}
             </Box>
           </div>

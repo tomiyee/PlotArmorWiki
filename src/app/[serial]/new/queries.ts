@@ -1,6 +1,6 @@
 import { db } from "@/db/index";
 import { pages } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { getSerialVolumesAndChapters } from "@/data/chapters/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
 
@@ -28,7 +28,7 @@ export async function getNewPageFormData(serialId: number) {
         introChapterId: pages.introChapterId,
       })
       .from(pages)
-      .where(eq(pages.serialId, serialId))
+      .where(and(eq(pages.serialId, serialId), isNull(pages.deletedAt)))
       .orderBy(asc(pages.name)),
     fetchSerialTemplates(serialId),
   ]);
