@@ -9,9 +9,11 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  templateInfoboxSections,
+  templates,
   volumes,
 } from "@/db/schema";
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, lte, max, or, sql } from "drizzle-orm";
 import type {
   PageStub,
   ParentPageStub,
@@ -677,12 +679,18 @@ export async function fetchPageTitleEntriesAtIdx(
 export const SEARCH_RESULT_LIMIT = 20;
 
 /**
- * Returns up to 20 visible, non-home pages whose canonical name matches `query`
- * (case-insensitive substring) at `cutoffIdx`. Returns an empty array when `query`
- * is blank so callers can skip the network round-trip entirely.
+ * Returns up to 20 visible, non-home pages whose canonical name — or any
+ * infobox row marked `include_in_search` on the serial's templates — matches
+ * `query` (case-insensitive substring) at `cutoffIdx`. Returns an empty array
+ * when `query` is blank so callers can skip the network round-trip entirely.
  *
  * Spoiler rule: pages with an intro chapter index beyond `cutoffIdx` are excluded
  * (same filter as `fetchSearchablePagesAtIdx`).
+ *
+ * Infobox match: an EXISTS subquery checks whether the page has a non-deleted
+ * infobox row whose label matches a template infobox section with
+ * `include_in_search = true` (scoped to this serial), and whose latest revision
+ * at or before `cutoffIdx` contains the query string.
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx` on the
  * returned IDs and fall back to `name` when no title row exists.
@@ -699,6 +707,66 @@ export async function searchPagesByNameAtIdx(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
+  // Subquery: does this page have a searchable infobox row matching the query?
+  //
+  // Matches when a non-deleted page infobox row's label equals the label of a
+  // template infobox section with `include_in_search = true` (scoped to this
+  // serial via the templates join), and the latest revision of that row at or
+  // before cutoffIdx contains the query string.
+  //
+  // The correlated reference `pages.id` ties the subquery to the outer page row.
+  // Using raw sql for the max-idx scalar subquery avoids a Drizzle table-alias
+  // collision between the outer `chapters` join and the inner revision join.
+  const pattern = `%${trimmed}%`;
+  const infoboxSearchExists = exists(
+    db
+      .select({ one: pageInfoboxSections.id })
+      .from(pageInfoboxSections)
+      .innerJoin(
+        templateInfoboxSections,
+        and(
+          eq(templateInfoboxSections.label, pageInfoboxSections.label),
+          eq(templateInfoboxSections.includeInSearch, true),
+        ),
+      )
+      .innerJoin(templates, and(
+        eq(templates.id, templateInfoboxSections.templateId),
+        eq(templates.serialId, serialId),
+      ))
+      .innerJoin(
+        pageInfoboxRevisions,
+        and(
+          eq(pageInfoboxRevisions.pageId, pageInfoboxSections.pageId),
+          eq(pageInfoboxRevisions.infoboxSectionId, pageInfoboxSections.id),
+        ),
+      )
+      .innerJoin(
+        chapters,
+        and(
+          eq(chapters.id, pageInfoboxRevisions.chapterId),
+          lte(chapters.idx, cutoffIdx),
+        ),
+      )
+      .where(
+        and(
+          eq(pageInfoboxSections.pageId, pages.id),
+          isNull(pageInfoboxSections.deletedAt),
+          ilike(pageInfoboxRevisions.content, pattern),
+          // Only the latest revision at or before cutoffIdx for this infobox row.
+          eq(
+            chapters.idx,
+            sql<number>`(
+              SELECT MAX(c2.idx)
+              FROM page_infobox_revisions pir2
+              JOIN chapters c2 ON c2.id = pir2.chapter_id AND c2.idx <= ${cutoffIdx}
+              WHERE pir2.page_id = ${pageInfoboxSections.pageId}
+                AND pir2.infobox_section_id = ${pageInfoboxSections.id}
+            )`,
+          ),
+        ),
+      ),
+  );
+
   return db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
@@ -709,7 +777,7 @@ export async function searchPagesByNameAtIdx(
         eq(pages.isHomePage, false),
         isNull(pages.deletedAt),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
-        ilike(pages.name, `%${trimmed}%`),
+        or(ilike(pages.name, pattern), infoboxSearchExists),
       ),
     )
     .orderBy(asc(pages.name))
