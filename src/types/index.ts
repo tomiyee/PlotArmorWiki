@@ -74,7 +74,7 @@ export type ChapterCutoff = {
 };
 
 /** A page stub with its intro chapter id, for the new-page parent dropdown and collision checks. */
-export type SerialPageStub = Pick<WikiPageRow, "id" | "name" | "introChapterId">;
+export type SerialPageStub = Pick<WikiPageRow, "id" | "name" | "slug" | "introChapterId">;
 
 /** Minimal page stub — enough to build option lists and wiki-link autocomplete entries. */
 export type PageStub = Pick<WikiPageRow, "id" | "name" | "slug">;
