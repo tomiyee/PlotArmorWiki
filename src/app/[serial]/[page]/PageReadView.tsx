@@ -9,6 +9,11 @@ import { Text } from "@/components/ui/Text";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import {
+  WikiPageRefsProvider,
+  useWikiPageRefOrdinals,
+  useWikiPageOrdinalMap,
+} from "@/contexts/WikiPageRefsContext";
 import { SuggestionForm } from "./SuggestionForm";
 import type { SectionData, FloaterRowData, ChapterData } from "./types";
 import type { SuggestionStatus } from "@/types";
@@ -131,6 +136,90 @@ function SubPageList(props: SubPageListProps) {
   );
 }
 
+type RefAwareMarkdownProps = {
+  /** Stable key identifying this section in the global refs registry (e.g. `"section-42"`). */
+  sectionKey: string;
+  /** Raw markdown to render; scanned for `{{ref|token}}` to register with the refs context. */
+  markdown: string;
+  /** Shrink text sizing (for infobox rows). */
+  sm?: boolean;
+  serialSlug?: string;
+  pageTitles?: Record<string, string>;
+  chapterType?: string;
+  wikiChapters?: Record<string, number>;
+};
+
+/**
+ * Registers this section's ref tokens with `WikiPageRefsProvider` and renders the
+ * markdown with globally consistent reference ordinals.
+ *
+ * @example
+ * <RefAwareMarkdown sectionKey="section-42" markdown={section.content} serialSlug="one-piece" />
+ */
+function RefAwareMarkdown(props: RefAwareMarkdownProps) {
+  const { sectionKey, markdown, ...rest } = props;
+  const refOrdinalMap = useWikiPageRefOrdinals(sectionKey, markdown);
+  return (
+    <MarkdownRenderer refOrdinalMap={refOrdinalMap} {...rest}>
+      {markdown}
+    </MarkdownRenderer>
+  );
+}
+
+type RefboxProps = {
+  /** Serial slug for link generation. */
+  serialSlug: string;
+  /** Slug → title map for page link display text. */
+  pageTitles?: Record<string, string>;
+  /** Serial's chapter type label. */
+  chapterType?: string;
+  /** Chapter name → idx map for chapter link resolution. */
+  wikiChapters?: Record<string, number>;
+};
+
+/**
+ * Renders an automatic reference list when the page has at least one `{{ref|…}}`.
+ * Must be rendered inside `WikiPageRefsProvider`. Only shows when the global
+ * ordinal map is non-empty.
+ *
+ * Builds an unordered-list markdown string from the ordinal map and passes it
+ * to `MarkdownRenderer` so `remarkWikiLinks` resolves each token to a hover-card
+ * link — no `{{refbox}}` syntax involved.
+ *
+ * @example
+ * <Refbox serialSlug="one-piece" pageTitles={pageTitles} chapterType="Chapter" />
+ */
+function Refbox(props: RefboxProps) {
+  const { serialSlug, pageTitles, chapterType, wikiChapters } = props;
+  const ordinalMap = useWikiPageOrdinalMap();
+  if (ordinalMap.size === 0) return null;
+
+  // Build "- <a id="ref-N" href="#ref-cite-N">[N]</a> [[token]]" lines.
+  // remarkWikiLinks converts [[token]] to a link; rehypeRaw renders the anchor.
+  const markdown = [...ordinalMap.entries()]
+    .map(
+      ([token, n]) =>
+        `- <a id="ref-${n}" href="#ref-cite-${n}">[${n}]</a> [[${token}]]`,
+    )
+    .join("\n");
+
+  return (
+    <div className="clear-right mt-6 pt-6 border-t border-border">
+      <Text variant="h3" className="mb-3">
+        References
+      </Text>
+      <MarkdownRenderer
+        serialSlug={serialSlug}
+        pageTitles={pageTitles}
+        chapterType={chapterType}
+        wikiChapters={wikiChapters}
+      >
+        {markdown}
+      </MarkdownRenderer>
+    </div>
+  );
+}
+
 /**
  * Read-mode layout for a wiki page: infobox floater, section content, and child page list.
  * Authenticated non-admins see a FilePenLine icon on hover over section headers to open the
@@ -167,6 +256,14 @@ export function PageReadView(props: PageReadViewProps) {
   const [showSuggestionDetail, setShowSuggestionDetail] = useState(false);
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
   const [subPageSearch, setSubPageSearch] = useState("");
+
+  // Build the global ref ordering: infobox rows first, then page sections.
+  // Both groups are already sorted by displayOrder from the server query.
+  const refsOrderedSections = [
+    ...floaterRows.map((r) => ({ key: `infobox-${r.id}`, markdown: r.content })),
+    ...sections.map((s) => ({ key: `section-${s.id}`, markdown: s.content })),
+  ];
+  const refsOrderedSectionKeys = refsOrderedSections.map((s) => s.key);
 
   const hasFloaterContent =
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
@@ -332,6 +429,10 @@ export function PageReadView(props: PageReadViewProps) {
   })();
 
   return (
+    <WikiPageRefsProvider
+      orderedSectionKeys={refsOrderedSectionKeys}
+      initialSections={refsOrderedSections}
+    >
     <div className="overflow-hidden">
       {hasFloaterContent && (
         <aside className="float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-border bg-muted/40 p-4 flex flex-col gap-3">
@@ -355,15 +456,15 @@ export function PageReadView(props: PageReadViewProps) {
                   </dt>
                   <dd className="text-foreground">
                     {row.content ? (
-                      <MarkdownRenderer
+                      <RefAwareMarkdown
+                        sectionKey={`infobox-${row.id}`}
+                        markdown={row.content}
                         sm
                         serialSlug={serialSlug}
                         pageTitles={pageTitles}
                         chapterType={chapterType}
                         wikiChapters={wikiChapters}
-                      >
-                        {row.content}
-                      </MarkdownRenderer>
+                      />
                     ) : (
                       <Text as="span" muted>
                         -
@@ -399,14 +500,14 @@ export function PageReadView(props: PageReadViewProps) {
             </>
           )}
           {section.content ? (
-            <MarkdownRenderer
+            <RefAwareMarkdown
+              sectionKey={`section-${section.id}`}
+              markdown={section.content}
               serialSlug={serialSlug}
               pageTitles={pageTitles}
               chapterType={chapterType}
               wikiChapters={wikiChapters}
-            >
-              {section.content}
-            </MarkdownRenderer>
+            />
           ) : (
             <Text muted>No content for this chapter yet.</Text>
           )}
@@ -432,6 +533,13 @@ export function PageReadView(props: PageReadViewProps) {
           />
         )}
       </div>
+
+      <Refbox
+        serialSlug={serialSlug}
+        pageTitles={pageTitles}
+        chapterType={chapterType}
+        wikiChapters={wikiChapters}
+      />
 
       <div className="clear-right mt-6 pt-6 border-t border-border">
         <div className="group flex items-center gap-2 mb-3">
@@ -474,5 +582,6 @@ export function PageReadView(props: PageReadViewProps) {
         )}
       </div>
     </div>
+    </WikiPageRefsProvider>
   );
 }

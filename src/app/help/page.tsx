@@ -61,6 +61,12 @@ export default function HelpPage() {
           >
             Suggesting edits
           </Link>
+          <Link
+            href="#inline-citations"
+            className="text-sm text-primary hover:underline"
+          >
+            Inline citations (ref / refbox)
+          </Link>
         </nav>
 
         {/* ── Section 1 ──────────────────────────────────────────────────────── */}
@@ -312,6 +318,93 @@ export default function HelpPage() {
         </section>
 
         {/* ── Section 5 ──────────────────────────────────────────────────────── */}
+        <section
+          id="inline-citations"
+          className="flex flex-col gap-4 scroll-mt-16"
+        >
+          <Text variant="h2">Inline citations (ref / refbox)</Text>
+          <Text>
+            You can cross-reference related pages and chapters inline with the
+            ref system. Two syntaxes are supported:
+          </Text>
+
+          <div className="flex flex-col gap-2">
+            <Text variant="h3">Citing a source inline</Text>
+            <Text>
+              Use{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                {"{{ref|page:slug}}"}
+              </code>{" "}
+              or{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                {"{{ref|chapter:Name}}"}
+              </code>{" "}
+              anywhere in a sentence. It renders as a clickable superscript
+              ordinal like{" "}
+              <sup>
+                <a href="#" className="text-primary">[1]</a>
+              </sup>{" "}
+              that links to the corresponding entry in the refbox.
+            </Text>
+            <pre className="rounded-md bg-muted px-4 py-3 text-sm font-mono overflow-x-auto">
+              {`Luffy is the captain of the Straw Hat Pirates.{{ref|page:luffy}}\nNami joined after the Arlong Arc.{{ref|chapter:Chapter 8}}`}
+            </pre>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Text variant="h3">Deduplication</Text>
+            <Text>
+              If you cite the same page or chapter more than once, all
+              occurrences share the same ordinal number, assigned by first
+              appearance in document order.
+            </Text>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Text variant="h3">Adding the reference list</Text>
+            <Text>
+              Place{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
+                {"{{refbox}}"}
+              </code>{" "}
+              on its own line where you want the numbered reference list to
+              appear — typically at the bottom of a section. It is replaced at
+              render time with an ordered list of all cited targets.
+            </Text>
+            <pre className="rounded-md bg-muted px-4 py-3 text-sm font-mono overflow-x-auto">
+              {`== References ==\n\n{{refbox}}`}
+            </pre>
+            <Text muted className="text-sm">
+              The{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">
+                {"{{refbox}}"}
+              </code>{" "}
+              position is author-controlled and is not added automatically.
+              Place it wherever a references section makes sense for your page.
+            </Text>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Text variant="h3">Editor support</Text>
+            <Text>
+              In the WYSIWYG editor, click the{" "}
+              <strong>Insert reference</strong> toolbar button (bookmark icon) to
+              open a page/chapter picker and insert a{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">
+                {"{{ref|…}}"}
+              </code>{" "}
+              chip at the cursor. Clicking an existing ref chip reopens the
+              picker so you can change the target. A live preview of the
+              deduplicated reference list is shown wherever{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">
+                {"{{refbox}}"}
+              </code>{" "}
+              appears in the editor.
+            </Text>
+          </div>
+        </section>
+
+        {/* ── Section 6 ──────────────────────────────────────────────────────── */}
         <section
           id="suggesting-edits"
           className="flex flex-col gap-4 scroll-mt-16"

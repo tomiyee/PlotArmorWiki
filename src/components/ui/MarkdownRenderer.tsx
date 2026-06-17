@@ -1,11 +1,14 @@
 import ReactMarkdown, { Components } from "react-markdown";
 import type { PluggableList } from "unified";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/Text";
 import { remarkWikiLinks } from "@/lib/remark-wiki-links";
+import { remarkRefs } from "@/lib/remark-refs";
 import { WikiLinkPreview } from "@/components/WikiLinkPreview";
 import { ChapterLinkPreview } from "@/components/ChapterLinkPreview";
+import { RefCitationSup } from "@/components/RefCitationSup";
 
 type MarkdownRendererProps = {
   /** Raw markdown string to render. */
@@ -39,6 +42,13 @@ type MarkdownRendererProps = {
    * Only used when `serialSlug` and `chapterType` are also provided.
    */
   wikiChapters?: Record<string, number>;
+  /**
+   * When provided, overrides local `{{ref|token}}` ordinal computation with
+   * globally consistent ordinals from `WikiPageRefsProvider`. Enables correct
+   * cross-section reference numbering on wiki pages.
+   * Obtain this from `useWikiPageRefOrdinals` in read mode.
+   */
+  refOrdinalMap?: Map<string, number>;
 };
 
 const COMPONENTS: Components = {
@@ -249,6 +259,42 @@ function makeAnchorComponent(serialSlug: string): Components["a"] {
 }
 
 /**
+ * Returns a `sup` component override that renders ref citation superscripts
+ * (those with `data-ref-token` from `remarkRefs`) as hover-card previews.
+ * Non-ref `<sup>` elements fall through as plain superscripts.
+ */
+function makeSupComponent(
+  serialSlug: string,
+  pageTitles?: Record<string, string>,
+  chapterType?: string,
+  wikiChapters?: Record<string, number>,
+): Components["sup"] {
+  return function RefSup(props) {
+    const { id, children } = props;
+    const rawToken = (props as Record<string, unknown>)["data-ref-token"];
+    if (typeof rawToken !== "string" || !id) {
+      return <sup id={id}>{children}</sup>;
+    }
+    const token = decodeURIComponent(rawToken);
+    const match = /^ref-cite-(\d+)$/.exec(id);
+    if (!match) {
+      return <sup id={id}>{children}</sup>;
+    }
+    return (
+      <RefCitationSup
+        n={parseInt(match[1], 10)}
+        id={id}
+        token={token}
+        serialSlug={serialSlug}
+        pageTitles={pageTitles}
+        chapterType={chapterType}
+        wikiChapters={wikiChapters}
+      />
+    );
+  };
+}
+
+/**
  * Renders a markdown string as styled HTML using explicit Tailwind utility
  * classes on each element - does not depend on @tailwindcss/typography so
  * heading sizes and weights are always correct.
@@ -276,6 +322,7 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
     pageTitles,
     chapterType,
     wikiChapters,
+    refOrdinalMap,
   } = props;
 
   const remarkPlugins: PluggableList = [remarkGfm];
@@ -287,15 +334,24 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
       }),
     );
   }
+  remarkPlugins.push(remarkRefs({ externalOrdinalMap: refOrdinalMap }));
 
   const baseComponents = sm ? SM_COMPONENTS : COMPONENTS;
   const components: Components = serialSlug
-    ? { ...baseComponents, a: makeAnchorComponent(serialSlug) }
+    ? {
+        ...baseComponents,
+        a: makeAnchorComponent(serialSlug),
+        sup: makeSupComponent(serialSlug, pageTitles, chapterType, wikiChapters),
+      }
     : baseComponents;
 
   return (
     <div className={cn("max-w-none", className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={[rehypeRaw]}
+        components={components}
+      >
         {children}
       </ReactMarkdown>
     </div>
