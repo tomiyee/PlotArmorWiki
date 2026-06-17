@@ -1,7 +1,15 @@
 import { db } from "@/db/index";
-import { templates, templateSections, templateInfoboxSections } from "@/db/schema";
+import {
+  templates,
+  templateSections,
+  templateInfoboxSections,
+} from "@/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
-import type { TemplateSectionRow, TemplateInfoboxSectionRow, TemplateSummary } from "@/types";
+import type {
+  TemplateSectionRow,
+  TemplateInfoboxSectionRow,
+  TemplateSummary,
+} from "@/types";
 
 /**
  * Fetches all templates for a serial with their sections and infobox rows,
@@ -13,13 +21,16 @@ import type { TemplateSectionRow, TemplateInfoboxSectionRow, TemplateSummary } f
  * This is the single source of truth for template data; previously duplicated
  * as a local `fetchSerialTemplates` function inside `[page]/page.tsx` and
  * `[serial]/new/queries.ts`.
- *
- * @example
- * const serialTemplates = await fetchSerialTemplates(serial.id);
  */
-export async function fetchSerialTemplates(serialId: number): Promise<TemplateSummary[]> {
+export async function fetchSerialTemplates(
+  serialId: number,
+): Promise<TemplateSummary[]> {
   const tmplRows = await db
-    .select({ id: templates.id, name: templates.name, hasInfobox: templates.hasInfobox })
+    .select({
+      id: templates.id,
+      name: templates.name,
+      hasInfobox: templates.hasInfobox,
+    })
     .from(templates)
     .where(eq(templates.serialId, serialId))
     .orderBy(asc(templates.name));
@@ -52,7 +63,10 @@ export async function fetchSerialTemplates(serialId: number): Promise<TemplateSu
   ]);
 
   const sectionsByTemplate = Map.groupBy(allTmplSections, (s) => s.templateId);
-  const infoboxByTemplate = Map.groupBy(allTmplInfoboxSections, (s) => s.templateId);
+  const infoboxByTemplate = Map.groupBy(
+    allTmplInfoboxSections,
+    (s) => s.templateId,
+  );
 
   return tmplRows.map((t) => ({
     id: t.id,

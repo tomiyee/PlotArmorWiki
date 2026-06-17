@@ -11,9 +11,22 @@ import {
   pageInfoboxImageRevisions,
   volumes,
 } from "@/db/schema";
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  max,
+  or,
+} from "drizzle-orm";
 import type {
   PageStub,
+  SerialPageStub,
   ParentPageStub,
   WikiPageRow,
   DeletedPageStub,
@@ -36,10 +49,6 @@ export const PG_INT_MAX = 2_147_483_647;
  * the name the reader should see at their current position. Pages with no
  * pageTitles row at or before the cutoff are omitted; callers fall back to
  * pages.name.
- *
- * @example
- * const titleMap = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
- * const displayName = titleMap.get(page.id) ?? page.name;
  */
 export async function resolvePageTitlesAtIdx(
   pageIds: number[],
@@ -55,10 +64,7 @@ export async function resolvePageTitlesAtIdx(
     .from(pageTitles)
     .innerJoin(chapters, eq(pageTitles.chapterId, chapters.id))
     .where(
-      and(
-        inArray(pageTitles.pageId, pageIds),
-        lte(chapters.idx, cutoffIdx),
-      ),
+      and(inArray(pageTitles.pageId, pageIds), lte(chapters.idx, cutoffIdx)),
     )
     .groupBy(pageTitles.pageId)
     .as("page_title_max_idx_sq");
@@ -85,10 +91,6 @@ export async function resolvePageTitlesAtIdx(
  *
  * Uses the max-idx pattern: the latest `pageRelationships` revision per
  * (parent, child) pair at or before `cutoffIdx` must have `isActive = true`.
- *
- * @example
- * const hasChildrenSet = await resolveHasChildrenSet(childPageIds, cutoffIdx);
- * const hasChildren = hasChildrenSet.has(page.id);
  */
 export async function resolveHasChildrenSet(
   pageIds: number[],
@@ -251,11 +253,6 @@ export function childRelMaxIdxSq(parentPageId: number, cutoffIdx: number) {
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx`
  * on the returned IDs and fall back to `name` when no title row exists.
- *
- * @example
- * const rows = await fetchSerialPagesAtIdx(serialId, cutoffIdx);
- * const titleMap = await resolvePageTitlesAtIdx(rows.map(r => r.id), cutoffIdx);
- * const options = rows.map(r => ({ slug: r.slug, title: titleMap.get(r.id) ?? r.name }));
  */
 export async function fetchSerialPagesAtIdx(
   serialId: number,
@@ -282,11 +279,6 @@ export async function fetchSerialPagesAtIdx(
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx`
  * on the returned IDs and fall back to `name` when no title row exists.
- *
- * @example
- * const rows = await fetchActiveParentPagesAtIdx(pageId, cutoffIdx);
- * const titleMap = await resolvePageTitlesAtIdx(rows.map(r => r.id), cutoffIdx);
- * const parents = rows.map(r => ({ ...r, title: titleMap.get(r.id) ?? r.name }));
  */
 export async function fetchActiveParentPagesAtIdx(
   pageId: number,
@@ -331,10 +323,6 @@ export async function fetchActiveParentPagesAtIdx(
 /**
  * Fetches a wiki page by serial id + slug. Returns `undefined` when no page
  * matches, so callers can call `notFound()` immediately.
- *
- * @example
- * const page = await fetchPageAtSlug(serial.id, decodedSlug);
- * if (!page) notFound();
  */
 export async function fetchPageAtSlug(
   serialId: number,
@@ -351,12 +339,10 @@ export async function fetchPageAtSlug(
 /**
  * Fetches the home page row for a serial. Returns `null` when the serial has no
  * home page yet (edge case during serial initialisation).
- *
- * @example
- * const homePage = await fetchSerialHomePage(serial.id);
- * if (homePage) { /* render home page content *\/ }
  */
-export async function fetchSerialHomePage(serialId: number): Promise<WikiPageRow | null> {
+export async function fetchSerialHomePage(
+  serialId: number,
+): Promise<WikiPageRow | null> {
   const [row] = await db
     .select()
     .from(pages)
@@ -372,14 +358,10 @@ export async function fetchSerialHomePage(serialId: number): Promise<WikiPageRow
  *
  * Applies `PG_INT_MAX` as the cutoff so the max-idx subquery finds the latest
  * relationship revision across all chapters, then filters to `isActive = true`.
- *
- * @example
- * const navPages = await getHomePageChildren(homePage.id);
- * // [{ id: 1, name: "Characters", slug: "characters" }, …]
  */
 export async function getHomePageChildren(
   homePageId: number,
-): Promise<{ id: number; name: string; slug: string }[]> {
+): Promise<PageStub[]> {
   const relMaxIdxSq = childRelMaxIdxSq(homePageId, PG_INT_MAX);
 
   return db
@@ -412,11 +394,10 @@ export async function getHomePageChildren(
  * Returns all soft-deleted pages for a serial, ordered newest deletion first.
  * Only call this after confirming the caller is an admin — this function has no
  * auth check itself.
- *
- * @example
- * const deleted = isAdmin ? await fetchDeletedPages(serial.id) : [];
  */
-export async function fetchDeletedPages(serialId: number): Promise<DeletedPageStub[]> {
+export async function fetchDeletedPages(
+  serialId: number,
+): Promise<DeletedPageStub[]> {
   const rows = await db
     .select({
       id: pages.id,
@@ -438,11 +419,6 @@ export async function fetchDeletedPages(serialId: number): Promise<DeletedPageSt
  * The returned array is ordered by `displayOrder` and combines both structure and content
  * so callers can derive both the edit-mode panel rows and the reader-facing section list
  * from one call.
- *
- * @example
- * const sections = await fetchPageSectionsAtIdx(page.id, cutoffIdx);
- * const pageSectionStructure = sections; // compatible with {id, name, displayOrder}[]
- * // section.content is "" when no revision exists at or before cutoffIdx
  */
 export async function fetchPageSectionsAtIdx(
   pageId: number,
@@ -458,7 +434,9 @@ export async function fetchPageSectionsAtIdx(
         displayOrder: pageSections.displayOrder,
       })
       .from(pageSections)
-      .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)))
+      .where(
+        and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
+      )
       .orderBy(asc(pageSections.displayOrder)),
     db
       .select({
@@ -479,7 +457,10 @@ export async function fetchPageSectionsAtIdx(
   ]);
 
   const versionBySectionId = new Map(
-    sectionVersions.map((v) => [v.sectionId, { content: v.content, chapterIdx: v.chapterIdx }]),
+    sectionVersions.map((v) => [
+      v.sectionId,
+      { content: v.content, chapterIdx: v.chapterIdx },
+    ]),
   );
 
   return activeSections.map((s) => {
@@ -500,12 +481,6 @@ export async function fetchPageSectionsAtIdx(
  *
  * When the page has no active infobox rows, returns an empty result with
  * `floaterImageUrl: undefined` so callers can skip infobox rendering entirely.
- *
- * @example
- * const { structure, floaterImageUrl, rows } = await fetchPageInfoboxAtIdx(page.id, cutoffIdx);
- * // floaterImageUrl === undefined  → no infobox
- * // floaterImageUrl === null       → infobox exists but no image uploaded
- * // floaterImageUrl === "https://…" → has image
  */
 export async function fetchPageInfoboxAtIdx(
   pageId: number,
@@ -518,11 +493,20 @@ export async function fetchPageInfoboxAtIdx(
       displayOrder: pageInfoboxSections.displayOrder,
     })
     .from(pageInfoboxSections)
-    .where(and(eq(pageInfoboxSections.pageId, pageId), isNull(pageInfoboxSections.deletedAt)))
+    .where(
+      and(
+        eq(pageInfoboxSections.pageId, pageId),
+        isNull(pageInfoboxSections.deletedAt),
+      ),
+    )
     .orderBy(asc(pageInfoboxSections.displayOrder));
 
   if (activeInfoboxRows.length === 0) {
-    return { structure: activeInfoboxRows as InfoboxSectionStructure[], floaterImageUrl: undefined, rows: [] };
+    return {
+      structure: activeInfoboxRows as InfoboxSectionStructure[],
+      floaterImageUrl: undefined,
+      rows: [],
+    };
   }
 
   const floaterMaxIdxSq = db
@@ -530,7 +514,10 @@ export async function fetchPageInfoboxAtIdx(
     .from(pageInfoboxImageRevisions)
     .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
     .where(
-      and(eq(pageInfoboxImageRevisions.pageId, pageId), lte(chapters.idx, cutoffIdx)),
+      and(
+        eq(pageInfoboxImageRevisions.pageId, pageId),
+        lte(chapters.idx, cutoffIdx),
+      ),
     )
     .as("floater_max_idx_sq");
 
@@ -554,7 +541,10 @@ export async function fetchPageInfoboxAtIdx(
       .innerJoin(
         ibRowMaxIdxSq,
         and(
-          eq(pageInfoboxRevisions.infoboxSectionId, ibRowMaxIdxSq.infoboxSectionId),
+          eq(
+            pageInfoboxRevisions.infoboxSectionId,
+            ibRowMaxIdxSq.infoboxSectionId,
+          ),
           eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
         ),
       )
@@ -585,10 +575,6 @@ export async function fetchPageInfoboxAtIdx(
  * Uses the max-idx pattern: the latest relationship revision per child at or
  * before `cutoffIdx` must be `isActive = true` to appear in the result.
  * Soft-deleted child pages are always excluded.
- *
- * @example
- * const children = await fetchPageChildPagesAtIdx(page.id, cutoffIdx);
- * // [{ id: 1, name: "Nami", slug: "nami", title: "Nami (Post-Timeskip)", hasChildren: true }]
  */
 export async function fetchPageChildPagesAtIdx(
   parentPageId: number,
@@ -613,7 +599,12 @@ export async function fetchPageChildPagesAtIdx(
         eq(chapters.idx, relMaxIdxSq.maxIdx),
       ),
     )
-    .where(and(eq(pageRelationships.parentPageId, parentPageId), isNull(pages.deletedAt)));
+    .where(
+      and(
+        eq(pageRelationships.parentPageId, parentPageId),
+        isNull(pages.deletedAt),
+      ),
+    );
 
   const activeChildPages = childPagesRaw.filter((r) => r.isActive);
   if (activeChildPages.length === 0) return [];
@@ -636,12 +627,10 @@ export async function fetchPageChildPagesAtIdx(
 /**
  * Returns all temporal title entries for a page (no cutoff), ordered by chapter idx.
  * Used by the edit-mode titles panel where admins can see and manage every title revision.
- *
- * @example
- * const entries = await fetchPageTitleEntries(homePage.id);
- * // [{ chapterId: 1, chapterLabel: "Volume 1 - Chapter 1", title: "Monkey D. Luffy" }]
  */
-export async function fetchPageTitleEntries(pageId: number): Promise<PageTitleEntry[]> {
+export async function fetchPageTitleEntries(
+  pageId: number,
+): Promise<PageTitleEntry[]> {
   const rows = await db
     .select({
       chapterId: pageTitles.chapterId,
@@ -668,10 +657,6 @@ export async function fetchPageTitleEntries(pageId: number): Promise<PageTitleEn
  *
  * `resolvedTitle` is `null` when no title entry exists at or before `cutoffIdx`;
  * callers fall back to `page.name` in that case.
- *
- * @example
- * const { entries, resolvedTitle } = await fetchPageTitleEntriesAtIdx(page.id, cutoffIdx);
- * const displayTitle = resolvedTitle ?? page.name;
  */
 export async function fetchPageTitleEntriesAtIdx(
   pageId: number,
@@ -729,10 +714,6 @@ export const SEARCH_RESULT_LIMIT = 20;
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx` on the
  * returned IDs and fall back to `name` when no title row exists.
- *
- * @example
- * const rawPages = await searchPagesByNameAtIdx(serial.id, cutoffIdx, "luffy");
- * const titleMap = await resolvePageTitlesAtIdx(rawPages.map(p => p.id), cutoffIdx);
  */
 export async function searchPagesByNameAtIdx(
   serialId: number,
@@ -765,19 +746,17 @@ export async function searchPagesByNameAtIdx(
  *
  * Title resolution is NOT performed here — call `resolvePageTitlesAtIdx` on the
  * returned IDs to apply chapter-versioned display names.
- *
- * @example
- * const introduced = await fetchPagesIntroducedInChapter(serial.id, chapter.id);
- * const titleMap = await resolvePageTitlesAtIdx(introduced.map(p => p.id), chapter.idx);
  */
 export async function fetchPagesIntroducedInChapter(
   serialId: number,
   chapterId: number,
-): Promise<{ id: number; name: string; slug: string }[]> {
+): Promise<PageStub[]> {
   return db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
-    .where(and(eq(pages.serialId, serialId), eq(pages.introChapterId, chapterId)))
+    .where(
+      and(eq(pages.serialId, serialId), eq(pages.introChapterId, chapterId)),
+    )
     .orderBy(pages.name);
 }
 
@@ -786,10 +765,6 @@ export async function fetchPagesIntroducedInChapter(
  * deleted page should be treated as non-existent (e.g. wiki-link hover previews).
  * For page rendering, use `fetchPageAtSlug` so the caller can show a "deleted"
  * notice instead of a 404.
- *
- * @example
- * const page = await fetchLivePageAtSlug(serial.id, "luffy");
- * if (!page) return null; // no preview for deleted or missing pages
  */
 export async function fetchLivePageAtSlug(
   serialId: number,
@@ -798,7 +773,13 @@ export async function fetchLivePageAtSlug(
   const [row] = await db
     .select()
     .from(pages)
-    .where(and(eq(pages.serialId, serialId), eq(pages.slug, slug), isNull(pages.deletedAt)))
+    .where(
+      and(
+        eq(pages.serialId, serialId),
+        eq(pages.slug, slug),
+        isNull(pages.deletedAt),
+      ),
+    )
     .limit(1);
   return row;
 }
@@ -807,13 +788,10 @@ export async function fetchLivePageAtSlug(
  * Returns all page stubs (id, name, slug) for a serial without any chapter cutoff
  * filter. Used to build the complete slug→title map that `resolvePageTitlesAtIdx`
  * needs when rendering wiki-link hover previews.
- *
- * @example
- * const stubs = await fetchAllSerialPageStubs(serial.id);
- * const titleByPageId = await resolvePageTitlesAtIdx(stubs.map(p => p.id), cutoffIdx);
- * const slugTitleMap = Object.fromEntries(stubs.map(p => [p.slug, titleByPageId.get(p.id) ?? p.name]));
  */
-export async function fetchAllSerialPageStubs(serialId: number): Promise<PageStub[]> {
+export async function fetchAllSerialPageStubs(
+  serialId: number,
+): Promise<PageStub[]> {
   return db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
@@ -824,10 +802,6 @@ export async function fetchAllSerialPageStubs(serialId: number): Promise<PageStu
  * Returns the content of the first active section for `pageId` at `cutoffIdx`,
  * or an empty string when no section/revision exists. Used by wiki-link hover
  * previews to show a short excerpt without fetching all sections.
- *
- * @example
- * const preview = await fetchFirstSectionAtIdx(page.id, cutoffIdx);
- * // "" when the page has no sections or no revisions at the cutoff
  */
 export async function fetchFirstSectionAtIdx(
   pageId: number,
@@ -838,7 +812,10 @@ export async function fetchFirstSectionAtIdx(
     .select({ content: pageSectionRevisions.content })
     .from(pageSectionRevisions)
     .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .innerJoin(pageSections, eq(pageSectionRevisions.sectionId, pageSections.id))
+    .innerJoin(
+      pageSections,
+      eq(pageSectionRevisions.sectionId, pageSections.id),
+    )
     .innerJoin(
       secMaxIdxSq,
       and(
@@ -846,7 +823,12 @@ export async function fetchFirstSectionAtIdx(
         eq(chapters.idx, secMaxIdxSq.maxIdx),
       ),
     )
-    .where(and(eq(pageSectionRevisions.pageId, pageId), isNull(pageSections.deletedAt)))
+    .where(
+      and(
+        eq(pageSectionRevisions.pageId, pageId),
+        isNull(pageSections.deletedAt),
+      ),
+    )
     .orderBy(asc(pageSections.displayOrder))
     .limit(1);
   return firstSection?.content ?? "";
@@ -861,13 +843,10 @@ export async function fetchFirstSectionAtIdx(
  * similar-pages warning. Soft-deleted pages are excluded — they are not valid
  * targets for parent assignment or name-collision checks.
  *
- * @example
- * const existingPages = await getSerialPages(serial.id);
- * // [{ id: 1, name: "Characters", introChapterId: null }, …]
  */
 export async function getSerialPages(
   serialId: number,
-): Promise<{ id: number; name: string; introChapterId: number | null }[]> {
+): Promise<SerialPageStub[]> {
   return db
     .select({
       id: pages.id,
@@ -882,12 +861,10 @@ export async function getSerialPages(
 /**
  * Fetches the `serialId` for a page by its primary key. Returns `null` when the
  * page does not exist. Used by auth guards that receive only a `pageId`.
- *
- * @example
- * const serialId = await fetchPageSerialId(pageId);
- * if (!serialId) throw new Error("Page not found.");
  */
-export async function fetchPageSerialId(pageId: number): Promise<number | null> {
+export async function fetchPageSerialId(
+  pageId: number,
+): Promise<number | null> {
   const [row] = await db
     .select({ serialId: pages.serialId })
     .from(pages)
@@ -903,10 +880,6 @@ export async function fetchPageSerialId(pageId: number): Promise<number | null> 
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx` on
  * the returned IDs and fall back to `name` when no title row exists.
- *
- * @example
- * const rawPages = await fetchSearchablePagesAtIdx(serial.id, cutoffIdx);
- * const titleMap = await resolvePageTitlesAtIdx(rawPages.map(p => p.id), cutoffIdx);
  */
 export async function fetchSearchablePagesAtIdx(
   serialId: number,

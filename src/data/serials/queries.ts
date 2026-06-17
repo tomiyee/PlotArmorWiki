@@ -10,10 +10,6 @@ import type { SerialRow, SerialAdminStub } from "@/types";
  *
  * Wrapped in `React.cache()` so that when the layout and its nested page both
  * call this function in the same request they share a single DB round-trip.
- *
- * @example
- * const serial = await getSerialBySlug("one-piece");
- * if (!serial) return notFound();
  */
 export const getSerialBySlug = cache(async function getSerialBySlug(
   serialSlug: string,
@@ -28,10 +24,6 @@ export const getSerialBySlug = cache(async function getSerialBySlug(
 
 /**
  * Returns the ordered author names for a serial, ready to pass to `<SerialMetadataEditor>`.
- *
- * @example
- * const authors = await fetchSerialAuthors(serial.id);
- * // ["Eiichiro Oda", "Shueisha"]
  */
 export async function fetchSerialAuthors(serialId: number): Promise<string[]> {
   const rows = await db
@@ -45,10 +37,6 @@ export async function fetchSerialAuthors(serialId: number): Promise<string[]> {
 /**
  * Returns all admins for a serial joined with their usernames, ordered by grant date.
  * Used by the admin management panel to display and revoke admin access.
- *
- * @example
- * const admins = await fetchSerialAdmins(serial.id);
- * // [{ userId: "abc123", username: "tommy" }]
  */
 export async function fetchSerialAdmins(
   serialId: number,
@@ -64,9 +52,6 @@ export async function fetchSerialAdmins(
 /**
  * Returns all serial rows, ordered by insertion order. Used by the home page to
  * list every wiki on the platform.
- *
- * @example
- * const allSerials = await fetchAllSerials();
  */
 export async function fetchAllSerials(): Promise<SerialRow[]> {
   return db.select().from(serials);
@@ -76,9 +61,6 @@ export async function fetchAllSerials(): Promise<SerialRow[]> {
  * Returns `true` when `userId` is in `serial_admins` for `serialId`. Does not
  * throw — safe for Server Component render paths where a hard error would break
  * the page for all visitors.
- *
- * @example
- * const isAdmin = await checkSerialAdminMembership(userId, serial.id);
  */
 export async function checkSerialAdminMembership(
   userId: string,

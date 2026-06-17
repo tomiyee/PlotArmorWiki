@@ -37,6 +37,9 @@ export type VolumeRow = {
   serialId: number;
 };
 
+/** Minimal volume fields returned by `fetchVolumeById` for chapter link previews. */
+export type VolumeDisplayInfo = Pick<VolumeRow, "displayName">;
+
 /**
  * A chapter row scoped to the fields used by the chapter selector and cutoff comparisons.
  * Previously exported as `ChapterData` from `@/types` — the two types are identical;
@@ -53,6 +56,9 @@ export type ChapterRow = {
   volumeId: number;
 };
 
+/** Minimal chapter fields returned by `fetchChapterById` for spoiler-gate rendering. */
+export type ChapterDisplayInfo = Pick<ChapterRow, "displayName" | "idx">;
+
 /** Paired volumes and chapters for a serial, ready to pass to `<ChapterSelector>` and `<SerialTOCDrawer>`. */
 export type SerialVolumesAndChapters = {
   volumeList: VolumeRow[];
@@ -67,25 +73,14 @@ export type ChapterCutoff = {
   readingChapterId: number | null;
 };
 
+/** A page stub with its intro chapter id, for the new-page parent dropdown and collision checks. */
+export type SerialPageStub = Pick<WikiPageRow, "id" | "name" | "introChapterId">;
+
 /** Minimal page stub — enough to build option lists and wiki-link autocomplete entries. */
-export type PageStub = {
-  /** DB primary key. */
-  id: number;
-  /** Canonical (creation-time) name; displayed when no chapter-versioned title exists at the reader's cutoff. */
-  name: string;
-  /** URL-safe slug used in the /{serial}/{slug} route; included so callers can build links without a second query. */
-  slug: string;
-};
+export type PageStub = Pick<WikiPageRow, "id" | "name" | "slug">;
 
 /** A parent page stub with routing information, used to render breadcrumb links. */
-export type ParentPageStub = {
-  /** DB primary key. */
-  id: number;
-  /** Canonical (creation-time) name; used as fallback when no chapter-versioned title exists. */
-  name: string;
-  /** URL-safe slug for the /{serial}/{slug} breadcrumb link. */
-  slug: string;
-};
+export type ParentPageStub = Pick<WikiPageRow, "id" | "name" | "slug">;
 
 /** Full wiki page row including soft-delete and idempotency fields. */
 export type WikiPageRow = {
@@ -251,6 +246,14 @@ export type PageTitlesAtIdx = {
   entries: PageTitleEntry[];
   /** The title the reader should see: the entry with the highest chapter idx ≤ cutoff. Null when no entry exists. */
   resolvedTitle: string | null;
+};
+
+/** All data needed to render the new-page creation form for a serial. */
+export type NewPageFormData = {
+  volumeList: VolumeRow[];
+  chapterList: ChapterRow[];
+  existingPages: SerialPageStub[];
+  serialTemplates: TemplateSummary[];
 };
 
 // ── Navbar / layout types ────────────────────────────────────────────────────
