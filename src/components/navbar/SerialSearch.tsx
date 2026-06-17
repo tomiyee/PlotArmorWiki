@@ -89,8 +89,14 @@ export function SerialSearch(props: SerialSearchProps) {
   // Without this, cmdk keeps the "+ Page" item highlighted when results load
   // above it because the item is still present in the list.
   useEffect(() => {
-    setSelectedValue(results.length > 0 ? results[0].name : "");
-  }, [results]);
+    if (results.length > 0) {
+      setSelectedValue(results[0].name);
+    } else if (isAdmin && query.trim()) {
+      setSelectedValue(`+ Page ${query.trim()}`);
+    } else {
+      setSelectedValue("");
+    }
+  }, [results, isAdmin, query]);
 
   // Keyboard shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
