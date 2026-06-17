@@ -5,11 +5,7 @@ import {
   templateInfoboxSections,
 } from "@/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
-import type {
-  TemplateSectionRow,
-  TemplateInfoboxSectionRow,
-  TemplateSummary,
-} from "@/types";
+import type { TemplateSummary } from "@/types";
 
 /**
  * Fetches all templates for a serial with their sections and infobox rows,
