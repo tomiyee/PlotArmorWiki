@@ -959,6 +959,23 @@ export async function addTemplateInfoboxSection(
   });
 }
 
+async function requireInfoboxSectionBelongsToSerial(
+  infoboxSectionId: number,
+  serialId: number,
+) {
+  const [target] = await db
+    .select({ id: templateInfoboxSections.id })
+    .from(templateInfoboxSections)
+    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
+    .where(
+      and(
+        eq(templateInfoboxSections.id, infoboxSectionId),
+        eq(templates.serialId, serialId),
+      ),
+    );
+  if (!target) throw new Error("Infobox section not found");
+}
+
 /**
  * Removes an infobox section from a template.
  *
@@ -976,18 +993,7 @@ export async function deleteTemplateInfoboxSection(
   const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
   if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
 
-  // Verify the infobox section's template belongs to this serial.
-  const [target] = await db
-    .select({ id: templateInfoboxSections.id })
-    .from(templateInfoboxSections)
-    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
-    .where(
-      and(
-        eq(templateInfoboxSections.id, infoboxSectionId),
-        eq(templates.serialId, serialId),
-      ),
-    );
-  if (!target) throw new Error("Infobox section not found");
+  await requireInfoboxSectionBelongsToSerial(infoboxSectionId, serialId);
 
   await db
     .delete(templateInfoboxSections)
@@ -1015,21 +1021,11 @@ export async function toggleTemplateInfoboxSectionSearch(
   const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
   if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
 
-  if (includeInSearchRaw === null) throw new Error("includeInSearch is required");
+  if (includeInSearchRaw === null || typeof includeInSearchRaw !== "string")
+    throw new Error("includeInSearch is required");
   const includeInSearch = includeInSearchRaw === "true";
 
-  // Verify the infobox section's template belongs to this serial.
-  const [target] = await db
-    .select({ id: templateInfoboxSections.id })
-    .from(templateInfoboxSections)
-    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
-    .where(
-      and(
-        eq(templateInfoboxSections.id, infoboxSectionId),
-        eq(templates.serialId, serialId),
-      ),
-    );
-  if (!target) throw new Error("Infobox section not found");
+  await requireInfoboxSectionBelongsToSerial(infoboxSectionId, serialId);
 
   await db
     .update(templateInfoboxSections)

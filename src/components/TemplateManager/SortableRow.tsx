@@ -60,7 +60,7 @@ export function SortableRow(props: SortableRowProps) {
           variant="ghost"
           size="icon-xs"
           title={includeInSearch ? "Exclude from search" : "Include in search"}
-          onClick={() => onToggleSearch(id, !(includeInSearch ?? false))}
+          onClick={() => onToggleSearch(id, !includeInSearch)}
           disabled={isPending}
           className={includeInSearch ? "text-primary" : "text-muted-foreground"}
         >

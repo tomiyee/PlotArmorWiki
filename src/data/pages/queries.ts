@@ -717,7 +717,8 @@ export async function searchPagesByNameAtIdx(
   // The correlated reference `pages.id` ties the subquery to the outer page row.
   // Using raw sql for the max-idx scalar subquery avoids a Drizzle table-alias
   // collision between the outer `chapters` join and the inner revision join.
-  const pattern = `%${trimmed}%`;
+  const escaped = trimmed.replace(/[\\%_]/g, '\\$&');
+  const pattern = `%${escaped}%`;
   const infoboxSearchExists = exists(
     db
       .select({ one: pageInfoboxSections.id })

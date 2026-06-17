@@ -294,11 +294,7 @@ export function TemplateItem(props: TemplateItemProps) {
           {template.hasInfobox && (
             <SortableAddList
               heading="Infobox rows"
-              items={localInfoboxSections.map((s) => ({
-                id: s.id,
-                label: s.label,
-                includeInSearch: s.includeInSearch,
-              }))}
+              items={localInfoboxSections}
               value={addingInfoboxLabel}
               onChange={setAddingInfoboxLabel}
               onAdd={handleAddInfoboxSection}
