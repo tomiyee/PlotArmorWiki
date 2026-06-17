@@ -47,6 +47,12 @@ export function SerialSearch(props: SerialSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PageSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  /**
+   * Tracks the highlighted CommandItem value. Driving this externally prevents
+   * cmdk from retaining focus on the "+ Page" item when real results load above
+   * it — cmdk sees the item still in the list and does not auto-move selection.
+   */
+  const [selectedValue, setSelectedValue] = useState("");
   const router = useRouter();
   /** Ref to track the debounce timer so we can cancel it on each keystroke. */
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,6 +84,19 @@ export function SerialSearch(props: SerialSearchProps) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, serialSlug]);
+
+  // Reset highlighted item to the first result whenever the result set changes.
+  // Without this, cmdk keeps the "+ Page" item highlighted when results load
+  // above it because the item is still present in the list.
+  useEffect(() => {
+    if (results.length > 0) {
+      setSelectedValue(results[0].name);
+    } else if (isAdmin && query.trim()) {
+      setSelectedValue(`+ Page ${query.trim()}`);
+    } else {
+      setSelectedValue("");
+    }
+  }, [results, isAdmin, query]);
 
   // Keyboard shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -126,7 +145,11 @@ export function SerialSearch(props: SerialSearchProps) {
         onClose={() => { setOpen(false); setQuery(""); }}
         showCloseButton={false}
       >
-        <Command shouldFilter={false}>
+        <Command
+          shouldFilter={false}
+          value={selectedValue}
+          onValueChange={setSelectedValue}
+        >
           <CommandInput
             placeholder="Search pages…"
             autoFocus

@@ -1,8 +1,7 @@
-import { db } from "@/db/index";
-import { pages } from "@/db/schema";
-import { and, asc, eq, isNull } from "drizzle-orm";
 import { getSerialVolumesAndChapters } from "@/data/chapters/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
+import { getSerialPages } from "@/data/pages/queries";
+import type { NewPageFormData } from "@/types";
 
 /**
  * Fetches all data needed to render the new-page creation form for a given serial.
@@ -12,24 +11,11 @@ import { fetchSerialTemplates } from "@/data/templates/queries";
  * page content without a separate round-trip after the user picks a template.
  * `existingPages` includes `introChapterId` so the parent dropdown can filter
  * out pages the reader hasn't reached yet.
- *
- * @example
- * const { volumeList, chapterList, existingPages, serialTemplates } =
- *   await getNewPageFormData(serial.id);
  */
-export async function getNewPageFormData(serialId: number) {
+export async function getNewPageFormData(serialId: number): Promise<NewPageFormData> {
   const [{ volumeList, chapterList }, existingPages, serialTemplates] = await Promise.all([
     getSerialVolumesAndChapters(serialId),
-    db
-      .select({
-        id: pages.id,
-        name: pages.name,
-        slug: pages.slug,
-        introChapterId: pages.introChapterId,
-      })
-      .from(pages)
-      .where(and(eq(pages.serialId, serialId), isNull(pages.deletedAt)))
-      .orderBy(asc(pages.name)),
+    getSerialPages(serialId),
     fetchSerialTemplates(serialId),
   ]);
 
