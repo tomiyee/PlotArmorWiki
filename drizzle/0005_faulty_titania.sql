@@ -1,1 +1,0 @@
-ALTER TABLE "template_infobox_sections" ADD COLUMN "include_in_search" boolean DEFAULT false NOT NULL;

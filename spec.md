@@ -255,6 +255,10 @@ Templates may define:
 - Infobox presence
 - Infobox sections
 
+### Searchable infobox labels
+
+Admins can mark specific infobox row labels as searchable at the serial level via the `serial_searchable_infobox_labels` table. When a label is marked searchable, the full-text search (`searchPagesByNameAtIdx`) extends its matching to the content of any page infobox row with that label (at the reader's chapter cutoff), in addition to matching on page names.
+
 ## Usage
 
 When creating a page, contributors may choose a template to initialize the page structure.
@@ -390,7 +394,7 @@ Responsibilities:
 
 ---
 
-## Search - PostgreSQL Full-Text Search
+## Search - PostgreSQL
 
 Chosen because:
 
@@ -400,8 +404,10 @@ Chosen because:
 
 Uses:
 
-- `tsvector`
-- SQL `WHERE` filtering by chapter visibility
+- `ILIKE` case-insensitive substring matching on page names and infobox row content
+- SQL `WHERE` filtering by chapter visibility (pages with `intro_chapter_id` beyond cutoff are excluded)
+
+Admins can configure which infobox row labels are included in search via the `serial_searchable_infobox_labels` table. When a label is marked searchable, the latest revision of any page's infobox row with that label (at or before the reader's cutoff) is matched against the query.
 
 ---
 

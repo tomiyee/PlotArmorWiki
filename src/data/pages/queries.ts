@@ -9,8 +9,7 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
-  templateInfoboxSections,
-  templates,
+  serialSearchableInfoboxLabels,
   volumes,
 } from "@/db/schema";
 import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, lte, max, or, sql } from "drizzle-orm";
@@ -696,17 +695,11 @@ export const SEARCH_RESULT_LIMIT = 20;
 
 /**
  * Returns up to 20 visible, non-home pages whose canonical name — or any
- * infobox row marked `include_in_search` on the serial's templates — matches
- * `query` (case-insensitive substring) at `cutoffIdx`. Returns an empty array
- * when `query` is blank so callers can skip the network round-trip entirely.
+ * infobox row whose label is in `serial_searchable_infobox_labels` for this
+ * serial — matches `query` (case-insensitive substring) at `cutoffIdx`.
+ * Returns an empty array when `query` is blank.
  *
- * Spoiler rule: pages with an intro chapter index beyond `cutoffIdx` are excluded
- * (same filter as `fetchSearchablePagesAtIdx`).
- *
- * Infobox match: an EXISTS subquery checks whether the page has a non-deleted
- * infobox row whose label matches a template infobox section with
- * `include_in_search = true` (scoped to this serial), and whose latest revision
- * at or before `cutoffIdx` contains the query string.
+ * Spoiler rule: pages with an intro chapter index beyond `cutoffIdx` are excluded.
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx` on the
  * returned IDs and fall back to `name` when no title row exists.
@@ -719,33 +712,24 @@ export async function searchPagesByNameAtIdx(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  // Subquery: does this page have a searchable infobox row matching the query?
-  //
-  // Matches when a non-deleted page infobox row's label equals the label of a
-  // template infobox section with `include_in_search = true` (scoped to this
-  // serial via the templates join), and the latest revision of that row at or
-  // before cutoffIdx contains the query string.
-  //
-  // The correlated reference `pages.id` ties the subquery to the outer page row.
-  // Using raw sql for the max-idx scalar subquery avoids a Drizzle table-alias
-  // collision between the outer `chapters` join and the inner revision join.
   const escaped = trimmed.replace(/[\\%_]/g, '\\$&');
   const pattern = `%${escaped}%`;
+
+  // Subquery: does this page have a searchable infobox row matching the query?
+  // A row is searchable when its label appears in serial_searchable_infobox_labels.
+  // Raw SQL for the max-idx scalar to avoid Drizzle alias collisions with the
+  // outer `chapters` join.
   const infoboxSearchExists = exists(
     db
       .select({ one: pageInfoboxSections.id })
       .from(pageInfoboxSections)
       .innerJoin(
-        templateInfoboxSections,
+        serialSearchableInfoboxLabels,
         and(
-          eq(templateInfoboxSections.label, pageInfoboxSections.label),
-          eq(templateInfoboxSections.includeInSearch, true),
+          eq(serialSearchableInfoboxLabels.label, pageInfoboxSections.label),
+          eq(serialSearchableInfoboxLabels.serialId, serialId),
         ),
       )
-      .innerJoin(templates, and(
-        eq(templates.id, templateInfoboxSections.templateId),
-        eq(templates.serialId, serialId),
-      ))
       .innerJoin(
         pageInfoboxRevisions,
         and(
@@ -765,7 +749,6 @@ export async function searchPagesByNameAtIdx(
           eq(pageInfoboxSections.pageId, pages.id),
           isNull(pageInfoboxSections.deletedAt),
           ilike(pageInfoboxRevisions.content, pattern),
-          // Only the latest revision at or before cutoffIdx for this infobox row.
           eq(
             chapters.idx,
             sql<number>`(

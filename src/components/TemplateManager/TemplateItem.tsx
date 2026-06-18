@@ -39,8 +39,6 @@ interface TemplateItemProps {
   deleteTemplateInfoboxSectionAction: ServerAction;
   /** Server action to persist the new infobox row order after drag-and-drop. */
   reorderTemplateInfoboxSectionAction: ReorderAction;
-  /** Server action to toggle whether an infobox row's content is included in search. */
-  toggleTemplateInfoboxSectionSearchAction: ServerAction;
 }
 
 export function TemplateItem(props: TemplateItemProps) {
@@ -55,7 +53,6 @@ export function TemplateItem(props: TemplateItemProps) {
     addTemplateInfoboxSectionAction,
     deleteTemplateInfoboxSectionAction,
     reorderTemplateInfoboxSectionAction,
-    toggleTemplateInfoboxSectionSearchAction,
   } = props;
 
   const router = useRouter();
@@ -141,13 +138,6 @@ export function TemplateItem(props: TemplateItemProps) {
     const fd = new FormData();
     fd.set("infoboxSectionId", String(infoboxSectionId));
     run(deleteTemplateInfoboxSectionAction, fd);
-  }
-
-  function handleToggleInfoboxSectionSearch(infoboxSectionId: number, include: boolean) {
-    const fd = new FormData();
-    fd.set("infoboxSectionId", String(infoboxSectionId));
-    fd.set("includeInSearch", String(include));
-    run(toggleTemplateInfoboxSectionSearchAction, fd);
   }
 
   // Memoize so the reference only changes when server data changes — not on every
@@ -300,7 +290,6 @@ export function TemplateItem(props: TemplateItemProps) {
               onAdd={handleAddInfoboxSection}
               onDelete={handleDeleteInfoboxSection}
               onReorder={handleReorderInfoboxSections}
-              onToggleSearch={handleToggleInfoboxSectionSearch}
               isPending={anyPending}
               inputRef={infoboxInputRef}
               placeholder="Row label…"

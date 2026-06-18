@@ -278,8 +278,23 @@ export const templateInfoboxSections = pgTable("template_infobox_sections", {
     .references(() => templates.id),
   label: text("label").notNull(),
   displayOrder: integer("display_order").notNull(),
-  includeInSearch: boolean("include_in_search").notNull().default(false),
 });
+
+/**
+ * Serial-level registry of infobox row labels whose content is included in
+ * page search. Replaces the per-template and per-page `include_in_search` flags.
+ * PK is (serial_id, label) — one row per enabled label per serial.
+ */
+export const serialSearchableInfoboxLabels = pgTable(
+  "serial_searchable_infobox_labels",
+  {
+    serialId: integer("serial_id")
+      .notNull()
+      .references(() => serials.id),
+    label: text("label").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.serialId, t.label] })],
+);
 
 export const chapterSynopses = pgTable("chapter_synopses", {
   chapterId: integer("chapter_id")

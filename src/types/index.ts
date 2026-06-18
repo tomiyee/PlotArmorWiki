@@ -126,8 +126,6 @@ export type TemplateInfoboxSectionRow = {
   label: string;
   /** 0-based position within the template's infobox; drives render order. */
   displayOrder: number;
-  /** When true, page infobox content for this row is included in full-text search. */
-  includeInSearch: boolean;
 };
 
 /** A template with its section and infobox row children, as returned by `fetchSerialTemplates`. */

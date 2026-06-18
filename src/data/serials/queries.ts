@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { db } from "@/db/index";
-import { serials, serialAuthors, serialAdmins, users } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { serials, serialAuthors, serialAdmins, serialSearchableInfoboxLabels, pageInfoboxSections, pages, users } from "@/db/schema";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import type { SerialRow, SerialAdminStub } from "@/types";
 
 /**
@@ -47,6 +47,43 @@ export async function fetchSerialAdmins(
     .innerJoin(users, eq(serialAdmins.userId, users.id))
     .where(eq(serialAdmins.serialId, serialId))
     .orderBy(asc(serialAdmins.grantedAt));
+}
+
+/**
+ * Returns the set of infobox row labels currently marked as searchable for a serial.
+ * These are the labels configured via the serial home page admin panel.
+ */
+export async function fetchSerialSearchableLabels(
+  serialId: number,
+): Promise<string[]> {
+  const rows = await db
+    .select({ label: serialSearchableInfoboxLabels.label })
+    .from(serialSearchableInfoboxLabels)
+    .where(eq(serialSearchableInfoboxLabels.serialId, serialId))
+    .orderBy(asc(serialSearchableInfoboxLabels.label));
+  return rows.map((r) => r.label);
+}
+
+/**
+ * Returns all distinct infobox row labels used across non-deleted pages in a serial,
+ * ordered alphabetically. Used to populate the searchable-labels manager UI.
+ */
+export async function fetchAllInfoboxLabelsForSerial(
+  serialId: number,
+): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ label: pageInfoboxSections.label })
+    .from(pageInfoboxSections)
+    .innerJoin(pages, eq(pages.id, pageInfoboxSections.pageId))
+    .where(
+      and(
+        eq(pages.serialId, serialId),
+        isNull(pages.deletedAt),
+        isNull(pageInfoboxSections.deletedAt),
+      ),
+    )
+    .orderBy(asc(pageInfoboxSections.label));
+  return rows.map((r) => r.label);
 }
 
 /**

@@ -15,7 +15,7 @@ type SortableAddListProps = {
   /** Heading rendered above the list. */
   heading: string;
   /** Items to display in sorted order. */
-  items: { id: number; label: string; includeInSearch?: boolean }[];
+  items: { id: number; label: string }[];
   /** Current value of the add-item input. */
   value: string;
   /** Updates the add-item input value. */
@@ -36,11 +36,6 @@ type SortableAddListProps = {
   emptyLabel: string;
   /** Accessible label for each row's delete button. */
   deleteTitle: string;
-  /**
-   * When provided, a search-toggle icon button is rendered per row.
-   * Called with the row's id and the new toggle value when clicked.
-   */
-  onToggleSearch?: (id: number, include: boolean) => void;
 };
 
 /**
@@ -77,7 +72,6 @@ export function SortableAddList(props: SortableAddListProps) {
     placeholder,
     emptyLabel,
     deleteTitle,
-    onToggleSearch,
   } = props;
 
   const sensors = useSortableSensors();
@@ -100,8 +94,6 @@ export function SortableAddList(props: SortableAddListProps) {
                   isPending={isPending}
                   deleteTitle={deleteTitle}
                   onDelete={onDelete}
-                  includeInSearch={item.includeInSearch}
-                  onToggleSearch={onToggleSearch}
                 />
               ))}
             </Box>

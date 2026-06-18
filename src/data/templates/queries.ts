@@ -52,7 +52,6 @@ export async function fetchSerialTemplates(
         id: templateInfoboxSections.id,
         label: templateInfoboxSections.label,
         displayOrder: templateInfoboxSections.displayOrder,
-        includeInSearch: templateInfoboxSections.includeInSearch,
       })
       .from(templateInfoboxSections)
       .where(inArray(templateInfoboxSections.templateId, tmplIds))

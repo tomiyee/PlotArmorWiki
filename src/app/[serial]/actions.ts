@@ -12,6 +12,7 @@ import {
   templates,
   templateSections,
   templateInfoboxSections,
+  serialSearchableInfoboxLabels,
   serialAdmins,
   users,
   userProgress,
@@ -1001,36 +1002,42 @@ export async function deleteTemplateInfoboxSection(
 }
 
 /**
- * Toggles the `includeInSearch` flag on a template infobox section.
- * When true, the content of page infobox rows with this label will be matched
- * during full-text search, enabling alias / alternate-name discovery.
+ * Adds or removes a label from the serial's searchable infobox labels registry.
+ * When enabled, page infobox rows with this label will be matched during search.
  *
  * @example
- * await toggleTemplateInfoboxSectionSearch(42, new FormData()); // formData has "infoboxSectionId" and "includeInSearch" fields
+ * const fd = new FormData();
+ * fd.set('label', 'Aliases');
+ * fd.set('enabled', 'true'); // 'true' to add, 'false' to remove
+ * await toggleSerialSearchableLabel(42, fd);
  */
-export async function toggleTemplateInfoboxSectionSearch(
+export async function toggleSerialSearchableLabel(
   serialId: number,
   formData: FormData,
 ) {
   await requireSerialAdmin(serialId);
-  const infoboxSectionIdRaw = formData.get("infoboxSectionId");
-  const includeInSearchRaw = formData.get("includeInSearch");
-  if (!infoboxSectionIdRaw || typeof infoboxSectionIdRaw !== "string")
-    throw new Error("Infobox section ID is required");
+  const label = formData.get("label");
+  const enabled = formData.get("enabled");
+  if (!label || typeof label !== "string" || !label.trim())
+    throw new Error("label is required");
+  if (enabled !== "true" && enabled !== "false")
+    throw new Error("enabled must be 'true' or 'false'");
 
-  const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
-  if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
-
-  if (includeInSearchRaw === null || typeof includeInSearchRaw !== "string")
-    throw new Error("includeInSearch is required");
-  const includeInSearch = includeInSearchRaw === "true";
-
-  await requireInfoboxSectionBelongsToSerial(infoboxSectionId, serialId);
-
-  await db
-    .update(templateInfoboxSections)
-    .set({ includeInSearch })
-    .where(eq(templateInfoboxSections.id, infoboxSectionId));
+  if (enabled === "true") {
+    await db
+      .insert(serialSearchableInfoboxLabels)
+      .values({ serialId, label: label.trim() })
+      .onConflictDoNothing();
+  } else {
+    await db
+      .delete(serialSearchableInfoboxLabels)
+      .where(
+        and(
+          eq(serialSearchableInfoboxLabels.serialId, serialId),
+          eq(serialSearchableInfoboxLabels.label, label.trim()),
+        ),
+      );
+  }
 }
 
 // ── Admin management ─────────────────────────────────────────────────────────

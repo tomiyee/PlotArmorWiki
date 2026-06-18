@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSerialBySlug, fetchSerialAuthors, fetchSerialAdmins } from "@/data/serials/queries";
+import { getSerialBySlug, fetchSerialAuthors, fetchSerialAdmins, fetchSerialSearchableLabels, fetchAllInfoboxLabelsForSerial } from "@/data/serials/queries";
 import { getChapterCutoff, getSerialVolumesAndChapters } from "@/data/chapters/queries";
 import {
   resolvePageTitlesAtIdx,
@@ -42,10 +42,10 @@ import {
   addTemplateInfoboxSection,
   deleteTemplateInfoboxSection,
   reorderTemplateInfoboxSections,
-  toggleTemplateInfoboxSectionSearch,
   addSerialAdmin,
   removeSerialAdmin,
   searchUsersForSerial,
+  toggleSerialSearchableLabel,
 } from "./actions";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -55,6 +55,7 @@ import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { PageEditor } from "./[page]/PageEditor";
 import { TemplateManager } from "@/components/TemplateManager";
 import { AdminManager } from "@/components/AdminManager";
+import { SearchableLabelsManager } from "@/components/SearchableLabelsManager";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { auth } from "@/auth";
@@ -92,6 +93,8 @@ export default async function SerialPage(props: SerialPageProps) {
     serialAdminList,
     session,
     pendingSuggestionsByPage,
+    searchableLabels,
+    allInfoboxLabels,
   ] = await Promise.all([
     getChapterCutoff(serial.id),
     fetchSerialAuthors(serial.id),
@@ -102,6 +105,8 @@ export default async function SerialPage(props: SerialPageProps) {
     fetchSerialAdmins(serial.id),
     auth(),
     getPendingSuggestionsByPage(serial.id),
+    fetchSerialSearchableLabels(serial.id),
+    fetchAllInfoboxLabelsForSerial(serial.id),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -148,7 +153,7 @@ export default async function SerialPage(props: SerialPageProps) {
     null,
     serial.id,
   );
-  const toggleTemplateInfoboxSectionSearchForSerial = toggleTemplateInfoboxSectionSearch.bind(
+  const toggleSerialSearchableLabelForSerial = toggleSerialSearchableLabel.bind(
     null,
     serial.id,
   );
@@ -364,7 +369,11 @@ export default async function SerialPage(props: SerialPageProps) {
                       addTemplateInfoboxSectionAction={addTemplateInfoboxSectionForSerial}
                       deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionForSerial}
                       reorderTemplateInfoboxSectionAction={reorderTemplateInfoboxSectionsForSerial}
-                      toggleTemplateInfoboxSectionSearchAction={toggleTemplateInfoboxSectionSearchForSerial}
+                    />
+                    <SearchableLabelsManager
+                      allLabels={allInfoboxLabels}
+                      searchableLabels={searchableLabels}
+                      toggleLabelAction={toggleSerialSearchableLabelForSerial}
                     />
                   </>
                 }

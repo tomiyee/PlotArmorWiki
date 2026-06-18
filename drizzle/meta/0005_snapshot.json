@@ -1,5 +1,5 @@
 {
-  "id": "1eac92c0-0081-445f-80e0-48a051731172",
+  "id": "84fa868d-a0c3-48d7-806b-32c8ae1802c2",
   "prevId": "e8d4c5e2-a293-4948-a280-f863358861c1",
   "version": "7",
   "dialect": "postgresql",
@@ -1400,6 +1400,53 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.serial_searchable_infobox_labels": {
+      "name": "serial_searchable_infobox_labels",
+      "schema": "",
+      "columns": {
+        "serial_id": {
+          "name": "serial_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "serial_searchable_infobox_labels_serial_id_serials_id_fk": {
+          "name": "serial_searchable_infobox_labels_serial_id_serials_id_fk",
+          "tableFrom": "serial_searchable_infobox_labels",
+          "tableTo": "serials",
+          "columnsFrom": [
+            "serial_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "serial_searchable_infobox_labels_serial_id_label_pk": {
+          "name": "serial_searchable_infobox_labels_serial_id_label_pk",
+          "columns": [
+            "serial_id",
+            "label"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.serials": {
       "name": "serials",
       "schema": "",
@@ -1533,13 +1580,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "include_in_search": {
-          "name": "include_in_search",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {},
