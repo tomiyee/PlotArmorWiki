@@ -9,21 +9,10 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   pageInfoboxImageRevisions,
+  serialSearchableInfoboxLabels,
   volumes,
 } from "@/db/schema";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-  max,
-  or,
-} from "drizzle-orm";
+import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, lte, max, or, sql } from "drizzle-orm";
 import type {
   PageStub,
   SerialPageStub,
@@ -705,12 +694,12 @@ export async function fetchPageTitleEntriesAtIdx(
 export const SEARCH_RESULT_LIMIT = 20;
 
 /**
- * Returns up to 20 visible, non-home pages whose canonical name matches `query`
- * (case-insensitive substring) at `cutoffIdx`. Returns an empty array when `query`
- * is blank so callers can skip the network round-trip entirely.
+ * Returns up to 20 visible, non-home pages whose canonical name — or any
+ * infobox row whose label is in `serial_searchable_infobox_labels` for this
+ * serial — matches `query` (case-insensitive substring) at `cutoffIdx`.
+ * Returns an empty array when `query` is blank.
  *
- * Spoiler rule: pages with an intro chapter index beyond `cutoffIdx` are excluded
- * (same filter as `fetchSearchablePagesAtIdx`).
+ * Spoiler rule: pages with an intro chapter index beyond `cutoffIdx` are excluded.
  *
  * Does NOT resolve chapter-versioned titles — call `resolvePageTitlesAtIdx` on the
  * returned IDs and fall back to `name` when no title row exists.
@@ -723,6 +712,57 @@ export async function searchPagesByNameAtIdx(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
+  const escaped = trimmed.replace(/[\\%_]/g, '\\$&');
+  const pattern = `%${escaped}%`;
+
+  // Subquery: does this page have a searchable infobox row matching the query?
+  // A row is searchable when its label appears in serial_searchable_infobox_labels.
+  // Raw SQL for the max-idx scalar to avoid Drizzle alias collisions with the
+  // outer `chapters` join.
+  const infoboxSearchExists = exists(
+    db
+      .select({ one: pageInfoboxSections.id })
+      .from(pageInfoboxSections)
+      .innerJoin(
+        serialSearchableInfoboxLabels,
+        and(
+          eq(serialSearchableInfoboxLabels.label, pageInfoboxSections.label),
+          eq(serialSearchableInfoboxLabels.serialId, serialId),
+        ),
+      )
+      .innerJoin(
+        pageInfoboxRevisions,
+        and(
+          eq(pageInfoboxRevisions.pageId, pageInfoboxSections.pageId),
+          eq(pageInfoboxRevisions.infoboxSectionId, pageInfoboxSections.id),
+        ),
+      )
+      .innerJoin(
+        chapters,
+        and(
+          eq(chapters.id, pageInfoboxRevisions.chapterId),
+          lte(chapters.idx, cutoffIdx),
+        ),
+      )
+      .where(
+        and(
+          eq(pageInfoboxSections.pageId, pages.id),
+          isNull(pageInfoboxSections.deletedAt),
+          ilike(pageInfoboxRevisions.content, pattern),
+          eq(
+            chapters.idx,
+            sql<number>`(
+              SELECT MAX(c2.idx)
+              FROM page_infobox_revisions pir2
+              JOIN chapters c2 ON c2.id = pir2.chapter_id AND c2.idx <= ${cutoffIdx}
+              WHERE pir2.page_id = ${pageInfoboxSections.pageId}
+                AND pir2.infobox_section_id = ${pageInfoboxSections.id}
+            )`,
+          ),
+        ),
+      ),
+  );
+
   return db
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
@@ -733,7 +773,7 @@ export async function searchPagesByNameAtIdx(
         eq(pages.isHomePage, false),
         isNull(pages.deletedAt),
         or(isNull(pages.introChapterId), lte(chapters.idx, cutoffIdx)),
-        ilike(pages.name, `%${trimmed}%`),
+        or(ilike(pages.name, pattern), infoboxSearchExists),
       ),
     )
     .orderBy(asc(pages.name))

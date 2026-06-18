@@ -53,7 +53,7 @@ PlotArmor is a spoiler-safe wiki platform. Users set a **chapter cutoff** per se
 | Database      | PostgreSQL (serverless)                                      |
 | ORM           | Drizzle ORM                                                  |
 | Auth          | Auth.js (NextAuth v5) — Google OAuth, Drizzle adapter        |
-| Search        | PostgreSQL full-text search (tsvector) — not yet implemented |
+| Search        | PostgreSQL `ILIKE` case-insensitive substring match with chapter-visibility filter |
 | Markdown      | `@mdxeditor/editor` (WYSIWYG edit) + `react-markdown` (render) |
 | Styling       | Tailwind CSS v4                                              |
 | UI components | Shadcn UI (Button, Input, Select, Dialog) + custom Text      |
@@ -93,7 +93,7 @@ All DB read queries live in `src/data/`, organized by domain. **Never write a ra
 
 Each domain lives in `src/data/<domain>/queries.ts`:
 
-- **`serials/`** — serial lookup by slug, listing all serials, fetching author/admin membership lists.
+- **`serials/`** — serial lookup by slug, listing all serials, fetching author/admin membership lists, fetching the set of searchable infobox labels and all distinct infobox labels for a serial.
 - **`chapters/`** — chapter and volume lookups by id/idx, full volume+chapter tree for a serial, progress cutoff resolution.
 - **`pages/`** — page lookups by slug or id (live and at-chapter-idx variants), page listings (all, searchable, deleted, parent, home), chapter-filtered content (sections, infobox rows, child pages, title entries), and shared subquery builder helpers used across page queries.
 - **`templates/`** — template listings per serial.

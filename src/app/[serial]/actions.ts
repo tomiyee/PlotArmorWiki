@@ -12,6 +12,7 @@ import {
   templates,
   templateSections,
   templateInfoboxSections,
+  serialSearchableInfoboxLabels,
   serialAdmins,
   users,
   userProgress,
@@ -959,6 +960,23 @@ export async function addTemplateInfoboxSection(
   });
 }
 
+async function requireInfoboxSectionBelongsToSerial(
+  infoboxSectionId: number,
+  serialId: number,
+) {
+  const [target] = await db
+    .select({ id: templateInfoboxSections.id })
+    .from(templateInfoboxSections)
+    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
+    .where(
+      and(
+        eq(templateInfoboxSections.id, infoboxSectionId),
+        eq(templates.serialId, serialId),
+      ),
+    );
+  if (!target) throw new Error("Infobox section not found");
+}
+
 /**
  * Removes an infobox section from a template.
  *
@@ -976,22 +994,50 @@ export async function deleteTemplateInfoboxSection(
   const infoboxSectionId = parseInt(infoboxSectionIdRaw, 10);
   if (isNaN(infoboxSectionId)) throw new Error("Invalid infobox section ID");
 
-  // Verify the infobox section's template belongs to this serial.
-  const [target] = await db
-    .select({ id: templateInfoboxSections.id })
-    .from(templateInfoboxSections)
-    .innerJoin(templates, eq(templateInfoboxSections.templateId, templates.id))
-    .where(
-      and(
-        eq(templateInfoboxSections.id, infoboxSectionId),
-        eq(templates.serialId, serialId),
-      ),
-    );
-  if (!target) throw new Error("Infobox section not found");
+  await requireInfoboxSectionBelongsToSerial(infoboxSectionId, serialId);
 
   await db
     .delete(templateInfoboxSections)
     .where(eq(templateInfoboxSections.id, infoboxSectionId));
+}
+
+/**
+ * Adds or removes a label from the serial's searchable infobox labels registry.
+ * When enabled, page infobox rows with this label will be matched during search.
+ *
+ * @example
+ * const fd = new FormData();
+ * fd.set('label', 'Aliases');
+ * fd.set('enabled', 'true'); // 'true' to add, 'false' to remove
+ * await toggleSerialSearchableLabel(42, fd);
+ */
+export async function toggleSerialSearchableLabel(
+  serialId: number,
+  formData: FormData,
+) {
+  await requireSerialAdmin(serialId);
+  const label = formData.get("label");
+  const enabled = formData.get("enabled");
+  if (!label || typeof label !== "string" || !label.trim())
+    throw new Error("label is required");
+  if (enabled !== "true" && enabled !== "false")
+    throw new Error("enabled must be 'true' or 'false'");
+
+  if (enabled === "true") {
+    await db
+      .insert(serialSearchableInfoboxLabels)
+      .values({ serialId, label: label.trim() })
+      .onConflictDoNothing();
+  } else {
+    await db
+      .delete(serialSearchableInfoboxLabels)
+      .where(
+        and(
+          eq(serialSearchableInfoboxLabels.serialId, serialId),
+          eq(serialSearchableInfoboxLabels.label, label.trim()),
+        ),
+      );
+  }
 }
 
 // ── Admin management ─────────────────────────────────────────────────────────

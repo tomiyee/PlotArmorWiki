@@ -15,6 +15,7 @@ import {
   templates,
   templateSections,
   templateInfoboxSections,
+  serialSearchableInfoboxLabels,
   chapterSynopses,
 } from "@/db/schema";
 import {
@@ -1189,16 +1190,50 @@ export async function renameInfoboxSection(formData: FormData): Promise<void> {
     throw new Error("infoboxSectionId and label are required");
 
   const [infoboxRow] = await db
-    .select({ pageId: pageInfoboxSections.pageId })
+    .select({ pageId: pageInfoboxSections.pageId, oldLabel: pageInfoboxSections.label })
     .from(pageInfoboxSections)
     .where(eq(pageInfoboxSections.id, infoboxSectionId))
     .limit(1);
-  if (infoboxRow) await requireSerialAdminByPageId(infoboxRow.pageId);
+  if (!infoboxRow) return;
+  await requireSerialAdminByPageId(infoboxRow.pageId);
 
   await db
     .update(pageInfoboxSections)
     .set({ label })
     .where(eq(pageInfoboxSections.id, infoboxSectionId));
+
+  // When the label changes, remove the old label from the serial's searchable
+  // registry if no other non-deleted infobox section in the serial still uses it.
+  if (infoboxRow.oldLabel !== label) {
+    const [pageRow] = await db
+      .select({ serialId: pages.serialId })
+      .from(pages)
+      .where(eq(pages.id, infoboxRow.pageId))
+      .limit(1);
+    if (pageRow) {
+      const [{ remaining }] = await db
+        .select({ remaining: count() })
+        .from(pageInfoboxSections)
+        .innerJoin(pages, eq(pages.id, pageInfoboxSections.pageId))
+        .where(
+          and(
+            eq(pages.serialId, pageRow.serialId),
+            eq(pageInfoboxSections.label, infoboxRow.oldLabel),
+            isNull(pageInfoboxSections.deletedAt),
+          ),
+        );
+      if (remaining === 0) {
+        await db
+          .delete(serialSearchableInfoboxLabels)
+          .where(
+            and(
+              eq(serialSearchableInfoboxLabels.serialId, pageRow.serialId),
+              eq(serialSearchableInfoboxLabels.label, infoboxRow.oldLabel),
+            ),
+          );
+      }
+    }
+  }
 }
 
 /**

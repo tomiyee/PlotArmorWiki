@@ -73,6 +73,7 @@ page_relationships            parent_page_id, child_page_id, chapter_id, is_acti
 templates                     id, serial_id, name, has_infobox
 template_sections             id, template_id, name, display_order
 template_infobox_sections     id, template_id, label, display_order
+serial_searchable_infobox_labels  serial_id, label
 
 page_suggestions                 id, page_id, proposed_by_user_id, target_chapter_id, status, citation, ...review fields
 page_suggestion_section_changes  id, suggestion_id, section_id, proposed_content
