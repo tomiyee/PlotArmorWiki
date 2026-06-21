@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/index";
 import {
-  serials,
   pages,
   pageTitles,
   pageRelationships,
@@ -15,8 +14,10 @@ import {
   templateInfoboxSections,
 } from "@/db/schema";
 import { and, asc, eq, like } from "drizzle-orm";
+import type { PostgresError } from "postgres";
 import { titleToSlug } from "@/lib/slug";
 import { requireSerialAdminBySlug } from "@/lib/auth-guard";
+import { getSerialBySlug } from "@/data/serials/queries";
 
 /**
  * Generates a slug unique within the serial. If `titleToSlug(name)` already
@@ -63,6 +64,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
   const introChapterIdRaw = formData.get("introChapterId");
   const parentPageIdRaw = formData.get("parentPageId");
   const templateIdRaw = formData.get("templateId");
+  const idempotencyKeyRaw = formData.get("idempotencyKey");
 
   if (!name || typeof name !== "string" || name.trim() === "") {
     throw new Error("Page name is required");
@@ -86,17 +88,20 @@ export async function createPage(serialSlug: string, formData: FormData) {
   if (isNaN(parentPageId) || parentPageId <= 0)
     throw new Error("Invalid parent page ID");
 
+  // Idempotency key: a UUID generated on form mount to deduplicate retries.
+  // Present only when the form sends it; absent for programmatic / legacy calls.
+  const idempotencyKey =
+    idempotencyKeyRaw && typeof idempotencyKeyRaw === "string"
+      ? idempotencyKeyRaw
+      : null;
+
   // Optional template - empty string or missing means no template.
   const templateId =
     templateIdRaw && typeof templateIdRaw === "string" && templateIdRaw !== ""
       ? parseInt(templateIdRaw, 10)
       : null;
 
-  const [serial] = await db
-    .select({ id: serials.id })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) throw new Error("Serial not found");
 
   // Pre-fetch the template definition outside the transaction (read-only).
@@ -144,8 +149,26 @@ export async function createPage(serialSlug: string, formData: FormData) {
   }
 
   const trimmedName = name.trim();
+
+  // --- Idempotency check (Layer 2) ---
+  // If a page was already created with the same key (e.g. the previous response
+  // was lost and the user retried), redirect to that page instead of creating a
+  // duplicate.
+  if (idempotencyKey) {
+    const [existing] = await db
+      .select({ slug: pages.slug })
+      .from(pages)
+      .where(eq(pages.idempotencyKey, idempotencyKey));
+
+    if (existing) {
+      revalidatePath(`/${serialSlug}`, "layout");
+      redirect(`/${serialSlug}/${encodeURIComponent(existing.slug)}`);
+    }
+  }
+
   const slug = await generateUniqueSlug(serial.id, trimmedName);
 
+  try {
   await db.transaction(async (tx) => {
     // 1. Insert the page.
     const [newPage] = await tx
@@ -155,6 +178,7 @@ export async function createPage(serialSlug: string, formData: FormData) {
         name: trimmedName,
         slug,
         introChapterId,
+        idempotencyKey,
       })
       .returning({ id: pages.id });
 
@@ -204,6 +228,26 @@ export async function createPage(serialSlug: string, formData: FormData) {
       );
     }
   });
+  } catch (err) {
+    // Unique-constraint violation on idempotency_key means a concurrent request
+    // already committed the same page. Look it up and redirect rather than crash.
+    const pgErr = err as PostgresError;
+    if (
+      idempotencyKey &&
+      pgErr.code === "23505" &&
+      pgErr.constraint_name === "pages_idempotency_key_unique"
+    ) {
+      const [race] = await db
+        .select({ slug: pages.slug })
+        .from(pages)
+        .where(eq(pages.idempotencyKey, idempotencyKey));
+      if (race) {
+        revalidatePath(`/${serialSlug}`, "layout");
+        redirect(`/${serialSlug}/${encodeURIComponent(race.slug)}`);
+      }
+    }
+    throw err;
+  }
 
   revalidatePath(`/${serialSlug}`, "layout");
   redirect(`/${serialSlug}/${encodeURIComponent(slug)}`);

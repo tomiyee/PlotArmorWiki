@@ -10,16 +10,21 @@ import { Popover } from "@/components/ui/Popover";
 import { Select } from "@/components/ui/Select";
 import type { Option } from "@/components/ui/Select";
 import { BookmarkIcon, XIcon } from "lucide-react";
-import { ChapterData, Volume } from "@/types";
+import { ChapterRow, VolumeRow as Volume } from "@/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { syncUserProgress } from "@/app/[serial]/actions";
 
-interface Props {
+interface ChapterSelectorProps {
+  /** DB id of the serial; used to scope the localStorage key, cookie name, and progress sync. */
   serialId: number;
+  /** URL slug of the serial. */
   serialSlug: string;
+  /** Label for the chapter unit (e.g. `"Chapter"`, `"Episode"`). */
   chapterType: string;
+  /** All volumes for this serial, used to build grouped chapter options. */
   volumes: Volume[];
-  chaptersByVolume: Partial<Record<number, ChapterData[]>>;
+  /** Chapters keyed by volume id, used alongside `volumes` to populate the dropdown. */
+  chaptersByVolume: Partial<Record<number, ChapterRow[]>>;
   /**
    * Chapter ID sourced from the `user_progress` database row (for authenticated
    * users). When provided it seeds the initial selection, overriding any stale
@@ -63,7 +68,7 @@ const GLOBAL_POPOVER_DISMISSED_KEY = "plotarmor:spoiler_popover_dismissed";
  *   chaptersByVolume={chaptersByVolume}
  * />
  */
-export function ChapterSelector(props: Props) {
+export function ChapterSelector(props: ChapterSelectorProps) {
   const {
     serialId,
     chapterType,

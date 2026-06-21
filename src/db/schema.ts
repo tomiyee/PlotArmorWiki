@@ -76,6 +76,10 @@ export const chapters = pgTable("chapters", {
  *
  * `isHomePage` marks the single automatically-created root page for a serial.
  * Every serial has exactly one home page.
+ *
+ * `deletedAt` supports soft-delete so that deleted pages can be restored. A
+ * non-null value hides the page from readers and excludes it from search and
+ * wiki-link resolution, but the row (and all its versioned content) is preserved.
  */
 export const pages = pgTable(
   "pages",
@@ -91,6 +95,20 @@ export const pages = pgTable(
     introChapterId: integer("intro_chapter_id").references(() => chapters.id),
     /** True for the single automatically-created root page per serial. */
     isHomePage: boolean("is_home_page").notNull().default(false),
+    /** Non-null when the page has been soft-deleted. Null for live pages. */
+    deletedAt: timestamp("deleted_at"),
+    /** Admin-supplied markdown reason for the deletion. Null when no reason was given. */
+    deletionReason: text("deletion_reason"),
+    /**
+     * UUID generated on the new-page form mount and submitted with the creation
+     * request. Uniqueness is enforced so that a network retry carrying the same
+     * key hits the constraint, is caught server-side, and redirects to the
+     * already-created page rather than inserting a duplicate.
+     *
+     * Null for the home page (created programmatically without a form) and for
+     * pages created before this column was added.
+     */
+    idempotencyKey: text("idempotency_key").unique(),
   },
   (t) => [uniqueIndex("pages_serial_id_slug_idx").on(t.serialId, t.slug)],
 );

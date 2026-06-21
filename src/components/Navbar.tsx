@@ -42,7 +42,7 @@ export default function Navbar(props: NavbarProps) {
     useNavbarSerialContext();
 
   return (
-    <nav className="sticky top-0 z-10 border-b bg-background">
+    <nav className="sticky top-0 z-20 border-b bg-background">
       <div className="mx-auto max-w-(--content-width) w-full px-4 py-2 flex items-center justify-between gap-4 min-h-13.5">
         {/* Left: hamburger (mobile) or logo (desktop) + serial breadcrumb + Pages + TOC */}
         <div className="flex items-center gap-2 min-w-0" suppressHydrationWarning>
@@ -95,7 +95,12 @@ export default function Navbar(props: NavbarProps) {
         </div>
         {/* Right: search + chapter selector + auth */}
         <Box className="gap-2 items-center">
-          {serialData && <SerialSearch serialSlug={serialData.serialSlug} />}
+          {serialData && (
+            <SerialSearch
+              serialSlug={serialData.serialSlug}
+              isAdmin={serialData.isAdmin}
+            />
+          )}
           {chapterSelectorSlot}
           {authSlot}
         </Box>

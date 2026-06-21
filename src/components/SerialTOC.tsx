@@ -7,7 +7,7 @@ import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Text } from "@/components/ui/Text";
 import { cn } from "@/lib/utils";
-import { ChapterData, Volume } from "@/types";
+import { ChapterRow as ChapterData, VolumeRow as Volume } from "@/types";
 
 type SerialTOCProps = {
   /** The serial's database ID, used as the localStorage key namespace. */

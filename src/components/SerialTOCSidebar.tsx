@@ -13,7 +13,7 @@ import {
 import { SerialTOC } from "@/components/SerialTOC";
 import { SerialEditor } from "@/components/SerialEditor";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { ChapterData, Volume } from "@/types";
+import { ChapterRow, VolumeRow as Volume } from "@/types";
 import { ChapterType, VolumeType } from "@/lib/serial-types";
 import type { BulkTocPayload } from "@/app/[serial]/actions";
 
@@ -25,7 +25,7 @@ type SerialTOCSidebarProps = {
   /** Ordered list of volumes to display in the TOC. */
   volumes: Volume[];
   /** Map from volume ID to its chapters, forwarded to SerialTOC and SerialEditor. */
-  chaptersByVolume: Record<number, ChapterData[]>;
+  chaptersByVolume: Record<number, ChapterRow[]>;
   /** Display label for an individual chapter (e.g. "Chapter", "Episode"). */
   chapterType: ChapterType;
   /** Display label for a volume group (e.g. "Volume", "Season"). Used in SerialEditor. */
@@ -55,6 +55,8 @@ type SerialTOCSidebarProps = {
   bulkApplyTocAction: (payload: BulkTocPayload) => Promise<void>;
   /** When false, hides the edit (pen) icon so non-admins cannot open SerialEditor. */
   isAdmin?: boolean;
+  /** The chapter the admin is currently reading; forwarded to SerialEditor as the initial "Writing as of" selection. */
+  readingChapterId?: number | null;
 };
 
 /**
@@ -84,6 +86,7 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
     updateSerialTypesAction,
     bulkApplyTocAction,
     isAdmin = false,
+    readingChapterId = null,
   } = props;
   const [editOpen, setEditOpen] = useState(false);
 
@@ -132,13 +135,14 @@ export function SerialTOCSidebar(props: SerialTOCSidebarProps) {
             {volumeType}s &amp; {chapterType}s
           </DialogTitle>
         </DialogHeader>
-        <DialogBody className="max-h-[70vh]">
+        <DialogBody className="max-h-70vh">
           <SerialEditor
             serialId={serialId}
             volumes={volumes}
             chaptersByVolume={chaptersByVolume}
             chapterType={chapterType}
             volumeType={volumeType}
+            readingChapterId={readingChapterId}
             addChapterAction={addChapterAction}
             addVolumeAction={addVolumeAction}
             deleteChapterAction={deleteChapterAction}

@@ -10,6 +10,7 @@ import {
   type LexicalNode,
 } from "lexical";
 import { WikiLinkChip } from "./WikiLinkChip";
+import { escapeWikiAlias } from "@/lib/wiki-links";
 
 // ── WikiLinkNode ─────────────────────────────────────────────────────────────
 
@@ -74,12 +75,12 @@ export class WikiLinkNode extends DecoratorNode<ReactElement> {
 
   getTextContent(): string {
     return this.__alias
-      ? `[[${this.__token}|${this.__alias}]]`
+      ? `[[${this.__token}|${escapeWikiAlias(this.__alias)}]]`
       : `[[${this.__token}]]`;
   }
 
   decorate(_editor: LexicalEditor, _config: EditorConfig): ReactElement {
-    return <WikiLinkChip token={this.__token} alias={this.__alias} />;
+    return <WikiLinkChip token={this.__token} alias={this.__alias} nodeKey={this.__key} />;
   }
 }
 

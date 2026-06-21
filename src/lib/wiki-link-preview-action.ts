@@ -1,20 +1,20 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { db } from "@/db/index";
+import { getSerialBySlug } from "@/data/serials/queries";
 import {
-  serials,
-  pages,
-  chapters,
-  chapterSynopses,
-  volumes,
-  pageInfoboxSections,
-  pageInfoboxRevisions,
-  pageInfoboxImageRevisions,
-  pageSections,
-  pageSectionRevisions,
-} from "@/db/schema";
-import { and, asc, eq, isNull, lte, max } from "drizzle-orm";
+  getChapterBySerialAndIdx,
+  getChapterCutoff,
+  fetchChapterById,
+  fetchChapterSynopsis,
+  fetchVolumeById,
+} from "@/data/chapters/queries";
+import {
+  fetchLivePageAtSlug,
+  fetchAllSerialPageStubs,
+  fetchFirstSectionAtIdx,
+  fetchPageInfoboxAtIdx,
+  resolvePageTitlesAtIdx,
+} from "@/data/pages/queries";
 
 export interface WikiLinkPreviewData {
   pageName: string;
@@ -27,6 +27,8 @@ export interface WikiLinkPreviewData {
   floaterImageUrl: string | null;
   /** Floater key-value rows. */
   floaterRows: { label: string; content: string }[];
+  /** slug → chapter-versioned title at the user's cutoff, for resolving [[slug]] wiki links. */
+  pageTitles: Record<string, string>;
 }
 
 /**
@@ -45,57 +47,37 @@ export async function getWikiLinkPreview(
   serialSlug: string,
   pageSlug: string,
 ): Promise<WikiLinkPreviewData | null> {
-  // Resolve serial
-  const [serial] = await db
-    .select({ id: serials.id, chapterType: serials.chapterType })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) return null;
 
-  // Read chapter cutoff from cookie (same pattern as page.tsx)
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
-  let cutoffIdx = 0;
-  if (raw) {
-    const chapterId = parseInt(raw, 10);
-    if (!isNaN(chapterId)) {
-      const [row] = await db
-        .select({ idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, chapterId))
-        .limit(1);
-      if (row) cutoffIdx = row.idx;
-    }
-  }
+  const { cutoffIdx } = await getChapterCutoff(serial.id);
 
-  // Resolve page by slug within the serial
-  const [page] = await db
-    .select({
-      id: pages.id,
-      name: pages.name,
-      introChapterId: pages.introChapterId,
-    })
-    .from(pages)
-    .where(and(eq(pages.serialId, serial.id), eq(pages.slug, pageSlug)))
-    .limit(1);
+  // Deleted pages return null so wiki links pointing to them render as plain text.
+  const page = await fetchLivePageAtSlug(serial.id, pageSlug);
   if (!page) return null;
 
-  // Resolve intro chapter name (introChapterId is null for the home page)
+  // Resolve intro chapter name (introChapterId is null for the home page).
   const introChapterRow = page.introChapterId
-    ? await db
-        .select({ displayName: chapters.displayName, idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, page.introChapterId))
-        .limit(1)
-        .then((rows) => rows[0] ?? null)
+    ? await fetchChapterById(page.introChapterId)
     : null;
 
   const introChapterName = introChapterRow
     ? `${serial.chapterType} ${introChapterRow.displayName}`
     : null;
 
-  // Check spoiler visibility
+  // Build slug → title map for all pages (used by MarkdownRenderer to resolve
+  // [[slug]] display text inside the preview content and floater rows).
+  const allPageStubs = await fetchAllSerialPageStubs(serial.id);
+  let resolvedPageTitles: Record<string, string> = {};
+  if (allPageStubs.length > 0) {
+    const pageIds = allPageStubs.map((p) => p.id);
+    const titleByPageId = await resolvePageTitlesAtIdx(pageIds, cutoffIdx);
+    resolvedPageTitles = Object.fromEntries(
+      allPageStubs.map((p) => [p.slug, titleByPageId.get(p.id) ?? p.name]),
+    );
+  }
+
+  // Check spoiler visibility.
   if (introChapterRow && introChapterRow.idx > cutoffIdx) {
     return {
       pageName: page.name,
@@ -104,136 +86,17 @@ export async function getWikiLinkPreview(
       firstSectionContent: "",
       floaterImageUrl: null,
       floaterRows: [],
+      pageTitles: resolvedPageTitles,
     };
   }
 
-  // Fetch the first section content at the user's cutoff
-  const sectionMaxIdxSq = db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, page.id),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+  const [firstSectionContent, infobox] = await Promise.all([
+    fetchFirstSectionAtIdx(page.id, cutoffIdx),
+    fetchPageInfoboxAtIdx(page.id, cutoffIdx),
+  ]);
 
-  const [firstSection] = await db
-    .select({ content: pageSectionRevisions.content })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .innerJoin(
-      pageSections,
-      eq(pageSectionRevisions.sectionId, pageSections.id),
-    )
-    .innerJoin(
-      sectionMaxIdxSq,
-      and(
-        eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
-        eq(chapters.idx, sectionMaxIdxSq.maxIdx),
-      ),
-    )
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, page.id),
-        isNull(pageSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageSections.displayOrder))
-    .limit(1);
-
-  const firstSectionContent = firstSection?.content ?? "";
-
-  // Fetch infobox data
-  const activeInfoboxRows = await db
-    .select({ id: pageInfoboxSections.id, label: pageInfoboxSections.label })
-    .from(pageInfoboxSections)
-    .where(
-      and(
-        eq(pageInfoboxSections.pageId, page.id),
-        isNull(pageInfoboxSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageInfoboxSections.displayOrder));
-
-  let floaterImageUrl: string | null = null;
-  let floaterRows: { label: string; content: string }[] = [];
-
-  if (activeInfoboxRows.length > 0) {
-    const floaterMaxIdxSq = db
-      .select({ maxIdx: max(chapters.idx).as("max_idx") })
-      .from(pageInfoboxImageRevisions)
-      .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageInfoboxImageRevisions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .as("floater_max_idx_sq");
-
-    const infoboxRowMaxIdxSq = db
-      .select({
-        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-        maxIdx: max(chapters.idx).as("max_idx"),
-      })
-      .from(pageInfoboxRevisions)
-      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-      .where(
-        and(
-          eq(pageInfoboxRevisions.pageId, page.id),
-          lte(chapters.idx, cutoffIdx),
-        ),
-      )
-      .groupBy(pageInfoboxRevisions.infoboxSectionId)
-      .as("infobox_row_max_idx_sq");
-
-    const [[floaterVersion], infoboxRowVersions] = await Promise.all([
-      db
-        .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
-        .from(pageInfoboxImageRevisions)
-        .innerJoin(
-          chapters,
-          eq(pageInfoboxImageRevisions.chapterId, chapters.id),
-        )
-        .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
-        .where(eq(pageInfoboxImageRevisions.pageId, page.id))
-        .limit(1),
-      db
-        .select({
-          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-          content: pageInfoboxRevisions.content,
-        })
-        .from(pageInfoboxRevisions)
-        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-        .innerJoin(
-          infoboxRowMaxIdxSq,
-          and(
-            eq(
-              pageInfoboxRevisions.infoboxSectionId,
-              infoboxRowMaxIdxSq.infoboxSectionId,
-            ),
-            eq(chapters.idx, infoboxRowMaxIdxSq.maxIdx),
-          ),
-        )
-        .where(eq(pageInfoboxRevisions.pageId, page.id)),
-    ]);
-
-    floaterImageUrl = floaterVersion?.imageUrl ?? null;
-    const rowContentMap = new Map(
-      infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]),
-    );
-    floaterRows = activeInfoboxRows.map((r) => ({
-      label: r.label,
-      content: rowContentMap.get(r.id) ?? "",
-    }));
-  }
+  const floaterImageUrl = infobox.floaterImageUrl ?? null;
+  const floaterRows = infobox.rows.map((r) => ({ label: r.label, content: r.content }));
 
   return {
     pageName: page.name,
@@ -242,6 +105,7 @@ export async function getWikiLinkPreview(
     firstSectionContent,
     floaterImageUrl,
     floaterRows,
+    pageTitles: resolvedPageTitles,
   };
 }
 
@@ -273,51 +137,15 @@ export async function getChapterLinkPreview(
   serialSlug: string,
   chapterIdx: number,
 ): Promise<ChapterLinkPreviewData | null> {
-  // Resolve serial
-  const [serial] = await db
-    .select({ id: serials.id, chapterType: serials.chapterType })
-    .from(serials)
-    .where(eq(serials.slug, serialSlug))
-    .limit(1);
+  const serial = await getSerialBySlug(serialSlug);
   if (!serial) return null;
 
-  // Read chapter cutoff from cookie
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`plotarmor_chapter_${serial.id}`)?.value;
-  let cutoffIdx = 0;
-  if (raw) {
-    const chapterId = parseInt(raw, 10);
-    if (!isNaN(chapterId)) {
-      const [row] = await db
-        .select({ idx: chapters.idx })
-        .from(chapters)
-        .where(eq(chapters.id, chapterId))
-        .limit(1);
-      if (row) cutoffIdx = row.idx;
-    }
-  }
+  const { cutoffIdx } = await getChapterCutoff(serial.id);
 
-  // Resolve chapter by serial + idx
-  const [chapter] = await db
-    .select({
-      id: chapters.id,
-      displayName: chapters.displayName,
-      idx: chapters.idx,
-      volumeId: chapters.volumeId,
-    })
-    .from(chapters)
-    .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
-    .where(and(eq(volumes.serialId, serial.id), eq(chapters.idx, chapterIdx)))
-    .limit(1);
+  const chapter = await getChapterBySerialAndIdx(serial.id, chapterIdx);
   if (!chapter) return null;
 
-  // Resolve volume name
-  const [volume] = await db
-    .select({ displayName: volumes.displayName })
-    .from(volumes)
-    .where(eq(volumes.id, chapter.volumeId))
-    .limit(1);
-
+  const volume = await fetchVolumeById(chapter.volumeId);
   const hidden = chapter.idx > cutoffIdx;
 
   if (hidden) {
@@ -330,14 +158,7 @@ export async function getChapterLinkPreview(
     };
   }
 
-  // Fetch synopsis snippet
-  const [synopsisRow] = await db
-    .select({ content: chapterSynopses.content })
-    .from(chapterSynopses)
-    .where(eq(chapterSynopses.chapterId, chapter.id))
-    .limit(1);
-
-  const synopsis = synopsisRow?.content ?? "";
+  const synopsis = (await fetchChapterSynopsis(chapter.id)) ?? "";
   const synopsisSnippet =
     synopsis.length > 200 ? synopsis.slice(0, 200).trimEnd() + "…" : synopsis;
 

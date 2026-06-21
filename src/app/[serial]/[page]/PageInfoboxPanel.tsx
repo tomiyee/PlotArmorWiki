@@ -1,28 +1,43 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useServerAction } from "@/hooks/useServerAction";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { InfoIcon } from "@/components/ui/InfoIcon";
+import { WikiLinkMDEditor } from "@/components/MDEditor/index";
 import { addInfoboxSection } from "./actions";
 import { PageInfoboxManager, type InfoboxSection } from "./PageInfoboxManager";
 import type { FloaterRowData } from "./types";
 
-interface Props {
+interface PageInfoboxPanelProps {
+  /** DB id of the page this infobox belongs to. */
   pageId: number;
+  /** Wall-clock-versioned infobox row structure for the management panel. */
   infoboxSectionStructure: InfoboxSection[];
+  /** Infobox rows at the reader's current chapter cutoff, used to seed draft state. */
   floaterRows: FloaterRowData[];
+  /** Controlled draft value for the floater image URL, owned by `PageEditor`. */
   draftFloaterImageUrl: string;
+  /** Setter for `draftFloaterImageUrl`, owned by `PageEditor`. */
   setDraftFloaterImageUrl: Dispatch<SetStateAction<string>>;
+  /** Controlled draft content keyed by infobox section id, owned by `PageEditor`. */
   draftFloaterRowContent: Record<number, string>;
+  /** Setter for `draftFloaterRowContent`, owned by `PageEditor`. */
   setDraftFloaterRowContent: Dispatch<SetStateAction<Record<number, string>>>;
   /** Whether the parent editor is pending a transition (disables inputs). */
   isPending: boolean;
+  /** Slug of the serial — forwarded to the MDEditor for wiki-link autocomplete. */
+  serialSlug: string;
+  /** All wiki pages for `[[Page]]` autocomplete in the MDEditor. */
+  wikiPages: { name: string; slug: string }[];
+  /** All chapters for `[[Chapter:Name]]` autocomplete in the MDEditor. */
+  wikiChapters?: { name: string; idx: number }[];
+  /** The serial's chapter type label (e.g. `"Chapter"`). */
+  chapterType?: string;
 }
 
 /**
@@ -40,20 +55,26 @@ interface Props {
  *   draftFloaterRowContent={{}}
  *   setDraftFloaterRowContent={setContent}
  *   isPending={false}
+ *   serialSlug="one-piece"
+ *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  * />
  */
-export function PageInfoboxPanel({
-  pageId,
-  infoboxSectionStructure,
-  floaterRows,
-  draftFloaterImageUrl,
-  setDraftFloaterImageUrl,
-  draftFloaterRowContent,
-  setDraftFloaterRowContent,
-  isPending: externalIsPending,
-}: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+export function PageInfoboxPanel(props: PageInfoboxPanelProps) {
+  const {
+    pageId,
+    infoboxSectionStructure,
+    floaterRows,
+    draftFloaterImageUrl,
+    setDraftFloaterImageUrl,
+    draftFloaterRowContent,
+    setDraftFloaterRowContent,
+    isPending: externalIsPending,
+    serialSlug,
+    wikiPages,
+    wikiChapters,
+    chapterType,
+  } = props;
+  const { runAsync, isPending } = useServerAction();
 
   const disabled = isPending || externalIsPending;
 
@@ -76,13 +97,10 @@ export function PageInfoboxPanel({
             className="self-start"
             disabled={disabled}
             onClick={() => {
-              startTransition(async () => {
-                const fd = new FormData();
-                fd.set("pageId", String(pageId));
-                fd.set("label", "Overview");
-                await addInfoboxSection(fd);
-                router.refresh();
-              });
+              const fd = new FormData();
+              fd.set("pageId", String(pageId));
+              fd.set("label", "Overview");
+              runAsync(() => addInfoboxSection(fd));
             }}
           >
             Enable infobox
@@ -108,17 +126,20 @@ export function PageInfoboxPanel({
 
           {floaterRows.map((row) => (
             <Box key={row.id} col className="gap-1.5">
-              <Label htmlFor={`floater-row-${row.id}`}>{row.label}</Label>
-              <Input
-                id={`floater-row-${row.id}`}
+              <Label>{row.label}</Label>
+              <WikiLinkMDEditor
                 value={draftFloaterRowContent[row.id] ?? ""}
-                onChange={(e) =>
+                onChange={(val) =>
                   setDraftFloaterRowContent((prev) => ({
                     ...prev,
-                    [row.id]: e.target.value,
+                    [row.id]: val ?? "",
                   }))
                 }
-                disabled={disabled}
+                height={120}
+                wikiPages={wikiPages}
+                serialSlug={serialSlug}
+                wikiChapters={wikiChapters}
+                chapterType={chapterType}
               />
             </Box>
           ))}

@@ -6,8 +6,12 @@ import { Text } from "@/components/ui/Text";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { getWikiLinkPreview } from "@/lib/wiki-link-preview-action";
 import type { WikiLinkPreviewData } from "@/lib/wiki-link-preview-action";
+import {
+  WIKI_LINK_CHIP_BASE,
+  WIKI_LINK_CHIP_LINK,
+} from "@/components/MDEditor/wikiLinkChipClasses";
 
-interface Props {
+interface WikiLinkPreviewProps {
   /** The URL the link points to. */
   href: string;
   /** Link label text. */
@@ -39,12 +43,8 @@ const PREVIEW_CHARS = 200;
  *   Luffy
  * </WikiLinkPreview>
  */
-export function WikiLinkPreview({
-  href,
-  children,
-  serialSlug,
-  pageName,
-}: Props) {
+export function WikiLinkPreview(props: WikiLinkPreviewProps) {
+  const { href, children, serialSlug, pageName } = props;
   const [preview, setPreview] = useState<
     WikiLinkPreviewData | "loading" | "missing"
   >("loading");
@@ -59,7 +59,7 @@ export function WikiLinkPreview({
   const anchor = (
     <a
       href={href}
-      className="text-primary underline hover:text-primary/80"
+      className={`${WIKI_LINK_CHIP_BASE} ${WIKI_LINK_CHIP_LINK}`}
       onMouseEnter={handleMouseEnter}
     >
       {children}
@@ -78,16 +78,16 @@ export function WikiLinkPreview({
 }
 
 interface PreviewContentProps {
+  /** Fetched preview data, or `"loading"` / `"missing"` sentinel values. */
   preview: WikiLinkPreviewData | "loading" | "missing";
+  /** Display name of the linked page, shown while loading or when missing. */
   pageName: string;
+  /** Serial slug forwarded to `MarkdownRenderer` for nested wiki link resolution. */
   serialSlug: string;
 }
 
-function PreviewContent({
-  preview,
-  pageName,
-  serialSlug,
-}: PreviewContentProps) {
+function PreviewContent(props: PreviewContentProps) {
+  const { preview, pageName, serialSlug } = props;
   if (preview === "loading") {
     return (
       <Text muted className="text-sm">
@@ -155,7 +155,11 @@ function PreviewContent({
                 <dt className="text-muted-foreground font-medium whitespace-nowrap">
                   {row.label}
                 </dt>
-                <dd className="text-foreground truncate">{row.content}</dd>
+                <dd className="text-foreground">
+                  <MarkdownRenderer sm serialSlug={serialSlug} pageTitles={preview.pageTitles}>
+                    {row.content}
+                  </MarkdownRenderer>
+                </dd>
               </Fragment>
             ))}
         </dl>
@@ -167,6 +171,7 @@ function PreviewContent({
           <MarkdownRenderer
             sm
             serialSlug={serialSlug}
+            pageTitles={preview.pageTitles}
             className="[&_p]:mb-1 [&_p:last-child]:mb-0"
           >
             {truncatedContent}

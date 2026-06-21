@@ -2,7 +2,7 @@ import { findAndReplace } from "mdast-util-find-and-replace";
 import type { Root } from "mdast";
 import type { Plugin } from "unified";
 import {
-  WIKI_LINK_RE,
+  DECODED_WIKI_LINK_RE,
   parseWikiLink,
   slugifyWikiName,
   isChapterCategory,
@@ -53,7 +53,7 @@ export function remarkWikiLinks(
 
   return () => (tree) => {
     findAndReplace(tree, [
-      WIKI_LINK_RE,
+      DECODED_WIKI_LINK_RE,
       (match: string, inner: string, alias: string | undefined) => {
         void match; // capture groups are what we need; full match unused
         const parts = parseWikiLink(inner, alias);

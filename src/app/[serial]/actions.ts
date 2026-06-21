@@ -31,7 +31,7 @@ import {
   not,
   sql,
 } from "drizzle-orm";
-import { parseChapterType, parseVolumeType } from "@/lib/serialTypes";
+import { parseChapterType, parseVolumeType } from "@/lib/serial-types";
 import { titleToSlug } from "@/lib/slug";
 import { requireSerialAdmin } from "@/lib/auth-guard";
 import { auth } from "@/auth";
@@ -872,17 +872,50 @@ export async function reorderTemplateSections(
   if (!target) throw new Error("Template not found");
 
   await db.transaction(async (tx) => {
-    for (let i = 0; i < orderedSectionIds.length; i++) {
-      await tx
-        .update(templateSections)
-        .set({ displayOrder: i })
-        .where(
-          and(
-            eq(templateSections.id, orderedSectionIds[i]),
-            eq(templateSections.templateId, templateId),
+    await Promise.all(
+      orderedSectionIds.map((id, i) =>
+        tx
+          .update(templateSections)
+          .set({ displayOrder: i })
+          .where(and(eq(templateSections.id, id), eq(templateSections.templateId, templateId))),
+      ),
+    );
+  });
+}
+
+/**
+ * Reorders infobox sections within a template. `orderedSectionIds` must
+ * include every infobox section for the template — no partial reorders.
+ *
+ * @example
+ * await reorderTemplateInfoboxSections(42, 7, [5, 3, 8]);
+ */
+export async function reorderTemplateInfoboxSections(
+  serialId: number,
+  templateId: number,
+  orderedSectionIds: number[],
+) {
+  await requireSerialAdmin(serialId);
+  if (orderedSectionIds.length === 0) return;
+
+  // Verify ownership.
+  const [target] = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(eq(templates.id, templateId), eq(templates.serialId, serialId)));
+  if (!target) throw new Error("Template not found");
+
+  await db.transaction(async (tx) => {
+    await Promise.all(
+      orderedSectionIds.map((id, i) =>
+        tx
+          .update(templateInfoboxSections)
+          .set({ displayOrder: i })
+          .where(
+            and(eq(templateInfoboxSections.id, id), eq(templateInfoboxSections.templateId, templateId)),
           ),
-        );
-    }
+      ),
+    );
   });
 }
 

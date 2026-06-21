@@ -12,6 +12,9 @@ import {
   UploadIcon,
 } from "lucide-react";
 import type { BulkTocPayload } from "@/app/[serial]/actions";
+import { Banner } from "@/components/ui/Banner";
+import { WritingAsOfBanner } from "@/app/[serial]/[page]/WritingAsOfBanner";
+import type { ChapterGroupOption } from "@/app/[serial]/[page]/types";
 import {
   DndContext,
   DragOverlay,
@@ -57,19 +60,7 @@ import {
   VolumeType,
 } from "@/lib/serial-types";
 import { Tooltip } from "@/components/ui/Tooltip";
-
-interface Chapter {
-  id: number;
-  displayName: string;
-  idx: number;
-  volumeId: number;
-}
-
-interface Volume {
-  id: number;
-  displayName: string;
-  idx: number;
-}
+import type { ChapterRow as Chapter, VolumeRow as Volume } from "@/types";
 
 interface PendingDelete {
   type: "volume" | "chapter";
@@ -83,6 +74,8 @@ interface SerialEditorProps {
   chaptersByVolume: Record<number, Chapter[]>;
   chapterType: ChapterType;
   volumeType: VolumeType;
+  /** The chapter the admin is currently reading; used as the initial "Writing as of" selection. */
+  readingChapterId?: number | null;
   addChapterAction: (formData: FormData) => Promise<void>;
   addVolumeAction: (formData: FormData) => Promise<void>;
   deleteChapterAction: (formData: FormData) => Promise<void>;
@@ -762,7 +755,7 @@ function TocDiffPreviewDialog(props: TocDiffPreviewDialogProps) {
       <DialogHeader>
         <DialogTitle>Preview TOC changes</DialogTitle>
       </DialogHeader>
-      <DialogBody className="max-h-[60vh]">
+      <DialogBody className="max-h-60vh">
         {!hasChanges ? (
           <Text muted>
             No changes detected - the uploaded TOC matches the current one.
@@ -925,6 +918,7 @@ export function SerialEditor(props: SerialEditorProps) {
     chaptersByVolume: initialChaptersByVolume,
     chapterType,
     volumeType,
+    readingChapterId = null,
     addChapterAction,
     addVolumeAction,
     deleteChapterAction,
@@ -941,6 +935,37 @@ export function SerialEditor(props: SerialEditorProps) {
   // SerialEditor is always in edit mode; it is rendered inside a dialog that
   // the user explicitly opens to manage volumes and chapters.
   const editing = true;
+
+  // Derive a flat, volume-named chapter list from existing props for the banner selector.
+  const allChaptersWithVolume = initialVolumes.flatMap((v) =>
+    (initialChaptersByVolume[v.id] ?? []).map((c) => ({
+      id: c.id,
+      displayName: c.displayName,
+      idx: c.idx,
+      volumeName: v.displayName,
+    })),
+  );
+  const headChapterId = allChaptersWithVolume.at(-1)?.id ?? null;
+  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
+    readingChapterId ?? headChapterId,
+  );
+
+  const chapterSelectOptions: ChapterGroupOption[] = (() => {
+    const volumeMap = new Map<
+      string,
+      { label: string; value: number; disabled: boolean }[]
+    >();
+    for (const ch of allChaptersWithVolume) {
+      const arr = volumeMap.get(ch.volumeName) ?? [];
+      arr.push({ label: ch.displayName, value: ch.id, disabled: false });
+      volumeMap.set(ch.volumeName, arr);
+    }
+    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
+      label: volumeName,
+      value: -1 as number,
+      children: chaps,
+    }));
+  })();
 
   const [volCollapsed, setVolCollapsed] = usePersistedStore<
     Record<number, boolean>
@@ -1268,6 +1293,16 @@ export function SerialEditor(props: SerialEditorProps) {
       : `This will permanently delete the ${currentChapterType.toLowerCase()}. This action cannot be undone.`;
 
   return (
+    <Banner scrollable={false}>
+    {allChaptersWithVolume.length > 0 && (
+      <WritingAsOfBanner
+        options={chapterSelectOptions}
+        value={selectedChapterId ?? undefined}
+        onChange={setSelectedChapterId}
+        isPending={false}
+        isDirty={false}
+      />
+    )}
     <section className="flex flex-col gap-4 mt-4">
       <Box className="items-center gap-2 flex-wrap">
         <Text variant="body" as="span">
@@ -1512,5 +1547,6 @@ export function SerialEditor(props: SerialEditorProps) {
         />
       )}
     </section>
+    </Banner>
   );
 }

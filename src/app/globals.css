@@ -54,6 +54,9 @@
   --toc-border: #d4c4a8;
   /* Layout */
   --content-width: 64rem; /* 5xl = 64rem */
+  --navbar-height: 54px; /* min-h-13.5 (3.375rem) + 2×py-2 (1rem) ≈ 54px */
+  /* Height of the serial scroll container — use this in sticky sidebars. */
+  --scroll-area-h: calc(100dvh - var(--navbar-height));
 }
 
 .dark {

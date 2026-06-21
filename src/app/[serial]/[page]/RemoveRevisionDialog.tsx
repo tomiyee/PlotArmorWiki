@@ -196,7 +196,9 @@ function SegmentLine(props: SegmentLineProps) {
       <div className="flex-1 self-center min-w-4 border-t-2 border-green-500 dark:border-green-400" />
     );
   }
-  return <div className="flex-1 self-center min-w-4 h-px bg-muted-foreground/30" />;
+  return (
+    <div className="flex-1 self-center min-w-4 h-px bg-muted-foreground/30" />
+  );
 }
 
 function VerticalSegmentLine(props: SegmentLineProps) {
@@ -342,15 +344,15 @@ function RevisionTimeline(props: RevisionTimelineProps) {
                   <div className="w-16 shrink-0 flex flex-col items-end justify-center">
                     {topLabel.includes(" · ") ? (
                       <>
-                        <Text className="text-[10px] leading-none text-right text-muted-foreground truncate w-full">
+                        <Text className="text-10px leading-none text-right text-muted-foreground truncate w-full">
                           {topLabel.slice(0, topLabel.indexOf(" · "))}
                         </Text>
-                        <Text className="text-[10px] leading-tight text-right truncate w-full">
+                        <Text className="text-10px leading-tight text-right truncate w-full">
                           {topLabel.slice(topLabel.indexOf(" · ") + 3)}
                         </Text>
                       </>
                     ) : (
-                      <Text className="text-[10px] leading-tight text-right truncate w-full">
+                      <Text className="text-10px leading-tight text-right truncate w-full">
                         {topLabel}
                       </Text>
                     )}
@@ -358,7 +360,7 @@ function RevisionTimeline(props: RevisionTimelineProps) {
                   <div className="w-5 flex justify-center shrink-0">
                     <DotNode variant={variant} />
                   </div>
-                  <Text className="text-[10px] leading-tight text-muted-foreground flex-1">
+                  <Text className="text-10px leading-tight text-muted-foreground flex-1">
                     {bottomLabel ?? ""}
                   </Text>
                 </Box>
@@ -410,7 +412,7 @@ function RevisionTimeline(props: RevisionTimelineProps) {
                     {/* Absolutely-positioned so top-1/2 lands at the col's vertical
                         midpoint, which equals the row midpoint (col is always the
                         tallest element). Matches the self-center segment lines. */}
-                    <div className="absolute inset-x-0 top-[calc(50%_-_1px)] border-t-2 border-green-500 dark:border-green-400" />
+                    <div className="absolute inset-x-0 top-[calc(50%-1px)] border-t-2 border-green-500 dark:border-green-400" />
                     <div className="w-3.5 h-3.5 shrink-0" />
                   </>
                 ) : (
@@ -632,7 +634,7 @@ export function RemoveRevisionDialog(props: RemoveRevisionDialogProps) {
             </Text>
             {!hasChanges ? (
               <Text className="text-sm text-muted-foreground italic">
-                The previous revision has identical content — no visible change
+                The previous revision has identical content - no visible change
                 to readers.
               </Text>
             ) : (
