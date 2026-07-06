@@ -248,6 +248,105 @@ export type PageTitlesAtIdx = {
   resolvedTitle: string | null;
 };
 
+/** A chapter at which a section or infobox row has a stored content revision. */
+export type RevisionChapterStub = {
+  /** FK to the chapter carrying the revision. */
+  chapterId: number;
+  /** The chapter's serial-wide ordering index. */
+  idx: number;
+  /** Chapter display name (e.g. "12"). */
+  displayName: string;
+  /** Display name of the volume containing the chapter. */
+  volumeName: string;
+};
+
+/**
+ * Revision chapter lists for every section and infobox row of a page, keyed by
+ * section / infobox-row id. Chapter stubs only — no content — so it is safe to
+ * send to readers whose cutoff precedes some revisions (existence of a later
+ * revision is deliberately visible; its content is not).
+ */
+export type PageRevisionChapters = {
+  sections: Record<number, RevisionChapterStub[]>;
+  infoboxRows: Record<number, RevisionChapterStub[]>;
+};
+
+/** A stored revision of the same section/row at a chapter after a suggestion's target chapter. */
+export type FutureRevision = {
+  /** FK to the chapter carrying the later revision. */
+  chapterId: number;
+  /** The chapter's serial-wide ordering index. */
+  chapterIdx: number;
+  /** Chapter display name. */
+  chapterName: string;
+  /** Display name of the volume containing the chapter. */
+  volumeName: string;
+  /** Stored markdown content of the later revision. */
+  content: string;
+};
+
+/** A proposed change to one body section within a pending suggestion. */
+export type PendingSuggestionSectionChange = {
+  sectionId: number;
+  sectionName: string;
+  /** Content readers at the target chapter currently see (highest revision idx ≤ target). */
+  currentContent: string;
+  proposedContent: string;
+  /** Revisions of this section at chapters after the target, ascending — candidates for carry-forward. */
+  futureRevisions: FutureRevision[];
+};
+
+/** A proposed change to one infobox row within a pending suggestion. */
+export type PendingSuggestionInfoboxChange = {
+  infoboxSectionId: number;
+  infoboxSectionLabel: string;
+  /** Content readers at the target chapter currently see (highest revision idx ≤ target). */
+  currentContent: string;
+  proposedContent: string;
+  /** Revisions of this row at chapters after the target, ascending — candidates for carry-forward. */
+  futureRevisions: FutureRevision[];
+};
+
+/**
+ * A fully-hydrated pending suggestion for admin review: proposer, target
+ * chapter, page identity (for serial-wide queues), per-change diffs, and
+ * later revisions that a carry-forward merge may need to update.
+ */
+export type PendingSuggestionDetail = {
+  id: number;
+  pageId: number;
+  /** URL slug of the page the suggestion targets, for queue links. */
+  pageSlug: string;
+  /** Canonical name of the page the suggestion targets. */
+  pageName: string;
+  proposerUsername: string | null;
+  targetChapterId: number;
+  /** Serial-wide ordering index of the target chapter, used for spoiler gating in review UIs. */
+  targetChapterIdx: number;
+  targetChapterName: string;
+  citation: string;
+  createdAt: Date;
+  sectionChanges: PendingSuggestionSectionChange[];
+  infoboxChanges: PendingSuggestionInfoboxChange[];
+};
+
+/**
+ * A carry-forward edit applied while approving a suggestion: replaces the
+ * content of one EXISTING later revision (chapter after the suggestion's
+ * target) of the same section or infobox row. Exactly one of `sectionId` /
+ * `infoboxSectionId` must be set.
+ */
+export type FutureRevisionUpdate = {
+  /** Chapter of the later revision being replaced. */
+  chapterId: number;
+  /** Set when carrying a body-section change forward. */
+  sectionId?: number;
+  /** Set when carrying an infobox-row change forward. */
+  infoboxSectionId?: number;
+  /** Full replacement markdown for that later revision. */
+  content: string;
+};
+
 /** All data needed to render the new-page creation form for a serial. */
 export type NewPageFormData = {
   volumeList: VolumeRow[];

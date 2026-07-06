@@ -117,7 +117,7 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
           selectedChapterIdx={selectedChapterIdx}
         />
         <Box className="ml-auto">
-          {lastUpdatedIdx !== null ? (
+          {lastUpdatedIdx !== null && lastUpdatedIdx === selectedChapterIdx ? (
             <Button
               type="button"
               variant="ghost"
@@ -130,7 +130,16 @@ export function SectionContentEditor(props: SectionContentEditorProps) {
               Remove revision
             </Button>
           ) : (
-            <Tooltip content="No revision exists for this section yet">
+            <Tooltip
+              content={
+                lastUpdatedIdx === null
+                  ? "No revision exists for this section yet"
+                  : `This section's revision was written at ${chapterType ?? "Chapter"} ${
+                      allChapters.find((c) => c.idx === lastUpdatedIdx)
+                        ?.displayName ?? lastUpdatedIdx
+                    }. Set your reading progress to that ${(chapterType ?? "Chapter").toLowerCase()} to remove it.`
+              }
+            >
               <Button
                 type="button"
                 variant="ghost"

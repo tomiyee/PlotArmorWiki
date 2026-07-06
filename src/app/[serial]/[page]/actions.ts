@@ -41,9 +41,6 @@ import { applyPageContentRevisions } from "./revisionHelpers";
 import { getSerialBySlug } from "@/data/serials/queries";
 import { getChapterIdxById } from "@/data/chapters/queries";
 import {
-  resolvePageTitlesAtIdx,
-  fetchActiveParentPagesAtIdx,
-  fetchSerialPagesAtIdx,
   sectionMaxIdxSq as buildSectionMaxIdxSq,
   infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
 } from "@/data/pages/queries";
@@ -629,121 +626,6 @@ export async function applyTemplateSections(
   });
 }
 
-/**
- * Resolves the active sections and infobox rows with their current content at a
- * given chapter cutoff, for pre-filling the suggestion form and the editor.
- * Co-located with `getPageContentAtChapter` since both read the same tables.
- *
- * @example
- * const { sections, infoboxSections } = await getSectionsAtChapter(42, chapterId);
- */
-export async function getSectionsAtChapter(
-  pageId: number,
-  chapterId: number,
-): Promise<{
-  sections: {
-    id: number;
-    name: string;
-    content: string;
-    lastUpdatedChapterIdx: number | null;
-  }[];
-  infoboxSections: { id: number; label: string; content: string }[];
-}> {
-  const cutoffIdxResult = await getChapterIdxById(chapterId);
-
-  if (cutoffIdxResult === null) throw new Error("Chapter not found");
-  const cutoffIdx = cutoffIdxResult;
-
-  const sectionMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
-  const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
-
-  const [activeSections, sectionVersions, activeInfoboxSections, ibVersions] =
-    await Promise.all([
-      db
-        .select({ id: pageSections.id, name: pageSections.name })
-        .from(pageSections)
-        .where(
-          and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
-        )
-        .orderBy(asc(pageSections.displayOrder)),
-      db
-        .select({
-          sectionId: pageSectionRevisions.sectionId,
-          content: pageSectionRevisions.content,
-          lastUpdatedChapterIdx: sectionMaxIdxSq.maxIdx,
-        })
-        .from(pageSectionRevisions)
-        .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-        .innerJoin(
-          sectionMaxIdxSq,
-          and(
-            eq(pageSectionRevisions.sectionId, sectionMaxIdxSq.sectionId),
-            eq(chapters.idx, sectionMaxIdxSq.maxIdx),
-          ),
-        )
-        .where(eq(pageSectionRevisions.pageId, pageId)),
-      db
-        .select({
-          id: pageInfoboxSections.id,
-          label: pageInfoboxSections.label,
-        })
-        .from(pageInfoboxSections)
-        .where(
-          and(
-            eq(pageInfoboxSections.pageId, pageId),
-            isNull(pageInfoboxSections.deletedAt),
-          ),
-        )
-        .orderBy(asc(pageInfoboxSections.displayOrder)),
-      db
-        .select({
-          infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-          content: pageInfoboxRevisions.content,
-        })
-        .from(pageInfoboxRevisions)
-        .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-        .innerJoin(
-          ibMaxIdxSq,
-          and(
-            eq(
-              pageInfoboxRevisions.infoboxSectionId,
-              ibMaxIdxSq.infoboxSectionId,
-            ),
-            eq(chapters.idx, ibMaxIdxSq.maxIdx),
-          ),
-        )
-        .where(eq(pageInfoboxRevisions.pageId, pageId)),
-    ]);
-
-  const versionBySectionId = new Map(
-    sectionVersions.map((v) => [
-      v.sectionId,
-      {
-        content: v.content ?? "",
-        lastUpdatedChapterIdx: v.lastUpdatedChapterIdx ?? null,
-      },
-    ]),
-  );
-  const ibContentById = new Map(
-    ibVersions.map((v) => [v.infoboxSectionId, v.content ?? ""]),
-  );
-
-  return {
-    sections: activeSections.map((s) => ({
-      id: s.id,
-      name: s.name,
-      content: versionBySectionId.get(s.id)?.content ?? "",
-      lastUpdatedChapterIdx:
-        versionBySectionId.get(s.id)?.lastUpdatedChapterIdx ?? null,
-    })),
-    infoboxSections: activeInfoboxSections.map((s) => ({
-      id: s.id,
-      label: s.label,
-      content: ibContentById.get(s.id) ?? "",
-    })),
-  };
-}
-
 // ── Page deletion / restore ───────────────────────────────────────────────────
 
 /**
@@ -1306,70 +1188,6 @@ async function isReachable(
     }
   }
   return false;
-}
-
-/**
- * Returns the active parent pages for a given page at a specific chapter,
- * including temporal titles resolved at that chapter's cutoff. Used by the
- * edit-mode Relationships panel to keep the parent list in sync with the
- * "Writing as of:" chapter selector.
- *
- * @example
- * const parents = await getParentPagesAtChapter('one-piece', 'luffy', 7);
- */
-export async function getParentPagesAtChapter(
-  serialSlug: string,
-  pageSlug: string,
-  chapterId: number,
-): Promise<{ id: number; name: string; slug: string; title: string }[]> {
-  const [{ pageId }, cutoffIdx] = await Promise.all([
-    resolvePageIds(serialSlug, pageSlug),
-    getChapterIdxById(chapterId),
-  ]);
-  if (cutoffIdx === null) throw new Error("Chapter not found");
-
-  const activeParents = await fetchActiveParentPagesAtIdx(pageId, cutoffIdx);
-  const titleMap = await resolvePageTitlesAtIdx(
-    activeParents.map((r) => r.id),
-    cutoffIdx,
-  );
-
-  return activeParents.map((r) => ({
-    ...r,
-    title: titleMap.get(r.id) ?? r.name,
-  }));
-}
-
-/**
- * Returns all pages in the serial with their titles resolved at the given
- * chapter's cutoff, excluding the current page. Used to keep the "Add parent"
- * dropdown in sync with the "Writing as of Chapter" selector — the same
- * temporal title resolution applied to `getParentPagesAtChapter`.
- *
- * @example
- * const allPages = await getAllSerialPagesAtChapter('one-piece', 'luffy', 7);
- * // allPages: [{ id: 1, title: 'Nami' }, ...]
- */
-export async function getAllSerialPagesAtChapter(
-  serialSlug: string,
-  pageSlug: string,
-  chapterId: number,
-): Promise<{ id: number; title: string }[]> {
-  const [{ serialId, pageId }, cutoffIdx] = await Promise.all([
-    resolvePageIds(serialSlug, pageSlug),
-    getChapterIdxById(chapterId),
-  ]);
-  if (cutoffIdx === null) throw new Error("Chapter not found");
-
-  const allPages = await fetchSerialPagesAtIdx(serialId, cutoffIdx);
-  const titleMap = await resolvePageTitlesAtIdx(
-    allPages.map((p) => p.id),
-    cutoffIdx,
-  );
-
-  return allPages
-    .filter((p) => p.id !== pageId)
-    .map((p) => ({ id: p.id, title: titleMap.get(p.id) ?? p.name }));
 }
 
 /**

@@ -302,11 +302,13 @@ export default function HelpPage() {
           <div className="flex flex-col gap-2">
             <Text variant="h3">Writing as of a chapter</Text>
             <Text>
-              When editing, you choose a target chapter (&ldquo;Writing as
-              of:&rdquo;). Your changes are saved at that chapter and will only
-              be shown to readers who have reached it. This lets you update a
+              Edits always apply as of your <strong>current reading
+              progress</strong> — the chapter you have selected in the chapter
+              selector. Your changes are saved at that chapter and will only be
+              shown to readers who have reached it. This lets you update a
               character&rsquo;s page after a major story event without spoiling
-              readers who haven&rsquo;t seen it yet.
+              readers who haven&rsquo;t seen it yet. To edit content as of an
+              earlier chapter, set your reading progress to that chapter first.
             </Text>
           </div>
         </section>
@@ -328,14 +330,21 @@ export default function HelpPage() {
             <ol className="list-decimal pl-5 flex flex-col gap-1.5 text-base">
               <li>Sign in to your PlotArmor account.</li>
               <li>
-                Navigate to the wiki page you want to improve and click{" "}
-                <strong>Suggest an edit</strong>.
+                Navigate to the wiki page you want to improve and pick the
+                section you want to change — hover over its heading and click
+                the edit icon, or use the <strong>Suggest an edit to</strong>{" "}
+                buttons at the bottom of the page. Each suggestion covers one
+                section (or the infobox) at a time.
               </li>
               <li>
-                Choose the target chapter - this limits your suggestion to
-                content visible to readers at or before that chapter.
+                Your suggestion applies as of your{" "}
+                <strong>current reading progress</strong>. To suggest a change
+                for an earlier chapter, set your reading progress to that
+                chapter first. The revision-history strip in the form shows
+                which stored version your edit starts from and whether the
+                section changes again later in the story.
               </li>
-              <li>Edit the section content and/or infobox rows.</li>
+              <li>Edit the section content (or infobox rows).</li>
               <li>
                 Fill in the <strong>Citation</strong> field with a quote, page
                 number, or episode timestamp that supports your changes.
@@ -371,11 +380,23 @@ export default function HelpPage() {
           <div className="flex flex-col gap-2">
             <Text variant="h3">Admin review</Text>
             <Text>
-              Admins see a review panel below each page listing all pending
-              suggestions with a side-by-side diff of the current and proposed
-              content. They can approve (which applies the changes to the wiki
-              at the target chapter) or reject (with an optional note to the
-              contributor).
+              Admins can review suggestions in two places: on the page itself
+              (a review panel above the page body) and in the{" "}
+              <strong>Suggestions awaiting review</strong> queue on the
+              serial&rsquo;s home page, which collects every unreviewed
+              suggestion across the wiki. Each card shows a side-by-side diff
+              of the current and proposed content. Approving applies the change
+              at the suggestion&rsquo;s chapter; rejecting records an optional
+              note for the contributor.
+            </Text>
+            <Text>
+              <strong>Carrying a change forward.</strong> If the suggested
+              section was written again at a later chapter, approving alone
+              only affects readers between the suggestion&rsquo;s chapter and
+              that later version. The review card points this out and lets the
+              admin edit each later version in place so the change carries
+              forward — or leave a later version alone if it already covers
+              (or supersedes) the suggestion.
             </Text>
           </div>
         </section>

@@ -37,6 +37,8 @@ import type {
   ChildPageStub,
   PageTitleEntry,
   PageTitlesAtIdx,
+  PageRevisionChapters,
+  RevisionChapterStub,
 } from "@/types";
 
 /** PostgreSQL INT4 max — use as cutoffIdx to mean "no chapter cutoff". */
@@ -244,6 +246,69 @@ export function childRelMaxIdxSq(parentPageId: number, cutoffIdx: number) {
     )
     .groupBy(pageRelationships.childPageId)
     .as("rel_max_idx_sq");
+}
+
+/**
+ * Returns, for every section and infobox row of a page, the full list of
+ * chapters at which a content revision exists (ascending by chapter idx).
+ * Chapter identity only — no revision content — so the result is safe to ship
+ * to readers whose cutoff precedes some of the revisions (e.g. the suggestion
+ * form's revision timeline, which shows that a section changes later without
+ * revealing how).
+ *
+ * @example
+ * const { sections } = await fetchPageRevisionChapters(pageId);
+ * sections[sectionId]; // → [{ chapterId, idx, displayName, volumeName }, ...]
+ */
+export async function fetchPageRevisionChapters(
+  pageId: number,
+): Promise<PageRevisionChapters> {
+  const [sectionRows, infoboxRows] = await Promise.all([
+    db
+      .select({
+        ownerId: pageSectionRevisions.sectionId,
+        chapterId: chapters.id,
+        idx: chapters.idx,
+        displayName: chapters.displayName,
+        volumeName: volumes.displayName,
+      })
+      .from(pageSectionRevisions)
+      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(pageSectionRevisions.pageId, pageId))
+      .orderBy(asc(chapters.idx)),
+    db
+      .select({
+        ownerId: pageInfoboxRevisions.infoboxSectionId,
+        chapterId: chapters.id,
+        idx: chapters.idx,
+        displayName: chapters.displayName,
+        volumeName: volumes.displayName,
+      })
+      .from(pageInfoboxRevisions)
+      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+      .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+      .where(eq(pageInfoboxRevisions.pageId, pageId))
+      .orderBy(asc(chapters.idx)),
+  ]);
+
+  const group = (
+    rows: {
+      ownerId: number;
+      chapterId: number;
+      idx: number;
+      displayName: string;
+      volumeName: string;
+    }[],
+  ): Record<number, RevisionChapterStub[]> => {
+    const byOwner: Record<number, RevisionChapterStub[]> = {};
+    for (const { ownerId, ...stub } of rows) {
+      (byOwner[ownerId] ??= []).push(stub);
+    }
+    return byOwner;
+  };
+
+  return { sections: group(sectionRows), infoboxRows: group(infoboxRows) };
 }
 
 /**

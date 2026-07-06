@@ -14,7 +14,6 @@ import {
 import type { BulkTocPayload } from "@/app/[serial]/actions";
 import { Banner } from "@/components/ui/Banner";
 import { WritingAsOfBanner } from "@/app/[serial]/[page]/WritingAsOfBanner";
-import type { ChapterGroupOption } from "@/app/[serial]/[page]/types";
 import {
   DndContext,
   DragOverlay,
@@ -936,7 +935,7 @@ export function SerialEditor(props: SerialEditorProps) {
   // the user explicitly opens to manage volumes and chapters.
   const editing = true;
 
-  // Derive a flat, volume-named chapter list from existing props for the banner selector.
+  // Derive a flat, volume-named chapter list from existing props for the banner.
   const allChaptersWithVolume = initialVolumes.flatMap((v) =>
     (initialChaptersByVolume[v.id] ?? []).map((c) => ({
       id: c.id,
@@ -946,26 +945,8 @@ export function SerialEditor(props: SerialEditorProps) {
     })),
   );
   const headChapterId = allChaptersWithVolume.at(-1)?.id ?? null;
-  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
-    readingChapterId ?? headChapterId,
-  );
-
-  const chapterSelectOptions: ChapterGroupOption[] = (() => {
-    const volumeMap = new Map<
-      string,
-      { label: string; value: number; disabled: boolean }[]
-    >();
-    for (const ch of allChaptersWithVolume) {
-      const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id, disabled: false });
-      volumeMap.set(ch.volumeName, arr);
-    }
-    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
-      label: volumeName,
-      value: -1 as number,
-      children: chaps,
-    }));
-  })();
+  // The writing chapter is pinned to the reader's cutoff (head as fallback).
+  const writingChapterId = readingChapterId ?? headChapterId;
 
   const [volCollapsed, setVolCollapsed] = usePersistedStore<
     Record<number, boolean>
@@ -1296,11 +1277,11 @@ export function SerialEditor(props: SerialEditorProps) {
     <Banner scrollable={false}>
     {allChaptersWithVolume.length > 0 && (
       <WritingAsOfBanner
-        options={chapterSelectOptions}
-        value={selectedChapterId ?? undefined}
-        onChange={setSelectedChapterId}
-        isPending={false}
-        isDirty={false}
+        chapterName={
+          allChaptersWithVolume.find((c) => c.id === writingChapterId)
+            ?.displayName ?? null
+        }
+        chapterType={currentChapterType}
       />
     )}
     <section className="flex flex-col gap-4 mt-4">

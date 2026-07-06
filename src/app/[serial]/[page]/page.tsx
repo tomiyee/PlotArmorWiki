@@ -12,6 +12,7 @@ import {
   fetchPageInfoboxAtIdx,
   fetchPageChildPagesAtIdx,
   fetchPageTitleEntriesAtIdx,
+  fetchPageRevisionChapters,
 } from "@/data/pages/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
 import { Text } from "@/components/ui/Text";
@@ -191,6 +192,7 @@ export default async function PageView(props: PageViewProps) {
     pendingSuggestionCount,
     pendingSuggestions,
     myPageSuggestions,
+    revisionChapters,
     serialTemplates,
   ] = await Promise.all([
     fetchPageSectionsAtIdx(page.id, cutoffIdx),
@@ -203,6 +205,10 @@ export default async function PageView(props: PageViewProps) {
     !isAdmin && isUserAuthenticated
       ? getMyPageSuggestions(page.id)
       : Promise.resolve([]),
+    // Powers the suggestion form's revision timeline; suggesters only.
+    !isAdmin && isUserAuthenticated
+      ? fetchPageRevisionChapters(page.id)
+      : Promise.resolve(undefined),
     // Only fetched for admins; non-admins never see the edit panel.
     isAdmin ? fetchSerialTemplates(serial.id) : Promise.resolve([]),
   ]);
@@ -295,6 +301,7 @@ export default async function PageView(props: PageViewProps) {
               pendingSuggestionCount={pendingSuggestionCount}
               pendingSuggestions={pendingSuggestions}
               myPageSuggestions={myPageSuggestions}
+              revisionChapters={revisionChapters}
             />
           </Box>
       </PageContainer>
