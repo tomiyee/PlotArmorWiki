@@ -9,9 +9,9 @@ import { Text } from "@/components/ui/Text";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
-import { SuggestionForm } from "./SuggestionForm";
+import { SuggestionForm, type SuggestionTarget } from "./SuggestionForm";
 import type { SectionData, FloaterRowData, ChapterData } from "./types";
-import type { SuggestionStatus } from "@/types";
+import type { SuggestionStatus, PageRevisionChapters } from "@/types";
 
 type MyPageSuggestion = {
   id: number;
@@ -31,7 +31,7 @@ type MyPageSuggestion = {
 type SuggestionContext = {
   /** True when the viewer is an admin - hides the suggest button and status banner. */
   isAdmin: boolean;
-  /** All chapters for the "Writing as of:" selector. */
+  /** All chapters for the serial, used to resolve the reader's cutoff. */
   allChapters: ChapterData[];
   /** The chapter the user is currently reading up to. */
   readingChapterId: number | null;
@@ -41,6 +41,8 @@ type SuggestionContext = {
   wikiChaptersList: { name: string; idx: number }[];
   /** All of the current user's suggestions for this page, most recent first. */
   myPageSuggestions: MyPageSuggestion[];
+  /** Revision chapter lists per section/infobox row, for the suggestion form's timeline. */
+  revisionChapters?: PageRevisionChapters;
 };
 
 type PageReadViewProps = {
@@ -163,7 +165,8 @@ export function PageReadView(props: PageReadViewProps) {
     subPagesAdornment,
   } = props;
 
-  const [showSuggestionForm, setShowSuggestionForm] = useState(false);
+  const [suggestionTarget, setSuggestionTarget] =
+    useState<SuggestionTarget | null>(null);
   const [showSuggestionDetail, setShowSuggestionDetail] = useState(false);
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
   const [subPageSearch, setSubPageSearch] = useState("");
@@ -172,21 +175,28 @@ export function PageReadView(props: PageReadViewProps) {
     hasInfobox && (floaterImageUrl || floaterRows.length > 0);
 
   const showSuggestButton =
-    !!suggestionContext && !suggestionContext.isAdmin && !showSuggestionForm;
+    !!suggestionContext && !suggestionContext.isAdmin && !suggestionTarget;
 
-  // Map sections to the flat format expected by SuggestionForm as initialSections.
-  const initialSections = sections.map((s) => ({
-    id: s.id,
-    name: s.name,
-    content: s.content,
-    lastUpdatedChapterIdx: s.lastUpdatedChapterIdx,
-  }));
+  const openSectionSuggestion = (section: SectionData, isFirst: boolean) =>
+    setSuggestionTarget({
+      kind: "section",
+      section: {
+        id: section.id,
+        name: section.name,
+        content: section.content,
+        isFirst,
+      },
+    });
 
-  const initialInfoboxSections = floaterRows.map((r) => ({
-    id: r.id,
-    label: r.label,
-    content: r.content,
-  }));
+  const openInfoboxSuggestion = () =>
+    setSuggestionTarget({
+      kind: "infobox",
+      rows: floaterRows.map((r) => ({
+        id: r.id,
+        label: r.label,
+        content: r.content,
+      })),
+    });
 
   const allSuggestions = suggestionContext?.myPageSuggestions ?? [];
   const totalSuggestions = allSuggestions.length;
@@ -334,7 +344,20 @@ export function PageReadView(props: PageReadViewProps) {
   return (
     <div className="overflow-hidden">
       {hasFloaterContent && (
-        <aside className="float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-border bg-muted/40 p-4 flex flex-col gap-3">
+        <aside className="group/floater float-none w-full mb-4 sm:float-right sm:w-72 sm:ml-4 sm:mb-4 rounded-lg border border-border bg-muted/40 p-4 flex flex-col gap-3">
+          {showSuggestButton && floaterRows.length > 0 && (
+            <div className="flex justify-end -mb-2">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="sm:opacity-0 sm:group-hover/floater:opacity-100 transition-opacity"
+                onClick={openInfoboxSuggestion}
+              >
+                <FilePenLine />
+                <span className="sr-only">Suggest an edit to the infobox</span>
+              </Button>
+            </div>
+          )}
           {floaterImageUrl && (
             <Image
               src={floaterImageUrl}
@@ -388,10 +411,12 @@ export function PageReadView(props: PageReadViewProps) {
                     variant="ghost"
                     size="icon-sm"
                     className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                    onClick={() => setShowSuggestionForm(true)}
+                    onClick={() => openSectionSuggestion(section, false)}
                   >
                     <FilePenLine />
-                    <span className="sr-only">Suggest an edit</span>
+                    <span className="sr-only">
+                      Suggest an edit to {section.name}
+                    </span>
                   </Button>
                 )}
               </div>
@@ -413,22 +438,45 @@ export function PageReadView(props: PageReadViewProps) {
         </div>
       ))}
 
-      {/* Suggestion form or status feedback */}
+      {/* Suggestion form, target picker, or status feedback */}
       <div className="clear-right mt-4 flex flex-col gap-4">
         {suggestionStatusBanner}
 
-        {showSuggestionForm && suggestionContext && (
+        {showSuggestButton && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Text muted className="text-sm">
+              Suggest an edit to:
+            </Text>
+            {sections.map((section, i) => (
+              <Button
+                key={section.id}
+                variant="outline"
+                size="sm"
+                onClick={() => openSectionSuggestion(section, i === 0)}
+              >
+                {i === 0 ? "Summary" : section.name}
+              </Button>
+            ))}
+            {floaterRows.length > 0 && (
+              <Button variant="outline" size="sm" onClick={openInfoboxSuggestion}>
+                Infobox
+              </Button>
+            )}
+          </div>
+        )}
+
+        {suggestionTarget && suggestionContext && (
           <SuggestionForm
             pageId={pageId}
+            target={suggestionTarget}
             allChapters={suggestionContext.allChapters}
             readingChapterId={suggestionContext.readingChapterId}
+            revisionChapters={suggestionContext.revisionChapters}
             wikiPages={suggestionContext.wikiPagesList}
             wikiChapters={suggestionContext.wikiChaptersList}
             chapterType={chapterType}
             serialSlug={serialSlug}
-            initialSections={initialSections}
-            initialInfoboxSections={initialInfoboxSections}
-            onClose={() => setShowSuggestionForm(false)}
+            onClose={() => setSuggestionTarget(null)}
           />
         )}
       </div>

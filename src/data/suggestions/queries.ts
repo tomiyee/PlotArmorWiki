@@ -10,13 +10,14 @@ import {
   pageInfoboxSections,
   pageInfoboxRevisions,
   users,
+  volumes,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
-import {
-  sectionMaxIdxSq as buildSectionMaxIdxSq,
-  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
-} from "@/data/pages/queries";
-import type { SuggestionStatus } from "@/types";
+import type {
+  SuggestionStatus,
+  PendingSuggestionDetail,
+  FutureRevision,
+} from "@/types";
 
 /**
  * Returns the serial id for a given page id. Used by suggestion auth guards
@@ -149,57 +150,69 @@ export async function fetchPendingSuggestionCount(
   return Number(cnt);
 }
 
+/** A stored revision of one section/infobox row, with chapter position, used to derive current + future content. */
+type OwnedRevision = {
+  ownerId: number;
+  chapterId: number;
+  chapterIdx: number;
+  chapterName: string;
+  volumeName: string;
+  content: string;
+};
+
 /**
- * Returns all pending suggestions for a page with proposer username,
- * per-section proposed changes, per-infobox-row proposed changes, and the
- * current content at each suggestion's target chapter for diff rendering.
- *
- * @example
- * const suggestions = await fetchPendingSuggestions(42);
+ * Splits an owner's revision list around a target chapter idx: `current` is
+ * the content readers at the target see (highest idx ≤ target), `future` are
+ * revisions strictly after the target (ascending) that a carry-forward merge
+ * may need to update.
  */
-export async function fetchPendingSuggestions(pageId: number): Promise<
-  {
+function splitRevisionsAroundTarget(
+  revisions: OwnedRevision[],
+  targetIdx: number,
+): { current: string; future: FutureRevision[] } {
+  let current = "";
+  const future: FutureRevision[] = [];
+  for (const rev of revisions) {
+    if (rev.chapterIdx <= targetIdx) {
+      // Revisions arrive ascending, so the last one ≤ target wins.
+      current = rev.content;
+    } else {
+      future.push({
+        chapterId: rev.chapterId,
+        chapterIdx: rev.chapterIdx,
+        chapterName: rev.chapterName,
+        volumeName: rev.volumeName,
+        content: rev.content,
+      });
+    }
+  }
+  return { current, future };
+}
+
+/**
+ * Hydrates base pending-suggestion rows with per-change detail: proposed
+ * content, the current content at each suggestion's target chapter, and all
+ * later revisions of the same section/row (for the carry-forward merge UI).
+ *
+ * Fetches every revision of the involved sections/rows in two queries and
+ * splits them around each suggestion's target idx in JS — revision counts per
+ * section are small, and this stays correct across suggestions from different
+ * pages with different target chapters.
+ */
+async function hydratePendingSuggestions(
+  suggestionRows: {
     id: number;
+    pageId: number;
+    pageSlug: string;
+    pageName: string;
     proposerUsername: string | null;
     targetChapterId: number;
+    targetChapterIdx: number;
     targetChapterName: string;
     citation: string;
     createdAt: Date;
-    sectionChanges: {
-      sectionId: number;
-      sectionName: string;
-      currentContent: string;
-      proposedContent: string;
-    }[];
-    infoboxChanges: {
-      infoboxSectionId: number;
-      infoboxSectionLabel: string;
-      currentContent: string;
-      proposedContent: string;
-    }[];
-  }[]
-> {
-  const suggestionRows = await db
-    .select({
-      id: pageSuggestions.id,
-      proposerUsername: users.username,
-      targetChapterId: pageSuggestions.targetChapterId,
-      targetChapterName: chapters.displayName,
-      targetChapterIdx: chapters.idx,
-      citation: pageSuggestions.citation,
-      createdAt: pageSuggestions.createdAt,
-    })
-    .from(pageSuggestions)
-    .innerJoin(users, eq(pageSuggestions.proposedByUserId, users.id))
-    .innerJoin(chapters, eq(pageSuggestions.targetChapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSuggestions.pageId, pageId),
-        eq(pageSuggestions.status, "pending"),
-      ),
-    )
-    .orderBy(asc(pageSuggestions.createdAt));
-
+  }[],
+): Promise<PendingSuggestionDetail[]> {
   if (suggestionRows.length === 0) return [];
 
   const suggestionIds = suggestionRows.map((s) => s.id);
@@ -236,149 +249,174 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
       .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
   ]);
 
-  // Batch current-content lookups by target chapter idx - one pair of queries
-  // per distinct cutoff instead of one pair per suggestion.
-  const distinctCutoffs = [
-    ...new Set(suggestionRows.map((s) => s.targetChapterIdx)),
+  const sectionIds = [...new Set(changeRows.map((c) => c.sectionId))];
+  const infoboxIds = [
+    ...new Set(infoboxChangeRows.map((c) => c.infoboxSectionId)),
   ];
 
-  const contentByCutoff = await Promise.all(
-    distinctCutoffs.map(async (cutoffIdx) => {
-      const secMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
-      const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
-
-      const [sectionRevisions, ibRevisions] = await Promise.all([
-        db
+  const [sectionRevisionRows, infoboxRevisionRows] = await Promise.all([
+    sectionIds.length === 0
+      ? Promise.resolve([])
+      : db
           .select({
-            sectionId: pageSectionRevisions.sectionId,
+            ownerId: pageSectionRevisions.sectionId,
+            chapterId: chapters.id,
+            chapterIdx: chapters.idx,
+            chapterName: chapters.displayName,
+            volumeName: volumes.displayName,
             content: pageSectionRevisions.content,
           })
           .from(pageSectionRevisions)
           .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-          .innerJoin(
-            secMaxIdxSq,
-            and(
-              eq(pageSectionRevisions.sectionId, secMaxIdxSq.sectionId),
-              eq(chapters.idx, secMaxIdxSq.maxIdx),
-            ),
-          )
-          .where(eq(pageSectionRevisions.pageId, pageId)),
-        db
+          .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+          .where(inArray(pageSectionRevisions.sectionId, sectionIds))
+          .orderBy(asc(chapters.idx)),
+    infoboxIds.length === 0
+      ? Promise.resolve([])
+      : db
           .select({
-            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
+            ownerId: pageInfoboxRevisions.infoboxSectionId,
+            chapterId: chapters.id,
+            chapterIdx: chapters.idx,
+            chapterName: chapters.displayName,
+            volumeName: volumes.displayName,
             content: pageInfoboxRevisions.content,
           })
           .from(pageInfoboxRevisions)
           .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-          .innerJoin(
-            ibMaxIdxSq,
-            and(
-              eq(
-                pageInfoboxRevisions.infoboxSectionId,
-                ibMaxIdxSq.infoboxSectionId,
-              ),
-              eq(chapters.idx, ibMaxIdxSq.maxIdx),
-            ),
-          )
-          .where(eq(pageInfoboxRevisions.pageId, pageId)),
-      ]);
+          .innerJoin(volumes, eq(chapters.volumeId, volumes.id))
+          .where(inArray(pageInfoboxRevisions.infoboxSectionId, infoboxIds))
+          .orderBy(asc(chapters.idx)),
+  ]);
 
-      return {
-        cutoffIdx,
-        sectionContent: new Map(
-          sectionRevisions.map((r) => [r.sectionId, r.content ?? ""]),
-        ),
-        ibContent: new Map(
-          ibRevisions.map((r) => [r.infoboxSectionId, r.content ?? ""]),
-        ),
-      };
-    }),
-  );
+  const groupByOwner = (rows: (Omit<OwnedRevision, "content"> & { content: string | null })[]) => {
+    const byOwner = new Map<number, OwnedRevision[]>();
+    for (const row of rows) {
+      const list = byOwner.get(row.ownerId) ?? [];
+      list.push({ ...row, content: row.content ?? "" });
+      byOwner.set(row.ownerId, list);
+    }
+    return byOwner;
+  };
 
-  const contentMapByCutoff = new Map(
-    contentByCutoff.map((entry) => [entry.cutoffIdx, entry]),
-  );
+  const sectionRevisionsById = groupByOwner(sectionRevisionRows);
+  const infoboxRevisionsById = groupByOwner(infoboxRevisionRows);
 
-  return suggestionRows.map((suggestion) => {
-    const cutoffContent = contentMapByCutoff.get(suggestion.targetChapterIdx);
-    const sectionContent =
-      cutoffContent?.sectionContent ?? new Map<number, string>();
-    const ibContent = cutoffContent?.ibContent ?? new Map<number, string>();
-
-    return {
-      id: suggestion.id,
-      proposerUsername: suggestion.proposerUsername,
-      targetChapterId: suggestion.targetChapterId,
-      targetChapterName: suggestion.targetChapterName,
-      citation: suggestion.citation,
-      createdAt: suggestion.createdAt,
-      sectionChanges: changeRows
-        .filter((c) => c.suggestionId === suggestion.id)
-        .map((c) => ({
+  return suggestionRows.map((suggestion) => ({
+    id: suggestion.id,
+    pageId: suggestion.pageId,
+    pageSlug: suggestion.pageSlug,
+    pageName: suggestion.pageName,
+    proposerUsername: suggestion.proposerUsername,
+    targetChapterId: suggestion.targetChapterId,
+    targetChapterIdx: suggestion.targetChapterIdx,
+    targetChapterName: suggestion.targetChapterName,
+    citation: suggestion.citation,
+    createdAt: suggestion.createdAt,
+    sectionChanges: changeRows
+      .filter((c) => c.suggestionId === suggestion.id)
+      .map((c) => {
+        const { current, future } = splitRevisionsAroundTarget(
+          sectionRevisionsById.get(c.sectionId) ?? [],
+          suggestion.targetChapterIdx,
+        );
+        return {
           sectionId: c.sectionId,
           sectionName: c.sectionName,
-          currentContent: sectionContent.get(c.sectionId) ?? "",
+          currentContent: current,
           proposedContent: c.proposedContent,
-        })),
-      infoboxChanges: infoboxChangeRows
-        .filter((c) => c.suggestionId === suggestion.id)
-        .map((c) => ({
+          futureRevisions: future,
+        };
+      }),
+    infoboxChanges: infoboxChangeRows
+      .filter((c) => c.suggestionId === suggestion.id)
+      .map((c) => {
+        const { current, future } = splitRevisionsAroundTarget(
+          infoboxRevisionsById.get(c.infoboxSectionId) ?? [],
+          suggestion.targetChapterIdx,
+        );
+        return {
           infoboxSectionId: c.infoboxSectionId,
           infoboxSectionLabel: c.infoboxSectionLabel,
-          currentContent: ibContent.get(c.infoboxSectionId) ?? "",
+          currentContent: current,
           proposedContent: c.proposedContent,
-        })),
-    };
-  });
+          futureRevisions: future,
+        };
+      }),
+  }));
 }
 
 /**
- * Returns the total count of pending suggestions across all pages of a serial.
- * Used for the serial home badge summarising outstanding review work.
+ * Returns all pending suggestions for a page with proposer username, per-change
+ * diffs against the target chapter, and later revisions for carry-forward.
  *
  * @example
- * const total = await fetchTotalPendingSuggestions(serial.id);
+ * const suggestions = await fetchPendingSuggestions(42);
  */
-export async function fetchTotalPendingSuggestions(
-  serialId: number,
-): Promise<number> {
-  const [{ cnt }] = await db
-    .select({ cnt: count() })
-    .from(pageSuggestions)
-    .innerJoin(pages, eq(pageSuggestions.pageId, pages.id))
-    .where(
-      and(eq(pages.serialId, serialId), eq(pageSuggestions.status, "pending")),
-    );
-  return Number(cnt);
-}
-
-/**
- * Returns pending suggestion counts grouped by page for a serial, ordered by
- * count descending then page name ascending. Used by the admin panel to
- * surface pages with the most outstanding review work first.
- *
- * @example
- * const byPage = await fetchPendingSuggestionsByPage(serial.id);
- */
-export async function fetchPendingSuggestionsByPage(
-  serialId: number,
-): Promise<
-  { pageId: number; pageSlug: string; pageName: string; count: number }[]
-> {
-  const rows = await db
+export async function fetchPendingSuggestions(
+  pageId: number,
+): Promise<PendingSuggestionDetail[]> {
+  const suggestionRows = await db
     .select({
-      pageId: pages.id,
+      id: pageSuggestions.id,
+      pageId: pageSuggestions.pageId,
       pageSlug: pages.slug,
       pageName: pages.name,
-      cnt: count(),
+      proposerUsername: users.username,
+      targetChapterId: pageSuggestions.targetChapterId,
+      targetChapterName: chapters.displayName,
+      targetChapterIdx: chapters.idx,
+      citation: pageSuggestions.citation,
+      createdAt: pageSuggestions.createdAt,
     })
     .from(pageSuggestions)
     .innerJoin(pages, eq(pageSuggestions.pageId, pages.id))
+    .innerJoin(users, eq(pageSuggestions.proposedByUserId, users.id))
+    .innerJoin(chapters, eq(pageSuggestions.targetChapterId, chapters.id))
+    .where(
+      and(
+        eq(pageSuggestions.pageId, pageId),
+        eq(pageSuggestions.status, "pending"),
+      ),
+    )
+    .orderBy(asc(pageSuggestions.createdAt));
+
+  return hydratePendingSuggestions(suggestionRows);
+}
+
+/**
+ * Returns all pending suggestions across every page of a serial, hydrated the
+ * same way as `fetchPendingSuggestions` and ordered oldest-first. Powers the
+ * admin review queue on the serial home page.
+ *
+ * @example
+ * const queue = await fetchPendingSuggestionsForSerial(serial.id);
+ */
+export async function fetchPendingSuggestionsForSerial(
+  serialId: number,
+): Promise<PendingSuggestionDetail[]> {
+  const suggestionRows = await db
+    .select({
+      id: pageSuggestions.id,
+      pageId: pageSuggestions.pageId,
+      pageSlug: pages.slug,
+      pageName: pages.name,
+      proposerUsername: users.username,
+      targetChapterId: pageSuggestions.targetChapterId,
+      targetChapterName: chapters.displayName,
+      targetChapterIdx: chapters.idx,
+      citation: pageSuggestions.citation,
+      createdAt: pageSuggestions.createdAt,
+    })
+    .from(pageSuggestions)
+    .innerJoin(pages, eq(pageSuggestions.pageId, pages.id))
+    .innerJoin(users, eq(pageSuggestions.proposedByUserId, users.id))
+    .innerJoin(chapters, eq(pageSuggestions.targetChapterId, chapters.id))
     .where(
       and(eq(pages.serialId, serialId), eq(pageSuggestions.status, "pending")),
     )
-    .groupBy(pages.id, pages.slug, pages.name)
-    .orderBy(desc(count()), asc(pages.name));
+    .orderBy(asc(pageSuggestions.createdAt));
 
-  return rows.map((r) => ({ ...r, count: Number(r.cnt) }));
+  return hydratePendingSuggestions(suggestionRows);
 }
+

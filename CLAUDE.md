@@ -110,9 +110,9 @@ Write mutations (inserts/updates/deletes) directly in the Server Action that own
 | `src/db/schema.ts` | Drizzle table definitions; source of truth. |
 | `src/app/[serial]/layout.tsx` | Fetches serial/volumes/chapters/home-page children; injects `<ChapterSelector>` + `<SerialTOCDrawer>` via `<SerialNavInjector>`. |
 | `src/app/[serial]/actions.ts` | Volume/chapter CRUD + reorder. Reorder reassigns `chapters.idx`; no version repair needed (revisions keyed by `chapter_id`). |
-| `src/app/[serial]/[page]/PageEditor.tsx` | Client Component owning page body. Edit mode: `<WikiLinkMDEditor>` per section, "Writing as of:" chapter selector, calls `getPageContentAtChapter` on chapter change. |
+| `src/app/[serial]/[page]/PageEditor.tsx` | Client Component owning page body. Edit mode: `<WikiLinkMDEditor>` per section. The writing chapter is pinned to the admin's reading cutoff (static "Writing as of:" banner — no selector); change reading progress to edit earlier chapters. |
 | `src/app/[serial]/[page]/actions.ts` | `savePageContent` (upserts at target chapter) + `getPageContentAtChapter` (pre-fills edit drafts). |
-| `src/app/[serial]/[page]/suggestionActions.ts` | Page suggestion workflow (submit/approve/reject/query). Also contains `getSectionsAtChapter` which pre-fills the suggestion form when the target chapter changes. |
+| `src/app/[serial]/[page]/suggestionActions.ts` | Page suggestion workflow (submit/approve/reject/query). Submit derives the target chapter from the caller's reading cutoff server-side and enforces one section XOR infobox rows per suggestion; approve optionally applies carry-forward updates to later revisions. |
 | `src/app/[serial]/chapter/[chapterIdx]/synopsisSuggestionActions.ts` | Synopsis suggestion workflow; approve writes to `chapterSynopses`. |
 | `src/lib/auth-guard.ts` | `isSerialAdmin`/`isAuthenticated` for Server Components; `requireSerialAdmin`/`requireAuthenticated` (throw on failure) for Server Actions. |
 | `src/components/ChapterSelector.tsx` | Reads/writes progress via `usePersistedStore` + mirrors to cookie for SSR. On first visit shows a spoiler callout `<Popover>`. |

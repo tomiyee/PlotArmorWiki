@@ -182,7 +182,7 @@ The home page has two permanent constraints that restrict its edit UI:
 - **No title renaming** - The home page slug is fixed and canonical (`/{serial}`). Its name cannot be changed, so the Titles panel is hidden in edit mode.
 - **No parent relationships** - The home page is the DAG root and can never have a parent. The Relationships panel is hidden in edit mode.
 
-In edit mode on the serial index page, Page Templates are shown above the "Writing as of:" selector so administrators can manage templates before editing content.
+In edit mode on the serial index page, Page Templates are shown at the top of the edit panel so administrators can manage templates before editing content. The "Writing as of:" banner is a static indicator pinned to the admin's reading cutoff — there is no separate chapter selector for editing.
 
 ---
 
@@ -269,17 +269,21 @@ Authenticated non-admin users can propose content changes for admin review. Sugg
 
 ## What can be suggested
 
-- **Wiki page sections** - one or more body section edits per suggestion.
-- **Infobox rows** - proposed values for any row on the page's infobox.
-- **Chapter synopses** - a proposed replacement for the synopsis text on a chapter page.
+Each suggestion targets a single reviewable unit:
+
+- **One wiki page section** - exactly one body section edit per suggestion.
+- **The infobox** - proposed values for one or more rows on the page's infobox (small, related fields edited together as one unit). A suggestion cannot mix a body section with infobox rows.
+- **Chapter synopses** - a proposed replacement for the synopsis text on a chapter page (separate workflow).
 
 ## Suggestion workflow
 
-1. A logged-in non-admin clicks "Suggest an edit" on a wiki page or "Suggest an edit to the synopsis" on a chapter page.
-2. They edit the content (using the same WYSIWYG editor as admins for body sections; plain text for infobox rows and synopses), select a "Writing as of:" target chapter, and provide a required citation.
-3. On submit, a pending suggestion record is created. The contributor sees a status banner indicating their suggestion is under review.
-4. The admin reviews suggestions inline - on the wiki page itself (in the admin review panel below the page body) or on the chapter page (in the synopsis review panel). The panel shows a before/after diff for each changed field.
-5. Approving a suggestion writes the proposed content directly into the appropriate revision table at the target chapter (same upsert as a direct admin save). Rejecting accepts an optional review note shown to the contributor.
+1. A logged-in non-admin picks a section on a wiki page (hover edit icon on the section heading, or the "Suggest an edit to" buttons below the content), or clicks "Suggest an edit to the synopsis" on a chapter page.
+2. They edit the content (using the same WYSIWYG editor as admins) and provide a required citation. The suggestion always applies **as of the user's current reading cutoff** - there is no separate "Writing as of:" selector, and the server resolves the target chapter from the reading-progress cookie / `user_progress` rather than trusting the client. To suggest at an earlier chapter, the user moves their reading progress there first.
+3. The form shows a revision timeline for the focused section: which stored revision the edit starts from, plus markers (chapter identity only, no content) for revisions after the user's cutoff.
+4. On submit, a pending suggestion record is created. The contributor sees a status banner indicating their suggestion is under review.
+5. The admin reviews suggestions inline - on the wiki page itself (review panel above the page body), in the serial home page's review queue (all unreviewed suggestions across the serial, grouped by page), or on the chapter page (synopsis review panel). The panel shows a before/after diff for each changed field, where "current" is the content readers at the suggestion's target chapter see.
+6. Approving a suggestion writes the proposed content directly into the appropriate revision table at the target chapter (same upsert as a direct admin save). Rejecting accepts an optional review note shown to the contributor.
+7. **Carry-forward:** when the suggested section/row also has revisions at chapters after the target, the review card explains that the approved change is only visible until the next revision, and offers an editor per later revision (pre-filled with that revision's content) so the admin can weave the change into it. Enabled, modified carry-forward edits are applied in the same transaction as the approval, ascending by chapter idx, through the shared `applyPageContentRevisions` invariant helper - a carried-forward revision that becomes identical to its predecessor is deleted automatically. Later revisions beyond the admin's own reading progress are hidden behind a "reveal" button with a spoiler badge.
 
 ## Data model
 
@@ -290,9 +294,9 @@ page_suggestion_infobox_changes  id, suggestion_id, infobox_section_id, proposed
 chapter_synopsis_suggestions     id, chapter_id, serial_id, proposed_by_user_id, proposed_content, citation, status, created_at, reviewed_at, reviewed_by_user_id, review_note
 ```
 
-One `page_suggestions` row covers all body section and infobox row changes for a single page suggestion. `chapter_synopsis_suggestions` is a separate table since synopses are keyed by chapter rather than page.
+The schema allows multiple changes per `page_suggestions` row; the single-unit rule (one section XOR infobox rows) is enforced in the submit action, not the schema. `chapter_synopsis_suggestions` is a separate table since synopses are keyed by chapter rather than page.
 
-The serial home page shows admins an accordion listing all pages with pending suggestions and their counts, so outstanding review work can be found without visiting every page.
+The serial home page shows admins a full review queue ("Suggestions awaiting review"): every pending suggestion in the serial, grouped by page and reviewable in place (approve / reject / carry-forward), so outstanding review work is handled without visiting every page. Suggestions targeting chapters beyond the admin's reading progress are hidden behind a count, in both the queue and the per-page panel.
 
 ---
 

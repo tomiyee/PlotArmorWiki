@@ -10,6 +10,7 @@ import {
   fetchPageInfoboxAtIdx,
   fetchPageChildPagesAtIdx,
   fetchPageTitleEntries,
+  fetchPageRevisionChapters,
 } from "@/data/pages/queries";
 import { fetchSerialTemplates } from "@/data/templates/queries";
 import type {
@@ -57,13 +58,11 @@ import { AdminManager } from "@/components/AdminManager";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin } from "@/lib/auth-guard";
 import { auth } from "@/auth";
-import { getPendingSuggestionsByPage } from "./[page]/suggestionActions";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/Accordion";
+  getPendingSuggestionsForSerial,
+  getMyPageSuggestions,
+} from "./[page]/suggestionActions";
+import { SerialSuggestionQueue } from "./SerialSuggestionQueue";
 import { DeletedPagesButton } from "@/components/DeletedPagesButton";
 
 interface SerialPageProps {
@@ -90,7 +89,7 @@ export default async function SerialPage(props: SerialPageProps) {
     isAdmin,
     serialAdminList,
     session,
-    pendingSuggestionsByPage,
+    pendingSuggestionQueue,
   ] = await Promise.all([
     getChapterCutoff(serial.id),
     fetchSerialAuthors(serial.id),
@@ -100,7 +99,7 @@ export default async function SerialPage(props: SerialPageProps) {
     isSerialAdmin(serial.id),
     fetchSerialAdmins(serial.id),
     auth(),
-    getPendingSuggestionsByPage(serial.id),
+    getPendingSuggestionsForSerial(serial.id),
   ]);
 
   const { cutoffIdx, readingChapterId } = chapterCutoff;
@@ -185,12 +184,31 @@ export default async function SerialPage(props: SerialPageProps) {
   let childPages: ChildPageStub[] = [];
   let homePageTitleEntries: PageTitleEntry[] = [];
 
+  let homePageRevisionChapters = undefined;
+  let homePageMySuggestions: Awaited<
+    ReturnType<typeof getMyPageSuggestions>
+  > = [];
+
   if (homePage) {
-    const [rawSections, infobox, fetchedChildPages, titleEntries] = await Promise.all([
+    const [
+      rawSections,
+      infobox,
+      fetchedChildPages,
+      titleEntries,
+      revisionChapters,
+      mySuggestions,
+    ] = await Promise.all([
       fetchPageSectionsAtIdx(homePage.id, cutoffIdx),
       fetchPageInfoboxAtIdx(homePage.id, cutoffIdx),
       fetchPageChildPagesAtIdx(homePage.id, cutoffIdx),
       fetchPageTitleEntries(homePage.id),
+      // Powers the suggestion form's revision timeline; suggesters only.
+      !isAdmin && isUserAuthenticated
+        ? fetchPageRevisionChapters(homePage.id)
+        : Promise.resolve(undefined),
+      !isAdmin && isUserAuthenticated
+        ? getMyPageSuggestions(homePage.id)
+        : Promise.resolve([]),
     ]);
 
     pageSectionStructure = rawSections;
@@ -200,6 +218,8 @@ export default async function SerialPage(props: SerialPageProps) {
     floaterRows = infobox.rows;
     childPages = fetchedChildPages;
     homePageTitleEntries = titleEntries;
+    homePageRevisionChapters = revisionChapters;
+    homePageMySuggestions = mySuggestions;
   }
 
   return (
@@ -243,56 +263,19 @@ export default async function SerialPage(props: SerialPageProps) {
               isAdmin={isAdmin}
             />
 
-            {isAdmin &&
-              pendingSuggestionsByPage.length > 0 &&
-              (() => {
-                const total = pendingSuggestionsByPage.reduce(
-                  (s, p) => s + p.count,
-                  0,
-                );
-                return (
-                  <Accordion className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 text-amber-700 dark:text-amber-400">
-                    <AccordionItem
-                      value="pending-suggestions"
-                      className="border-none"
-                    >
-                      <AccordionTrigger className="text-sm font-medium hover:no-underline">
-                        <span>
-                          <span className="font-semibold">{total}</span> pending{" "}
-                          {total === 1 ? "suggestion" : "suggestions"} across{" "}
-                          <span className="font-semibold">
-                            {pendingSuggestionsByPage.length}
-                          </span>{" "}
-                          {pendingSuggestionsByPage.length === 1
-                            ? "page"
-                            : "pages"}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <ul className="flex flex-col gap-1 pt-1">
-                          {pendingSuggestionsByPage.map((p) => (
-                            <li
-                              key={p.pageId}
-                              className="flex items-center justify-between text-sm"
-                            >
-                              <a
-                                href={`/${serialSlug}/${p.pageSlug}`}
-                                className="hover:underline font-medium"
-                              >
-                                {p.pageName}
-                              </a>
-                              <span className="text-xs text-amber-600 dark:text-amber-500">
-                                {p.count}{" "}
-                                {p.count === 1 ? "suggestion" : "suggestions"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                );
-              })()}
+            {isAdmin && pendingSuggestionQueue.length > 0 && (
+              <SerialSuggestionQueue
+                suggestions={pendingSuggestionQueue}
+                serialSlug={serialSlug}
+                chapterType={serial.chapterType}
+                readerCutoffIdx={readingChapterId !== null ? cutoffIdx : null}
+                wikiPages={wikiPages}
+                wikiChapters={allChapters.map((c) => ({
+                  name: c.displayName,
+                  idx: c.idx,
+                }))}
+              />
+            )}
 
             {homePage ? (
               <PageEditor
@@ -323,6 +306,8 @@ export default async function SerialPage(props: SerialPageProps) {
                 isHomePage
                 isAdmin={isAdmin}
                 isAuthenticated={isUserAuthenticated}
+                myPageSuggestions={homePageMySuggestions}
+                revisionChapters={homePageRevisionChapters}
                 subPagesAdornment={
                   isAdmin && deletedPages.length > 0 ? (
                     <DeletedPagesButton

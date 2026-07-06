@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useServerAction } from "@/hooks/useServerAction";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Box } from "@/components/ui/Box";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
-import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Text } from "@/components/ui/Text";
 import {
@@ -18,27 +17,41 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { submitPageSuggestion } from "./suggestionActions";
-import { getSectionsAtChapter } from "./actions";
 import { InfoIcon } from "@/components/ui/InfoIcon";
-import { LastUpdatedTag } from "./LastUpdatedTag";
-import type { ChapterData, ChapterGroupOption } from "./types";
+import { SectionRevisionTimeline } from "./SectionRevisionTimeline";
+import type { ChapterData } from "./types";
+import type { PageRevisionChapters, RevisionChapterStub } from "@/types";
 
 const WikiLinkMDEditor = dynamic(
   () => import("@/components/MDEditor").then((m) => m.WikiLinkMDEditor),
   { ssr: false },
 );
 
+/**
+ * The single unit a suggestion targets: one body section, or the infobox
+ * (whose small related rows are edited together as one reviewable unit).
+ */
+export type SuggestionTarget =
+  | {
+      kind: "section";
+      section: { id: number; name: string; content: string; isFirst: boolean };
+    }
+  | { kind: "infobox"; rows: { id: number; label: string; content: string }[] };
+
 type SuggestionFormProps = {
   /** DB id of the page being suggested. */
   pageId: number;
-  /** All chapters for this serial, used to build the "Writing as of:" selector. */
+  /** The single section or infobox unit this suggestion edits. */
+  target: SuggestionTarget;
+  /** All chapters for this serial, used to resolve the reader's cutoff name/idx. */
   allChapters: ChapterData[];
   /**
-   * The chapter the user is currently reading up to - used as the default
-   * for the "Writing as of:" selector and caps the available choices to prevent
-   * exposing the suggester to content beyond their progress.
+   * The chapter the user is currently reading up to. Suggestions are always
+   * written as of this chapter — there is no separate target selector.
    */
   readingChapterId: number | null;
+  /** Revision chapters per section/infobox row, powering the revision timeline. */
+  revisionChapters?: PageRevisionChapters;
   /** Wiki pages for `[[Page]]` autocomplete in the editor. */
   wikiPages: { name: string; slug: string }[];
   /** Chapter name → idx map for `[[Chapter:Name]]` autocomplete. */
@@ -47,94 +60,68 @@ type SuggestionFormProps = {
   chapterType?: string;
   /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
-  /** Pre-loaded sections at the reader's current cutoff (avoids an extra round-trip). */
-  initialSections: {
-    id: number;
-    name: string;
-    content: string;
-    lastUpdatedChapterIdx: number | null;
-  }[];
-  /** Pre-loaded infobox rows at the reader's current cutoff. Empty when page has no infobox. */
-  initialInfoboxSections: { id: number; label: string; content: string }[];
   /** Called when the user cancels or dismisses the post-submit confirmation dialog. */
   onClose: () => void;
 };
 
 /**
- * Inline suggestion form shown to authenticated non-admin users inside PageReadView.
- * Allows proposing section content changes with a single citation field.
- * Fetches section content at the chosen target chapter when the chapter selector changes.
- * Only chapters up to the user's reading progress are shown to prevent spoilers.
+ * Inline suggestion form shown to authenticated non-admin users inside
+ * PageReadView, focused on a single section (or the infobox) at a time.
+ *
+ * The suggestion is always written "as of" the user's current reading cutoff —
+ * to suggest for an earlier chapter, the user changes their reading progress.
+ * A revision timeline shows which stored version the edit starts from and
+ * whether the section changes again later (existence only, no content).
  *
  * @example
  * <SuggestionForm
  *   pageId={42}
+ *   target={{ kind: "section", section: { id: 1, name: "History", content: "...", isFirst: false } }}
  *   allChapters={allChapters}
  *   readingChapterId={7}
  *   wikiPages={[{ name: "Luffy", slug: "luffy" }]}
  *   serialSlug="one-piece"
- *   initialSections={[{ id: 1, name: "Summary", content: "..." }]}
- *   initialInfoboxSections={[{ id: 3, label: "Age", content: "19" }]}
- *   onClose={() => setShowForm(false)}
+ *   onClose={() => setTarget(null)}
  * />
  */
 export function SuggestionForm(props: SuggestionFormProps) {
   const {
     pageId,
+    target,
     allChapters,
     readingChapterId,
+    revisionChapters,
     wikiPages,
     wikiChapters,
     chapterType,
     serialSlug,
-    initialSections,
-    initialInfoboxSections,
     onClose,
   } = props;
 
-  const { runAsync, isPending: isSubmitPending } = useServerAction();
-  const [isFetchPending, startTransition] = useTransition();
-  const isPending = isFetchPending || isSubmitPending;
+  const { runAsync, isPending } = useServerAction();
 
-  // Restrict available chapters to those at or before the user's reading cutoff.
-  const readingChapterIdx =
+  const readingChapter =
     readingChapterId !== null
-      ? (allChapters.find((c) => c.id === readingChapterId)?.idx ?? null)
+      ? (allChapters.find((c) => c.id === readingChapterId) ?? null)
       : null;
-  const availableChapters =
-    readingChapterIdx !== null
-      ? allChapters.filter((c) => c.idx <= readingChapterIdx)
-      : allChapters;
 
-  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(
-    readingChapterId ?? availableChapters.at(-1)?.id ?? null,
-  );
-  const selectedChapterIdx =
-    availableChapters.find((c) => c.id === selectedChapterId)?.idx ?? null;
-  const [sections, setSections] = useState(initialSections);
-  const [infoboxSections, setInfoboxSections] = useState(
-    initialInfoboxSections,
-  );
-  const [draftContent, setDraftContent] = useState<Record<number, string>>(
-    Object.fromEntries(initialSections.map((s) => [s.id, s.content])),
-  );
-  const [infoboxDraftContent, setInfoboxDraftContent] = useState<
-    Record<number, string>
-  >(Object.fromEntries(initialInfoboxSections.map((s) => [s.id, s.content])));
+  const initialDrafts: Record<number, string> =
+    target.kind === "section"
+      ? { [target.section.id]: target.section.content }
+      : Object.fromEntries(target.rows.map((r) => [r.id, r.content]));
+
+  const [draftContent, setDraftContent] =
+    useState<Record<number, string>>(initialDrafts);
   const [citation, setCitation] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  // Tracks which chapter's content is actually loaded in the editors - lags behind
-  // selectedChapterId during async fetches. Used as editor key so MDXEditor remounts
-  // with the correct diffMarkdown baseline whenever the displayed chapter changes.
-  // (diffSourcePlugin captures diffMarkdown once at init; remount is the only reset path.)
-  const [contentChapterId, setContentChapterId] = useState(selectedChapterId);
 
-  // Dirty state: true when any draft differs from the section content or citation is non-empty.
+  // Dirty state: true when any draft differs from the stored content or citation is non-empty.
   const isDirty =
     citation.trim().length > 0 ||
-    sections.some((s) => draftContent[s.id] !== s.content) ||
-    infoboxSections.some((s) => infoboxDraftContent[s.id] !== s.content);
+    (target.kind === "section"
+      ? draftContent[target.section.id] !== target.section.content
+      : target.rows.some((r) => draftContent[r.id] !== r.content));
 
   // Warn before navigating away with a started draft.
   useEffect(() => {
@@ -148,94 +135,71 @@ export function SuggestionForm(props: SuggestionFormProps) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
-  const handleChapterChange = useCallback(
-    (chapterId: number) => {
-      setSelectedChapterId(chapterId);
-      startTransition(async () => {
-        const { sections: newSections, infoboxSections: newIbSections } =
-          await getSectionsAtChapter(pageId, chapterId);
-        setSections(newSections);
-        setDraftContent(
-          Object.fromEntries(newSections.map((s) => [s.id, s.content])),
-        );
-        setInfoboxSections(newIbSections);
-        setInfoboxDraftContent(
-          Object.fromEntries(newIbSections.map((s) => [s.id, s.content])),
-        );
-        setContentChapterId(chapterId);
-      });
-    },
-    [pageId],
-  );
-
   const handleSubmit = useCallback(() => {
-    if (!selectedChapterId) {
-      setSubmitError("Please select a target chapter.");
-      return;
-    }
     if (!citation.trim()) {
       setSubmitError("Citation is required.");
       return;
     }
-    const changes = sections
-      .filter(
-        (s) => draftContent[s.id] !== s.content && draftContent[s.id]?.trim(),
-      )
-      .map((s) => ({ sectionId: s.id, proposedContent: draftContent[s.id] }));
-    const infoboxChanges = infoboxSections
-      .filter(
-        (s) =>
-          infoboxDraftContent[s.id] !== s.content &&
-          infoboxDraftContent[s.id]?.trim(),
-      )
-      .map((s) => ({
-        infoboxSectionId: s.id,
-        proposedContent: infoboxDraftContent[s.id],
-      }));
-    if (changes.length === 0 && infoboxChanges.length === 0) {
-      setSubmitError("Make at least one change before submitting.");
+    const sectionChanges =
+      target.kind === "section" &&
+      draftContent[target.section.id] !== target.section.content &&
+      draftContent[target.section.id]?.trim()
+        ? [
+            {
+              sectionId: target.section.id,
+              proposedContent: draftContent[target.section.id],
+            },
+          ]
+        : [];
+    const infoboxChanges =
+      target.kind === "infobox"
+        ? target.rows
+            .filter(
+              (r) =>
+                draftContent[r.id] !== r.content && draftContent[r.id]?.trim(),
+            )
+            .map((r) => ({
+              infoboxSectionId: r.id,
+              proposedContent: draftContent[r.id],
+            }))
+        : [];
+    if (sectionChanges.length === 0 && infoboxChanges.length === 0) {
+      setSubmitError("Make a change before submitting.");
       return;
     }
     setSubmitError(null);
     runAsync(
-      () => submitPageSuggestion(pageId, selectedChapterId, citation, changes, infoboxChanges),
+      () =>
+        submitPageSuggestion(pageId, citation, sectionChanges, infoboxChanges),
       () => setShowSuccessDialog(true),
       (err) => setSubmitError(err),
     );
-  }, [
-    runAsync,
-    selectedChapterId,
-    citation,
-    sections,
-    infoboxSections,
-    draftContent,
-    infoboxDraftContent,
-    pageId,
-  ]);
+  }, [runAsync, citation, target, draftContent, pageId]);
 
-  // Build chapter selector options from filtered available chapters only.
-  const chapterSelectOptions: ChapterGroupOption[] = (() => {
-    const volumeMap = new Map<string, { label: string; value: number }[]>();
-    for (const ch of availableChapters) {
-      const arr = volumeMap.get(ch.volumeName) ?? [];
-      arr.push({ label: ch.displayName, value: ch.id });
-      volumeMap.set(ch.volumeName, arr);
+  const chapterLabel = chapterType ?? "Chapter";
+
+  // Revision chapters for the timeline. For the infobox unit, merge the rows'
+  // revision chapters (deduped by chapter) so one strip covers the whole unit.
+  const timelineRevisions: RevisionChapterStub[] = (() => {
+    if (!revisionChapters) return [];
+    if (target.kind === "section") {
+      return revisionChapters.sections[target.section.id] ?? [];
     }
-    return Array.from(volumeMap.entries()).map(([volumeName, chaps]) => ({
-      label: volumeName,
-      value: -1 as number,
-      children: chaps.map((c) => ({
-        label: c.label,
-        value: c.value,
-        disabled: false,
-      })),
-    }));
+    const byChapterId = new Map<number, RevisionChapterStub>();
+    for (const row of target.rows) {
+      for (const rev of revisionChapters.infoboxRows[row.id] ?? []) {
+        byChapterId.set(rev.chapterId, rev);
+      }
+    }
+    return [...byChapterId.values()].sort((a, b) => a.idx - b.idx);
   })();
 
-  const selectedChapterName = availableChapters.find(
-    (c) => c.id === selectedChapterId,
-  )?.displayName;
-  const chapterLabel = chapterType ?? "Chapter";
+  const targetTitle =
+    target.kind === "section"
+      ? target.section.isFirst
+        ? "Suggest an edit · Summary"
+        : `Suggest an edit · ${target.section.name}`
+      : "Suggest an edit · Infobox";
 
   return (
     <>
@@ -259,7 +223,7 @@ export function SuggestionForm(props: SuggestionFormProps) {
         className="gap-6 rounded-lg border border-border bg-muted/30 p-6"
       >
         <Box className="items-center justify-between">
-          <Text variant="h3">Suggest an edit</Text>
+          <Text variant="h3">{targetTitle}</Text>
           <Button variant="ghost" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
@@ -277,50 +241,49 @@ export function SuggestionForm(props: SuggestionFormProps) {
           </Link>
         </Text>
 
-        {/* Chapter selector */}
-        {availableChapters.length > 0 && (
-          <Box col className="gap-2">
-            <Label htmlFor="suggestion-target-chapter">
-              Writing as of {chapterLabel}:
-            </Label>
-            <Select<number>
-              id="suggestion-target-chapter"
-              options={chapterSelectOptions}
-              value={selectedChapterId ?? undefined}
-              onChange={handleChapterChange}
-              disabled={isPending}
-              className="w-52"
-            />
-            {selectedChapterName && (
-              <Text className="text-sm text-amber-600 dark:text-amber-400">
-                Write for readers up to {chapterLabel} {selectedChapterName}.
-                Avoid referencing later events - an admin will review your
-                suggestion.
-              </Text>
-            )}
-          </Box>
+        {/* Fixed "as of" context — always the reader's current cutoff. */}
+        {readingChapter ? (
+          <Text className="text-sm text-amber-600 dark:text-amber-400">
+            You are suggesting as of {chapterLabel}{" "}
+            {readingChapter.displayName} — your current reading progress. Write
+            for readers up to that point and avoid referencing later events. To
+            suggest for an earlier {chapterLabel.toLowerCase()}, set your
+            reading progress there first.
+          </Text>
+        ) : (
+          <Text className="text-sm text-destructive">
+            Set your reading progress for this serial before suggesting an
+            edit — suggestions always apply as of the {chapterLabel.toLowerCase()}{" "}
+            you are reading.
+          </Text>
         )}
 
-        {/* Section editors */}
-        {sections.map((section, i) => (
-          <Box col key={section.id} className="gap-2">
+        <SectionRevisionTimeline
+          revisions={timelineRevisions}
+          cutoffIdx={readingChapter?.idx ?? null}
+          chapterType={chapterLabel}
+        />
+
+        {/* Focused editor(s) */}
+        {target.kind === "section" ? (
+          <Box col className="gap-2">
             <Box className="items-center gap-2">
-              {i > 0 && <Text variant="h3">{section.name}</Text>}
-              {i === 0 && (
-                <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
+              {!target.section.isFirst && (
+                <Text variant="h3">{target.section.name}</Text>
               )}
-              <LastUpdatedTag
-                lastUpdatedIdx={section.lastUpdatedChapterIdx}
-                selectedChapterIdx={selectedChapterIdx}
-              />
+              {target.section.isFirst && (
+                <>
+                  <Text variant="h3">Summary</Text>
+                  <InfoIcon contents="This section will appear in preview tooltips when this page is mentioned elsewhere." />
+                </>
+              )}
             </Box>
             <WikiLinkMDEditor
-              key={`${contentChapterId}-${section.id}`}
-              value={draftContent[section.id] ?? ""}
+              value={draftContent[target.section.id] ?? ""}
               onChange={(val) =>
                 setDraftContent((prev) => ({
                   ...prev,
-                  [section.id]: val ?? "",
+                  [target.section.id]: val ?? "",
                 }))
               }
               height={260}
@@ -331,20 +294,15 @@ export function SuggestionForm(props: SuggestionFormProps) {
               chapterType={chapterType}
             />
           </Box>
-        ))}
-
-        {/* Infobox row editors */}
-        {infoboxSections.length > 0 && (
+        ) : (
           <Box col className="gap-4">
-            <Text variant="h3">Infobox</Text>
-            {infoboxSections.map((row) => (
+            {target.rows.map((row) => (
               <Box col key={row.id} className="gap-1.5">
                 <Label>{row.label}</Label>
                 <WikiLinkMDEditor
-                  key={`${contentChapterId}-ib-${row.id}`}
-                  value={infoboxDraftContent[row.id] ?? ""}
+                  value={draftContent[row.id] ?? ""}
                   onChange={(val) =>
-                    setInfoboxDraftContent((prev) => ({
+                    setDraftContent((prev) => ({
                       ...prev,
                       [row.id]: val ?? "",
                     }))
@@ -384,7 +342,10 @@ export function SuggestionForm(props: SuggestionFormProps) {
           <Text className="text-sm text-destructive">{submitError}</Text>
         )}
 
-        <Button onClick={handleSubmit} disabled={isPending || !isDirty}>
+        <Button
+          onClick={handleSubmit}
+          disabled={isPending || !isDirty || !readingChapter}
+        >
           {isPending ? "Submitting…" : "Submit suggestion"}
         </Button>
       </Box>
