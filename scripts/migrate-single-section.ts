@@ -115,16 +115,24 @@ async function migratePageBody(pageId: number): Promise<void> {
   `);
   const sections = [...sectionsResult];
   if (sections.length === 0) return;
-  const sectionIds = sections.map((s) => s.id);
+  // Non-deleted section ids, used below to ignore revisions belonging to a
+  // deleted section (mergeBody only ever looks up ids present in `sections`).
+  const liveSectionIds = new Set(sections.map((s) => s.id));
 
+  // Scoped by page_id only (not section_id) - passing a JS array into a raw
+  // `= ANY(${...})` clause does not bind correctly through postgres.js/drizzle,
+  // and filtering client-side below is just as correct here since revisions
+  // for deleted sections are simply never looked up during merge.
   const revisionsResult = await db.execute<SectionRevisionRow>(sql`
     SELECT r.section_id AS "sectionId", r.chapter_id AS "chapterId", c.idx, r.content
     FROM page_section_revisions r
     INNER JOIN chapters c ON r.chapter_id = c.id
-    WHERE r.page_id = ${pageId} AND r.section_id = ANY(${sectionIds})
+    WHERE r.page_id = ${pageId}
     ORDER BY c.idx ASC
   `);
-  const revisions = [...revisionsResult];
+  const revisions = [...revisionsResult].filter((r) =>
+    liveSectionIds.has(r.sectionId),
+  );
   if (revisions.length === 0) return;
 
   // Distinct chapters touched by any section revision, in chronological order.
@@ -166,18 +174,18 @@ async function migratePageInfobox(pageId: number): Promise<void> {
     ORDER BY display_order ASC
   `);
   const rows = [...rowsResult];
-  const rowIds = rows.map((r) => r.id);
+  // Non-deleted row ids, used to ignore revisions belonging to a deleted row
+  // (same rationale as liveSectionIds in migratePageBody above).
+  const liveRowIds = new Set(rows.map((r) => r.id));
 
   const [contentRevisionsResult, imageRevisionsResult] = await Promise.all([
-    rowIds.length > 0
-      ? db.execute<InfoboxRevisionRow>(sql`
-          SELECT r.infobox_section_id AS "infoboxSectionId", r.chapter_id AS "chapterId", c.idx, r.content
-          FROM page_infobox_revisions r
-          INNER JOIN chapters c ON r.chapter_id = c.id
-          WHERE r.page_id = ${pageId} AND r.infobox_section_id = ANY(${rowIds})
-          ORDER BY c.idx ASC
-        `)
-      : Promise.resolve([] as InfoboxRevisionRow[]),
+    db.execute<InfoboxRevisionRow>(sql`
+      SELECT r.infobox_section_id AS "infoboxSectionId", r.chapter_id AS "chapterId", c.idx, r.content
+      FROM page_infobox_revisions r
+      INNER JOIN chapters c ON r.chapter_id = c.id
+      WHERE r.page_id = ${pageId}
+      ORDER BY c.idx ASC
+    `),
     db.execute<ImageRevisionRow>(sql`
       SELECT r.chapter_id AS "chapterId", c.idx, r.image_url AS "imageUrl"
       FROM page_infobox_image_revisions r
@@ -186,7 +194,9 @@ async function migratePageInfobox(pageId: number): Promise<void> {
       ORDER BY c.idx ASC
     `),
   ]);
-  const contentRevisions = [...contentRevisionsResult];
+  const contentRevisions = [...contentRevisionsResult].filter((r) =>
+    liveRowIds.has(r.infoboxSectionId),
+  );
   const imageRevisions = [...imageRevisionsResult];
 
   if (contentRevisions.length === 0 && imageRevisions.length === 0) return;
