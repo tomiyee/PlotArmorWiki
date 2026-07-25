@@ -11,7 +11,7 @@ import {
 import {
   fetchLivePageAtSlug,
   fetchAllSerialPageStubs,
-  fetchFirstSectionAtIdx,
+  fetchPageContentAtIdx,
   fetchPageInfoboxAtIdx,
   resolvePageTitlesAtIdx,
 } from "@/data/pages/queries";
@@ -21,12 +21,12 @@ export interface WikiLinkPreviewData {
   introChapterName: string | null;
   /** Whether the page is hidden due to the user's chapter cutoff. */
   hidden: boolean;
-  /** First section content (truncated). Empty string if none. */
-  firstSectionContent: string;
+  /** Page body content. Empty string if none. */
+  bodyContent: string;
   /** Floater image URL, or null. */
   floaterImageUrl: string | null;
-  /** Floater key-value rows. */
-  floaterRows: { label: string; content: string }[];
+  /** Merged infobox content, or empty string when absent. */
+  infoboxContent: string;
   /** slug → chapter-versioned title at the user's cutoff, for resolving [[slug]] wiki links. */
   pageTitles: Record<string, string>;
 }
@@ -83,28 +83,25 @@ export async function getWikiLinkPreview(
       pageName: page.name,
       introChapterName,
       hidden: true,
-      firstSectionContent: "",
+      bodyContent: "",
       floaterImageUrl: null,
-      floaterRows: [],
+      infoboxContent: "",
       pageTitles: resolvedPageTitles,
     };
   }
 
-  const [firstSectionContent, infobox] = await Promise.all([
-    fetchFirstSectionAtIdx(page.id, cutoffIdx),
+  const [pageContent, infobox] = await Promise.all([
+    fetchPageContentAtIdx(page.id, cutoffIdx),
     fetchPageInfoboxAtIdx(page.id, cutoffIdx),
   ]);
-
-  const floaterImageUrl = infobox.floaterImageUrl ?? null;
-  const floaterRows = infobox.rows.map((r) => ({ label: r.label, content: r.content }));
 
   return {
     pageName: page.name,
     introChapterName,
     hidden: false,
-    firstSectionContent,
-    floaterImageUrl,
-    floaterRows,
+    bodyContent: pageContent.content,
+    floaterImageUrl: infobox.imageUrl,
+    infoboxContent: infobox.content,
     pageTitles: resolvedPageTitles,
   };
 }

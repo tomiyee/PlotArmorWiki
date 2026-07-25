@@ -8,12 +8,11 @@ import {
   resolvePageTitlesAtIdx,
   fetchActiveParentPagesAtIdx,
   fetchSerialPagesAtIdx,
-  fetchPageSectionsAtIdx,
+  fetchPageContentAtIdx,
   fetchPageInfoboxAtIdx,
   fetchPageChildPagesAtIdx,
   fetchPageTitleEntriesAtIdx,
 } from "@/data/pages/queries";
-import { fetchSerialTemplates } from "@/data/templates/queries";
 import { Text } from "@/components/ui/Text";
 import { Box } from "@/components/ui/Box";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -183,7 +182,7 @@ export default async function PageView(props: PageViewProps) {
 
   // ── All page data in one parallel batch ───────────────────────────────────
   const [
-    rawSections,
+    pageContent,
     infobox,
     childPages,
     activeParentPagesRaw,
@@ -191,9 +190,8 @@ export default async function PageView(props: PageViewProps) {
     pendingSuggestionCount,
     pendingSuggestions,
     myPageSuggestions,
-    serialTemplates,
   ] = await Promise.all([
-    fetchPageSectionsAtIdx(page.id, cutoffIdx),
+    fetchPageContentAtIdx(page.id, cutoffIdx),
     fetchPageInfoboxAtIdx(page.id, cutoffIdx),
     fetchPageChildPagesAtIdx(page.id, cutoffIdx),
     fetchActiveParentPagesAtIdx(page.id, cutoffIdx),
@@ -203,13 +201,8 @@ export default async function PageView(props: PageViewProps) {
     !isAdmin && isUserAuthenticated
       ? getMyPageSuggestions(page.id)
       : Promise.resolve([]),
-    // Only fetched for admins; non-admins never see the edit panel.
-    isAdmin ? fetchSerialTemplates(serial.id) : Promise.resolve([]),
   ]);
 
-  const infoboxSectionStructure = infobox.structure;
-  const floaterImageUrl = infobox.floaterImageUrl;
-  const floaterRows = infobox.rows;
   const { entries: pageTitleEntries, resolvedTitle } = pageTitlesData;
   const displayTitle = resolvedTitle ?? page.name;
 
@@ -269,11 +262,11 @@ export default async function PageView(props: PageViewProps) {
               pageSlug={decodedPageSlug}
               pageId={page.id}
               pageTitleEntries={pageTitleEntries}
-              pageSectionStructure={rawSections}
-              sections={rawSections}
-              infoboxSectionStructure={infoboxSectionStructure}
-              floaterImageUrl={floaterImageUrl}
-              floaterRows={floaterRows}
+              content={pageContent.content}
+              contentLastUpdatedChapterIdx={pageContent.lastUpdatedChapterIdx}
+              infoboxContent={infobox.content}
+              infoboxLastUpdatedChapterIdx={infobox.lastUpdatedChapterIdx}
+              floaterImageUrl={infobox.imageUrl}
               allChapters={allChapters}
               headChapterId={headChapterId}
               readingChapterId={readingChapterId}
@@ -289,7 +282,6 @@ export default async function PageView(props: PageViewProps) {
               childPages={childPages}
               parentPages={parentPages}
               allSerialPages={allSerialPages}
-              serialTemplates={serialTemplates}
               isAdmin={isAdmin}
               isAuthenticated={isUserAuthenticated}
               pendingSuggestionCount={pendingSuggestionCount}

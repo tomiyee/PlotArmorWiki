@@ -11,13 +11,8 @@ import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { SimilarPagesWarning } from "./SimilarPagesWarning";
-import { TemplateSelector } from "./TemplateSelector";
 
-import type {
-  ChapterRow as Chapter,
-  VolumeRow as Volume,
-  TemplateSummary as Template,
-} from "@/types";
+import type { ChapterRow as Chapter, VolumeRow as Volume } from "@/types";
 import type { PageOption } from "./SimilarPagesWarning";
 
 type SubmitButtonProps = {
@@ -58,17 +53,12 @@ interface NewPageFormProps {
   defaultIntroChapterId?: number;
   /** Pre-filled page name, e.g. when navigating here from the search palette's "+ Page" option. */
   defaultName?: string;
-  /** Serial templates for pre-populating sections and infobox rows on the new page. */
-  templates: Template[];
 }
 
 /**
  * Page creation form. Tracks the selected intro chapter and narrows the parent
  * page dropdown to pages that are visible at (i.e. introduced at or before) that
  * chapter, so a child page cannot reference a parent that doesn't exist yet.
- * When templates are defined for the serial, a "Use template" dropdown lets the
- * user pre-populate sections and infobox rows; a preview shows the resulting
- * structure before submitting.
  */
 export function NewPageForm(props: NewPageFormProps) {
   const {
@@ -80,7 +70,6 @@ export function NewPageForm(props: NewPageFormProps) {
     defaultParentPageId,
     defaultIntroChapterId,
     defaultName,
-    templates,
   } = props;
   const chapterTypeLabel = chapterType.toLowerCase();
 
@@ -241,9 +230,6 @@ export function NewPageForm(props: NewPageFormProps) {
           placeholder="Select a parent page…"
         />
       </Box>
-
-      {/* Template selection (only shown when templates exist) */}
-      <TemplateSelector templates={templates} />
 
       <SubmitButton disabled={!hasChapters} />
     </form>

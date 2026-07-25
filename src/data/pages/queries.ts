@@ -4,11 +4,8 @@ import {
   pages,
   pageTitles,
   pageRelationships,
-  pageSections,
-  pageSectionRevisions,
-  pageInfoboxSections,
-  pageInfoboxRevisions,
-  pageInfoboxImageRevisions,
+  pageContentRevisions,
+  pageInfoboxContentRevisions,
   volumes,
 } from "@/db/schema";
 import {
@@ -30,10 +27,8 @@ import type {
   ParentPageStub,
   WikiPageRow,
   DeletedPageStub,
-  PageSectionAtIdx,
+  PageContentAtIdx,
   PageInfoboxAtIdx,
-  InfoboxSectionStructure,
-  InfoboxRowAtIdx,
   ChildPageStub,
   PageTitleEntry,
   PageTitlesAtIdx,
@@ -138,75 +133,65 @@ export async function resolveHasChildrenSet(
 }
 
 /**
- * Returns the Drizzle subquery that, for each section of `pageId`, finds the
- * highest `chapters.idx` ≤ `cutoffIdx` at which a revision exists. Callers
- * join this subquery to `pageSectionRevisions` + `chapters` to obtain the
- * chapter-versioned content at the reader's cutoff.
+ * Returns the Drizzle subquery for the highest `chapters.idx` ≤ `cutoffIdx`
+ * at which a body-content revision exists for `pageId`. Callers join this to
+ * `pageContentRevisions` + `chapters` to obtain the chapter-versioned body at
+ * the reader's cutoff. Since a page now has a single body field, this
+ * resolves to at most one row (unlike the old per-section grouped subquery).
  *
  * Returns a subquery object — callers must await their own `db.select(…).from(…)
  * .innerJoin(sq, …)` call. This keeps the helper composable with different
  * outer SELECT projections.
  *
  * @example
- * const sq = sectionMaxIdxSq(pageId, cutoffIdx);
- * const rows = await db
- *   .select({ sectionId: pageSectionRevisions.sectionId, content: pageSectionRevisions.content })
- *   .from(pageSectionRevisions)
- *   .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
- *   .innerJoin(sq, and(eq(pageSectionRevisions.sectionId, sq.sectionId), eq(chapters.idx, sq.maxIdx)))
- *   .where(eq(pageSectionRevisions.pageId, pageId));
+ * const sq = pageContentMaxIdxSq(pageId, cutoffIdx);
+ * const [row] = await db
+ *   .select({ content: pageContentRevisions.content })
+ *   .from(pageContentRevisions)
+ *   .innerJoin(chapters, eq(pageContentRevisions.chapterId, chapters.id))
+ *   .innerJoin(sq, eq(chapters.idx, sq.maxIdx))
+ *   .where(eq(pageContentRevisions.pageId, pageId));
  */
-export function sectionMaxIdxSq(pageId: number, cutoffIdx: number) {
+export function pageContentMaxIdxSq(pageId: number, cutoffIdx: number) {
   return db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageContentRevisions)
+    .innerJoin(chapters, eq(pageContentRevisions.chapterId, chapters.id))
     .where(
-      and(
-        eq(pageSectionRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
+      and(eq(pageContentRevisions.pageId, pageId), lte(chapters.idx, cutoffIdx)),
     )
-    .groupBy(pageSectionRevisions.sectionId)
-    .as("section_max_idx_sq");
+    .as("page_content_max_idx_sq");
 }
 
 /**
- * Returns the Drizzle subquery that, for each infobox row of `pageId`, finds
- * the highest `chapters.idx` ≤ `cutoffIdx` at which a revision exists. Callers
- * join this to `pageInfoboxRevisions` + `chapters` to get chapter-versioned
- * infobox content.
+ * Returns the Drizzle subquery for the highest `chapters.idx` ≤ `cutoffIdx`
+ * at which an infobox revision exists for `pageId`. Callers join this to
+ * `pageInfoboxContentRevisions` + `chapters` to get chapter-versioned infobox
+ * content + image at the reader's cutoff.
  *
  * Returns a subquery object — callers must await their own query.
  *
  * @example
- * const sq = infoboxRowMaxIdxSq(pageId, cutoffIdx);
- * const rows = await db
- *   .select({ infoboxSectionId: pageInfoboxRevisions.infoboxSectionId, content: pageInfoboxRevisions.content })
- *   .from(pageInfoboxRevisions)
- *   .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
- *   .innerJoin(sq, and(eq(pageInfoboxRevisions.infoboxSectionId, sq.infoboxSectionId), eq(chapters.idx, sq.maxIdx)))
- *   .where(eq(pageInfoboxRevisions.pageId, pageId));
+ * const sq = pageInfoboxMaxIdxSq(pageId, cutoffIdx);
+ * const [row] = await db
+ *   .select({ content: pageInfoboxContentRevisions.content })
+ *   .from(pageInfoboxContentRevisions)
+ *   .innerJoin(chapters, eq(pageInfoboxContentRevisions.chapterId, chapters.id))
+ *   .innerJoin(sq, eq(chapters.idx, sq.maxIdx))
+ *   .where(eq(pageInfoboxContentRevisions.pageId, pageId));
  */
-export function infoboxRowMaxIdxSq(pageId: number, cutoffIdx: number) {
+export function pageInfoboxMaxIdxSq(pageId: number, cutoffIdx: number) {
   return db
-    .select({
-      infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-      maxIdx: max(chapters.idx).as("max_idx"),
-    })
-    .from(pageInfoboxRevisions)
-    .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+    .select({ maxIdx: max(chapters.idx).as("max_idx") })
+    .from(pageInfoboxContentRevisions)
+    .innerJoin(chapters, eq(pageInfoboxContentRevisions.chapterId, chapters.id))
     .where(
       and(
-        eq(pageInfoboxRevisions.pageId, pageId),
+        eq(pageInfoboxContentRevisions.pageId, pageId),
         lte(chapters.idx, cutoffIdx),
       ),
     )
-    .groupBy(pageInfoboxRevisions.infoboxSectionId)
-    .as("infobox_row_max_idx_sq");
+    .as("page_infobox_max_idx_sq");
 }
 
 /**
@@ -413,158 +398,59 @@ export async function fetchDeletedPages(
 }
 
 /**
- * Fetches all active sections for a page and their chapter-versioned content at `cutoffIdx`.
- * Runs two queries in parallel: section structure (wall-clock) + section revisions (chapter-versioned).
- *
- * The returned array is ordered by `displayOrder` and combines both structure and content
- * so callers can derive both the edit-mode panel rows and the reader-facing section list
- * from one call.
+ * Fetches a page's merged body content at `cutoffIdx` - the highest-idx
+ * revision at or before the reader's cutoff, or an empty result when no
+ * revision exists yet.
  */
-export async function fetchPageSectionsAtIdx(
+export async function fetchPageContentAtIdx(
   pageId: number,
   cutoffIdx: number,
-): Promise<PageSectionAtIdx[]> {
-  const maxIdxSq = sectionMaxIdxSq(pageId, cutoffIdx);
+): Promise<PageContentAtIdx> {
+  const maxIdxSq = pageContentMaxIdxSq(pageId, cutoffIdx);
 
-  const [activeSections, sectionVersions] = await Promise.all([
-    db
-      .select({
-        id: pageSections.id,
-        name: pageSections.name,
-        displayOrder: pageSections.displayOrder,
-      })
-      .from(pageSections)
-      .where(
-        and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)),
-      )
-      .orderBy(asc(pageSections.displayOrder)),
-    db
-      .select({
-        sectionId: pageSectionRevisions.sectionId,
-        content: pageSectionRevisions.content,
-        chapterIdx: chapters.idx,
-      })
-      .from(pageSectionRevisions)
-      .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-      .innerJoin(
-        maxIdxSq,
-        and(
-          eq(pageSectionRevisions.sectionId, maxIdxSq.sectionId),
-          eq(chapters.idx, maxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageSectionRevisions.pageId, pageId)),
-  ]);
+  const [row] = await db
+    .select({ content: pageContentRevisions.content, chapterIdx: chapters.idx })
+    .from(pageContentRevisions)
+    .innerJoin(chapters, eq(pageContentRevisions.chapterId, chapters.id))
+    .innerJoin(maxIdxSq, eq(chapters.idx, maxIdxSq.maxIdx))
+    .where(eq(pageContentRevisions.pageId, pageId))
+    .limit(1);
 
-  const versionBySectionId = new Map(
-    sectionVersions.map((v) => [
-      v.sectionId,
-      { content: v.content, chapterIdx: v.chapterIdx },
-    ]),
-  );
-
-  return activeSections.map((s) => {
-    const v = versionBySectionId.get(s.id);
-    return {
-      id: s.id,
-      name: s.name,
-      displayOrder: s.displayOrder,
-      content: v?.content ?? "",
-      lastUpdatedChapterIdx: v?.chapterIdx ?? null,
-    };
-  });
+  return {
+    content: row?.content ?? "",
+    lastUpdatedChapterIdx: row?.chapterIdx ?? null,
+  };
 }
 
 /**
- * Fetches the complete infobox data for a page at `cutoffIdx`: the wall-clock-versioned
- * row structure, the chapter-versioned floater image URL, and the chapter-versioned row content.
- *
- * When the page has no active infobox rows, returns an empty result with
- * `floaterImageUrl: undefined` so callers can skip infobox rendering entirely.
+ * Fetches a page's merged infobox content + image at `cutoffIdx`. "Has an
+ * infobox" is derived, not stored: callers should check
+ * `lastUpdatedChapterIdx !== null` rather than any structural flag - a
+ * revision only exists when the page had non-empty infobox content or an
+ * image at some point at or before the cutoff.
  */
 export async function fetchPageInfoboxAtIdx(
   pageId: number,
   cutoffIdx: number,
 ): Promise<PageInfoboxAtIdx> {
-  const activeInfoboxRows = await db
+  const maxIdxSq = pageInfoboxMaxIdxSq(pageId, cutoffIdx);
+
+  const [row] = await db
     .select({
-      id: pageInfoboxSections.id,
-      label: pageInfoboxSections.label,
-      displayOrder: pageInfoboxSections.displayOrder,
+      content: pageInfoboxContentRevisions.content,
+      imageUrl: pageInfoboxContentRevisions.imageUrl,
+      chapterIdx: chapters.idx,
     })
-    .from(pageInfoboxSections)
-    .where(
-      and(
-        eq(pageInfoboxSections.pageId, pageId),
-        isNull(pageInfoboxSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageInfoboxSections.displayOrder));
-
-  if (activeInfoboxRows.length === 0) {
-    return {
-      structure: activeInfoboxRows as InfoboxSectionStructure[],
-      floaterImageUrl: undefined,
-      rows: [],
-    };
-  }
-
-  const floaterMaxIdxSq = db
-    .select({ maxIdx: max(chapters.idx).as("max_idx") })
-    .from(pageInfoboxImageRevisions)
-    .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageInfoboxImageRevisions.pageId, pageId),
-        lte(chapters.idx, cutoffIdx),
-      ),
-    )
-    .as("floater_max_idx_sq");
-
-  const ibRowMaxIdxSq = infoboxRowMaxIdxSq(pageId, cutoffIdx);
-
-  const [[floaterVersion], infoboxRowVersions] = await Promise.all([
-    db
-      .select({ imageUrl: pageInfoboxImageRevisions.imageUrl })
-      .from(pageInfoboxImageRevisions)
-      .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
-      .innerJoin(floaterMaxIdxSq, eq(chapters.idx, floaterMaxIdxSq.maxIdx))
-      .where(eq(pageInfoboxImageRevisions.pageId, pageId))
-      .limit(1),
-    db
-      .select({
-        infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-        content: pageInfoboxRevisions.content,
-      })
-      .from(pageInfoboxRevisions)
-      .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-      .innerJoin(
-        ibRowMaxIdxSq,
-        and(
-          eq(
-            pageInfoboxRevisions.infoboxSectionId,
-            ibRowMaxIdxSq.infoboxSectionId,
-          ),
-          eq(chapters.idx, ibRowMaxIdxSq.maxIdx),
-        ),
-      )
-      .where(eq(pageInfoboxRevisions.pageId, pageId)),
-  ]);
-
-  const rowContentMap = new Map(
-    infoboxRowVersions.map((v) => [v.infoboxSectionId, v.content]),
-  );
-
-  const rows: InfoboxRowAtIdx[] = activeInfoboxRows.map((r) => ({
-    id: r.id,
-    label: r.label,
-    content: rowContentMap.get(r.id) ?? "",
-  }));
+    .from(pageInfoboxContentRevisions)
+    .innerJoin(chapters, eq(pageInfoboxContentRevisions.chapterId, chapters.id))
+    .innerJoin(maxIdxSq, eq(chapters.idx, maxIdxSq.maxIdx))
+    .where(eq(pageInfoboxContentRevisions.pageId, pageId))
+    .limit(1);
 
   return {
-    structure: activeInfoboxRows,
-    floaterImageUrl: floaterVersion?.imageUrl ?? null,
-    rows,
+    content: row?.content ?? "",
+    imageUrl: row?.imageUrl ?? null,
+    lastUpdatedChapterIdx: row?.chapterIdx ?? null,
   };
 }
 
@@ -796,42 +682,6 @@ export async function fetchAllSerialPageStubs(
     .select({ id: pages.id, name: pages.name, slug: pages.slug })
     .from(pages)
     .where(eq(pages.serialId, serialId));
-}
-
-/**
- * Returns the content of the first active section for `pageId` at `cutoffIdx`,
- * or an empty string when no section/revision exists. Used by wiki-link hover
- * previews to show a short excerpt without fetching all sections.
- */
-export async function fetchFirstSectionAtIdx(
-  pageId: number,
-  cutoffIdx: number,
-): Promise<string> {
-  const secMaxIdxSq = sectionMaxIdxSq(pageId, cutoffIdx);
-  const [firstSection] = await db
-    .select({ content: pageSectionRevisions.content })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .innerJoin(
-      pageSections,
-      eq(pageSectionRevisions.sectionId, pageSections.id),
-    )
-    .innerJoin(
-      secMaxIdxSq,
-      and(
-        eq(pageSectionRevisions.sectionId, secMaxIdxSq.sectionId),
-        eq(chapters.idx, secMaxIdxSq.maxIdx),
-      ),
-    )
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, pageId),
-        isNull(pageSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageSections.displayOrder))
-    .limit(1);
-  return firstSection?.content ?? "";
 }
 
 /**

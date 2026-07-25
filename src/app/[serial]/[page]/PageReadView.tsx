@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { SuggestionForm } from "./SuggestionForm";
-import type { SectionData, FloaterRowData, ChapterData } from "./types";
+import type { ChapterData } from "./types";
 import type { SuggestionStatus } from "@/types";
 
 type MyPageSuggestion = {
@@ -19,8 +19,8 @@ type MyPageSuggestion = {
   reviewNote: string | null;
   createdAt: Date;
   targetChapterName: string;
-  sectionChanges: { sectionName: string; proposedContent: string }[];
-  infoboxChanges: { label: string; proposedContent: string }[];
+  proposedContent: string | null;
+  proposedInfoboxContent: string | null;
 } | null;
 
 /**
@@ -46,14 +46,16 @@ type SuggestionContext = {
 type PageReadViewProps = {
   /** Slug of the parent serial, used to resolve wiki links. */
   serialSlug: string;
-  /** Page sections with chapter-versioned content. */
-  sections: SectionData[];
-  /** True when the page has infobox rows. */
-  hasInfobox: boolean;
-  /** URL of the infobox cover image, or null/undefined when absent. */
-  floaterImageUrl: string | null | undefined;
-  /** Infobox rows to render in the floater panel. */
-  floaterRows: FloaterRowData[];
+  /** The page's merged body content at the reader's cutoff. */
+  content: string;
+  /** Chapter idx the body content was last updated at, used to pre-fill the suggestion form. */
+  contentLastUpdatedChapterIdx: number | null;
+  /** Merged infobox content at the reader's cutoff. Empty string when the page has no infobox content. */
+  infoboxContent: string;
+  /** Chapter idx the infobox content was last updated at, used to pre-fill the suggestion form. */
+  infoboxLastUpdatedChapterIdx: number | null;
+  /** URL of the infobox cover image, or null when absent. */
+  floaterImageUrl: string | null;
   /** Sub-pages active at the reader's chapter cutoff. `hasChildren` drives folder vs. document icon. */
   childPages: { id: number; name: string; slug: string; title: string; hasChildren: boolean }[];
   /** DB id of this page, used for linking to the new-page form and suggestion submission. */
@@ -66,7 +68,7 @@ type PageReadViewProps = {
   chapterType?: string;
   /**
    * When provided, the authenticated non-admin suggestion flow is enabled -
-   * shows "Suggest an edit" icon buttons on section headers, status banner, and inline form.
+   * shows a "Suggest an edit" icon button, status banner, and inline form.
    * Omit for anonymous users or when the page is rendered in edit mode.
    */
   suggestionContext?: SuggestionContext;
@@ -132,17 +134,18 @@ function SubPageList(props: SubPageListProps) {
 }
 
 /**
- * Read-mode layout for a wiki page: infobox floater, section content, and child page list.
- * Authenticated non-admins see a FilePenLine icon on hover over section headers to open the
+ * Read-mode layout for a wiki page: infobox floater, body content, and child page list.
+ * Authenticated non-admins see a FilePenLine icon on hover over the body to open the
  * inline suggestion form. Multiple past suggestions can be browsed via prev/next navigation.
  *
  * @example
  * <PageReadView
  *   serialSlug="one-piece"
- *   sections={[{ id: 1, name: "Summary", content: "...", lastUpdatedChapterIdx: 1 }]}
- *   hasInfobox={true}
+ *   content="..."
+ *   contentLastUpdatedChapterIdx={1}
+ *   infoboxContent="**Age:** 19"
+ *   infoboxLastUpdatedChapterIdx={1}
  *   floaterImageUrl="https://..."
- *   floaterRows={[{ id: 1, label: "Age", content: "19" }]}
  *   childPages={[]}
  *   pageId={42}
  * />
@@ -150,10 +153,11 @@ function SubPageList(props: SubPageListProps) {
 export function PageReadView(props: PageReadViewProps) {
   const {
     serialSlug,
-    sections,
-    hasInfobox,
+    content,
+    contentLastUpdatedChapterIdx,
+    infoboxContent,
+    infoboxLastUpdatedChapterIdx,
     floaterImageUrl,
-    floaterRows,
     childPages,
     pageId,
     pageTitles,
@@ -168,25 +172,10 @@ export function PageReadView(props: PageReadViewProps) {
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
   const [subPageSearch, setSubPageSearch] = useState("");
 
-  const hasFloaterContent =
-    hasInfobox && (floaterImageUrl || floaterRows.length > 0);
+  const hasFloaterContent = !!(floaterImageUrl || infoboxContent);
 
   const showSuggestButton =
     !!suggestionContext && !suggestionContext.isAdmin && !showSuggestionForm;
-
-  // Map sections to the flat format expected by SuggestionForm as initialSections.
-  const initialSections = sections.map((s) => ({
-    id: s.id,
-    name: s.name,
-    content: s.content,
-    lastUpdatedChapterIdx: s.lastUpdatedChapterIdx,
-  }));
-
-  const initialInfoboxSections = floaterRows.map((r) => ({
-    id: r.id,
-    label: r.label,
-    content: r.content,
-  }));
 
   const allSuggestions = suggestionContext?.myPageSuggestions ?? [];
   const totalSuggestions = allSuggestions.length;
@@ -233,8 +222,8 @@ export function PageReadView(props: PageReadViewProps) {
     const { status, reviewNote } = currentSuggestion;
     if (status === "pending") {
       const hasChanges =
-        currentSuggestion.sectionChanges.length > 0 ||
-        currentSuggestion.infoboxChanges.length > 0;
+        !!currentSuggestion.proposedContent ||
+        !!currentSuggestion.proposedInfoboxContent;
       return (
         <Text
           as="div"
@@ -260,34 +249,24 @@ export function PageReadView(props: PageReadViewProps) {
               <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Writing as of {currentSuggestion.targetChapterName}
               </Text>
-              {currentSuggestion.sectionChanges.map((change, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <Text className="text-xs font-medium">
-                    {change.sectionName}
-                  </Text>
+              {currentSuggestion.proposedContent && (
+                <div className="flex flex-col gap-1">
+                  <Text className="text-xs font-medium">Body</Text>
                   <div className="rounded border border-border bg-background p-3 text-xs overflow-auto">
                     <MarkdownRenderer serialSlug={serialSlug} sm>
-                      {change.proposedContent}
+                      {currentSuggestion.proposedContent}
                     </MarkdownRenderer>
                   </div>
                 </div>
-              ))}
-              {currentSuggestion.infoboxChanges.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <Text className="text-xs font-medium">Infobox changes</Text>
-                  {currentSuggestion.infoboxChanges.map((change, i) => (
-                    <div key={i} className="flex flex-col gap-0.5 text-xs">
-                      <Text
-                        as="span"
-                        className="font-medium text-muted-foreground"
-                      >
-                        {change.label}:
-                      </Text>
-                      <MarkdownRenderer sm serialSlug={serialSlug}>
-                        {change.proposedContent}
-                      </MarkdownRenderer>
-                    </div>
-                  ))}
+              )}
+              {currentSuggestion.proposedInfoboxContent && (
+                <div className="flex flex-col gap-1">
+                  <Text className="text-xs font-medium">Infobox</Text>
+                  <div className="rounded border border-border bg-background p-3 text-xs overflow-auto">
+                    <MarkdownRenderer sm serialSlug={serialSlug}>
+                      {currentSuggestion.proposedInfoboxContent}
+                    </MarkdownRenderer>
+                  </div>
                 </div>
               )}
             </div>
@@ -346,72 +325,46 @@ export function PageReadView(props: PageReadViewProps) {
             />
           )}
 
-          {floaterRows.length > 0 && (
-            <dl className="flex flex-col gap-2 text-sm">
-              {floaterRows.map((row) => (
-                <div key={row.id}>
-                  <dt className="font-medium text-muted-foreground">
-                    {row.label}
-                  </dt>
-                  <dd className="text-foreground">
-                    {row.content ? (
-                      <MarkdownRenderer
-                        sm
-                        serialSlug={serialSlug}
-                        pageTitles={pageTitles}
-                        chapterType={chapterType}
-                        wikiChapters={wikiChapters}
-                      >
-                        {row.content}
-                      </MarkdownRenderer>
-                    ) : (
-                      <Text as="span" muted>
-                        -
-                      </Text>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </aside>
-      )}
-
-      {sections.map((section, i) => (
-        <div key={section.id} className="group mb-6 last:mb-0">
-          {i > 0 && (
-            <>
-              <div className="flex items-center gap-2 mb-1">
-                <Text variant="h2">{section.name}</Text>
-                {showSuggestButton && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                    onClick={() => setShowSuggestionForm(true)}
-                  >
-                    <FilePenLine />
-                    <span className="sr-only">Suggest an edit</span>
-                  </Button>
-                )}
-              </div>
-              <hr className="border-border mb-3" />
-            </>
-          )}
-          {section.content ? (
+          {infoboxContent && (
             <MarkdownRenderer
+              sm
               serialSlug={serialSlug}
               pageTitles={pageTitles}
               chapterType={chapterType}
               wikiChapters={wikiChapters}
             >
-              {section.content}
+              {infoboxContent}
             </MarkdownRenderer>
-          ) : (
-            <Text muted>No content for this chapter yet.</Text>
           )}
-        </div>
-      ))}
+        </aside>
+      )}
+
+      <div className="group mb-6">
+        {showSuggestButton && (
+          <div className="flex justify-end mb-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setShowSuggestionForm(true)}
+            >
+              <FilePenLine />
+              <span className="sr-only">Suggest an edit</span>
+            </Button>
+          </div>
+        )}
+        {content ? (
+          <MarkdownRenderer
+            serialSlug={serialSlug}
+            pageTitles={pageTitles}
+            chapterType={chapterType}
+            wikiChapters={wikiChapters}
+          >
+            {content}
+          </MarkdownRenderer>
+        ) : (
+          <Text muted>No content for this chapter yet.</Text>
+        )}
+      </div>
 
       {/* Suggestion form or status feedback */}
       <div className="clear-right mt-4 flex flex-col gap-4">
@@ -426,8 +379,10 @@ export function PageReadView(props: PageReadViewProps) {
             wikiChapters={suggestionContext.wikiChaptersList}
             chapterType={chapterType}
             serialSlug={serialSlug}
-            initialSections={initialSections}
-            initialInfoboxSections={initialInfoboxSections}
+            initialContent={content}
+            initialContentLastUpdatedChapterIdx={contentLastUpdatedChapterIdx}
+            initialInfoboxContent={infoboxContent}
+            initialInfoboxLastUpdatedChapterIdx={infoboxLastUpdatedChapterIdx}
             onClose={() => setShowSuggestionForm(false)}
           />
         )}

@@ -6,20 +6,12 @@ import {
   fetchSerialPagesAtIdx,
   fetchSerialHomePage,
   fetchDeletedPages,
-  fetchPageSectionsAtIdx,
+  fetchPageContentAtIdx,
   fetchPageInfoboxAtIdx,
   fetchPageChildPagesAtIdx,
   fetchPageTitleEntries,
 } from "@/data/pages/queries";
-import { fetchSerialTemplates } from "@/data/templates/queries";
-import type {
-  ChapterRow,
-  PageSectionAtIdx,
-  InfoboxSectionStructure,
-  InfoboxRowAtIdx,
-  ChildPageStub,
-  PageTitleEntry,
-} from "@/types";
+import type { ChapterRow, ChildPageStub, PageTitleEntry } from "@/types";
 import {
   addChapter,
   addVolume,
@@ -32,16 +24,6 @@ import {
   reorderAllChapters,
   updateSerialMetadata,
   bulkApplyToc,
-  createTemplate,
-  deleteTemplate,
-  renameTemplate,
-  toggleTemplateInfobox,
-  addTemplateSection,
-  deleteTemplateSection,
-  reorderTemplateSections,
-  addTemplateInfoboxSection,
-  deleteTemplateInfoboxSection,
-  reorderTemplateInfoboxSections,
   addSerialAdmin,
   removeSerialAdmin,
   searchUsersForSerial,
@@ -52,7 +34,6 @@ import { Text } from "@/components/ui/Text";
 import { SerialMetadataEditor } from "@/components/SerialMetadataEditor";
 import { SerialTOCSidebar } from "@/components/SerialTOCSidebar";
 import { PageEditor } from "./[page]/PageEditor";
-import { TemplateManager } from "@/components/TemplateManager";
 import { AdminManager } from "@/components/AdminManager";
 import { EditModeAdminSetter } from "@/contexts/EditModeContext";
 import { isSerialAdmin } from "@/lib/auth-guard";
@@ -71,7 +52,7 @@ interface SerialPageProps {
   params: Promise<{ serial: string }>;
 }
 
-/** Serial home page: metadata editor, home wiki page content, template manager, and admin controls. */
+/** Serial home page: metadata editor, home wiki page content, and admin controls. */
 export default async function SerialPage(props: SerialPageProps) {
   const { params } = props;
   const { serial: serialSlug } = await params;
@@ -86,7 +67,6 @@ export default async function SerialPage(props: SerialPageProps) {
     authors,
     { volumeList, chapterList },
     homePage,
-    serialTemplates,
     isAdmin,
     serialAdminList,
     session,
@@ -96,7 +76,6 @@ export default async function SerialPage(props: SerialPageProps) {
     fetchSerialAuthors(serial.id),
     getSerialVolumesAndChapters(serial.id),
     fetchSerialHomePage(serial.id),
-    fetchSerialTemplates(serial.id),
     isSerialAdmin(serial.id),
     fetchSerialAdmins(serial.id),
     auth(),
@@ -133,21 +112,6 @@ export default async function SerialPage(props: SerialPageProps) {
   const removeAdminForSerial = removeSerialAdmin.bind(null, serial.id);
   const searchUsersForThisSerial = searchUsersForSerial.bind(null, serial.id);
 
-  // Template actions bound to this serial.
-  const createTemplateForSerial = createTemplate.bind(null, serial.id);
-  const deleteTemplateForSerial = deleteTemplate.bind(null, serial.id);
-  const renameTemplateForSerial = renameTemplate.bind(null, serial.id);
-  const toggleTemplateInfoboxForSerial = toggleTemplateInfobox.bind(null, serial.id);
-  const addTemplateSectionForSerial = addTemplateSection.bind(null, serial.id);
-  const deleteTemplateSectionForSerial = deleteTemplateSection.bind(null, serial.id);
-  const reorderTemplateSectionsForSerial = reorderTemplateSections.bind(null, serial.id);
-  const addTemplateInfoboxSectionForSerial = addTemplateInfoboxSection.bind(null, serial.id);
-  const deleteTemplateInfoboxSectionForSerial = deleteTemplateInfoboxSection.bind(null, serial.id);
-  const reorderTemplateInfoboxSectionsForSerial = reorderTemplateInfoboxSections.bind(
-    null,
-    serial.id,
-  );
-
   const headChapterId = chapterList.at(-1)?.id ?? null;
   const volumeNameById = new Map(volumeList.map((v) => [v.id, v.displayName]));
   const allChapters = chapterList.map((c) => ({
@@ -177,27 +141,27 @@ export default async function SerialPage(props: SerialPageProps) {
   }));
 
   // ── Home page content ─────────────────────────────────────────────────────
-  let pageSectionStructure: PageSectionAtIdx[] = [];
-  let sections: PageSectionAtIdx[] = [];
-  let infoboxSectionStructure: InfoboxSectionStructure[] = [];
-  let floaterImageUrl: string | null | undefined = undefined;
-  let floaterRows: InfoboxRowAtIdx[] = [];
+  let content = "";
+  let contentLastUpdatedChapterIdx: number | null = null;
+  let infoboxContent = "";
+  let infoboxLastUpdatedChapterIdx: number | null = null;
+  let floaterImageUrl: string | null = null;
   let childPages: ChildPageStub[] = [];
   let homePageTitleEntries: PageTitleEntry[] = [];
 
   if (homePage) {
-    const [rawSections, infobox, fetchedChildPages, titleEntries] = await Promise.all([
-      fetchPageSectionsAtIdx(homePage.id, cutoffIdx),
+    const [pageContent, infobox, fetchedChildPages, titleEntries] = await Promise.all([
+      fetchPageContentAtIdx(homePage.id, cutoffIdx),
       fetchPageInfoboxAtIdx(homePage.id, cutoffIdx),
       fetchPageChildPagesAtIdx(homePage.id, cutoffIdx),
       fetchPageTitleEntries(homePage.id),
     ]);
 
-    pageSectionStructure = rawSections;
-    sections = rawSections;
-    infoboxSectionStructure = infobox.structure;
-    floaterImageUrl = infobox.floaterImageUrl;
-    floaterRows = infobox.rows;
+    content = pageContent.content;
+    contentLastUpdatedChapterIdx = pageContent.lastUpdatedChapterIdx;
+    infoboxContent = infobox.content;
+    infoboxLastUpdatedChapterIdx = infobox.lastUpdatedChapterIdx;
+    floaterImageUrl = infobox.imageUrl;
     childPages = fetchedChildPages;
     homePageTitleEntries = titleEntries;
   }
@@ -300,11 +264,11 @@ export default async function SerialPage(props: SerialPageProps) {
                 pageSlug={homePage.slug}
                 pageId={homePage.id}
                 pageTitleEntries={homePageTitleEntries}
-                pageSectionStructure={pageSectionStructure}
-                sections={sections}
-                infoboxSectionStructure={infoboxSectionStructure}
+                content={content}
+                contentLastUpdatedChapterIdx={contentLastUpdatedChapterIdx}
+                infoboxContent={infoboxContent}
+                infoboxLastUpdatedChapterIdx={infoboxLastUpdatedChapterIdx}
                 floaterImageUrl={floaterImageUrl}
-                floaterRows={floaterRows}
                 allChapters={allChapters}
                 headChapterId={headChapterId}
                 readingChapterId={readingChapterId}
@@ -338,29 +302,14 @@ export default async function SerialPage(props: SerialPageProps) {
                   ) : undefined
                 }
                 editModeHeader={
-                  <>
-                    <AdminManager
-                      serialId={serial.id}
-                      currentUserId={session?.user?.id ?? ""}
-                      admins={serialAdminList}
-                      addAdminAction={addAdminForSerial}
-                      removeAdminAction={removeAdminForSerial}
-                      searchUsersAction={searchUsersForThisSerial}
-                    />
-                    <TemplateManager
-                      templates={serialTemplates}
-                      createTemplateAction={createTemplateForSerial}
-                      deleteTemplateAction={deleteTemplateForSerial}
-                      renameTemplateAction={renameTemplateForSerial}
-                      toggleTemplateInfoboxAction={toggleTemplateInfoboxForSerial}
-                      addTemplateSectionAction={addTemplateSectionForSerial}
-                      deleteTemplateSectionAction={deleteTemplateSectionForSerial}
-                      reorderTemplateSectionAction={reorderTemplateSectionsForSerial}
-                      addTemplateInfoboxSectionAction={addTemplateInfoboxSectionForSerial}
-                      deleteTemplateInfoboxSectionAction={deleteTemplateInfoboxSectionForSerial}
-                      reorderTemplateInfoboxSectionAction={reorderTemplateInfoboxSectionsForSerial}
-                    />
-                  </>
+                  <AdminManager
+                    serialId={serial.id}
+                    currentUserId={session?.user?.id ?? ""}
+                    admins={serialAdminList}
+                    addAdminAction={addAdminForSerial}
+                    removeAdminAction={removeAdminForSerial}
+                    searchUsersAction={searchUsersForThisSerial}
+                  />
                 }
               />
             ) : (
