@@ -206,6 +206,11 @@ export const pageInfoboxRevisions = pgTable(
 /**
  * Chapter-versioned infobox image per page.
  * Read pattern: max `chapters.idx` ≤ cutoff per `page_id`.
+ *
+ * @deprecated Superseded by `pageInfoboxContentRevisions`, which folds the
+ * image URL into the same row as infobox content. Dropped once the
+ * single-content backfill (see `scripts/migrate-single-section.ts`) is
+ * verified.
  */
 export const pageInfoboxImageRevisions = pgTable(
   "page_infobox_image_revisions",
@@ -216,6 +221,58 @@ export const pageInfoboxImageRevisions = pgTable(
     chapterId: integer("chapter_id")
       .notNull()
       .references(() => chapters.id),
+    imageUrl: text("image_url"),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
+);
+
+/**
+ * Chapter-versioned page body content — one merged markdown blob per page
+ * per chapter, replacing the old per-section `page_sections` /
+ * `page_section_revisions` pair. Read pattern: max `chapters.idx` ≤ cutoff
+ * per `page_id`.
+ *
+ * A page no longer has a section structure; it has exactly one body field.
+ */
+export const pageContentRevisions = pgTable(
+  "page_content_revisions",
+  {
+    pageId: integer("page_id")
+      .notNull()
+      .references(() => pages.id),
+    chapterId: integer("chapter_id")
+      .notNull()
+      .references(() => chapters.id),
+    content: text("content"),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
+);
+
+/**
+ * Chapter-versioned infobox content + image for a page, merged into a single
+ * row. Replaces `page_infobox_sections` / `page_infobox_revisions` (per-row
+ * structure) and `page_infobox_image_revisions` (separate image table).
+ *
+ * Named distinctly from the legacy `page_infobox_revisions` table (rather
+ * than reusing that name) because renaming a table in-place via drizzle-kit
+ * requires an interactive prompt; this repo generates migrations
+ * non-interactively, so the new table gets its own name instead of the
+ * exact final name proposed in the design doc.
+ *
+ * "Has infobox" is derived, not stored: a page has an infobox iff this table
+ * has any row with non-null `content` or `image_url` at or before the
+ * reader's cutoff.
+ */
+export const pageInfoboxContentRevisions = pgTable(
+  "page_infobox_content_revisions",
+  {
+    pageId: integer("page_id")
+      .notNull()
+      .references(() => pages.id),
+    chapterId: integer("chapter_id")
+      .notNull()
+      .references(() => chapters.id),
+    content: text("content"),
     imageUrl: text("image_url"),
   },
   (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
@@ -377,8 +434,10 @@ export const serialAdmins = pgTable(
 );
 
 /**
- * A user-submitted suggestion to change section content on a wiki page.
- * One suggestion can cover multiple sections via `page_suggestion_section_changes`.
+ * A user-submitted suggestion to change the body content and/or infobox
+ * content of a wiki page. `proposedContent` / `proposedInfoboxContent` hold
+ * the single merged proposed values directly on the row - there is no longer
+ * a child table of per-section changes, since a page has one body field.
  * Admin review is the only spoiler gate - no server-side content filtering.
  */
 export const pageSuggestions = pgTable("page_suggestions", {
@@ -397,6 +456,10 @@ export const pageSuggestions = pgTable("page_suggestions", {
     .default("pending"),
   /** A quote, timestamp, or chapter reference supporting all proposed changes in this suggestion. */
   citation: text("citation").notNull(),
+  /** Proposed replacement for the page body. Null when this suggestion only changes infobox content. */
+  proposedContent: text("proposed_content"),
+  /** Proposed replacement for the infobox content. Null when this suggestion only changes the body. */
+  proposedInfoboxContent: text("proposed_infobox_content"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
   reviewedByUserId: text("reviewed_by_user_id").references(() => users.id),

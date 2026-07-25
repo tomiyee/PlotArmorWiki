@@ -36,6 +36,13 @@
       "when": 1781383145584,
       "tag": "0004_nervous_virginia_dare",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785017260889,
+      "tag": "0005_add_single_content_page_revisions",
+      "breakpoints": true
     }
   ]
 }
