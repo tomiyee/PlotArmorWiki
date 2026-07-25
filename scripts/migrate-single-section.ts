@@ -9,6 +9,13 @@
  *   - page_infobox_sections + page_infobox_revisions
  *     + page_infobox_image_revisions               -> page_infobox_content_revisions
  *
+ * The legacy tables above are queried with raw SQL (rather than through
+ * `src/db/schema.ts`) because this script is meant to run in the window
+ * between migration 0005 (additive) and migration 0006 (which drops those
+ * tables) - by the time 0006 has landed, schema.ts no longer exports them.
+ * Raw SQL keeps the script runnable against a database that still has the
+ * legacy tables regardless of which schema.ts revision is checked out.
+ *
  * For each page, every distinct chapter idx at which ANY section/infobox row
  * changed gets one merged snapshot: the first (lead) section's content is
  * used verbatim (no heading - this matches how it renders today with no
@@ -20,7 +27,7 @@
  *
  * Consecutive-duplicate revisions are collapsed (a merged snapshot equal to
  * the previously emitted one is skipped) to match the "revisions must
- * differ" invariant enforced elsewhere by `applyPageContentRevisions`.
+ * differ" invariant enforced elsewhere by `applyPageContentRevision`.
  *
  * Per the resolved design decisions, pending suggestions are DELETED (not
  * converted) - the app has no users yet, so there is nothing to preserve.
@@ -28,8 +35,8 @@
  * Idempotent: clears both destination tables before writing, so it is safe
  * to re-run against the same database during testing.
  *
- * Run once, after migration 0005 is applied, and before the destructive
- * migration that drops the legacy per-section tables:
+ * Run once, after migration 0005 is applied, and before migration 0006 (the
+ * destructive migration that drops the legacy per-section tables):
  *
  *   npx tsx scripts/migrate-single-section.ts
  */
@@ -38,15 +45,9 @@ dotenv.config({ path: ".env.local" });
 
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   pages,
-  chapters,
-  pageSections,
-  pageSectionRevisions,
-  pageInfoboxSections,
-  pageInfoboxRevisions,
-  pageInfoboxImageRevisions,
   pageContentRevisions,
   pageInfoboxContentRevisions,
   pageSuggestions,
@@ -61,11 +62,25 @@ if (!process.env.DATABASE_URL) {
 const client = postgres(process.env.DATABASE_URL);
 const db = drizzle(client);
 
-type StructureRow = { id: number; displayOrder: number };
+type LegacySection = { id: number; name: string; displayOrder: number };
+type LegacyInfoboxRow = { id: number; label: string; displayOrder: number };
+type SectionRevisionRow = {
+  sectionId: number;
+  chapterId: number;
+  idx: number;
+  content: string | null;
+};
+type InfoboxRevisionRow = {
+  infoboxSectionId: number;
+  chapterId: number;
+  idx: number;
+  content: string | null;
+};
+type ImageRevisionRow = { chapterId: number; idx: number; imageUrl: string | null };
 
 /** Merges the lead section verbatim, then `## {name}` + content for the rest. Omits sections with no content yet. */
 function mergeBody(
-  sections: (StructureRow & { name: string })[],
+  sections: LegacySection[],
   contentBySectionId: Map<number, string>,
 ): string {
   const parts: string[] = [];
@@ -79,7 +94,7 @@ function mergeBody(
 
 /** Merges infobox rows as `**{label}:** {content}` blocks, one per non-empty row. */
 function mergeInfobox(
-  rows: (StructureRow & { label: string })[],
+  rows: LegacyInfoboxRow[],
   contentByRowId: Map<number, string>,
 ): string {
   return rows
@@ -92,36 +107,24 @@ function mergeInfobox(
 }
 
 async function migratePageBody(pageId: number): Promise<void> {
-  const sections = await db
-    .select({
-      id: pageSections.id,
-      name: pageSections.name,
-      displayOrder: pageSections.displayOrder,
-    })
-    .from(pageSections)
-    .where(and(eq(pageSections.pageId, pageId), isNull(pageSections.deletedAt)))
-    .orderBy(asc(pageSections.displayOrder));
-
+  const sectionsResult = await db.execute<LegacySection>(sql`
+    SELECT id, name, display_order AS "displayOrder"
+    FROM page_sections
+    WHERE page_id = ${pageId} AND deleted_at IS NULL
+    ORDER BY display_order ASC
+  `);
+  const sections = [...sectionsResult];
   if (sections.length === 0) return;
   const sectionIds = sections.map((s) => s.id);
 
-  const revisions = await db
-    .select({
-      sectionId: pageSectionRevisions.sectionId,
-      chapterId: pageSectionRevisions.chapterId,
-      idx: chapters.idx,
-      content: pageSectionRevisions.content,
-    })
-    .from(pageSectionRevisions)
-    .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-    .where(
-      and(
-        eq(pageSectionRevisions.pageId, pageId),
-        inArray(pageSectionRevisions.sectionId, sectionIds),
-      ),
-    )
-    .orderBy(asc(chapters.idx));
-
+  const revisionsResult = await db.execute<SectionRevisionRow>(sql`
+    SELECT r.section_id AS "sectionId", r.chapter_id AS "chapterId", c.idx, r.content
+    FROM page_section_revisions r
+    INNER JOIN chapters c ON r.chapter_id = c.id
+    WHERE r.page_id = ${pageId} AND r.section_id = ANY(${sectionIds})
+    ORDER BY c.idx ASC
+  `);
+  const revisions = [...revisionsResult];
   if (revisions.length === 0) return;
 
   // Distinct chapters touched by any section revision, in chronological order.
@@ -156,52 +159,35 @@ async function migratePageBody(pageId: number): Promise<void> {
 }
 
 async function migratePageInfobox(pageId: number): Promise<void> {
-  const rows = await db
-    .select({
-      id: pageInfoboxSections.id,
-      label: pageInfoboxSections.label,
-      displayOrder: pageInfoboxSections.displayOrder,
-    })
-    .from(pageInfoboxSections)
-    .where(
-      and(
-        eq(pageInfoboxSections.pageId, pageId),
-        isNull(pageInfoboxSections.deletedAt),
-      ),
-    )
-    .orderBy(asc(pageInfoboxSections.displayOrder));
+  const rowsResult = await db.execute<LegacyInfoboxRow>(sql`
+    SELECT id, label, display_order AS "displayOrder"
+    FROM page_infobox_sections
+    WHERE page_id = ${pageId} AND deleted_at IS NULL
+    ORDER BY display_order ASC
+  `);
+  const rows = [...rowsResult];
   const rowIds = rows.map((r) => r.id);
 
-  const [contentRevisions, imageRevisions] = await Promise.all([
+  const [contentRevisionsResult, imageRevisionsResult] = await Promise.all([
     rowIds.length > 0
-      ? db
-          .select({
-            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-            chapterId: pageInfoboxRevisions.chapterId,
-            idx: chapters.idx,
-            content: pageInfoboxRevisions.content,
-          })
-          .from(pageInfoboxRevisions)
-          .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
-          .where(
-            and(
-              eq(pageInfoboxRevisions.pageId, pageId),
-              inArray(pageInfoboxRevisions.infoboxSectionId, rowIds),
-            ),
-          )
-          .orderBy(asc(chapters.idx))
-      : Promise.resolve([]),
-    db
-      .select({
-        chapterId: pageInfoboxImageRevisions.chapterId,
-        idx: chapters.idx,
-        imageUrl: pageInfoboxImageRevisions.imageUrl,
-      })
-      .from(pageInfoboxImageRevisions)
-      .innerJoin(chapters, eq(pageInfoboxImageRevisions.chapterId, chapters.id))
-      .where(eq(pageInfoboxImageRevisions.pageId, pageId))
-      .orderBy(asc(chapters.idx)),
+      ? db.execute<InfoboxRevisionRow>(sql`
+          SELECT r.infobox_section_id AS "infoboxSectionId", r.chapter_id AS "chapterId", c.idx, r.content
+          FROM page_infobox_revisions r
+          INNER JOIN chapters c ON r.chapter_id = c.id
+          WHERE r.page_id = ${pageId} AND r.infobox_section_id = ANY(${rowIds})
+          ORDER BY c.idx ASC
+        `)
+      : Promise.resolve([] as InfoboxRevisionRow[]),
+    db.execute<ImageRevisionRow>(sql`
+      SELECT r.chapter_id AS "chapterId", c.idx, r.image_url AS "imageUrl"
+      FROM page_infobox_image_revisions r
+      INNER JOIN chapters c ON r.chapter_id = c.id
+      WHERE r.page_id = ${pageId}
+      ORDER BY c.idx ASC
+    `),
   ]);
+  const contentRevisions = [...contentRevisionsResult];
+  const imageRevisions = [...imageRevisionsResult];
 
   if (contentRevisions.length === 0 && imageRevisions.length === 0) return;
 

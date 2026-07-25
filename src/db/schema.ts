@@ -132,107 +132,10 @@ export const pageTitles = pgTable(
 );
 
 /**
- * Wall-clock versioned section structure per page.
- * Soft-deleted via `deleted_at`.
- */
-export const pageSections = pgTable("page_sections", {
-  id: serial("id").primaryKey(),
-  pageId: integer("page_id")
-    .notNull()
-    .references(() => pages.id),
-  name: text("name").notNull(),
-  displayOrder: integer("display_order").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  deletedAt: timestamp("deleted_at"),
-});
-
-/**
- * Chapter-versioned section content.
- * Read pattern: max `chapters.idx` ≤ cutoff per `(page_id, section_id)`.
- */
-export const pageSectionRevisions = pgTable(
-  "page_section_revisions",
-  {
-    pageId: integer("page_id")
-      .notNull()
-      .references(() => pages.id),
-    sectionId: integer("section_id")
-      .notNull()
-      .references(() => pageSections.id),
-    chapterId: integer("chapter_id")
-      .notNull()
-      .references(() => chapters.id),
-    content: text("content"),
-  },
-  (t) => [primaryKey({ columns: [t.pageId, t.sectionId, t.chapterId] })],
-);
-
-/**
- * Wall-clock versioned infobox rows per page.
- * Soft-deleted via `deleted_at`.
- */
-export const pageInfoboxSections = pgTable("page_infobox_sections", {
-  id: serial("id").primaryKey(),
-  pageId: integer("page_id")
-    .notNull()
-    .references(() => pages.id),
-  label: text("label").notNull(),
-  displayOrder: integer("display_order").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  deletedAt: timestamp("deleted_at"),
-});
-
-/**
- * Chapter-versioned infobox row content.
- * Read pattern: max `chapters.idx` ≤ cutoff per `(page_id, infobox_section_id)`.
- */
-export const pageInfoboxRevisions = pgTable(
-  "page_infobox_revisions",
-  {
-    pageId: integer("page_id")
-      .notNull()
-      .references(() => pages.id),
-    infoboxSectionId: integer("infobox_section_id")
-      .notNull()
-      .references(() => pageInfoboxSections.id),
-    chapterId: integer("chapter_id")
-      .notNull()
-      .references(() => chapters.id),
-    content: text("content"),
-  },
-  (t) => [primaryKey({ columns: [t.pageId, t.infoboxSectionId, t.chapterId] })],
-);
-
-/**
- * Chapter-versioned infobox image per page.
- * Read pattern: max `chapters.idx` ≤ cutoff per `page_id`.
- *
- * @deprecated Superseded by `pageInfoboxContentRevisions`, which folds the
- * image URL into the same row as infobox content. Dropped once the
- * single-content backfill (see `scripts/migrate-single-section.ts`) is
- * verified.
- */
-export const pageInfoboxImageRevisions = pgTable(
-  "page_infobox_image_revisions",
-  {
-    pageId: integer("page_id")
-      .notNull()
-      .references(() => pages.id),
-    chapterId: integer("chapter_id")
-      .notNull()
-      .references(() => chapters.id),
-    imageUrl: text("image_url"),
-  },
-  (t) => [primaryKey({ columns: [t.pageId, t.chapterId] })],
-);
-
-/**
  * Chapter-versioned page body content — one merged markdown blob per page
- * per chapter, replacing the old per-section `page_sections` /
- * `page_section_revisions` pair. Read pattern: max `chapters.idx` ≤ cutoff
- * per `page_id`.
+ * per chapter. Read pattern: max `chapters.idx` ≤ cutoff per `page_id`.
  *
- * A page no longer has a section structure; it has exactly one body field.
+ * A page has no section structure; it has exactly one body field.
  */
 export const pageContentRevisions = pgTable(
   "page_content_revisions",
@@ -250,14 +153,7 @@ export const pageContentRevisions = pgTable(
 
 /**
  * Chapter-versioned infobox content + image for a page, merged into a single
- * row. Replaces `page_infobox_sections` / `page_infobox_revisions` (per-row
- * structure) and `page_infobox_image_revisions` (separate image table).
- *
- * Named distinctly from the legacy `page_infobox_revisions` table (rather
- * than reusing that name) because renaming a table in-place via drizzle-kit
- * requires an interactive prompt; this repo generates migrations
- * non-interactively, so the new table gets its own name instead of the
- * exact final name proposed in the design doc.
+ * row (one row covers both the text content and the floater image URL).
  *
  * "Has infobox" is derived, not stored: a page has an infobox iff this table
  * has any row with non-null `content` or `image_url` at or before the
@@ -303,39 +199,6 @@ export const pageRelationships = pgTable(
     primaryKey({ columns: [t.parentPageId, t.childPageId, t.chapterId] }),
   ],
 );
-
-/**
- * Reusable page templates per serial.
- * A template defines the section and infobox structure for a category of pages.
- */
-export const templates = pgTable("templates", {
-  id: serial("id").primaryKey(),
-  serialId: integer("serial_id")
-    .notNull()
-    .references(() => serials.id),
-  name: text("name").notNull(),
-  hasInfobox: boolean("has_infobox").notNull().default(false),
-});
-
-/** Section slots defined by a template. */
-export const templateSections = pgTable("template_sections", {
-  id: serial("id").primaryKey(),
-  templateId: integer("template_id")
-    .notNull()
-    .references(() => templates.id),
-  name: text("name").notNull(),
-  displayOrder: integer("display_order").notNull(),
-});
-
-/** Infobox row slots defined by a template. */
-export const templateInfoboxSections = pgTable("template_infobox_sections", {
-  id: serial("id").primaryKey(),
-  templateId: integer("template_id")
-    .notNull()
-    .references(() => templates.id),
-  label: text("label").notNull(),
-  displayOrder: integer("display_order").notNull(),
-});
 
 export const chapterSynopses = pgTable("chapter_synopses", {
   chapterId: integer("chapter_id")
@@ -465,44 +328,6 @@ export const pageSuggestions = pgTable("page_suggestions", {
   reviewedByUserId: text("reviewed_by_user_id").references(() => users.id),
   reviewNote: text("review_note"),
 });
-
-/**
- * One row per section changed in a suggestion.
- * Unique per (suggestion, section) - a suggestion can only propose one change per section.
- */
-export const pageSuggestionSectionChanges = pgTable(
-  "page_suggestion_section_changes",
-  {
-    id: serial("id").primaryKey(),
-    suggestionId: integer("suggestion_id")
-      .notNull()
-      .references(() => pageSuggestions.id, { onDelete: "cascade" }),
-    sectionId: integer("section_id")
-      .notNull()
-      .references(() => pageSections.id),
-    proposedContent: text("proposed_content").notNull(),
-  },
-  (t) => [uniqueIndex().on(t.suggestionId, t.sectionId)],
-);
-
-/**
- * One row per infobox row changed in a suggestion.
- * Unique per (suggestion, infobox_section) - one proposed value per row.
- */
-export const pageSuggestionInfoboxChanges = pgTable(
-  "page_suggestion_infobox_changes",
-  {
-    id: serial("id").primaryKey(),
-    suggestionId: integer("suggestion_id")
-      .notNull()
-      .references(() => pageSuggestions.id, { onDelete: "cascade" }),
-    infoboxSectionId: integer("infobox_section_id")
-      .notNull()
-      .references(() => pageInfoboxSections.id),
-    proposedContent: text("proposed_content").notNull(),
-  },
-  (t) => [uniqueIndex().on(t.suggestionId, t.infoboxSectionId)],
-);
 
 /**
  * A user-submitted suggestion to update a chapter's synopsis text.

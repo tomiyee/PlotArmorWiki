@@ -43,6 +43,13 @@
       "when": 1785017260889,
       "tag": "0005_add_single_content_page_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785018670171,
+      "tag": "0006_drop_legacy_per_section_tables",
+      "breakpoints": true
     }
   ]
 }
