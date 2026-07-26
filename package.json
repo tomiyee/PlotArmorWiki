@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "backup": "node scripts/backup-db.js",
     "prepare": "scripts/install-hooks.sh"
   },
   "dependencies": {
