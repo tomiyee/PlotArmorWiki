@@ -37,7 +37,7 @@ export default async function NewPagePage(props: NewPagePageProps) {
     notFound();
   }
 
-  const [{ readingChapterId }, { volumeList, chapterList, existingPages, serialTemplates }] =
+  const [{ readingChapterId }, { volumeList, chapterList, existingPages }] =
     await Promise.all([
       getChapterCutoff(serial.id),
       getNewPageFormData(serial.id),
@@ -85,7 +85,6 @@ export default async function NewPagePage(props: NewPagePageProps) {
             defaultParentPageId={defaultParentPageId}
             defaultIntroChapterId={readingChapterId ?? undefined}
             defaultName={defaultName}
-            templates={serialTemplates}
           />
         </Box>
       </PageContainer>

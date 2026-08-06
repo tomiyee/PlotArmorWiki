@@ -3,17 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/index";
-import {
-  pages,
-  pageTitles,
-  pageRelationships,
-  pageSections,
-  pageInfoboxSections,
-  templates,
-  templateSections,
-  templateInfoboxSections,
-} from "@/db/schema";
-import { and, asc, eq, like } from "drizzle-orm";
+import { pages, pageTitles, pageRelationships } from "@/db/schema";
+import { and, eq, like } from "drizzle-orm";
 import type { PostgresError } from "postgres";
 import { titleToSlug } from "@/lib/slug";
 import { requireSerialAdminBySlug } from "@/lib/auth-guard";
@@ -63,7 +54,6 @@ export async function createPage(serialSlug: string, formData: FormData) {
   const name = formData.get("name");
   const introChapterIdRaw = formData.get("introChapterId");
   const parentPageIdRaw = formData.get("parentPageId");
-  const templateIdRaw = formData.get("templateId");
   const idempotencyKeyRaw = formData.get("idempotencyKey");
 
   if (!name || typeof name !== "string" || name.trim() === "") {
@@ -95,58 +85,8 @@ export async function createPage(serialSlug: string, formData: FormData) {
       ? idempotencyKeyRaw
       : null;
 
-  // Optional template - empty string or missing means no template.
-  const templateId =
-    templateIdRaw && typeof templateIdRaw === "string" && templateIdRaw !== ""
-      ? parseInt(templateIdRaw, 10)
-      : null;
-
   const serial = await getSerialBySlug(serialSlug);
   if (!serial) throw new Error("Serial not found");
-
-  // Pre-fetch the template definition outside the transaction (read-only).
-  let templateDef: {
-    hasInfobox: boolean;
-    sections: { name: string; displayOrder: number }[];
-    infoboxSections: { label: string; displayOrder: number }[];
-  } | null = null;
-
-  if (templateId !== null && !isNaN(templateId)) {
-    const [tmpl] = await db
-      .select({ id: templates.id, hasInfobox: templates.hasInfobox })
-      .from(templates)
-      .where(
-        and(eq(templates.id, templateId), eq(templates.serialId, serial.id)),
-      );
-
-    if (tmpl) {
-      const [tmplSections, tmplInfoboxSections] = await Promise.all([
-        db
-          .select({
-            name: templateSections.name,
-            displayOrder: templateSections.displayOrder,
-          })
-          .from(templateSections)
-          .where(eq(templateSections.templateId, tmpl.id))
-          .orderBy(asc(templateSections.displayOrder)),
-        tmpl.hasInfobox
-          ? db
-              .select({
-                label: templateInfoboxSections.label,
-                displayOrder: templateInfoboxSections.displayOrder,
-              })
-              .from(templateInfoboxSections)
-              .where(eq(templateInfoboxSections.templateId, tmpl.id))
-              .orderBy(asc(templateInfoboxSections.displayOrder))
-          : Promise.resolve([]),
-      ]);
-      templateDef = {
-        hasInfobox: tmpl.hasInfobox,
-        sections: tmplSections,
-        infoboxSections: tmplInfoboxSections,
-      };
-    }
-  }
 
   const trimmedName = name.trim();
 
@@ -200,33 +140,9 @@ export async function createPage(serialSlug: string, formData: FormData) {
       isActive: true,
     });
 
-    // 4. Seed sections from the template (or fall back to a default "Summary" section).
-    if (templateDef && templateDef.sections.length > 0) {
-      await tx.insert(pageSections).values(
-        templateDef.sections.map((s) => ({
-          pageId: newPage.id,
-          name: s.name,
-          displayOrder: s.displayOrder,
-        })),
-      );
-    } else {
-      await tx.insert(pageSections).values({
-        pageId: newPage.id,
-        name: "Summary",
-        displayOrder: 0,
-      });
-    }
-
-    // 5. Seed infobox rows from the template when hasInfobox is true.
-    if (templateDef?.hasInfobox && templateDef.infoboxSections.length > 0) {
-      await tx.insert(pageInfoboxSections).values(
-        templateDef.infoboxSections.map((s) => ({
-          pageId: newPage.id,
-          label: s.label,
-          displayOrder: s.displayOrder,
-        })),
-      );
-    }
+    // No content revision is seeded here - a page starts with an empty body
+    // and infobox; the first edit creates the initial page_content_revisions
+    // (and, if used, page_infobox_content_revisions) row.
   });
   } catch (err) {
     // Unique-constraint violation on idempotency_key means a concurrent request

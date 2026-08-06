@@ -2,19 +2,15 @@ import { db } from "@/db/index";
 import {
   pages,
   chapters,
-  pageSections,
-  pageSectionRevisions,
   pageSuggestions,
-  pageSuggestionSectionChanges,
-  pageSuggestionInfoboxChanges,
-  pageInfoboxSections,
-  pageInfoboxRevisions,
+  pageContentRevisions,
+  pageInfoboxContentRevisions,
   users,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq } from "drizzle-orm";
 import {
-  sectionMaxIdxSq as buildSectionMaxIdxSq,
-  infoboxRowMaxIdxSq as buildInfoboxRowMaxIdxSq,
+  pageContentMaxIdxSq as buildPageContentMaxIdxSq,
+  pageInfoboxMaxIdxSq as buildPageInfoboxMaxIdxSq,
 } from "@/data/pages/queries";
 import type { SuggestionStatus } from "@/types";
 
@@ -41,7 +37,7 @@ export async function fetchSerialIdByPageId(pageId: number): Promise<number> {
  *
  * @example
  * const suggestions = await fetchMyPageSuggestions(pageId, userId);
- * // → [{ status: 'pending', reviewNote: null, sectionChanges: [...] }, ...]
+ * // → [{ status: 'pending', reviewNote: null, proposedContent: '...' }, ...]
  */
 export async function fetchMyPageSuggestions(
   pageId: number,
@@ -53,8 +49,8 @@ export async function fetchMyPageSuggestions(
     reviewNote: string | null;
     createdAt: Date;
     targetChapterName: string;
-    sectionChanges: { sectionName: string; proposedContent: string }[];
-    infoboxChanges: { label: string; proposedContent: string }[];
+    proposedContent: string | null;
+    proposedInfoboxContent: string | null;
   }[]
 > {
   const rows = await db
@@ -64,6 +60,8 @@ export async function fetchMyPageSuggestions(
       reviewNote: pageSuggestions.reviewNote,
       createdAt: pageSuggestions.createdAt,
       targetChapterName: chapters.displayName,
+      proposedContent: pageSuggestions.proposedContent,
+      proposedInfoboxContent: pageSuggestions.proposedInfoboxContent,
     })
     .from(pageSuggestions)
     .innerJoin(chapters, eq(pageSuggestions.targetChapterId, chapters.id))
@@ -75,56 +73,7 @@ export async function fetchMyPageSuggestions(
     )
     .orderBy(desc(pageSuggestions.createdAt));
 
-  if (rows.length === 0) return [];
-
-  const suggestionIds = rows.map((r) => r.id);
-
-  const [sectionChangeRows, infoboxChangeRows] = await Promise.all([
-    db
-      .select({
-        suggestionId: pageSuggestionSectionChanges.suggestionId,
-        sectionName: pageSections.name,
-        proposedContent: pageSuggestionSectionChanges.proposedContent,
-      })
-      .from(pageSuggestionSectionChanges)
-      .innerJoin(
-        pageSections,
-        eq(pageSuggestionSectionChanges.sectionId, pageSections.id),
-      )
-      .where(inArray(pageSuggestionSectionChanges.suggestionId, suggestionIds)),
-    db
-      .select({
-        suggestionId: pageSuggestionInfoboxChanges.suggestionId,
-        label: pageInfoboxSections.label,
-        proposedContent: pageSuggestionInfoboxChanges.proposedContent,
-      })
-      .from(pageSuggestionInfoboxChanges)
-      .innerJoin(
-        pageInfoboxSections,
-        eq(
-          pageSuggestionInfoboxChanges.infoboxSectionId,
-          pageInfoboxSections.id,
-        ),
-      )
-      .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
-  ]);
-
-  return rows.map((row) => ({
-    id: row.id,
-    status: row.status,
-    reviewNote: row.reviewNote,
-    createdAt: row.createdAt,
-    targetChapterName: row.targetChapterName,
-    sectionChanges: sectionChangeRows
-      .filter((c) => c.suggestionId === row.id)
-      .map((c) => ({
-        sectionName: c.sectionName,
-        proposedContent: c.proposedContent,
-      })),
-    infoboxChanges: infoboxChangeRows
-      .filter((c) => c.suggestionId === row.id)
-      .map((c) => ({ label: c.label, proposedContent: c.proposedContent })),
-  }));
+  return rows;
 }
 
 /**
@@ -150,9 +99,9 @@ export async function fetchPendingSuggestionCount(
 }
 
 /**
- * Returns all pending suggestions for a page with proposer username,
- * per-section proposed changes, per-infobox-row proposed changes, and the
- * current content at each suggestion's target chapter for diff rendering.
+ * Returns all pending suggestions for a page with proposer username, the
+ * proposed body/infobox content, and the current content at each
+ * suggestion's target chapter for diff rendering.
  *
  * @example
  * const suggestions = await fetchPendingSuggestions(42);
@@ -165,18 +114,10 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
     targetChapterName: string;
     citation: string;
     createdAt: Date;
-    sectionChanges: {
-      sectionId: number;
-      sectionName: string;
-      currentContent: string;
-      proposedContent: string;
-    }[];
-    infoboxChanges: {
-      infoboxSectionId: number;
-      infoboxSectionLabel: string;
-      currentContent: string;
-      proposedContent: string;
-    }[];
+    currentContent: string;
+    proposedContent: string | null;
+    currentInfoboxContent: string;
+    proposedInfoboxContent: string | null;
   }[]
 > {
   const suggestionRows = await db
@@ -188,6 +129,8 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
       targetChapterIdx: chapters.idx,
       citation: pageSuggestions.citation,
       createdAt: pageSuggestions.createdAt,
+      proposedContent: pageSuggestions.proposedContent,
+      proposedInfoboxContent: pageSuggestions.proposedInfoboxContent,
     })
     .from(pageSuggestions)
     .innerJoin(users, eq(pageSuggestions.proposedByUserId, users.id))
@@ -202,40 +145,6 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
 
   if (suggestionRows.length === 0) return [];
 
-  const suggestionIds = suggestionRows.map((s) => s.id);
-
-  const [changeRows, infoboxChangeRows] = await Promise.all([
-    db
-      .select({
-        suggestionId: pageSuggestionSectionChanges.suggestionId,
-        sectionId: pageSuggestionSectionChanges.sectionId,
-        sectionName: pageSections.name,
-        proposedContent: pageSuggestionSectionChanges.proposedContent,
-      })
-      .from(pageSuggestionSectionChanges)
-      .innerJoin(
-        pageSections,
-        eq(pageSuggestionSectionChanges.sectionId, pageSections.id),
-      )
-      .where(inArray(pageSuggestionSectionChanges.suggestionId, suggestionIds)),
-    db
-      .select({
-        suggestionId: pageSuggestionInfoboxChanges.suggestionId,
-        infoboxSectionId: pageSuggestionInfoboxChanges.infoboxSectionId,
-        infoboxSectionLabel: pageInfoboxSections.label,
-        proposedContent: pageSuggestionInfoboxChanges.proposedContent,
-      })
-      .from(pageSuggestionInfoboxChanges)
-      .innerJoin(
-        pageInfoboxSections,
-        eq(
-          pageSuggestionInfoboxChanges.infoboxSectionId,
-          pageInfoboxSections.id,
-        ),
-      )
-      .where(inArray(pageSuggestionInfoboxChanges.suggestionId, suggestionIds)),
-  ]);
-
   // Batch current-content lookups by target chapter idx - one pair of queries
   // per distinct cutoff instead of one pair per suggestion.
   const distinctCutoffs = [
@@ -244,53 +153,31 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
 
   const contentByCutoff = await Promise.all(
     distinctCutoffs.map(async (cutoffIdx) => {
-      const secMaxIdxSq = buildSectionMaxIdxSq(pageId, cutoffIdx);
-      const ibMaxIdxSq = buildInfoboxRowMaxIdxSq(pageId, cutoffIdx);
+      const contentMaxIdxSq = buildPageContentMaxIdxSq(pageId, cutoffIdx);
+      const ibMaxIdxSq = buildPageInfoboxMaxIdxSq(pageId, cutoffIdx);
 
-      const [sectionRevisions, ibRevisions] = await Promise.all([
+      const [[contentRow], [ibRow]] = await Promise.all([
         db
-          .select({
-            sectionId: pageSectionRevisions.sectionId,
-            content: pageSectionRevisions.content,
-          })
-          .from(pageSectionRevisions)
-          .innerJoin(chapters, eq(pageSectionRevisions.chapterId, chapters.id))
-          .innerJoin(
-            secMaxIdxSq,
-            and(
-              eq(pageSectionRevisions.sectionId, secMaxIdxSq.sectionId),
-              eq(chapters.idx, secMaxIdxSq.maxIdx),
-            ),
-          )
-          .where(eq(pageSectionRevisions.pageId, pageId)),
+          .select({ content: pageContentRevisions.content })
+          .from(pageContentRevisions)
+          .innerJoin(chapters, eq(pageContentRevisions.chapterId, chapters.id))
+          .innerJoin(contentMaxIdxSq, eq(chapters.idx, contentMaxIdxSq.maxIdx))
+          .where(eq(pageContentRevisions.pageId, pageId)),
         db
-          .select({
-            infoboxSectionId: pageInfoboxRevisions.infoboxSectionId,
-            content: pageInfoboxRevisions.content,
-          })
-          .from(pageInfoboxRevisions)
-          .innerJoin(chapters, eq(pageInfoboxRevisions.chapterId, chapters.id))
+          .select({ content: pageInfoboxContentRevisions.content })
+          .from(pageInfoboxContentRevisions)
           .innerJoin(
-            ibMaxIdxSq,
-            and(
-              eq(
-                pageInfoboxRevisions.infoboxSectionId,
-                ibMaxIdxSq.infoboxSectionId,
-              ),
-              eq(chapters.idx, ibMaxIdxSq.maxIdx),
-            ),
+            chapters,
+            eq(pageInfoboxContentRevisions.chapterId, chapters.id),
           )
-          .where(eq(pageInfoboxRevisions.pageId, pageId)),
+          .innerJoin(ibMaxIdxSq, eq(chapters.idx, ibMaxIdxSq.maxIdx))
+          .where(eq(pageInfoboxContentRevisions.pageId, pageId)),
       ]);
 
       return {
         cutoffIdx,
-        sectionContent: new Map(
-          sectionRevisions.map((r) => [r.sectionId, r.content ?? ""]),
-        ),
-        ibContent: new Map(
-          ibRevisions.map((r) => [r.infoboxSectionId, r.content ?? ""]),
-        ),
+        currentContent: contentRow?.content ?? "",
+        currentInfoboxContent: ibRow?.content ?? "",
       };
     }),
   );
@@ -301,9 +188,6 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
 
   return suggestionRows.map((suggestion) => {
     const cutoffContent = contentMapByCutoff.get(suggestion.targetChapterIdx);
-    const sectionContent =
-      cutoffContent?.sectionContent ?? new Map<number, string>();
-    const ibContent = cutoffContent?.ibContent ?? new Map<number, string>();
 
     return {
       id: suggestion.id,
@@ -312,22 +196,10 @@ export async function fetchPendingSuggestions(pageId: number): Promise<
       targetChapterName: suggestion.targetChapterName,
       citation: suggestion.citation,
       createdAt: suggestion.createdAt,
-      sectionChanges: changeRows
-        .filter((c) => c.suggestionId === suggestion.id)
-        .map((c) => ({
-          sectionId: c.sectionId,
-          sectionName: c.sectionName,
-          currentContent: sectionContent.get(c.sectionId) ?? "",
-          proposedContent: c.proposedContent,
-        })),
-      infoboxChanges: infoboxChangeRows
-        .filter((c) => c.suggestionId === suggestion.id)
-        .map((c) => ({
-          infoboxSectionId: c.infoboxSectionId,
-          infoboxSectionLabel: c.infoboxSectionLabel,
-          currentContent: ibContent.get(c.infoboxSectionId) ?? "",
-          proposedContent: c.proposedContent,
-        })),
+      currentContent: cutoffContent?.currentContent ?? "",
+      proposedContent: suggestion.proposedContent,
+      currentInfoboxContent: cutoffContent?.currentInfoboxContent ?? "",
+      proposedInfoboxContent: suggestion.proposedInfoboxContent,
     };
   });
 }

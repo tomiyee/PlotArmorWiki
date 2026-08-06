@@ -104,44 +104,6 @@ export type WikiPageRow = {
   idempotencyKey: string | null;
 };
 
-/** A content section belonging to a page template. */
-export type TemplateSectionRow = {
-  /** FK to the parent template; used to group sections after the parallel fetch. */
-  templateId: number;
-  /** DB primary key. */
-  id: number;
-  /** Heading used for this section in the new-page form and the page editor. */
-  name: string;
-  /** 0-based position within the template; drives render order. */
-  displayOrder: number;
-};
-
-/** An infobox row belonging to a page template. */
-export type TemplateInfoboxSectionRow = {
-  /** FK to the parent template; used to group rows after the parallel fetch. */
-  templateId: number;
-  /** DB primary key. */
-  id: number;
-  /** Label displayed as the row's key in the infobox sidebar (e.g. "Author", "Status"). */
-  label: string;
-  /** 0-based position within the template's infobox; drives render order. */
-  displayOrder: number;
-};
-
-/** A template with its section and infobox row children, as returned by `fetchSerialTemplates`. */
-export type TemplateSummary = {
-  /** DB primary key. */
-  id: number;
-  /** Human-readable name shown in the template picker (e.g. "Character", "Location"). */
-  name: string;
-  /** Whether applying this template adds an infobox panel to the page. */
-  hasInfobox: boolean;
-  /** Ordered list of body sections this template contributes. */
-  sections: TemplateSectionRow[];
-  /** Ordered list of infobox rows this template contributes; empty when `hasInfobox` is false. */
-  infoboxSections: TemplateInfoboxSectionRow[];
-};
-
 /** A serial admin record joined with their username, for the admin management panel. */
 export type SerialAdminStub = {
   /** Auth.js user id (UUID string). */
@@ -165,55 +127,29 @@ export type DeletedPageStub = {
 };
 
 /**
- * A page section with its chapter-versioned content at a given reading position.
- * Combines the wall-clock-versioned structure (id, name, displayOrder) with the
- * chapter-versioned content (content, lastUpdatedChapterIdx).
+ * A page's merged body content at a given reading position. A page has
+ * exactly one body field - there is no longer a per-section structure.
  */
-export type PageSectionAtIdx = {
-  /** DB primary key. */
-  id: number;
-  /** Section heading. */
-  name: string;
-  /** 0-based render order within the page. */
-  displayOrder: number;
+export type PageContentAtIdx = {
   /** Markdown body at the reader's cutoff; empty string when no revision exists yet. */
   content: string;
   /** The chapter idx of the revision that supplied `content`; null when no revision exists. */
   lastUpdatedChapterIdx: number | null;
 };
 
-/** A single infobox row as defined by the page structure (wall-clock versioned). */
-export type InfoboxSectionStructure = {
-  /** DB primary key. */
-  id: number;
-  /** Row label shown as the infobox key (e.g. "Author", "Status"). */
-  label: string;
-  /** 0-based render order within the infobox. */
-  displayOrder: number;
-};
-
-/** An infobox row with its chapter-versioned content at a given reading position. */
-export type InfoboxRowAtIdx = {
-  /** DB primary key (matches the corresponding InfoboxSectionStructure.id). */
-  id: number;
-  /** Row label shown as the infobox key. */
-  label: string;
-  /** Markdown content at the reader's cutoff; empty string when no revision exists yet. */
-  content: string;
-};
-
 /**
- * Combined infobox data for a page at a given reading position.
- * `floaterImageUrl` is `undefined` when the page has no infobox rows at all,
- * `null` when rows exist but no image has been uploaded, and a URL string otherwise.
+ * A page's merged infobox content + image at a given reading position.
+ * "Has an infobox" is derived, not stored: `lastUpdatedChapterIdx !== null`
+ * means a revision resolved at or before the cutoff, which only happens when
+ * the page has non-empty infobox content or an image at that point in time.
  */
 export type PageInfoboxAtIdx = {
-  /** Wall-clock-versioned row structure for the edit-mode panel. */
-  structure: InfoboxSectionStructure[];
-  /** CDN URL of the floater image; undefined = no infobox, null = infobox but no image. */
-  floaterImageUrl: string | null | undefined;
-  /** Chapter-versioned row content for rendering. */
-  rows: InfoboxRowAtIdx[];
+  /** Merged infobox markdown at the reader's cutoff; empty string when no revision exists yet. */
+  content: string;
+  /** CDN URL of the infobox image; null when no image has been set (even if `content` is non-empty). */
+  imageUrl: string | null;
+  /** The chapter idx of the revision that supplied this data; null when no revision exists (no infobox). */
+  lastUpdatedChapterIdx: number | null;
 };
 
 /** A child page with its chapter-versioned title and sub-page indicator, for the sub-pages list. */
@@ -253,7 +189,6 @@ export type NewPageFormData = {
   volumeList: VolumeRow[];
   chapterList: ChapterRow[];
   existingPages: SerialPageStub[];
-  serialTemplates: TemplateSummary[];
 };
 
 // ── Navbar / layout types ────────────────────────────────────────────────────

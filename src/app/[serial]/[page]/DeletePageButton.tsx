@@ -30,8 +30,6 @@ type WikiLinkRef = {
   pageSlug: string;
   /** Display name of the page that contains the reference. */
   pageName: string;
-  /** Name of the section containing the link. */
-  sectionName: string;
 };
 
 type ChapterSynopsisRef = {
@@ -160,20 +158,14 @@ export function DeletePageButton(props: DeletePageButtonProps) {
                   {dialogState.wikiRefs.map((ref, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <span className="text-muted-foreground">•</span>
-                      <span>
-                        <a
-                          href={`/${serialSlug}/${ref.pageSlug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium hover:underline"
-                        >
-                          {ref.pageName}
-                        </a>
-                        {" - "}
-                        <span className="text-muted-foreground">
-                          {ref.sectionName}
-                        </span>
-                      </span>
+                      <a
+                        href={`/${serialSlug}/${ref.pageSlug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium hover:underline"
+                      >
+                        {ref.pageName}
+                      </a>
                     </li>
                   ))}
                 </ul>
