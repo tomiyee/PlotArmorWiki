@@ -92,7 +92,7 @@ function mergeBody(
   return parts.join("\n\n").trim();
 }
 
-/** Merges infobox rows as `**{label}:** {content}` blocks, one per non-empty row. */
+/** Merges infobox rows as `**{label}**` on its own line above `{content}`, one block per non-empty row. */
 function mergeInfobox(
   rows: LegacyInfoboxRow[],
   contentByRowId: Map<number, string>,
@@ -100,7 +100,7 @@ function mergeInfobox(
   return rows
     .map((r) => {
       const content = contentByRowId.get(r.id);
-      return content ? `**${r.label}:** ${content}` : null;
+      return content ? `**${r.label}**\n\n${content}` : null;
     })
     .filter((x): x is string => x !== null)
     .join("\n\n");
