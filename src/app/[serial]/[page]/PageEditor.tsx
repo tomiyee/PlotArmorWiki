@@ -308,6 +308,22 @@ export function PageEditor(props: PageEditorProps) {
   const hiddenSuggestionCount =
     pendingSuggestions.length - visibleSuggestions.length;
 
+  // Reused in both read and edit mode. The isAdmin gate is applied at each
+  // call site because read mode shows the warning only to admins while edit
+  // mode (already admin-only) always shows it.
+  const hiddenSuggestionsWarning =
+    hiddenSuggestionCount > 0 ? (
+      <Text
+        as="div"
+        className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+      >
+        {hiddenSuggestionCount} pending{" "}
+        {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
+        {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
+        reading progress - advance your chapter to review them.
+      </Text>
+    ) : null;
+
   // Compute dirty state: true when any draft differs from the server-provided value.
   const isDirty =
     draftContent !== content ||
@@ -526,17 +542,7 @@ export function PageEditor(props: PageEditorProps) {
             serialSlug={serialSlug}
           />
         )}
-        {isAdmin && hiddenSuggestionCount > 0 && (
-          <Text
-            as="div"
-            className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
-          >
-            {hiddenSuggestionCount} pending{" "}
-            {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
-            {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your
-            current reading progress - advance your chapter to review them.
-          </Text>
-        )}
+        {isAdmin && hiddenSuggestionsWarning}
         <PageReadView
           serialSlug={serialSlug}
           content={content}
@@ -624,17 +630,7 @@ export function PageEditor(props: PageEditorProps) {
           serialSlug={serialSlug}
         />
       )}
-      {hiddenSuggestionCount > 0 && (
-        <Text
-          as="div"
-          className="rounded-md border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
-        >
-          {hiddenSuggestionCount} pending{" "}
-          {hiddenSuggestionCount === 1 ? "suggestion" : "suggestions"} target
-          {hiddenSuggestionCount === 1 ? "s" : ""} chapters beyond your current
-          reading progress - advance your chapter to review them.
-        </Text>
-      )}
+      {hiddenSuggestionsWarning}
 
       <Text className="text-xs text-muted-foreground">
         Markdown and{" "}
